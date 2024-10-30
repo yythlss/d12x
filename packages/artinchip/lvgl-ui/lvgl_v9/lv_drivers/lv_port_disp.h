@@ -19,6 +19,10 @@ extern "C" {
 #define DISP_SHOW_FPS 1
 #endif
 
+#ifndef LV_DISP_FB_DUMP
+#define LV_DISP_FB_DUMP 0
+#endif
+
 typedef struct {
     struct mpp_fb *fb;
     struct aicfb_screeninfo info;

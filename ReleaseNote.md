@@ -1,3 +1,39 @@
+# V1.1.1 #
+## 新增 ##
+- FreeType：D13x支持独立使用PSRAM Heap
+- MPP：支持FLAC的Audio封装格式
+- USB Display：增加Linux Host端的驱动安装包
+- Camera：框架增加更多的摄像头调节接口；GM7150支持调整色度
+- 打包：支持自动计算NFTL分区的镜像大小
+- Benchmark：支持单精度浮点的模式
+- 新增示例：test_camera
+- I2C：新增软件模拟I2C的驱动实现
+- G73x：支持栈回溯功能
+- Touch：框架中支持翻转、旋转、缩放、裁剪，目前已适配GT911
+- 新增方案：G73x scan
+- 新增器件：
+- NAND：XT26G02D
+
+## 优化 ##
+- Boot：自动计算BootLoader的size信息，默认将其放在PSRAM的末尾
+- MPP：优化第一次播放时的噪声处理
+- GMAC：优化内存资源的占用
+- USB Display：优化Touch的同步处理；OSD对屏幕分辨率自适应；支持屏幕有效区域的裁剪
+- WiFi：RTL完善功能支持
+- test_dvp & UVC：优化调试log中的信息描述，提升易读性
+- 启动动画：优化内存资源占用；支持 480x272 小分辨率的屏幕
+- LVGL V9：优化多处资源管理和处理性能；支持图片cache的大小配置
+
+## 修改 ##
+- LVGL V9：默认关闭性能监测；支持导出Framebuffer；完善绘画Buf的处理；支持从SD卡中读取RTP配置
+- AWTK：修正第一帧的vsync处理
+- DE：修正CCM、GAMMA参数
+- Audio：调整AMIC的默认配置参数
+- 启动动画：修正动画过程中的图片切换同步
+- LittleFS、PSADC：修正打开 RT_DEBUG 后的编译问题
+- 修正colorblock在屏幕裁剪模式中的越界问题；
+- 修正同时播放视频时的画面撕裂问题
+
 # V1.1.0 #
 ## 新增 ##
 - 支持LVGL9，并适配了所有Demo

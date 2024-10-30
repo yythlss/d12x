@@ -137,6 +137,9 @@ int aicupg_fat_direct_write(char *dst_type, u32 intf_id, char *fpath,
 typedef void (*progress_cb)(u32 percent);
 void aicupg_fat_set_process_cb(progress_cb cb);
 
+void *aicupg_malloc_align(u32 size, size_t align);
+void aicupg_free_align(void *ptr);
+
 #ifdef __cplusplus
 }
 #endif

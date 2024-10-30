@@ -93,9 +93,7 @@ struct aic_dma_task {
      */
     struct aic_dma_task *v_next;
 };
-#endif
-
-#ifdef AIC_DMA_DRV_V20
+#else
 struct aic_dma_task {
     u32 link_id;
     u32 cfg1; /* dma transfer configuration */
@@ -168,12 +166,6 @@ int hal_dma_chan_start(struct aic_dma_chan *chan);
 int hal_dma_chan_stop(struct aic_dma_chan *chan);
 int hal_dma_chan_pause(struct aic_dma_chan *chan);
 int hal_dma_chan_resume(struct aic_dma_chan *chan);
-#if defined(AIC_DMA_DRV_V20)
-int hal_dma_chan_link_pause(struct aic_dma_chan *chan);
-int hal_dma_chan_abandon(struct aic_dma_chan *chan);
-int hal_dma_chan_wb_enable(struct aic_dma_chan *chan,
-                        u32 src_addr, u32 dst_addr);
-#endif
 int hal_dma_chan_terminate_all(struct aic_dma_chan *chan);
 int hal_dma_chan_register_cb(struct aic_dma_chan *chan,
                              dma_async_callback callback,

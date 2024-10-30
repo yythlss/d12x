@@ -207,6 +207,8 @@ enum i2c_slave_event {
 #define I2C_7BIT_ADDR           0
 #define I2C_10BIT_ADDR          1
 
+#define I2C_MAX_CHAN            8
+
 #define I2C_INTR_MASTER_MASK    (I2C_INTR_RX_UNDER |\
                         I2C_INTR_RX_FULL |\
                         I2C_INTR_TX_EMPTY |\
@@ -223,6 +225,10 @@ enum i2c_slave_event {
 static inline void hal_i2c_module_enable(aic_i2c_ctrl *i2c_dev)
 {
     uint32_t reg_val;
+
+    reg_val = readl(i2c_dev->reg_base + I2C_CTL);
+    reg_val |= I2C_CTL_RESTART_ENABLE;
+    writel(reg_val, i2c_dev->reg_base + I2C_CTL);
 
     reg_val = readl(i2c_dev->reg_base + I2C_ENABLE);
     reg_val |= I2C_ENABLE_BIT | I2C_SDA_STUCK_RECOVERY_ENABLE;

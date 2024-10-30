@@ -1,20 +1,29 @@
 /*
-* Copyright (C) 2020-2023 ArtInChip Technology Co. Ltd
-*
-*  author: <jun.ma@artinchip.com>
-*  Desc: aic_audio_decoder interface
-*/
+ * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Author: <jun.ma@artinchip.com>
+ * Desc: aic_audio_decoder interface
+ */
 
 #include "mpp_log.h"
 #include "audio_decoder.h"
 
 
 extern struct aic_audio_decoder* create_mp3_decoder();
+#ifdef LPKG_USING_LIBFLAC
+extern struct aic_audio_decoder* create_flac_decoder();
+#endif
 
 struct aic_audio_decoder* aic_audio_decoder_create(enum aic_audio_codec_type type)
 {
 	if(type == MPP_CODEC_AUDIO_DECODER_MP3)
 		return create_mp3_decoder();
+#ifdef LPKG_USING_LIBFLAC
+	else if (type == MPP_CODEC_AUDIO_DECODER_FLAC)
+		return create_flac_decoder();
+#endif
 	return NULL;
 }
 

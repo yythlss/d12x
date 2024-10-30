@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Authors: Li Siyao <siyao.li@artinchip.com>
+ * Authors: Siyao Li <siyao.li@artinchip.com>
  */
 
 #include <stdbool.h>
@@ -229,9 +229,16 @@ static rt_uint8_t drv_psadc_resolution(struct rt_adc_device *dev)
     return 12;
 }
 
+static rt_err_t drv_psadc_convert(struct rt_adc_device *dev, rt_uint32_t ch,
+                                 rt_uint32_t *value)
+{
+    return RT_EOK;
+}
+
 static const struct rt_adc_ops aic_adc_ops =
 {
     .enabled = drv_psadc_enabled,
+    .convert = drv_psadc_convert,
     .get_resolution = drv_psadc_resolution,
     .get_adc_values_poll = drv_psadc_get_adc_values_poll,
     .get_adc_values = drv_psadc_get_adc_values,

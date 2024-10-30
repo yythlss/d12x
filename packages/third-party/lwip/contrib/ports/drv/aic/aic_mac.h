@@ -152,7 +152,7 @@ typedef struct {
 
 /* 5 Ethernet driver receive buffers are used (in a chained linked list)*/
 #ifndef ETH_RXBUFNB
-#define ETH_RXBUFNB 16 /*  4 Rx buffers of size ETH_RX_BUF_SIZE */
+#define ETH_RXBUFNB 4 /*  4 Rx buffers of size ETH_RX_BUF_SIZE */
 #endif
 
 #ifndef ETH_TX_BUF_SIZE
@@ -161,7 +161,7 @@ typedef struct {
 
 /* 5 ethernet driver transmit buffers are used (in a chained linked list)*/
 #ifndef ETH_TXBUFNB
-#define ETH_TXBUFNB 16 /* 4  Tx buffers of size ETH_TX_BUF_SIZE */
+#define ETH_TXBUFNB 4 /* 4  Tx buffers of size ETH_TX_BUF_SIZE */
 #endif
 
 #define AICMAC_PBUF_SIZE    LWIP_MEM_ALIGN_SIZE(PBUF_POOL_BUFSIZE)

@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Wu Dehuang <dehuang.wu@artinchip.com>
+ * Authors:  Wu Dehuang <dehuang.wu@artinchip.com>
  */
 
 #include <stdio.h>
@@ -487,8 +487,8 @@ static s32 exfat_search_file(struct fat_volume *vol, struct fat_file *file,
             /* Bingo */
             file->start_clus = first_cluster;
             file->size = data_len;
-            pr_err("Start cluster: 0x%X\n", file->start_clus);
-            pr_err("bootcfg file size: 0x%X\n", file->size);
+            pr_debug("Start cluster: 0x%X\n", file->start_clus);
+            pr_debug("bootcfg file size: 0x%X\n", file->size);
             return 0;
         }
     }

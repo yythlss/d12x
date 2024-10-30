@@ -2,6 +2,25 @@
 # i2c devices local parameter
 #-----------------------------
 
+# soft_i2c parameter
+
+menu "SOFT_I2C Parameter"
+    depends on AIC_USING_SOFT_I2C
+
+    config AIC_SOFT_I2C_SCL_PIN
+        string "SOFT_I2C SCL PIN"
+        default "PD.6"
+
+    config AIC_SOFT_I2C_SDA_PIN
+        string "SOFT_I2C SDA PIN"
+        default "PD.7"
+
+    config AIC_DEV_SOFT_I2C_DELAY_TIME
+        int "Setting SOFT_I2C GPIO Level Change Delay Time(us)"
+        default 5
+
+endmenu
+
 # i2c0 parameter
 
 menu "I2C0 Parameter"

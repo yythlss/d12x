@@ -94,6 +94,10 @@ menu "UART0 Parameter"
        default 6     if AIC_DEV_UART0_MODE_RS232_SW_HW_FLOW_CTRL
        default 7     if AIC_DEV_UART0_MODE_RS485_SIMULATION
 
+    config AIC_SERIAL_USING_FLOWCTRL
+       bool
+       default y     if AIC_DEV_UART0_MODE_RS232_UNAUTO_FLOW_CTRL || AIC_DEV_UART0_MODE_RS232_SW_FLOW_CTRL || AIC_DEV_UART0_MODE_RS232_SW_HW_FLOW_CTRL
+
    menuconfig AIC_UART0_RTS_ENABLE
         bool
         prompt "Enable RTS"
@@ -257,6 +261,10 @@ menu "UART1 Parameter"
        default 5     if AIC_DEV_UART1_MODE_RS232_SW_FLOW_CTRL
        default 6     if AIC_DEV_UART1_MODE_RS232_SW_HW_FLOW_CTRL
        default 7     if AIC_DEV_UART1_MODE_RS485_SIMULATION
+
+    config AIC_SERIAL_USING_FLOWCTRL
+       bool
+       default y     if AIC_DEV_UART1_MODE_RS232_UNAUTO_FLOW_CTRL || AIC_DEV_UART1_MODE_RS232_SW_FLOW_CTRL || AIC_DEV_UART1_MODE_RS232_SW_HW_FLOW_CTRL
 
     menuconfig AIC_UART1_RTS_ENABLE
         bool
@@ -422,6 +430,9 @@ menu "UART2 Parameter"
        default 6     if AIC_DEV_UART2_MODE_RS232_SW_HW_FLOW_CTRL
        default 7     if AIC_DEV_UART2_MODE_RS485_SIMULATION
 
+    config AIC_SERIAL_USING_FLOWCTRL
+       bool
+       default y     if AIC_DEV_UART2_MODE_RS232_UNAUTO_FLOW_CTRL || AIC_DEV_UART2_MODE_RS232_SW_FLOW_CTRL || AIC_DEV_UART2_MODE_RS232_SW_HW_FLOW_CTRL
 
     menuconfig AIC_UART2_RTS_ENABLE
         bool
@@ -588,6 +599,10 @@ menu "UART3 Parameter"
        default 6     if AIC_DEV_UART3_MODE_RS232_SW_HW_FLOW_CTRL
        default 7     if AIC_DEV_UART3_MODE_RS485_SIMULATION
 
+    config AIC_SERIAL_USING_FLOWCTRL
+       bool
+       default y     if AIC_DEV_UART3_MODE_RS232_UNAUTO_FLOW_CTRL || AIC_DEV_UART3_MODE_RS232_SW_FLOW_CTRL || AIC_DEV_UART3_MODE_RS232_SW_HW_FLOW_CTRL
+
    menuconfig AIC_UART3_RTS_ENABLE
         bool
         prompt "Enable RTS"
@@ -751,6 +766,10 @@ menu "UART4 Parameter"
        default 5     if AIC_DEV_UART4_MODE_RS232_SW_FLOW_CTRL
        default 6     if AIC_DEV_UART4_MODE_RS232_SW_HW_FLOW_CTRL
        default 7     if AIC_DEV_UART4_MODE_RS485_SIMULATION
+
+    config AIC_SERIAL_USING_FLOWCTRL
+       bool
+       default y     if AIC_DEV_UART4_MODE_RS232_UNAUTO_FLOW_CTRL || AIC_DEV_UART4_MODE_RS232_SW_FLOW_CTRL || AIC_DEV_UART4_MODE_RS232_SW_HW_FLOW_CTRL
 
    menuconfig AIC_UART4_RTS_ENABLE
         bool
@@ -917,6 +936,10 @@ menu "UART5 Parameter"
        default 6     if AIC_DEV_UART5_MODE_RS232_SW_HW_FLOW_CTRL
        default 7     if AIC_DEV_UART5_MODE_RS485_SIMULATION
 
+    config AIC_SERIAL_USING_FLOWCTRL
+       bool
+       default y     if AIC_DEV_UART5_MODE_RS232_UNAUTO_FLOW_CTRL || AIC_DEV_UART5_MODE_RS232_SW_FLOW_CTRL || AIC_DEV_UART5_MODE_RS232_SW_HW_FLOW_CTRL
+
    menuconfig AIC_UART5_RTS_ENABLE
         bool
         prompt "Enable RTS"
@@ -1081,6 +1104,10 @@ menu "UART6 Parameter"
        default 6     if AIC_DEV_UART6_MODE_RS232_SW_HW_FLOW_CTRL
        default 7     if AIC_DEV_UART6_MODE_RS485_SIMULATION
 
+    config AIC_SERIAL_USING_FLOWCTRL
+       bool
+       default y     if AIC_DEV_UART6_MODE_RS232_UNAUTO_FLOW_CTRL || AIC_DEV_UART6_MODE_RS232_SW_FLOW_CTRL || AIC_DEV_UART6_MODE_RS232_SW_HW_FLOW_CTRL
+
     menuconfig AIC_UART6_RTS_ENABLE
         bool
         prompt "Enable RTS"
@@ -1244,6 +1271,10 @@ menu "UART7 Parameter"
        default 5     if AIC_DEV_UART7_MODE_RS232_SW_FLOW_CTRL
        default 6     if AIC_DEV_UART7_MODE_RS232_SW_HW_FLOW_CTRL
        default 7     if AIC_DEV_UART7_MODE_RS485_SIMULATION
+
+    config AIC_SERIAL_USING_FLOWCTRL
+       bool
+       default y     if AIC_DEV_UART7_MODE_RS232_UNAUTO_FLOW_CTRL || AIC_DEV_UART7_MODE_RS232_SW_FLOW_CTRL || AIC_DEV_UART7_MODE_RS232_SW_HW_FLOW_CTRL
 
     menuconfig AIC_UART7_RTS_ENABLE
         bool

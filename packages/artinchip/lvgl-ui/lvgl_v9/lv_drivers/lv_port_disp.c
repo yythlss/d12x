@@ -8,11 +8,82 @@
 
 #include <aic_core.h>
 #include <stdbool.h>
+#include <getopt.h>
+#include <string.h>
 #include "lvgl.h"
 #include "lv_port_disp.h"
 #include "lv_tpc_run.h"
 #include "lv_draw_ge2d.h"
 #include "lv_mpp_dec.h"
+
+#if LV_DISP_FB_DUMP
+static char g_save_path[128] = { 0 };
+static bool g_dump_flag = false;
+
+static inline void lv_disp_buf_dump(lv_display_t *disp)
+{
+    if (g_dump_flag) {
+        g_dump_flag = false;
+        lv_fs_res_t res = LV_FS_RES_OK;
+        lv_color_format_t cf = lv_display_get_color_format(disp);
+        uint32_t h = lv_display_get_vertical_resolution(disp);
+        uint32_t w = lv_display_get_horizontal_resolution(disp);
+        uint32_t stride = lv_draw_buf_width_to_stride(w, cf);
+        lv_draw_buf_t *disp_buf = lv_display_get_buf_active(disp);
+        lv_fs_file_t file_save;
+        uint32_t data_write = 0;
+        char src[128];
+
+        snprintf(src, 127, "L:%s", g_save_path);
+        res = lv_fs_open(&file_save, src, LV_FS_MODE_WR);
+        if(res != LV_FS_RES_OK) {
+            LV_LOG_ERROR("open %s failed", src);
+            return;
+        }
+        lv_fs_write(&file_save, disp_buf->data, h * stride, &data_write);
+        lv_fs_close(&file_save);
+        printf("save %s ok\n", g_save_path);
+    }
+}
+
+static void lv_fb_dump(int argc, char **argv)
+{
+    int ret;
+    const char sopts[] = "u:o:";
+    const struct option lopts[] = {
+        {"usage",   no_argument, NULL, 'u'},
+        {"output",  required_argument, NULL, 'o'},
+        {0, 0, 0, 0}
+    };
+
+    optind = 0;
+    while ((ret = getopt_long(argc, argv, sopts, lopts, NULL)) != -1) {
+        switch (ret) {
+        case 'o':
+            strcpy(g_save_path, optarg);
+            break;
+        case 'u':
+            printf("Usage: %s [Options]: \n", argv[0]);
+            printf("\t-o, --output  image path\n");
+            printf("\tfor example:\n");
+            printf("\tlv_fb_dump -o /sdcard/out.bin\n");
+            return;
+        default:
+            LV_LOG_ERROR("Invalid parameter: %#x\n", ret);
+            return;
+        }
+    }
+
+    if (strlen(g_save_path)) {
+        g_dump_flag = true;
+    } else {
+        printf("please check output path:%s\n", g_save_path);
+    }
+    return;
+}
+
+MSH_CMD_EXPORT_ALIAS(lv_fb_dump, lv_dump, lvgl dump display buffer);
+#endif
 
 static void display_cal_frame_rate(aic_disp_t *aic_disp)
 {
@@ -129,6 +200,10 @@ static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
     (void)px_map;
 
     if (lv_disp_flush_is_last(disp)) {
+#if LV_DISP_FB_DUMP
+        // dump frame buffer
+        lv_disp_buf_dump(disp);
+#endif
         if (disp_buf->data == aic_disp->buf_aligned) {
 #ifdef AIC_PAN_DISPLAY
             aic_disp->buf_id  =  aic_disp->buf_id > 0 ? 0 : 1;
@@ -186,7 +261,7 @@ static lv_color_format_t lv_display_fmt(enum mpp_pixel_format cf)
     return fmt;
 }
 
-#if LV_USE_OS && defined(AIC_PAN_DISPLAY)
+#if LV_USE_OS && defined(AIC_PAN_DISPLAY) && defined(LV_DISPLAY_ROTATE_EN)
 static void aic_display_thread(void *ptr)
 {
     aic_disp_t *aic_disp = (aic_disp_t *)ptr;
@@ -219,7 +294,7 @@ static void aic_display_thread(void *ptr)
 #if defined(LV_DISPLAY_ROTATE_EN)
 static uint8_t *create_draw_buf(aic_disp_t *aic_disp, int w, int h, lv_color_format_t cf)
 {
-    int bpp = lv_color_format_get_bpp(cf);
+    int bpp = lv_color_format_get_bpp(cf) / 8;
     int buf_size = ALIGN_UP(w, 8) * ALIGN_UP(h, 8) * bpp;
 
     aic_disp->buf = (uint8_t *)aicos_malloc_try_cma(buf_size + CACHE_LINE_SIZE - 1);
@@ -307,7 +382,7 @@ void lv_port_disp_init(void)
     lv_display_set_rotation(disp, LV_ROTATE_DEGREE / 90);
 #endif
 
-#if LV_USE_OS && defined(AIC_PAN_DISPLAY)
+#if LV_USE_OS && defined(AIC_PAN_DISPLAY) && defined(LV_DISPLAY_ROTATE_EN)
     aic_disp->sync_ready = true;
     lv_thread_sync_init(&aic_disp->sync);
     lv_thread_sync_init(&aic_disp->sync_notify);

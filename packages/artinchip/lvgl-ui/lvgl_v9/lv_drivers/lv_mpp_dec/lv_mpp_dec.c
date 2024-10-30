@@ -382,6 +382,13 @@ static lv_result_t jpeg_decoder_info(lv_image_decoder_t *decoder, const void *sr
         return LV_RESULT_INVALID;
     }
 
+#if defined(MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE)
+    int size_shift = jpeg_size_limit(width, height);
+    width = width >> size_shift;
+    height = height >> size_shift;
+    header->reserved_2 = size_shift;
+#endif
+
     header->w = width;
     header->h = height;
     header->cf = mpp_fmt_to_lv_fmt(format);
@@ -754,7 +761,18 @@ static lv_result_t lv_mpp_dec_open(lv_image_decoder_t *decoder, lv_image_decoder
     dec_frame.buf.format = config.pix_fmt;
     dec_frame.buf.buf_type = MPP_PHY_ADDR;
 
+    int size_shift = 0;
+#if defined(MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE)
+    if (type == MPP_CODEC_VIDEO_DECODER_MJPEG)
+        size_shift = dsc->header.reserved_2;
+#endif
     set_frame_buf_size(&dec_frame, buf_size, 0);
+    if (size_shift > 0) {
+        struct mpp_scale_ratio scale;
+        scale.hor_scale = size_shift;
+        scale.ver_scale = size_shift;
+        mpp_decoder_control(dec, MPP_DEC_INIT_CMD_SET_SCALE, &scale);
+    }
 
     CHECK_RET(frame_buf_alloc(mpp_data, &dec_frame.buf, buf_size, dsc->header.cf), LV_RESULT_OK);
 
@@ -894,7 +912,7 @@ void lv_mpp_dec_deinit(void)
     }
 }
 
-#if defined(LPKG_USING_LVGL) && defined(LVGL_V_9)
+#if defined(LPKG_USING_LVGL) && defined(LVGL_V_9) && LV_CACHE_DEF_SIZE > 0
 bool lv_drop_one_cached_image()
 {
     #define img_cache_p (LV_GLOBAL_DEFAULT()->img_cache)

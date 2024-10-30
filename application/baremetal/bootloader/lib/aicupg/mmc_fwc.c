@@ -138,7 +138,7 @@ s32 mmc_fwc_sparse_fill(struct aicupg_mmc_priv *priv, struct aic_partition *part
     u32 *fill_buf, fill_buf_num_blks, fill_blks = 0;
     int i, j;
 
-    fill_buf = (u32 *)aicos_malloc_align(0, ROUNDUP(SPARSE_FILLBUF_SIZE, CACHE_LINE_SIZE), CACHE_LINE_SIZE);
+    fill_buf = (u32 *)aicupg_malloc_align(ROUNDUP(SPARSE_FILLBUF_SIZE, CACHE_LINE_SIZE), CACHE_LINE_SIZE);
     if (!fill_buf) {
         pr_err("Malloc failed for: CHUNK_TYPE_FILL\n");
         return 0;
@@ -193,7 +193,7 @@ s32 mmc_fwc_sparse_fill(struct aicupg_mmc_priv *priv, struct aic_partition *part
     }
 
 out:
-    aicos_free_align(0, fill_buf);
+    aicupg_free_align(fill_buf);
     return fill_blks;
 }
 
@@ -404,7 +404,7 @@ s32 mmc_fwc_raw_write(struct fwc_info *fwc, u8 *buf, s32 len)
     long n;
     u32 clen = 0, calc_len = 0;
 
-    rdbuf = aicos_malloc_align(0, len, CACHE_LINE_SIZE);
+    rdbuf = aicupg_malloc_align(len, CACHE_LINE_SIZE);
     if (!rdbuf) {
         pr_err("Error: malloc buffer failed.\n");
         return 0;
@@ -468,7 +468,7 @@ s32 mmc_fwc_raw_write(struct fwc_info *fwc, u8 *buf, s32 len)
 
 out:
     if (rdbuf)
-        aicos_free_align(0, rdbuf);
+        aicupg_free_align(rdbuf);
     return clen;
 }
 

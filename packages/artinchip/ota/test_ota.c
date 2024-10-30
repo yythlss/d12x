@@ -11,7 +11,7 @@
 #include <rtdevice.h>
 #include <ota.h>
 #include <env.h>
-#include <absystem.h>
+#include <absystem_os.h>
 
 #define BUFFER_SIZE 256 //Need to be less than 2048 bytes
 

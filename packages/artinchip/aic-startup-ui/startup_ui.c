@@ -29,9 +29,24 @@
 #include "stddef.h"
 
 #define PATH_MAX 1024
+
+#ifdef LPKG_CHERRYUSB_DEVICE_DISPLAY_TEMPLATE
+#define AIC_STARTUP_UI_SHOW_LVGL_LOGO
+
+#ifdef AIC_LVGL_USB_OSD_DEMO
+#error "Not support turn on LVGL USB OSD DEMO and Startup UI at the same time"
+#endif
+#endif
+
+#ifdef AIC_STARTUP_UI_SHOW_LVGL_LOGO
+#define IMAGE_EXTENSION ".png"
+#define IMAGE_CATALOG   "/data/lvgl_data"
+#define IMAGE_PATH_ROOT "/data/lvgl_data/logo.png"
+#else
 #define IMAGE_EXTENSION ".jpg"
 #define IMAGE_CATALOG   "/data"
 #define IMAGE_PATH_ROOT "/data/image"
+#endif
 
 #ifdef AIC_STARTUP_UI_POS_X
 #define IMAGE_SCREEN_POS_X AIC_STARTUP_UI_POS_X
@@ -132,7 +147,6 @@ static struct frame_allocator *allocator_open(u8 *buf, u32 x, u32 y)
 }
 #endif
 
-#ifndef USE_VE_FILL_FB
 static int ge_bitblt(struct ge_bitblt *blt)
 {
     int ret = 0;
@@ -164,10 +178,12 @@ static int ge_bitblt(struct ge_bitblt *blt)
 
     return 0;
 }
-#endif
 
-#if defined (AIC_PAN_DISPLAY) && !defined(USE_VE_FILL_FB)
+#ifdef AIC_PAN_DISPLAY
+static u32 fb_copy_index = 0;
+#ifndef USE_VE_FILL_FB
 static u32 startup_fb_buf_index = 0;
+#endif
 #endif
 
 static struct aicfb_screeninfo *get_screen_info(void)
@@ -263,6 +279,52 @@ static void render_frame(struct mpp_fb* fb, struct mpp_frame* frame,
 }
 #endif
 
+#ifdef AIC_PAN_DISPLAY
+static void framebuffer_copy(int buffer_index)
+{
+    struct ge_bitblt blt;
+    struct aicfb_screeninfo *info = NULL;;
+
+    info = get_screen_info();
+    if (info == NULL)
+        return;
+
+    u32 fb0_buf_addr0 = (u32)(unsigned long)info->framebuffer;;
+    u32 fb0_buf_addr1 = fb0_buf_addr0 + info->smem_len;;
+
+    memset(&blt, 0, sizeof(struct ge_bitblt));
+
+    if (buffer_index == 0) {
+        blt.src_buf.phy_addr[0] = fb0_buf_addr0;
+    } else {
+        blt.src_buf.phy_addr[0] = fb0_buf_addr1;
+    }
+    blt.src_buf.buf_type = MPP_PHY_ADDR;
+    blt.src_buf.format = info->format;
+    blt.src_buf.stride[0] = info->stride;
+    blt.src_buf.size.width = info->width;
+    blt.src_buf.size.height = info->height;
+    blt.src_buf.crop_en = 0;
+
+    if (buffer_index == 0) {
+        blt.dst_buf.phy_addr[0] = fb0_buf_addr1;
+    } else {
+        blt.dst_buf.phy_addr[0] = fb0_buf_addr0;
+    }
+    blt.dst_buf.buf_type = MPP_PHY_ADDR;
+    blt.dst_buf.format = info->format;
+    blt.dst_buf.stride[0] = info->stride;
+    blt.dst_buf.size.width = info->width;
+    blt.dst_buf.size.height = info->height;
+    blt.dst_buf.crop_en = 0;
+
+    logi("phy_addr: %x, stride: %d", blt.src_buf.phy_addr[0], blt.src_buf.stride[0]);
+    logi("width: %d, height: %d, format: %d", blt.src_buf.size.width, blt.src_buf.size.height, blt.src_buf.format);
+
+    ge_bitblt(&blt);
+}
+#endif
+
 static int decode_pic_from_path(const char *path, u32 offset_x, u32 offset_y,
                          u32 width, u32 height, u32 layer_id, bool is_first_img)
 {
@@ -308,11 +370,18 @@ static int decode_pic_from_path(const char *path, u32 offset_x, u32 offset_y,
 #ifdef USE_VE_FILL_FB
     config.pix_fmt = info->format;
 #else
-    config.pix_fmt = MPP_FMT_RGB_565;
+    config.pix_fmt = MPP_FMT_NV12;
 #endif
 
     if (pic[0] == 0xff && pic[1] == 0xd8) {
         dec = mpp_decoder_create(MPP_CODEC_VIDEO_DECODER_MJPEG);
+    } else if (pic[1] == 'P' || pic[2] == 'N' || pic[3] == 'G') {
+        if (config.pix_fmt == MPP_FMT_RGB_565 || config.pix_fmt == MPP_FMT_BGR_565) {
+            loge("PNG decode does nor support RGB565\n");
+            free(pic);
+            return -1;
+        }
+        dec = mpp_decoder_create(MPP_CODEC_VIDEO_DECODER_PNG);
     } else {
         loge("Unsupported or invalid image format\n");
         free(pic);
@@ -398,7 +467,12 @@ static int count_images(const char *directoryPath)
 
 static void construct_imagepath(char *outputBuffer, int image_number)
 {
+#ifdef AIC_STARTUP_UI_SHOW_LVGL_LOGO
+    (void)image_number;
+    snprintf(outputBuffer, PATH_MAX, "%s", IMAGE_PATH_ROOT);
+#else
     snprintf(outputBuffer, PATH_MAX, "%s%d%s", IMAGE_PATH_ROOT, image_number, IMAGE_EXTENSION);
+#endif
 }
 
 int startup_ui_show(void)
@@ -437,6 +511,15 @@ int startup_ui_show(void)
             decode_pic_from_path(image_path, IMAGE_SCREEN_POS_X, IMAGE_SCREEN_POS_Y, 0, 0, AICFB_LAYER_TYPE_UI, false);
         }
     }
+#ifdef AIC_PAN_DISPLAY
+    if ((image_count % 2) == 0) {
+        /* frame buffer copy */
+        framebuffer_copy(!fb_copy_index);
+        /* switch to frame buffer 0 */
+        mpp_fb_ioctl(startup_ui->startup_fb, AICFB_PAN_DISPLAY, &fb_copy_index);
+        mpp_fb_ioctl(startup_ui->startup_fb, AICFB_WAIT_FOR_VSYNC, NULL);
+    }
+#endif
     free(startup_ui);
 
     return 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -12,28 +12,28 @@
 
 #define CSC_COEFFS_NUM 12
 
-static const unsigned int yuv2rgb_bt601[CSC_COEFFS_NUM] = {
-    0x04a8, 0x0000, 0x0662, 0x3212,
-    0x04a8, 0x1e70, 0x1cc0, 0x087a,
-    0x04a8, 0x0811, 0x0000, 0x2eb4
+static const int yuv2rgb_bt601[CSC_COEFFS_NUM] = {
+    1192, 0, 1634, -3269,
+    1192, -401, -833, 2467,
+    1192, 2066, 0, -4131
 };
 
-static const unsigned int yuv2rgb_bt709[CSC_COEFFS_NUM] = {
-    0x04a8, 0x0000, 0x0722, 0x3093,
-    0x04a8, 0x1f27, 0x1ddf, 0x04ce,
-    0x04a8, 0x0873, 0x0000, 0x2df2
+static const int yuv2rgb_bt709[CSC_COEFFS_NUM] = {
+    1192, 0, 1836, -3970,
+    1192, -218, -546, 1230,
+    1192, 2163, 0, -4624
 };
 
-static const unsigned int yuv2rgb_bt601_full[CSC_COEFFS_NUM] = {
-    0x0400, 0x0000, 0x059c, 0x34ca,
-    0x0400, 0x1ea1, 0x1d26, 0x0877,
-    0x0400, 0x0717, 0x0000, 0x31d4
+static const int yuv2rgb_bt601_full[CSC_COEFFS_NUM] = {
+    1024, 0, 1436, -2871,
+    1024, -352, -731, 2167,
+    1024, 1815, 0, -3629
 };
 
-static const unsigned int yuv2rgb_bt709_full[CSC_COEFFS_NUM] = {
-    0x0400, 0x0000, 0x064d, 0x3368,
-    0x0400, 0x1f41, 0x1e22, 0x053e,
-    0x0400, 0x076c, 0x0000, 0x3129
+static const int yuv2rgb_bt709_full[CSC_COEFFS_NUM] = {
+    1024, 0, 1613, -3225,
+    1024, -192, -479, 1342,
+    1024, 1900, 0, -3800
 };
 
 static const int rgb2yuv_bt601[CSC_COEFFS_NUM] = {
@@ -274,7 +274,7 @@ void ge_scaler0_enable(unsigned long base_addr, u32 enable)
 
 void ge_set_csc_coefs(unsigned long base_addr, int color_space, u32 csc)
 {
-    const u32 *coefs;
+    const int *coefs;
     int i;
 
     switch (color_space) {

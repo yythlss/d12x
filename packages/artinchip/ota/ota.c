@@ -18,7 +18,7 @@
 #include "aic_core.h"
 #include <ota.h>
 #include <env.h>
-#include <absystem.h>
+#include <absystem_os.h>
 #include <burn.h>
 #include <ctype.h>
 

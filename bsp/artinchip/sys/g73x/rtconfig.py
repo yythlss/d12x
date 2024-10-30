@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2022-2024, ArtInChip Technology Co., Ltd
+
 import os
 import platform
 
@@ -31,11 +35,25 @@ if os.getenv('RTT_EXEC_PATH'):
 # BUILD = 'debug'
 BUILD = 'release'
 if BUILD == 'debug':
-    CFLAGS_DBG = ' -O0 -gdwarf-2'
-    AFLAGS_DBG = ' -gdwarf-2'
+    CFLAGS_DBG = ' -O0 -gdwarf-2 '
+    AFLAGS_DBG = ' -gdwarf-2 '
+    B_AFLAGS = ''
+    B_CFLAGS = ''
+    LFLAGS = ''
+    B_AFLAGS += ' -D_ENABLE_BACK_TRACE_STACK_ '
+    CFLAGS_DBG += ' -fno-omit-frame-pointer '
+    B_AFLAGS +=  ' -D_NO_OMIT_FRAME_POINT_ '
+    #B_CFLAGS += ' -fstack-protector-all '
+    #LFLAGS += ' -Wl,--wrap=__stack_chk_fail '
 else:
     CFLAGS_DBG = ' -O2 -g2'
     AFLAGS_DBG = ''
+    B_AFLAGS = ''
+    B_CFLAGS = ''
+    LFLAGS = ''
+    B_AFLAGS += ' -D_ENABLE_BACK_TRACE_STACK_ '
+    #CFLAGS_DBG += ' -fno-omit-frame-pointer '
+    #B_AFLAGS +=  ' -D_NO_OMIT_FRAME_POINT_ '
 
 prj_out_dir = ''
 if os.environ.get('PRJ_OUT_DIR'):
@@ -73,8 +91,8 @@ if PLATFORM == 'gcc':
     if CPUNAME == 'e906' or CPUNAME == 'e907':
         DEVICE = ' -march=rv32imac_xtheade -mabi=ilp32'
 
-    B_CFLAGS  = ' -c -g -ffunction-sections -fdata-sections -Wall -mcmodel=medlow'
-    B_AFLAGS  = ' -c' + ' -x assembler-with-cpp' + ' -D__ASSEMBLY__'
+    B_CFLAGS  += ' -c -g -ffunction-sections -fdata-sections -Wall -mcmodel=medany '
+    B_AFLAGS  += ' -c' + ' -x assembler-with-cpp' + ' -D__ASSEMBLY__'
     CFLAGS  = DEVICE + B_CFLAGS + CFLAGS_DBG
     AFLAGS  = DEVICE + B_AFLAGS + AFLAGS_DBG
     CXXFLAGS = CFLAGS

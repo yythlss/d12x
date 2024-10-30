@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -442,6 +442,15 @@ static inline void qspi_hw_drop_invalid_data(u32 base, bool drop)
     val &= ~(TCFG_BIT_DINVD_MSK);
     val |= TCFG_BIT_DINVD_VAL(drop);
     writel(val, QSPI_REG_TCFG(base));
+}
+
+static inline void qspi_hw_ctrl_reset(u32 base)
+{
+    u32 val;
+
+    val = readl(QSPI_REG_CFG(base));
+    val |= CFG_BIT_CTRL_RST_MSK;
+    writel(val, QSPI_REG_CFG(base));
 }
 
 static inline void qspi_hw_reset_fifo(u32 base)

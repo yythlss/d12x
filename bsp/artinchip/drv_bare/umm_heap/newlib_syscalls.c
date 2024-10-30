@@ -19,13 +19,14 @@
 #include <unistd.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
-#include <umm_malloc.h>
+#include <aic_core.h>
+#include <aic_tlsf.h>
 
 void *_malloc_r(struct _reent *ptr, size_t size)
 {
     void* result;
 
-    result = (void*)umm_malloc(size);
+    result = (void*)aic_tlsf_malloc(MEM_DEFAULT, size);
     if (result == NULL)
     {
         ptr->_errno = ENOMEM;
@@ -38,7 +39,7 @@ void *_realloc_r(struct _reent *ptr, void *old, size_t newlen)
 {
     void* result;
 
-   result = (void*)umm_realloc(old, newlen);
+   result = (void*)aic_tlsf_realloc(MEM_DEFAULT, old, newlen);
     if (result == NULL)
     {
         ptr->_errno = ENOMEM;
@@ -51,7 +52,7 @@ void *_calloc_r(struct _reent *ptr, size_t size, size_t len)
 {
     void* result;
 
-    result = (void*)umm_calloc(size, len);
+    result = (void*)aic_tlsf_calloc(MEM_DEFAULT, size, len);
     if (result == NULL)
     {
         ptr->_errno = ENOMEM;
@@ -62,7 +63,7 @@ void *_calloc_r(struct _reent *ptr, size_t size, size_t len)
 
 void _free_r(struct _reent *ptr, void *addr)
 {
-    umm_free(addr);
+    aic_tlsf_free(MEM_DEFAULT, addr);
 }
 
 int *__errno(void)

@@ -1,7 +1,8 @@
 #include <rtthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <dfs_posix.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "amessage.pb-c.h"
 
@@ -24,7 +25,7 @@ static void protobuf_encode_to_file(int argc, char *argv[])
         encode_msg.has_a  = 1;
         encode_msg.a      = atoi(argv[1]);
         encode_msg.has_b  = 1;
-        encode_msg.b      = atoi(argv[2]); 
+        encode_msg.b      = atoi(argv[2]);
 
         msg_len = amessage__get_packed_size(&encode_msg);
         buffer = malloc(msg_len);

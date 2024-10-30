@@ -17,8 +17,10 @@
 
 #define DE_TIMEOUT_MS     100
 
-static unsigned int vsync_flag = 0;
 static struct aic_de_comp *g_aic_de_comp;
+
+static int aic_de_set_gamma_config(struct aicfb_gamma_config *gamma);
+static int aic_de_set_ccm_config(struct aicfb_ccm_config *ccm);
 
 static struct aic_de_comp *aic_de_request_drvdata(void)
 {
@@ -38,10 +40,8 @@ static irqreturn_t aic_de_handler(int irq, void *ctx)
     status = de_timing_interrupt_status(comp->regs);
     de_timing_interrupt_clean_status(comp->regs, status);
 
-    if ((status & TIMING_INIT_V_BLANK_FLAG) && vsync_flag) {
-        vsync_flag = 0;
+    if (status & TIMING_INIT_V_BLANK_FLAG)
         aicos_wqueue_wakeup(comp->vsync_queue);
-    }
 
     if (comp->scaler_active & SCALER0_CTRL_ACTIVE) {
         comp->scaler_active = comp->scaler_active & 0xF;
@@ -237,6 +237,9 @@ static int aic_de_timing_enable(void)
     de_timing_enable_interrupt(comp->regs, true, TIMING_INIT_UNDERFLOW_FLAG);
 #endif
 
+    aic_de_set_gamma_config(&comp->gamma);
+    aic_de_set_ccm_config(&comp->ccm);
+
     de_timing_enable(comp->regs, 1);
 
     aic_de_release_drvdata();
@@ -257,7 +260,6 @@ static int aic_de_wait_for_vsync(void)
     struct aic_de_comp *comp = aic_de_request_drvdata();
     int ret = 0;
 
-    vsync_flag = 1;
     ret = aicos_wqueue_wait(comp->vsync_queue, DE_TIMEOUT_MS);
     if (ret < 0) {
             hal_log_err("DE wait vsync irq failed, ret: %d\n", ret);

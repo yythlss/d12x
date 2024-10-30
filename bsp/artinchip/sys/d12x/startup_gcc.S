@@ -186,6 +186,10 @@ save_boot_params_ret:
     bltu    a0, a1, 1b
 2:
 
+    /* Reloc private params */
+    la      a5, reloc_private_params
+    jalr    a5
+
 #ifndef __NO_SYSTEM_INIT
     la      a5, SystemInit
     jalr    a5

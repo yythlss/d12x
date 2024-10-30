@@ -605,7 +605,7 @@ static s32 get_mem_buf_cmd_read_output_data(struct upg_cmd *cmd, u8 *buf,
 
     if (cmd->state == CMD_STATE_RESP) {
         memlen = (u32)(long)cmd->priv;
-        mem = aicos_malloc_align(0, memlen, ARCH_DMA_MINALIGN);
+        mem = aicupg_malloc_align(memlen, ARCH_DMA_MINALIGN);
         /*
          * Enter read RESP state, to make it simple, HOST should read
          * RESP in one read operation.
@@ -669,7 +669,7 @@ static s32 free_mem_buf_cmd_write_input_data(struct upg_cmd *cmd, u8 *buf,
         memcpy(&addr, buf, 4);
         clen += 4;
 
-        aicos_free_align(0, (void *)(long)addr);
+        aicupg_free_align((void *)(long)addr);
         cmd_state_set_next(cmd, CMD_STATE_RESP);
     }
 

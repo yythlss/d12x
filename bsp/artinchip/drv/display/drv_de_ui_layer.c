@@ -208,6 +208,11 @@ int config_ui_layer_rect(struct aic_de_comp *comp,
         de_ui_layer_enable(comp->regs, 1);
     }
 
+#ifdef AIC_SCREEN_CROP
+    x_offset += AIC_SCREEN_CROP_POS_X;
+    y_offset += AIC_SCREEN_CROP_POS_Y;
+#endif
+
     de_ui_layer_set_rect(comp->regs, in_w, in_h, x_offset, y_offset,
                  stride0, addr0, layer_data->rect_id);
     de_ui_layer_rect_enable(comp->regs, layer_data->rect_id, 1);

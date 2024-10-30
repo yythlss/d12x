@@ -30,6 +30,7 @@ source "packages/third-party/sqlite/Kconfig"
 # for baremetal mode
 source "packages/third-party/dfs/Kconfig"
 source "packages/third-party/libmad/Kconfig"
+source "packages/third-party/libFLAC/Kconfig"
 source "packages/third-party/fdtlib/Kconfig"
 source "packages/third-party/gif/Kconfig"
 source "packages/third-party/micropython-1.13.0/Kconfig"

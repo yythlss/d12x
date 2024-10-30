@@ -49,7 +49,11 @@ typedef enum {
     LV_THREAD_PRIO_LOWEST,
     LV_THREAD_PRIO_LOW,
     LV_THREAD_PRIO_MID,
+#ifdef LPKG_LVGL_THREAD_PRIO
+    LV_THREAD_PRIO_HIGH = LPKG_LVGL_THREAD_PRIO,
+#else
     LV_THREAD_PRIO_HIGH,
+#endif
     LV_THREAD_PRIO_HIGHEST,
 } lv_thread_prio_t;
 

@@ -367,7 +367,13 @@ static void cmd_wifi_ap(int argc, char **argv)
 	}
 #endif
 #if defined(CONFIG_ENABLE_WPS_AP) && CONFIG_ENABLE_WPS_AP
+#if CONFIG_LWIP_LAYER
+#if !defined(CONFIG_PLATFOMR_CUSTOMER_RTOS)
 	wpas_wps_dev_config(pnetif->hwaddr, 1);
+#else
+	//TODO
+#endif
+#endif
 #endif
 
 	if(argc == 4) {

@@ -296,6 +296,16 @@ struct aic_pinmux aic_pinmux_config[] = {
 #ifdef AIC_USING_GPAI7
     {2, PIN_PULL_DIS, 3, "PA.7"},
 #endif
+#ifdef AIC_USING_AUDIO
+#ifdef AIC_AUDIO_PLAYBACK
+    {4, PIN_PULL_DIS, 3, "PE.11"},
+    {1, PIN_PULL_DIS, 3, AIC_AUDIO_PA_ENABLE_GPIO},
+#endif
+#ifdef AIC_AUDIO_DMIC
+    {4, PIN_PULL_DIS, 3, "PF.14"},
+    {4, PIN_PULL_DIS, 3, "PF.15"},
+#endif
+#endif
 #ifdef AIC_USING_RTP
     {2, PIN_PULL_DIS, 3, "PA.8"},
     {2, PIN_PULL_DIS, 3, "PA.9"},

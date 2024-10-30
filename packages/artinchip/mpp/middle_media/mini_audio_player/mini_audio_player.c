@@ -1,9 +1,11 @@
 /*
-* Copyright (C) 2020-2023 ArtInChip Technology Co. Ltd
-*
-*  author: <jun.ma@artinchip.com>
-*  Desc: mini_audio_player
-*/
+ * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *  Author: <jun.ma@artinchip.com>
+ *  Desc: mini_audio_player
+ */
 
 #include <string.h>
 #include "aic_audio_decoder.h"
@@ -44,6 +46,7 @@ enum MINI_AUDIO_PLAYER_EVENT {
 enum PLAYER_FILE_TYPE {
     PLAYER_FILE_MP3 = 0,
     PLAYER_FILE_WAV = 1,
+    PLAYER_FILE_FLAC = 2,
 };
 
 #define MINI_AUDIO_PLAYER_WAVE_BUFF_SIZE (4*1024)
@@ -215,8 +218,8 @@ static int mini_audio_player_open(struct mini_audio_player *player)
                 goto _exit;
             }
         }
-
-
+    } else if (!strncmp(ptr+1, "flac", 4)) {
+        player->type = PLAYER_FILE_FLAC;
     } else {
         MINI_AUDIO_PLAYER_ERROR("unsupport file type\n");
         goto _exit;
@@ -241,8 +244,12 @@ static int mini_audio_player_open(struct mini_audio_player *player)
     player->audio_info.nb_channel = media_info.audio_stream.nb_channel;
     player->audio_info.bits_per_sample = media_info.audio_stream.bits_per_sample;
 
-    if (player->type == PLAYER_FILE_MP3) {
-        player->decoder = aic_audio_decoder_create(MPP_CODEC_AUDIO_DECODER_MP3);
+    if (player->type == PLAYER_FILE_MP3 || player->type == PLAYER_FILE_FLAC) {
+        if (player->type == PLAYER_FILE_MP3)
+            player->decoder = aic_audio_decoder_create(MPP_CODEC_AUDIO_DECODER_MP3);
+        else if (player->type == PLAYER_FILE_FLAC)
+            player->decoder = aic_audio_decoder_create(MPP_CODEC_AUDIO_DECODER_FLAC);
+
         if (player->decoder == NULL) {
             MINI_AUDIO_PLAYER_ERROR("aic_audio_decoder_create fail\n");
             goto _exit;
@@ -262,6 +269,14 @@ static int mini_audio_player_open(struct mini_audio_player *player)
         MINI_AUDIO_PLAYER_ERROR("aic_audio_render_init fail\n");
         goto _exit;
     }
+
+    // set volume
+    if (player->volume != 0) {
+        aic_audio_render_set_volume(player->render,player->volume);
+    } else {
+        player->volume = aic_audio_render_get_volume(player->render);
+    }
+
     // set attr
     attr.bits_per_sample = player->audio_info.bits_per_sample;
     attr.channels = player->audio_info.nb_channel;
@@ -269,12 +284,6 @@ static int mini_audio_player_open(struct mini_audio_player *player)
     if (aic_audio_render_set_attr(player->render,&attr)) {
         MINI_AUDIO_PLAYER_ERROR("aic_audio_render_set_attr fail\n");
         goto _exit;
-    }
-    // set volume
-    if (player->volume != 0) {
-        aic_audio_render_set_volume(player->render,player->volume);
-    } else {
-        player->volume = aic_audio_render_get_volume(player->render);
     }
 
     return 0;
@@ -420,7 +429,11 @@ static void mini_audio_player_entry(void *parameter)
                             eos = 1;
                         }
                     }
-                    aic_audio_decoder_decode(player->decoder);
+                    decoder_ret = aic_audio_decoder_decode(player->decoder);
+                    if (decoder_ret == DEC_NO_RENDER_FRAME) {
+                        need_peek = 0;
+                        usleep(5000);
+                    }
                     decoder_ret = aic_audio_decoder_get_frame(player->decoder,&audio_frame);
                     if (decoder_ret == DEC_OK) {
                         aic_audio_render_rend(player->render,audio_frame.data,audio_frame.size);
@@ -428,6 +441,11 @@ static void mini_audio_player_entry(void *parameter)
                         if (audio_frame.flag & PARSER_EOS) {
                             player->state = MINI_AUDIO_PLAYER_STATE_STOPED;
                         }
+                    } else if (eos && DEC_NO_RENDER_FRAME == decoder_ret &&
+                        player->state != MINI_AUDIO_PLAYER_STATE_STOPED) {
+                        /*Decoder in multithread conditions, should sleep until all data
+                         *decoding to complete*/
+                        usleep(5000);
                     }
                 } else {// wav
                     parser_ret = aic_parser_peek(player->parser,&parser_pkt);

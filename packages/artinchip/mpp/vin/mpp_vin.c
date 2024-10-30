@@ -41,7 +41,7 @@ int mpp_vin_init(char *camera)
         pr_err("Failed to find camera %s\n", camera);
         return -1;
     }
-    if (rt_device_open(g_camera_dev, 'r') < 0) {
+    if (rt_device_open(g_camera_dev, RT_DEVICE_FLAG_RDONLY) < 0) {
         pr_err("Failed to open camera %s\n", camera);
         return -1;
     }

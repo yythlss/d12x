@@ -24,9 +24,20 @@ You must specify one of -DSP or -DDP to compile correctly.
 You must specify one of -DROLL or -DUNROLL to compile correctly.
 
 */
+#include <rtconfig.h>
 
-//#define SP
+#ifdef ARCH_RISCV_FPU_S
+#define SP
+#else
+/*
+ * If the chip does not support floating-point, then this program is executed
+ * with software double precision floating-point.
+ */
 #define DP
+#endif
+
+#define FABS(x)			((x > 0) ? (x) : (-x))
+
 #define __NO_OS__
 #define UNROLL
 
@@ -35,6 +46,7 @@ You must specify one of -DROLL or -DUNROLL to compile correctly.
 #define ZERO 0.0
 #define ONE 1.0
 #define PREC "Single "
+#define FLOOR_REAL		floorf
 #endif
 
 #ifdef DP
@@ -42,6 +54,7 @@ You must specify one of -DROLL or -DUNROLL to compile correctly.
 #define ZERO 0.0e0
 #define ONE 1.0e0
 #define PREC "Double "
+#define FLOOR_REAL		floor
 #endif
 
 #define NTIMES 10
@@ -65,18 +78,18 @@ int print_time (row)
 int row;
 {
 #ifndef AIC_PRINT_FLOAT_CUSTOM
-	fprintf(stderr,"%11.2f%11.2f%11.2f%11.0f%11.2f%11.2f\n", (double)timer[0][row],
-			(double)timer[1][row], (double)timer[2][row], (double)timer[3][row],
-			(double)timer[4][row], (double)timer[5][row]);
+	fprintf(stderr,"%11.2f%11.2f%11.2f%11.0f%11.2f%11.2f\n", (REAL)timer[0][row],
+			(REAL)timer[1][row], (REAL)timer[2][row], (REAL)timer[3][row],
+			(REAL)timer[4][row], (REAL)timer[5][row]);
 #else
 	/* print float */
-	double p_f[6] = {0};
+	REAL p_f[6] = {0};
 	unsigned int p_i1[6] = {0};
 	unsigned int p_i2[6] = {0};
 	int i = 0;
 
 	for (i=0; i<6; i++){
-		p_f[i] = (double)timer[i][row];
+		p_f[i] = (REAL)timer[i][row];
 		p_i1[i] = (unsigned int)p_f[i];
 		p_i2[i] = (unsigned int)((p_f[i]-p_i1[i])*100.0);
 	}
@@ -537,12 +550,12 @@ int incx,n;
 		/* code for increment not equal to 1 */
 
 		ix = 0;
-		dmax = fabs((double)dx[0]);
+		dmax = FABS(dx[0]);
 		ix = ix + incx;
 		for (i = 1; i < n; i++) {
-			if(fabs((double)dx[ix]) > dmax)  {
+			if(FABS(dx[ix]) > dmax)  {
 				itemp = i;
-				dmax = fabs((double)dx[ix]);
+				dmax = FABS(dx[ix]);
 			}
 			ix = ix + incx;
 		}
@@ -552,11 +565,11 @@ int incx,n;
 		/* code for increment equal to 1 */
 
 		itemp = 0;
-		dmax = fabs((double)dx[0]);
+		dmax = FABS(dx[0]);
 		for (i = 1; i < n; i++) {
-			if(fabs((double)dx[i]) > dmax) {
+			if(FABS(dx[i]) > dmax) {
 				itemp = i;
-				dmax = fabs((double)dx[i]);
+				dmax = FABS(dx[i]);
 			}
 		}
 	}
@@ -605,9 +618,9 @@ REAL x;
 	while (eps == ZERO) {
 		b = a - ONE;
 		c = b + b + b;
-		eps = fabs((double)(c-ONE));
+		eps = FABS((c-ONE));
 	}
-	return(eps*fabs((double)x));
+	return(eps*FABS(x));
 }
 
 /*----------------------*/
@@ -739,6 +752,7 @@ return clock()/1.0e6;
 }
 #endif
 #include <sys/time.h>
+#include <aic_common.h>
 #include <aic_time.h>
 
 
@@ -853,10 +867,8 @@ void test_linpack()
         resid = 0.0;
         normx = 0.0;
         for (i = 0; i < n; i++) {
-            	resid = (resid > fabs((double)b[i]))
-			? resid : fabs((double)b[i]);
-            	normx = (normx > fabs((double)x[i]))
-			? normx : fabs((double)x[i]);
+            resid = (resid > FABS(b[i])) ? resid : FABS(b[i]);
+            normx = (normx > FABS(x[i])) ? normx : FABS(x[i]);
 	}
         eps = epslon((REAL)ONE);
         residn = resid/( n*norma*normx*eps );
@@ -864,8 +876,8 @@ void test_linpack()
    	printf("     norm. resid      resid           machep");
         printf("         x[0]-1        x[n-1]-1\n");
 	printf("  %8.1f      %16.8e%16.8e%16.8e%16.8e\n",
-	       (double)residn, (double)resid, (double)eps,
-               (double)x[0]-1, (double)x[n-1]-1);
+	       (REAL)residn, (REAL)resid, (REAL)eps,
+               (REAL)x[0]-1, (REAL)x[n-1]-1);
 
    	fprintf(stderr,"    times are reported for matrices of order %5d\n",n);
 	fprintf(stderr,"      dgefa      dgesl      total       kflops     unit");
@@ -999,10 +1011,10 @@ void test_linpack()
 
 	kf = (timer[3][3] < timer[3][7]) ? timer[3][3] : timer[3][7];
 	kf = (kf > ZERO) ? (kf + .5) : (kf - .5);
-	if (fabs((double)kf) < ONE)
+	if (FABS(kf) < ONE)
 		kflops = 0;
 	else {
-		kflops = floor(fabs((double)kf));
+		kflops = FLOOR_REAL(FABS(kf));
 		if (kf < ZERO) kflops = -kflops;
 	}
 

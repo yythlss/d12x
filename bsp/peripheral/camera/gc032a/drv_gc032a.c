@@ -28,12 +28,7 @@
 #define GC03_I2C_SLAVE_ID     0x21
 #define GC032A_CHIP_ID        0x232A
 
-struct reginfo {
-    u8 reg;
-    u8 val;
-};
-
-static const struct reginfo sensor_init_data[] = {
+static const struct reg8_info sensor_init_data[] = {
     /* System */
     {0xf3, 0xff},
     {0xf5, 0x06},
@@ -358,18 +353,7 @@ static struct gc03_dev g_gc03_dev = {0};
 
 static int gc03_write_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 val)
 {
-    u8 buf[2];
-    struct rt_i2c_msg msgs;
-
-    buf[0] = reg;
-    buf[1] = val;
-
-    msgs.addr = GC03_I2C_SLAVE_ID;
-    msgs.flags = RT_I2C_WR;
-    msgs.buf = buf;
-    msgs.len = 2;
-
-    if (rt_i2c_transfer(i2c, &msgs, 1) != 1) {
+    if (rt_i2c_write_reg(i2c, GC03_I2C_SLAVE_ID, reg, &val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
         return -1;
     }
@@ -379,20 +363,7 @@ static int gc03_write_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 val)
 
 static int gc03_read_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 *val)
 {
-    struct rt_i2c_msg msg[2];
-    u8 buf = reg;
-
-    msg[0].addr  = GC03_I2C_SLAVE_ID;
-    msg[0].flags = RT_I2C_WR;
-    msg[0].buf   = &buf;
-    msg[0].len   = 1;
-
-    msg[1].addr  = GC03_I2C_SLAVE_ID;
-    msg[1].flags = RT_I2C_RD;
-    msg[1].buf   = val;
-    msg[1].len   = 1;
-
-    if (rt_i2c_transfer(i2c, msg, 2) != 2) {
+    if (rt_i2c_read_reg(i2c, GC03_I2C_SLAVE_ID, reg, val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, *val);
         return -1;
     }
@@ -408,7 +379,7 @@ static void gc032a_reset(struct gc03_dev *sensor)
 static int gc032a_init(struct gc03_dev *sensor)
 {
     int i = 0;
-    const struct reginfo *info = sensor_init_data;
+    const struct reg8_info *info = sensor_init_data;
 
     gc032a_reset(sensor);
     aicos_udelay(1000);
@@ -441,11 +412,11 @@ static void gc032a_power_on(struct gc03_dev *sensor)
     if (sensor->on)
         return;
 
-    rt_pin_write(sensor->pwdn_pin, PIN_LOW);
+    camera_pin_set_low(sensor->pwdn_pin);
     aicos_udelay(1);
-    rt_pin_write(sensor->pwdn_pin, PIN_HIGH);
+    camera_pin_set_high(sensor->pwdn_pin);
     aicos_udelay(2);
-    rt_pin_write(sensor->pwdn_pin, PIN_LOW);
+    camera_pin_set_low(sensor->pwdn_pin);
 
     sensor->on = true;
 }
@@ -456,9 +427,9 @@ static void gc032a_power_off(struct gc03_dev *sensor)
     if (!sensor->on)
         return;
 
-    rt_pin_write(sensor->pwdn_pin, PIN_HIGH);
+    camera_pin_set_high(sensor->pwdn_pin);
     aicos_udelay(1);
-    rt_pin_write(sensor->pwdn_pin, PIN_LOW);
+    camera_pin_set_low(sensor->pwdn_pin);
 
     sensor->on = false;
 #endif

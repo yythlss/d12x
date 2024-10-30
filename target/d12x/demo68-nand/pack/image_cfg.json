@@ -100,8 +100,8 @@
                 "head_ver": "0x00010001",
                 "loader": {
                     "file": "bootloader.bin",
-                    "load address": "0x40300000",
-                    "entry point":  "0x40300100",
+                    "load address": "CONFIG_AIC_BOOTLOADER_LOAD_BASE",
+                    "entry point": "CONFIG_AIC_BOOTLOADER_TEXT_BASE", // 256 byte aic header
                 },
                 "resource": {
                     "private": "pbp_cfg.bin",

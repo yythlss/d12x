@@ -8,7 +8,10 @@ CPPPATH = [cwd]
 src = []
 
 if GetDepend('AIC_ENV_INTERFACE'):
-    src = Glob('*.c')
+    src += Glob('env.c')
+
+if GetDepend('AIC_AB_SYSTEM_INTERFACE') and not GetDepend('AIC_BOOTLOADER'):
+    src += Glob('absystem_os.c')
 
 group = DefineGroup('env', src, depend = [''], CPPPATH = CPPPATH)
 

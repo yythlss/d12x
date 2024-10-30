@@ -188,6 +188,12 @@ static void perf_update_timer_cb(lv_timer_t * t)
                                   1000 / disp_refr_period);   /*Limit due to possible off-by-one error*/
 
     info->calculated.cpu = 100 - LV_SYSMON_GET_IDLE();
+
+#ifdef LPKG_USING_CPU_USAGE
+#include "cpu_usage.h"
+    info->calculated.cpu = (uint32_t)cpu_load_average();
+#endif
+
     info->calculated.refr_avg_time = info->measured.refr_cnt ? (info->measured.refr_elaps_sum / info->measured.refr_cnt) :
                                      0;
 

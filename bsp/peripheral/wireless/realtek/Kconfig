@@ -48,4 +48,9 @@ menu "realtek wlan Parameter"
     config AIC_DEV_REALTEK_DEBUG
         bool "Enable Realtek driver debug information"
         default y
+
+    config REALTEK_FULL_FNC_MODE
+        bool "Enabl Realtek driver full function"
+        default n
+
 endmenu

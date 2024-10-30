@@ -87,6 +87,7 @@ s32 nand_fwc_spl_reserve_blocks(struct aicupg_nand_priv *priv);
 s32 nand_fwc_spl_prepare(struct aicupg_nand_priv *priv, u32 datasiz,
                          u32 blksiz);
 s32 nand_fwc_spl_write(struct fwc_info *fwc, u8 *buf, s32 len);
+s32 nand_fwc_spl_end(struct aicupg_nand_priv *priv);
 int nand_spl_get_candidate_blocks(u32 *blks, u32 size);
 
 #ifdef __cplusplus

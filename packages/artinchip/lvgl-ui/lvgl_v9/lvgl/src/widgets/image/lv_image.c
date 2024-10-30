@@ -226,10 +226,12 @@ void lv_image_set_src(lv_obj_t * obj, const void * src)
 
     update_align(obj);
 
+#if !defined(AIC_LVGL_METER_DEMO) || defined(LV_METER_SIMPLE_POINT)
     /*Provide enough room for the rotated corners*/
     if(img->rotation || img->scale_x != LV_SCALE_NONE || img->scale_y != LV_SCALE_NONE) {
         lv_obj_refresh_ext_draw_size(obj);
     }
+#endif
 
     lv_obj_invalidate(obj);
 }
@@ -284,12 +286,14 @@ void lv_image_set_rotation(lv_obj_t * obj, int32_t angle)
 
     img->rotation = angle;
 
+#if !defined(AIC_LVGL_METER_DEMO) || defined(LV_METER_SIMPLE_POINT)
     /* Disable invalidations because lv_obj_refresh_ext_draw_size would invalidate
      * the whole ext draw area */
     lv_display_t * disp = lv_obj_get_display(obj);
     lv_display_enable_invalidation(disp, false);
     lv_obj_refresh_ext_draw_size(obj);
     lv_display_enable_invalidation(disp, true);
+#endif
 
     _lv_image_buf_get_transformed_area(&a, w, h, img->rotation, img->scale_x, img->scale_y, &pivot_px);
     a.x1 += obj->coords.x1;
@@ -325,14 +329,14 @@ void lv_image_set_pivot(lv_obj_t * obj, int32_t x, int32_t y)
     lv_obj_invalidate_area(obj, &a);
 
     lv_point_set(&img->pivot, x, y);
-
+#if !defined(AIC_LVGL_METER_DEMO) || defined(LV_METER_SIMPLE_POINT)
     /* Disable invalidations because lv_obj_refresh_ext_draw_size would invalidate
      * the whole ext draw area */
     lv_display_t * disp = lv_obj_get_display(obj);
     lv_display_enable_invalidation(disp, false);
     lv_obj_refresh_ext_draw_size(obj);
     lv_display_enable_invalidation(disp, true);
-
+#endif
     lv_image_get_pivot(obj, &pivot_px);
     _lv_image_buf_get_transformed_area(&a, w, h, img->rotation, img->scale_x, img->scale_y, &pivot_px);
     a.x1 += obj->coords.x1;

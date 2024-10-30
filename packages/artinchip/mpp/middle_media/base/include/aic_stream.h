@@ -40,12 +40,52 @@ struct aic_stream {
       ((const uint8_t*)(x))[0])
 #endif
 
+#ifndef AIC_RL24
+#   define AIC_RL24(x)                                \
+    (((uint32_t)((const uint8_t*)(x))[2] << 16) |    \
+               (((const uint8_t*)(x))[1] <<  8) |    \
+                ((const uint8_t*)(x))[0])
+#endif
+
 #ifndef AIC_RL32
 #   define AIC_RL32(x)                                \
     (((uint32_t)((const uint8_t*)(x))[3] << 24) |    \
                (((const uint8_t*)(x))[2] << 16) |    \
                (((const uint8_t*)(x))[1] <<  8) |    \
                 ((const uint8_t*)(x))[0])
+#endif
+
+#ifndef AIC_RB16
+#   define AIC_RB16(x)                           \
+    ((((const uint8_t*)(x))[0] << 8) |          \
+      ((const uint8_t*)(x))[1])
+#endif
+
+#ifndef AIC_RB24
+#   define AIC_RB24(x)                                \
+    (((uint32_t)((const uint8_t*)(x))[0] << 16) |    \
+               (((const uint8_t*)(x))[1] <<  8) |    \
+                ((const uint8_t*)(x))[2])
+#endif
+
+#ifndef AIC_RB32
+#   define AIC_RB32(x)                                \
+    (((uint32_t)((const uint8_t*)(x))[0] << 24) |    \
+               (((const uint8_t*)(x))[1] << 16) |    \
+               (((const uint8_t*)(x))[2] <<  8) |    \
+                ((const uint8_t*)(x))[3])
+#endif
+
+#ifndef AIC_RB64
+#   define AIC_RB64(x)                                   \
+    (((uint64_t)((const uint8_t*)(x))[0] << 56) |       \
+     ((uint64_t)((const uint8_t*)(x))[1] << 48) |       \
+     ((uint64_t)((const uint8_t*)(x))[2] << 40) |       \
+     ((uint64_t)((const uint8_t*)(x))[3] << 32) |       \
+     ((uint64_t)((const uint8_t*)(x))[4] << 24) |       \
+     ((uint64_t)((const uint8_t*)(x))[5] << 16) |       \
+     ((uint64_t)((const uint8_t*)(x))[6] <<  8) |       \
+      (uint64_t)((const uint8_t*)(x))[7])
 #endif
 
 #define aic_stream_read(      \

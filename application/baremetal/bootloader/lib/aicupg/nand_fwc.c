@@ -205,7 +205,7 @@ s32 nand_fwc_uffs_write(struct fwc_info *fwc, u8 *buf, s32 len)
     int total_len = 0, remain_offset = 0;
     u8 *wbuf = NULL, *pbuf = NULL;
 
-    wbuf = aicos_malloc_align(0, ROUNDUP(len, fwc->block_size), CACHE_LINE_SIZE);
+    wbuf = aicupg_malloc_align(ROUNDUP(len, fwc->block_size), CACHE_LINE_SIZE);
     if (!wbuf) {
         pr_err("malloc failed.\n");
         return 0;
@@ -293,13 +293,13 @@ s32 nand_fwc_uffs_write(struct fwc_info *fwc, u8 *buf, s32 len)
     pr_debug("%s, data len %d, trans len %d\n", __func__, len, fwc->trans_size);
 
     fwc->calc_partition_crc = fwc->meta.crc;
-    aicos_free_align(0, wbuf);
+    aicupg_free_align(wbuf);
 
     return len;
 
 out:
     if (wbuf)
-        aicos_free_align(0, wbuf);
+        aicupg_free_align(wbuf);
 
     return ret;
 }
@@ -350,7 +350,7 @@ s32 nand_fwc_mtd_write(struct fwc_info *fwc, u8 *buf, s32 len)
     int i, ret = 0, calc_len = 0;
     u8 *rdbuf, *buf_to_write, *buf_to_read;
 
-    rdbuf = aicos_malloc_align(0, len, CACHE_LINE_SIZE);
+    rdbuf = aicupg_malloc_align(len, CACHE_LINE_SIZE);
     if (!rdbuf) {
         pr_err("Error: malloc buffer failed.\n");
         return 0;
@@ -431,11 +431,11 @@ s32 nand_fwc_mtd_write(struct fwc_info *fwc, u8 *buf, s32 len)
 
     pr_debug("%s, data len %d, trans len %d\n", __func__, len, fwc->trans_size);
 
-    aicos_free_align(0, rdbuf);
+    aicupg_free_align(rdbuf);
     return len;
 out:
     if (rdbuf)
-        aicos_free_align(0, rdbuf);
+        aicupg_free_align(rdbuf);
     return 0;
 }
 
@@ -449,7 +449,7 @@ s32 nand_fwc_nftl_write(struct fwc_info *fwc, u8 *buf, s32 len)
     int i, calc_len = 0, ret = 0;
     u8 *rdbuf;
 
-    rdbuf = aicos_malloc_align(0, len, CACHE_LINE_SIZE);
+    rdbuf = aicupg_malloc_align(len, CACHE_LINE_SIZE);
     if (!rdbuf) {
         pr_err("Error: malloc buffer failed.\n");
         return 0;
@@ -514,11 +514,11 @@ s32 nand_fwc_nftl_write(struct fwc_info *fwc, u8 *buf, s32 len)
 
     pr_debug("%s, data len %d, trans len %d\n", __func__, len, fwc->trans_size);
     (void)ret;
-    aicos_free_align(0, rdbuf);
+    aicupg_free_align(rdbuf);
     return len;
 out:
     if (rdbuf)
-        aicos_free_align(0, rdbuf);
+        aicupg_free_align(rdbuf);
     return 0;
 }
 #endif
@@ -566,6 +566,9 @@ void nand_fwc_data_end(struct fwc_info *fwc)
     priv = (struct aicupg_nand_priv *)fwc->priv;
     if (!priv)
         return;
+
+    if (priv->spl_flag)
+        nand_fwc_spl_end(priv);
 
 #ifdef AIC_NFTL_SUPPORT
     struct nftl_api_handler_t *nftl_handler;

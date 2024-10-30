@@ -576,12 +576,15 @@ static lv_obj_t * creat_screen_blank_delay_dropdown(lv_obj_t * parent)
     return dd;
 }
 
+static void lv_mpp_fb_open(void)
+{
+    g_fb = mpp_fb_open();
+}
+
 static void lv_bg_dark_set(lv_obj_t * parent)
 {
     struct aicfb_screeninfo info;
     char bg_dark[256];
-
-    g_fb = mpp_fb_open();
 
     mpp_fb_ioctl(g_fb, AICFB_GET_SCREENINFO, &info);
     snprintf(bg_dark, 255, "L:/%dx%d_%d_%08x.fake",\
@@ -624,12 +627,37 @@ static unsigned int lv_calculate_pictures_count(void)
     return image_count;
 }
 
+static void lv_menu_set_style(lv_obj_t * menu)
+{
+    struct aicfb_screeninfo info;
+    u32 height = USB_OSD_MENU_HEIGHT;
+    u32 width = USB_OSD_MENU_WIDTH;
+
+    mpp_fb_ioctl(g_fb, AICFB_GET_SCREENINFO, &info);
+
+    static lv_style_t menu_style;
+    lv_style_init(&menu_style);
+    lv_style_set_bg_opa(&menu_style, LV_OPA_90);
+
+    if (info.width < width)
+        width = info.width * 0.8;
+    if (height > info.height)
+        height = info.height * 0.8;
+
+    lv_style_set_width(&menu_style, width);
+    lv_style_set_height(&menu_style, height);
+    lv_style_set_align(&menu_style, LV_ALIGN_BOTTOM_MID);
+
+    lv_obj_add_style(menu, &menu_style, 0);
+}
+
 lv_obj_t * lv_settings_screen_creat(void)
 {
     lv_obj_t * settings_screen = lv_obj_create(NULL);
     lv_obj_clear_flag(settings_screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(settings_screen, menu_event_cb, LV_EVENT_ALL, NULL);
 
+    lv_mpp_fb_open();
     lv_bg_dark_set(settings_screen);
     lv_logo_image_create(settings_screen);
 
@@ -644,20 +672,13 @@ lv_obj_t * lv_settings_screen_creat(void)
     menu = lv_menu_create(settings_screen);
     lv_obj_add_event_cb(menu, menu_event_handler, LV_EVENT_ALL, menu);
     lv_timer_create(menu_hide_callback, USB_OSD_MENU_HIDE_TIME_MS, 0);
-
-    static lv_style_t menu_style;
-    lv_style_init(&menu_style);
-    lv_style_set_bg_opa(&menu_style, LV_OPA_90);
-    lv_obj_add_style(menu, &menu_style, 0);
+    lv_menu_set_style(menu);
 
     lv_color_t bg_color = lv_obj_get_style_bg_color(menu, 0);
     if(lv_color_brightness(bg_color) > 127)
         lv_obj_set_style_bg_color(menu, lv_color_darken(lv_obj_get_style_bg_color(menu, 0), 10), 0);
     else
         lv_obj_set_style_bg_color(menu, lv_color_darken(lv_obj_get_style_bg_color(menu, 0), 50), 0);
-
-    lv_obj_set_size(menu, USB_OSD_MENU_WIDTH, USB_OSD_MENU_HEIGHT);
-    lv_obj_align(menu, LV_ALIGN_BOTTOM_MID, 0, 0);
 
     /* Create sub pages */
     lv_obj_t * cont;

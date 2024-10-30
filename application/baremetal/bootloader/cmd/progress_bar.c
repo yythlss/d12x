@@ -26,7 +26,7 @@
 #define WIDTH_SPLIT_NUMERATOR       5
 #define WIDTH_SPLIT_DENOMINATOR     6
 
-#define BAR_HEIGHT                  35
+#define BAR_HEIGHT                  32
 
 #define SPLIT_WIDTH(w)              \
     ((w) * WIDTH_SPLIT_NUMERATOR / WIDTH_SPLIT_DENOMINATOR)
@@ -139,13 +139,11 @@ void aicfb_draw_rect(struct aicfb_screeninfo *info,
                     u8 red, u8 green, u8 blue)
 {
 #ifndef AIC_BOOTLOADER_CMD_ONLY_FB_CONSOLE
-    unsigned long dcache_size, fb_dcache_start;
     int pbytes = info->bits_per_pixel / 8;
     unsigned char *fb;
     int i, j;
 
     fb = (unsigned char *)(info->framebuffer + y * info->stride + x * pbytes);
-    fb_dcache_start = ALIGN_DOWM((unsigned long)fb, ARCH_DMA_MINALIGN);
 
     switch (info->format) {
     case MPP_FMT_ARGB_8888:
@@ -183,9 +181,7 @@ void aicfb_draw_rect(struct aicfb_screeninfo *info,
         return;
     };
 
-    dcache_size = ALIGN_UP((unsigned long)fb - fb_dcache_start,
-            ARCH_DMA_MINALIGN);
-    aicos_dcache_clean_range((unsigned long *)fb_dcache_start, dcache_size);
+    aicos_dcache_clean_range((unsigned long *)info->framebuffer, info->smem_len);
 #endif
 }
 
@@ -293,7 +289,7 @@ void aicfb_draw_bar(unsigned int value)
 #if (AIC_BOOTLOADER_CMD_PROGRESS_BAR_ROTATE == 90)
     width     = BAR_HEIGHT;
     height    = SPLIT_WIDTH(info.height);
-    bar_x     = (info.width - width) / 2;
+    bar_x     = 0;
     bar_y     = (info.height - height) / 2 + height;
     console_x = bar_x + BAR_HEIGHT + 5;
     console_y = info.height / 2;
@@ -301,7 +297,7 @@ void aicfb_draw_bar(unsigned int value)
     width     = SPLIT_WIDTH(info.width);
     height    = BAR_HEIGHT;
     bar_x     = (info.width - width) / 2;
-    bar_y     = (info.height - height) / 2;
+    bar_y     = 0;
     console_x = info.width / 2;
     console_y = bar_y + BAR_HEIGHT + 5;
 #endif

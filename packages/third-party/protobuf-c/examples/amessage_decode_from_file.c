@@ -1,7 +1,8 @@
 #include <rtthread.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <dfs_posix.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "amessage.pb-c.h"
 

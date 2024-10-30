@@ -50,17 +50,6 @@ uint32_t usb_disp_rotate = AIC_FB_ROTATE_DEGREE;
 uint32_t usb_disp_rotate = 0;
 #endif
 
-#ifdef AIC_USB_DISP_SCALE_DOWN_X
-uint32_t usb_disp_scale_down_x = AIC_USB_DISP_SCALE_DOWN_X;
-#else
-uint32_t usb_disp_scale_down_x = 0;
-#endif
-#ifdef AIC_USB_DISP_SCALE_DOWN_Y
-uint32_t usb_disp_scale_down_y = AIC_USB_DISP_SCALE_DOWN_Y;
-#else
-uint32_t usb_disp_scale_down_y = 0;
-#endif
-
 #ifdef AIC_USB_DISP_DEF_DIS
 uint8_t usb_display_en = 0;
 #else

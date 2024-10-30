@@ -21,17 +21,42 @@
 /**
  * lvds channel output order
  *
- * default D3 CK D2 D1 D0
- *          4  3  2  1  0
+ * link 0 default D3         CK         D2         D1         D0
+ *                PD26/PD27  PD24/PD25  PD22/PD23  PD20/PD21  PD18/PD19
+ *
+ * link 1 default D3         CK         D2         D1         D0
+ *                PD16/PD17  PD14/PD15  PD12/PD13  PD10/PD11  PD8/PD9
+ *
+ *
+ * link 0 example:
+ *                D2         CK         D3         D1         D0
+ *                PD26/PD27  PD24/PD25  PD22/PD23  PD20/PD21  PD18/PD19
+ *
+ * AIC_LVDS_LINK0_LANES LVDS_LANES(LVDS_D2, LVDS_CK, LVDS_D3, LVDS_D1, LVDS_D0)
+ * link1 example is the same as link0
  */
 #define AIC_LVDS_LINK0_LANES      LVDS_LANES(LVDS_D3, LVDS_CK, LVDS_D2, LVDS_D1, LVDS_D0)
 #define AIC_LVDS_LINK1_LANES      LVDS_LANES(LVDS_D3, LVDS_CK, LVDS_D2, LVDS_D1, LVDS_D0)
 
 /**
  * lvds channel polarities
+ *
+ * link 0 default PD26/PD27  PD24/PD25  PD22/PD23  PD20/PD21  PD18/PD19
+ *                N/P        N/P        N/P        N/P        N/P
+ *
+ * link 1 default PD16/PD17  PD14/PD15  PD12/PD13  PD10/PD11  PD8/PD9
+ *                N/P        N/P        N/P        N/P        N/P
+ *
+ *
+ * link 0 example:
+ *                PD26/PD27  PD24/PD25  PD22/PD23  PD20/PD21  PD18/PD19
+ *                N/P        P/N        N/P        P/N        N/P
+ *
+ * AIC_LVDS_LINK0_POL 0b01010
+ * link1 example is the same as link0
  */
-#define AIC_LVDS_LINK0_POL        0x0
-#define AIC_LVDS_LINK1_POL        0x0
+#define AIC_LVDS_LINK0_POL        0b00000
+#define AIC_LVDS_LINK1_POL        0b00000
 
 /**
  * lvds channel phy config
@@ -43,13 +68,41 @@
  * MIPI-DSI options
  */
 
-/* data line assignments */
+/**
+ * data lane assignments
+ *
+ * default D3          D2          D1          D0
+ *         PD26/PD27   PD24/PD25   PD22/PD23   PD19/PD20
+ *
+ * example D0          D1          D2          D3
+ *         PD26/PD27   PD24/PD25   PD22/PD23   PD19/PD20
+ *
+ * LANE_ASSIGNMENTS 0x0123
+ */
 #define LANE_ASSIGNMENTS 0x3210
 
-/* data line polarities */
+/**
+ * data lane polarities
+ *
+ * default PD26/PD27   PD24/PD25   PD22/PD23   PD19/PD20
+ *         N/P         N/P         N/P         N/P
+ *
+ * example PD26/PD27   PD24/PD25   PD22/PD23   PD19/PD20
+ *         P/N         N/P         P/N         N/P
+ *
+ * LANE_POLARITIES 0b1010
+ */
 #define LANE_POLARITIES  0b0000
 
-/* data clk inverse */
+/**
+ * data clk inverse
+ *
+ * default PD24/PD25
+ *         N/P
+ *
+ * CLK_INVERSE 1 PD24/PD25
+ *               P/N
+ */
 #define CLK_INVERSE      0
 
 /* virtual channel id */

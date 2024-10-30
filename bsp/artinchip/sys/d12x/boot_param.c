@@ -67,6 +67,11 @@ void *aic_get_boot_resource(void)
     return (void *)(boot_params_stash.r.a[1]);
 }
 
+void aic_set_boot_resource(void *res_addr)
+{
+    boot_params_stash.r.a[1] = (u32)(uintptr_t)res_addr;
+}
+
 int aic_get_boot_image_id(void)
 {
     return get_boot_image_id(boot_params_stash.r.a[0]);

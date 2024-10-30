@@ -18,6 +18,7 @@
 #include "mpp_vin.h"
 
 #include "drv_camera.h"
+#include "camera_inner.h"
 
 /* Default format configuration of OV2640 */
 #define OV2640_DFT_WIN          OV2640_WIN_VGA
@@ -287,16 +288,11 @@ enum ov2640_win_type {
     OV2640_WIN_UXGA,
 };
 
-struct regval_list {
-    u8 reg_num;
-    u8 value;
-};
-
 struct ov2640_win_size {
     char           *name;
     u32             width;
     u32             height;
-    const struct regval_list *regs;
+    const struct reg8_info *regs;
 };
 
 struct ov2640_dev {
@@ -320,7 +316,7 @@ static struct ov2640_dev g_ov2640_dev = {0};
 
 #define ENDMARKER { 0xff, 0xff }
 
-static const struct regval_list ov2640_init_regs[] = {
+static const struct reg8_info ov2640_init_regs[] = {
     { BANK_SEL, BANK_SEL_DSP },
     { 0x2c,   0xff },
     { 0x2e,   0xdf },
@@ -502,7 +498,7 @@ static const struct regval_list ov2640_init_regs[] = {
  * The preamble, setup the internal DSP to input an UXGA (1600x1200) image.
  * Then the different zooming configurations will setup the output image size.
  */
-static const struct regval_list ov2640_size_change_preamble_regs[] = {
+static const struct reg8_info ov2640_size_change_preamble_regs[] = {
     { BANK_SEL, BANK_SEL_DSP },
     { RESET, RESET_DVP },
     { SIZEL, SIZEL_HSIZE8_11_SET(UXGA_WIDTH) |
@@ -531,45 +527,45 @@ static const struct regval_list ov2640_size_change_preamble_regs[] = {
     { R_DVP_SP, pclk_div },             \
     { RESET, 0x00 }
 
-static const struct regval_list ov2640_qcif_regs[] = {
+static const struct reg8_info ov2640_qcif_regs[] = {
     PER_SIZE_REG_SEQ(QCIF_WIDTH, QCIF_HEIGHT, 3, 3, 4),
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_qvga_regs[] = {
+static const struct reg8_info ov2640_qvga_regs[] = {
     PER_SIZE_REG_SEQ(QVGA_WIDTH, QVGA_HEIGHT, 2, 2, 4),
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_cif_regs[] = {
+static const struct reg8_info ov2640_cif_regs[] = {
     PER_SIZE_REG_SEQ(CIF_WIDTH, CIF_HEIGHT, 2, 2, 8),
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_vga_regs[] = {
+static const struct reg8_info ov2640_vga_regs[] = {
     PER_SIZE_REG_SEQ(VGA_WIDTH, VGA_HEIGHT, 0, 0, 2),
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_svga_regs[] = {
+static const struct reg8_info ov2640_svga_regs[] = {
     PER_SIZE_REG_SEQ(SVGA_WIDTH, SVGA_HEIGHT, 1, 1, 2),
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_xga_regs[] = {
+static const struct reg8_info ov2640_xga_regs[] = {
     PER_SIZE_REG_SEQ(XGA_WIDTH, XGA_HEIGHT, 0, 0, 2),
     { CTRLI,    0x00 },
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_sxga_regs[] = {
+static const struct reg8_info ov2640_sxga_regs[] = {
     PER_SIZE_REG_SEQ(SXGA_WIDTH, SXGA_HEIGHT, 0, 0, 2),
     { CTRLI,    0x00 },
     { R_DVP_SP, 2 | R_DVP_SP_AUTO_MODE },
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_uxga_regs[] = {
+static const struct reg8_info ov2640_uxga_regs[] = {
     PER_SIZE_REG_SEQ(UXGA_WIDTH, UXGA_HEIGHT, 0, 0, 0),
     { CTRLI,    0x00 },
     { R_DVP_SP, 0 | R_DVP_SP_AUTO_MODE },
@@ -591,13 +587,13 @@ static const struct ov2640_win_size ov2640_supported_win_sizes[] = {
 };
 
 /* Register settings for pixel formats */
-static const struct regval_list ov2640_format_change_preamble_regs[] = {
+static const struct reg8_info ov2640_format_change_preamble_regs[] = {
     { BANK_SEL, BANK_SEL_DSP },
     { R_BYPASS, R_BYPASS_USE_DSP },
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_yuyv_regs[] = {
+static const struct reg8_info ov2640_yuyv_regs[] = {
     { IMAGE_MODE, IMAGE_MODE_YUV422 },
     { 0xd7, 0x03 },
     { 0x33, 0xa0 },
@@ -608,7 +604,7 @@ static const struct regval_list ov2640_yuyv_regs[] = {
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_uyvy_regs[] = {
+static const struct reg8_info ov2640_uyvy_regs[] = {
     { IMAGE_MODE, IMAGE_MODE_LBYTE_FIRST | IMAGE_MODE_YUV422 },
     { 0xd7, 0x01 },
     { 0x33, 0xa0 },
@@ -618,7 +614,7 @@ static const struct regval_list ov2640_uyvy_regs[] = {
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_rgb565_be_regs[] = {
+static const struct reg8_info ov2640_rgb565_be_regs[] = {
     { IMAGE_MODE, IMAGE_MODE_RGB565 },
     { 0xd7, 0x03 },
     { RESET,  0x00 },
@@ -626,7 +622,7 @@ static const struct regval_list ov2640_rgb565_be_regs[] = {
     ENDMARKER,
 };
 
-static const struct regval_list ov2640_rgb565_le_regs[] = {
+static const struct reg8_info ov2640_rgb565_le_regs[] = {
     { IMAGE_MODE, IMAGE_MODE_LBYTE_FIRST | IMAGE_MODE_RGB565 },
     { 0xd7, 0x03 },
     { RESET,  0x00 },
@@ -636,18 +632,7 @@ static const struct regval_list ov2640_rgb565_le_regs[] = {
 
 static int ov2640_write_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 val)
 {
-    u8 buf[2];
-    struct rt_i2c_msg msgs;
-
-    buf[0] = reg;
-    buf[1] = val;
-
-    msgs.addr = OV2640_I2C_SLAVE_ID;
-    msgs.flags = RT_I2C_WR;
-    msgs.buf = buf;
-    msgs.len = 2;
-
-    if (rt_i2c_transfer(i2c, &msgs, 1) != 1) {
+    if (rt_i2c_write_reg(i2c, OV2640_I2C_SLAVE_ID, reg, &val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
         return -1;
     }
@@ -657,20 +642,7 @@ static int ov2640_write_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 val)
 
 static int ov2640_read_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 *val)
 {
-    struct rt_i2c_msg msg[2];
-    u8 buf = reg;
-
-    msg[0].addr  = OV2640_I2C_SLAVE_ID;
-    msg[0].flags = RT_I2C_WR;
-    msg[0].buf   = &buf;
-    msg[0].len   = 1;
-
-    msg[1].addr  = OV2640_I2C_SLAVE_ID;
-    msg[1].flags = RT_I2C_RD;
-    msg[1].buf   = val;
-    msg[1].len   = 1;
-
-    if (rt_i2c_transfer(i2c, msg, 2) != 2) {
+    if (rt_i2c_read_reg(i2c, OV2640_I2C_SLAVE_ID, reg, val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, *val);
         return -1;
     }
@@ -679,14 +651,13 @@ static int ov2640_read_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 *val)
 }
 
 static int ov2640_write_array(struct rt_i2c_bus_device *i2c,
-                              const struct regval_list *vals)
+                              const struct reg8_info *vals)
 {
     int ret;
 
-    while ((vals->reg_num != 0xff) || (vals->value != 0xff)) {
-        ret = ov2640_write_reg(i2c,
-                        vals->reg_num, vals->value);
-        LOG_D("array: 0x%02x, 0x%02x", vals->reg_num, vals->value);
+    while ((vals->reg != 0xff) || (vals->val != 0xff)) {
+        ret = ov2640_write_reg(i2c, vals->reg, vals->val);
+        LOG_D("array: 0x%02x, 0x%02x", vals->reg, vals->val);
 
         if (ret < 0)
             return ret;
@@ -715,7 +686,7 @@ static int ov2640_mask_set(struct rt_i2c_bus_device *i2c,
 static int ov2640_reset(struct rt_i2c_bus_device *i2c)
 {
     int ret = 0;
-    static const struct regval_list reset_seq[] = {
+    static const struct reg8_info reset_seq[] = {
         {BANK_SEL, BANK_SEL_SENS},
         {COM7, COM7_SRST},
         ENDMARKER,
@@ -736,13 +707,16 @@ static void ov2640_set_power(struct ov2640_dev *sensor, int on)
     if (sensor->power_count == on)
         return;
 
-    if (sensor->pwdn_pin)
-        rt_pin_write(sensor->pwdn_pin, !on);
+    if (on)
+        camera_pin_set_low(sensor->pwdn_pin);
+    else
+        camera_pin_set_high(sensor->pwdn_pin);
+
     if (on && sensor->rst_pin) {
         /* Active the reset pin to perform a reset pulse */
-        rt_pin_write(sensor->rst_pin, PIN_LOW);
+        camera_pin_set_low(sensor->rst_pin);
         rt_thread_mdelay(5);
-        rt_pin_write(sensor->rst_pin, PIN_HIGH);
+        camera_pin_set_high(sensor->rst_pin);
     }
 
     sensor->power_count += on ? 1 : -1;
@@ -753,7 +727,7 @@ static void ov2640_set_power(struct ov2640_dev *sensor, int on)
 static int ov2640_set_params(struct rt_i2c_bus_device *i2c,
                              const struct ov2640_win_size *win, u32 code)
 {
-    const struct regval_list *selected_cfmt_regs;
+    const struct reg8_info *selected_cfmt_regs;
     u8 val;
     int ret;
 
@@ -876,37 +850,20 @@ done:
     return ret;
 }
 
-static int ov2640_i2c_init(struct ov2640_dev *sensor)
-{
-    char name[8] = "";
-
-    snprintf(name, 8, "i2c%d", AIC_CAMERA_I2C_CHAN);
-    sensor->i2c = rt_i2c_bus_device_find(name);
-    if (sensor->i2c == RT_NULL) {
-        LOG_E("Failed to open %s", name);
-        return -ENODEV;
-    }
-
-    return 0;
-}
-
-static int ov2640_set_xclk(u32 freq)
-{
-    g_ov2640_dev.xclk_freq = freq;
-    return 0;
-}
-
 static rt_err_t ov2640_init(rt_device_t dev)
 {
     int ret = 0;
     struct ov2640_dev *sensor = &g_ov2640_dev;
 
-    ret = ov2640_i2c_init(sensor);
-    if (ret != 0)
+    sensor->i2c = camera_i2c_get();
+    if (!sensor->i2c)
         return -RT_EINVAL;
 
-    if (ov2640_set_xclk(24000000))
+    sensor->xclk_freq = camera_xclk_rate_get();
+    if (!sensor->xclk_freq) {
+        LOG_E("Must set XCLK freq first!\n");
         return -RT_EINVAL;
+    }
 
     sensor->win = &ov2640_supported_win_sizes[OV2640_DFT_WIN];
     sensor->cfmt_code  = OV2640_DFT_CODE;
@@ -918,10 +875,10 @@ static rt_err_t ov2640_init(rt_device_t dev)
                         MEDIA_SIGNAL_VSYNC_ACTIVE_LOW |
                         MEDIA_SIGNAL_PCLK_SAMPLE_FALLING;
 
-    sensor->rst_pin = rt_pin_get(AIC_CAMERA_RST_PIN);
-    sensor->pwdn_pin = rt_pin_get(AIC_CAMERA_PWDN_PIN);
-    rt_pin_mode(sensor->rst_pin, PIN_MODE_OUTPUT);
-    rt_pin_mode(sensor->pwdn_pin, PIN_MODE_OUTPUT);
+    sensor->rst_pin = camera_rst_pin_get();
+    sensor->pwdn_pin = camera_pwdn_pin_get();
+    if (!sensor->rst_pin || !sensor->pwdn_pin)
+        return -RT_EINVAL;
 
     ret = ov2640_video_probe(sensor);
     if (ret)

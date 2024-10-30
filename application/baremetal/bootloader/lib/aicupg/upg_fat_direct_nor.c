@@ -58,7 +58,7 @@ int fat_direct_write_spinor(u32 spi_id, char *fpath, u32 doffset)
 
     printf("Programming %s to 0x%x\n", fpath, doffset);
     printf("\t");
-    buf = aicos_malloc_align(0, MAX_WRITE_SIZE, FRAME_LIST_SIZE);
+    buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     soffset = 0;
     writecnt = 0;
 
@@ -103,7 +103,7 @@ int fat_direct_write_spinor(u32 spi_id, char *fpath, u32 doffset)
     }
 
     if (buf)
-        aicos_free_align(0, buf);
+        aicupg_free_align(buf);
     printf("\n");
     return ret;
 }

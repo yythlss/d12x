@@ -51,10 +51,12 @@ const struct aic_spinand_info xtx_spinand_table[] = {
     /*XT26G01B device*/
     { DEVID(0xF1), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
       DIE(0), "XTX 128MB: 2048+64@64@1024", cmd_cfg_table },
-    /*XT26G04D device
+    /*XT26G04D device */
     { DEVID(0x33), PAGESIZE(4096), OOBSIZE(256), BPL(2048), PPB(64), PLANENUM(1),
       DIE(0), "XTX 512MB: 4096+256@64@2048", cmd_cfg_table, xt26g01c_ecc_get_status},
-      */
+    /*XT26G02D device */
+    { DEVID(0x32), PAGESIZE(2048), OOBSIZE(128), BPL(2048), PPB(64), PLANENUM(1),
+      DIE(0), "XTX 256MB: 2048+128@64@2048", cmd_cfg_table, xt26g01c_ecc_get_status},
 };
 
 const struct aic_spinand_info *xtx_spinand_detect(struct aic_spinand *flash)

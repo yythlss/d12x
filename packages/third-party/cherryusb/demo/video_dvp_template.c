@@ -204,7 +204,7 @@ static int sensor_get_fmt(void)
 
     ret = mpp_dvp_ioctl(DVP_IN_G_FMT, &f);
     if (ret < 0) {
-        USB_LOG_ERR("ioctl() failed! err %d\n", ret);
+        USB_LOG_ERR("Failed to get sensor format! err %d\n", ret);
         return -1;
     }
 
@@ -222,7 +222,7 @@ static int sensor_set_infmt(void)
 
     ret = mpp_dvp_ioctl(DVP_IN_S_FMT, &g_uvc_video.src_fmt);
     if (ret < 0) {
-        USB_LOG_ERR("ioctl() failed! err %d\n", ret);
+        USB_LOG_ERR("Failed to set DVP in-format! err %d\n", ret);
         return -1;
     }
 
@@ -241,7 +241,7 @@ static int sensor_set_outfmt(int width, int height, int format)
 
     ret = mpp_dvp_ioctl(DVP_OUT_S_FMT, &f);
     if (ret < 0) {
-        USB_LOG_ERR("ioctl() failed! err -%d\n", -ret);
+        USB_LOG_ERR("Failed to set DVP out-format! err -%d\n", -ret);
         return -1;
     }
     return 0;
@@ -252,7 +252,7 @@ static int sensor_request_buf(struct vin_video_buf *vbuf)
     int i = 0;
 
     if (mpp_dvp_ioctl(DVP_REQ_BUF, (void *)vbuf) < 0) {
-        USB_LOG_ERR("ioctl() failed!\n");
+        USB_LOG_ERR("Failed to request buf!\n");
         return -1;
     }
 
@@ -265,13 +265,18 @@ static int sensor_request_buf(struct vin_video_buf *vbuf)
             vbuf->planes[i * vbuf->num_planes + 1].len);
     }
 
+    if (vbuf->num_buffers < 3) {
+        pr_err("The number of video buf must >= 3!\n");
+        return -1;
+    }
+
     return 0;
 }
 
 static int sensor_queue_buf(int index)
 {
     if (mpp_dvp_ioctl(DVP_Q_BUF, (void *)(ptr_t)index) < 0) {
-        USB_LOG_ERR("ioctl() failed!\n");
+        USB_LOG_ERR("Q failed! Maybe buf state is invalid.\n");
         return -1;
     }
 
@@ -284,7 +289,7 @@ static int sensor_dequeue_buf(int *index)
 
     ret = mpp_dvp_ioctl(DVP_DQ_BUF, (void *)index);
     if (ret < 0) {
-        USB_LOG_ERR("ioctl() failed! err %d\n", ret);
+        USB_LOG_ERR("DQ failed! Maybe cannot receive data from Camera. err %d\n", ret);
         return -1;
     }
 
@@ -302,10 +307,10 @@ static int sensor_start(void)
 
     ret = mpp_dvp_ioctl(DVP_STREAM_ON, NULL);
     if (ret < 0) {
-        USB_LOG_ERR("ioctl() failed! err %d\n", ret);
+        USB_LOG_ERR("Failed to start streaming! err %d\n", ret);
         return -1;
     } else {
-        USB_LOG_DBG("start sensor, ret:%d\n", ret);
+        USB_LOG_DBG("Start sensor\n");
     }
 
     return 0;
@@ -317,7 +322,7 @@ static int sensor_stop(void)
 
     ret = mpp_dvp_ioctl(DVP_STREAM_OFF, NULL);
     if (ret < 0) {
-        USB_LOG_ERR("ioctl() failed! err -%d\n", -ret);
+        USB_LOG_ERR("Failed to start streaming! err -%d\n", -ret);
         return -1;
     }
 

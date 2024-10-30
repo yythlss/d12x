@@ -33,21 +33,21 @@ static void *upg_fat_malloc_align(struct fwc_info *fwc, u32 *size, size_t align)
     switch (*size) {
         case DATA_WRITE_ONCE_MAX_SIZE:
             *size = ALIGN_DOWN(DATA_WRITE_ONCE_MAX_SIZE, fwc->block_size);
-            ptr = aicos_malloc_align(0, *size, align);
+            ptr = aicupg_malloc_align(*size, align);
             if (ptr)
                 break;
         case DATA_WRITE_ONCE_MID_SIZE:
             *size = ALIGN_DOWN(DATA_WRITE_ONCE_MID_SIZE, fwc->block_size);
-            ptr = aicos_malloc_align(0, *size, align);
+            ptr = aicupg_malloc_align(*size, align);
             if (ptr)
                 break;
         case DATA_WRITE_ONCE_MIN_SIZE:
             *size = ALIGN_DOWN(DATA_WRITE_ONCE_MIN_SIZE, fwc->block_size);
-            ptr = aicos_malloc_align(0, *size, align);
+            ptr = aicupg_malloc_align(*size, align);
             if (ptr)
                 break;
         default:
-            ptr = aicos_malloc_align(0, *size, align);
+            ptr = aicupg_malloc_align(*size, align);
             if (ptr)
                 break;
     }
@@ -57,7 +57,7 @@ static void *upg_fat_malloc_align(struct fwc_info *fwc, u32 *size, size_t align)
 
 static void upg_fat_free_align(void *mem)
 {
-    aicos_free_align(0, mem);
+    aicupg_free_align(mem);
 }
 
 #define FRAME_LIST_SIZE 4096
@@ -73,7 +73,7 @@ static s32 media_device_write(char *image_name, struct fwc_meta *pmeta)
 
     fwc = NULL;
     buf = NULL;
-    fwc = aicos_malloc_align(0, sizeof(struct fwc_info), FRAME_LIST_SIZE);
+    fwc = aicupg_malloc_align(sizeof(struct fwc_info), FRAME_LIST_SIZE);
     if (!fwc) {
         pr_err("Error: malloc fwc failed.\n");
         ret = -1;
@@ -91,7 +91,7 @@ static s32 media_device_write(char *image_name, struct fwc_meta *pmeta)
     media_data_write_start(fwc);
 
     /*config write size once*/
-    if (config_ram_size <= 0x100000)
+    if (config_ram_size <= 0x400000)
         write_once_size = DATA_WRITE_ONCE_MIN_SIZE;
     else
         write_once_size = DATA_WRITE_ONCE_MAX_SIZE;
@@ -151,7 +151,7 @@ static s32 media_device_write(char *image_name, struct fwc_meta *pmeta)
             (total_len * 1000000 / start_us) / 1024 % 1024);
 
     upg_fat_free_align(buf);
-    aicos_free_align(0, fwc);
+    aicupg_free_align(fwc);
 
     return total_len;
 err:
@@ -159,7 +159,7 @@ err:
     if (buf)
         upg_fat_free_align(buf);
     if (fwc)
-        aicos_free_align(0, fwc);
+        aicupg_free_align(fwc);
     return 0;
 }
 
@@ -175,7 +175,7 @@ s32 aicupg_fat_write(char *image_name, char *protection,
     u64 total_len = 0;
 
     pmeta = NULL;
-    pmeta = (struct fwc_meta *)aicos_malloc_align(0, header->meta_size, FRAME_LIST_SIZE);
+    pmeta = (struct fwc_meta *)aicupg_malloc_align(header->meta_size, FRAME_LIST_SIZE);
     if (!pmeta) {
         pr_err("Error: malloc for meta failed.\n");
         ret = -1;
@@ -231,10 +231,10 @@ s32 aicupg_fat_write(char *image_name, char *protection,
            (ulong)((total_len * 1000000 / start_us) / 1024 / 1024),
            (ulong)((total_len * 1000000 / start_us) / 1024 % 1024));
 
-    aicos_free_align(0, pmeta);
+    aicupg_free_align(pmeta);
     return write_len;
 err:
     if (pmeta)
-        aicos_free_align(0, pmeta);
+        aicupg_free_align(pmeta);
     return 0;
 }

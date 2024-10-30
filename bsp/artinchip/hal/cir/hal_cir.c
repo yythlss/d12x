@@ -15,9 +15,6 @@ int hal_cir_init(aic_cir_ctrl_t *aic_cir_ctrl)
     int ret = 0;
     uint32_t reg_val;
 
-    aic_cir_ctrl->cir_base = CIR_BASE;
-    aic_cir_ctrl->irq_num = CIR_IRQn;
-    aic_cir_ctrl->clk_idx = CLK_CIR;
     ret = hal_clk_enable_deassertrst(aic_cir_ctrl->clk_idx);
 
     /* Set noise thresholld */
@@ -56,7 +53,7 @@ int hal_cir_set_tx_carrier(aic_cir_ctrl_t * aic_cir_ctrl,
 {
     uint32_t mod_clk, clk_div, carrier_high, carrier_low, val;
 
-    mod_clk = hal_clk_get_freq(CLK_CIR);
+    mod_clk = hal_clk_get_freq(aic_cir_ctrl->clk_idx);
     if (protocol == 1) {
         /* RC5 protocol */
         clk_div = DIV_ROUND_UP(mod_clk, 36000);
@@ -79,7 +76,7 @@ void hal_cir_set_rx_sample_clock(aic_cir_ctrl_t * aic_cir_ctrl,
 {
     uint32_t mod_clk, clk_div;
 
-    mod_clk = hal_clk_get_freq(CLK_CIR);
+    mod_clk = hal_clk_get_freq(aic_cir_ctrl->clk_idx);
     if (protocol == 1) {
         /* RC5 protocol */
         clk_div = DIV_ROUND_UP(mod_clk, 36000);

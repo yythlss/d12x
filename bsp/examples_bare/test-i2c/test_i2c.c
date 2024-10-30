@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -18,9 +18,13 @@
 
 #ifdef SE_I2C_BASE
 #define I2C_REG_BASE(x)     (SE_I2C_BASE)
+#define I2C_CLK_ID          CLK_SE_I2C
 #else
 #define I2C_REG_BASE(x)     (I2C0_BASE + (x * I2C_BASE_OFFSET))
+#define I2C_CLK_ID          (CLK_I2C0 + x)
 #endif
+
+#define I2C_RATE            400000
 
 aic_i2c_ctrl g_i2c_ctrl;
 
@@ -126,8 +130,9 @@ static int test_i2c_example(int argc, char *argv[])
     g_i2c_ctrl.reg_base = I2C_REG_BASE(bus_id);
     g_i2c_ctrl.msg = msgs;
     g_i2c_ctrl.addr_bit = I2C_7BIT_ADDR;
-    g_i2c_ctrl.speed_mode = I2C_400K_SPEED;
+    g_i2c_ctrl.target_rate = I2C_RATE;
     g_i2c_ctrl.bus_mode = I2C_MASTER_MODE;
+    g_i2c_ctrl.clk_id = I2C_CLK_ID;
 
     hal_i2c_init(&g_i2c_ctrl);
 

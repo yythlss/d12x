@@ -1,10 +1,11 @@
-
 /*
-* Copyright (C) 2020-2023 ArtInChip Technology Co. Ltd
-*
-*  author: <jun.ma@artinchip.com>
-*  Desc: audio_player_demo
-*/
+ * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Author: <jun.ma@artinchip.com>
+ * Desc: audio_player_demo
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -72,7 +73,7 @@ static int read_dir(char* path, struct audio_file_list *files)
         if (ptr == NULL)
             continue;
 
-        if (strcmp(ptr, ".mp3") && strcmp(ptr, ".wav"))
+        if (strcmp(ptr, ".mp3") && strcmp(ptr, ".wav") && strcmp(ptr, ".flac"))
             continue;
 
         printf("name: %s\n", dir_file->d_name);

@@ -66,19 +66,44 @@ C**********************************************************************
 #define CPU_FREQ (hal_clk_get_freq(CLK_CPU)/1000000)
 
 /* map the FORTRAN math functions, etc. to the C versions */
-#define DSIN	sin
-#define DCOS	cos
-#define DATAN	atan
-#define DLOG	log
-#define DEXP	exp
-#define DSQRT	sqrt
+#ifdef ARCH_RISCV_FPU_S
+#define SP
+#else
+/*
+ * If the chip does not support floating-point, then this program is executed
+ * with software double precision floating-point.
+ */
+#define DP
+#endif
+
+#ifdef SP
+#define REAL        float
+#define SIN         sinf
+#define COS         cosf
+#define ATAN        atanf
+#define LOG         logf
+#define EXP         expf
+#define SQRT        sqrtf
+#define STR_REAL    "Single"
+#endif
+
+#ifdef DP
+#define REAL        double
+#define SIN         sin
+#define COS         cos
+#define ATAN        atan
+#define LOG         log
+#define EXP         exp
+#define SQRT        sqrt
+#define STR_REAL    "Double"
+#endif
 #define IF		if
 
 /* function prototypes */
-void POUT(long N, long J, long K, double X1, double X2, double X3, double X4);
-void PA(double E[]);
+void POUT(long N, long J, long K, REAL X1, REAL X2, REAL X3, REAL X4);
+void PA(REAL E[]);
 void P0(void);
-void P3(double X, double Y, double *Z);
+void P3(REAL X, REAL Y, REAL *Z);
 #define USAGE	"usage: whetdc [-c] [loops]\n"
 
 static long my_time(int t)
@@ -89,7 +114,7 @@ static long my_time(int t)
 /*
 	COMMON T,T1,T2,E1(4),J,K,L
 */
-double T,T1,T2,E1[5];
+REAL T,T1,T2,E1[5];
 int J,K,L;
 
 int
@@ -98,7 +123,7 @@ whetstone_main(int argc, char *argv[])
 	/* used in the FORTRAN version */
 	long I;
 	long N1, N2, N3, N4, N6, N7, N8, N9, N10, N11;
-	double X1,X2,X3,X4,X,Y,Z;
+	REAL X1,X2,X3,X4,X,Y,Z;
 	long LOOP;
 	int II, JJ;
 
@@ -280,8 +305,8 @@ C
 	Y = 0.5;
 
 	for (I = 1; I <= N7; I++) {
-		X = T * DATAN(T2*DSIN(X)*DCOS(X)/(DCOS(X+Y)+DCOS(X-Y)-1.0));
-		Y = T * DATAN(T2*DSIN(Y)*DCOS(Y)/(DCOS(X+Y)+DCOS(X-Y)-1.0));
+		X = T * ATAN(T2*SIN(X)*COS(X)/(COS(X+Y)+COS(X-Y)-1.0));
+		Y = T * ATAN(T2*SIN(Y)*COS(Y)/(COS(X+Y)+COS(X-Y)-1.0));
 	}
 
 #ifdef PRINTOUT
@@ -350,7 +375,7 @@ C
 	X = 0.75;
 
 	for (I = 1; I <= N11; I++)
-		X = DSQRT(DEXP(DLOG(X)/T1));
+		X = SQRT(EXP(LOG(X)/T1));
 
 #ifdef PRINTOUT
 	IF (JJ==II)POUT(N11,J,K,X,X,X,X);
@@ -393,11 +418,11 @@ C--------------------------------------------------------------------
 
 #ifndef AIC_PRINT_FLOAT_CUSTOM
 	if (KIPS >= 1000.0) {
-		printf("C Converted Double Precision Whetstones: %.1f MIPS\n", KIPS/1000.0);
+		printf("C Converted %s Precision Whetstones: %.1f MIPS\n", STR_REAL, KIPS/1000.0);
 		printf("Score(CPU %ldMHz): %.2f\n", CPU_FREQ, KIPS/1000.0/CPU_FREQ);
 	}
 	else {
-		printf("C Converted Double Precision Whetstones: %.1f KIPS\n", KIPS);
+		printf("C Converted %s Precision Whetstones: %.1f KIPS\n", STR_REAL, KIPS);
 	}
 #else
 	/* print float */
@@ -409,7 +434,7 @@ C--------------------------------------------------------------------
 		p_f = KIPS/1000.0;
 		p_i1 = (unsigned int)p_f;
 		p_i2 = (unsigned int)((p_f-p_i1)*10.0);
-		printf("C Converted Double Precision Whetstones: %d.%d MIPS\n", p_i1, p_i2);
+		printf("C Converted %s Precision Whetstones: %d.%d MIPS\n", STR_REAL, p_i1, p_i2);
 
 		p_f = KIPS/1000.0/CPU_FREQ;
 		p_i1 = (unsigned int)p_f;
@@ -420,7 +445,7 @@ C--------------------------------------------------------------------
 		p_f = KIPS;
 		p_i1 = (unsigned int)p_f;
 		p_i2 = (unsigned int)((p_f-p_i1)*10.0);
-		printf("C Converted Double Precision Whetstones: %d.%d KIPS\n", p_i1, p_i2);
+		printf("C Converted %s Precision Whetstones: %d.%d KIPS\n", STR_REAL, p_i1, p_i2);
 	}
 #endif
 	if (continuous)
@@ -430,7 +455,7 @@ C--------------------------------------------------------------------
 }
 
 void
-PA(double E[])
+PA(REAL E[])
 {
 	J = 0;
 
@@ -454,9 +479,9 @@ P0(void)
 }
 
 void
-P3(double X, double Y, double *Z)
+P3(REAL X, REAL Y, REAL *Z)
 {
-	double X1, Y1;
+	REAL X1, Y1;
 
 	X1 = X;
 	Y1 = Y;
@@ -467,7 +492,7 @@ P3(double X, double Y, double *Z)
 
 #ifdef PRINTOUT
 void
-POUT(long N, long J, long K, double X1, double X2, double X3, double X4)
+POUT(long N, long J, long K, REAL X1, REAL X2, REAL X3, REAL X4)
 {
 	printf("%7ld %7ld %7ld %12.4e %12.4e %12.4e %12.4e\n",
 						N, J, K, X1, X2, X3, X4);

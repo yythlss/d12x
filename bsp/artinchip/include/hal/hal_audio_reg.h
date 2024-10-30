@@ -190,7 +190,7 @@
 
 #define ADC_CTL2_REG						(0xA4)
 #define ADC_CTL2_MBIAS_CTL					(8)
-#define ADC_CTL2_PGA_GAIN_SEL					(0xA)
+#define ADC_CTL2_PGA_GAIN_SEL					(0xF)
 #define ADC_CTL2_PGA_GAIN_MASK					GENMASK(3, 0)
 
 #define DEFAULT_AUDIO_FREQ					(24576000)

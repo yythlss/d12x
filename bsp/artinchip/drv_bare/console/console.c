@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Authors:  Wu Dehuang <dehuang.wu@artinchip.com>
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -383,7 +391,8 @@ static int console_run_cmd_internal(struct tiny_console *cons,
     for (c = root; c; c = c->next) {
         int rc = CONSOLE_OK;
 
-        if (strncasecmp(c->cmdname, args[starg_arg], strlen(args[starg_arg])))
+        if (strncasecmp(c->cmdname, args[starg_arg], strlen(c->cmdname)) ||
+            strlen(c->cmdname) != strlen(args[starg_arg]))
             continue;
 
         /* name is matched */

@@ -1,11 +1,36 @@
 /*
- * Copyright (c) 2020-2021 Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Authors:  Wu Dehuang <dehuang.wu@artinchip.com>
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <aic_common.h>
+#include <boot_param.h>
 #include <private_param.h>
+
+char private_params_stash[1024];
+
+void reloc_private_params(void)
+{
+    void *res_addr;
+    int i;
+
+    res_addr = aic_get_boot_resource();
+    if (res_addr) {
+        for (i = 0; i < sizeof(private_params_stash); i += 4) {
+            memcpy(&private_params_stash[i], res_addr, 4);
+            if (*(u32 *)res_addr == DATA_SECT_TYPE_END)
+                break;
+            res_addr += 4;
+        }
+        aic_set_boot_resource(private_params_stash);
+    }
+}
 
 static u32 *find_section(void *start, u32 type)
 {

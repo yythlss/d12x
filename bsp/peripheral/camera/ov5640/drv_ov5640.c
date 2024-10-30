@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -17,6 +17,7 @@
 #include "mpp_vin.h"
 
 #include "drv_camera.h"
+#include "camera_inner.h"
 
 /* Format configuration of OV5640 */
 #define OV5640_MODE             OV5640_MODE_VGA_640_480
@@ -568,20 +569,7 @@ static u32 ov5640_ilog2(u32 x)
 
 static int ov5640_write_reg(struct ov5640_dev *sensor, u16 reg, u8 val)
 {
-    struct rt_i2c_bus_device *client = sensor->iic;
-    u8 buf[3];
-    struct rt_i2c_msg msgs;
-
-    buf[0] = reg >> 8;
-    buf[1] = reg & 0xff;
-    buf[2] = val;
-
-    msgs.addr = OV5640_DEFAULT_SLAVE_ID;
-    msgs.flags = RT_I2C_WR;
-    msgs.buf = buf;
-    msgs.len = 3;
-
-    if (rt_i2c_transfer(client, &msgs, 1) != 1) {
+    if (rt_i2c_write_reg16(sensor->iic, OV5640_DEFAULT_SLAVE_ID, reg, &val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
         return -1;
     }
@@ -593,24 +581,7 @@ static int ov5640_write_reg(struct ov5640_dev *sensor, u16 reg, u8 val)
 
 static int ov5640_read_reg(struct ov5640_dev *sensor, u16 reg, u8 *val)
 {
-    struct rt_i2c_bus_device *client = sensor->iic;
-    struct rt_i2c_msg msg[2];
-    u8 buf[2] = {0};
-
-    buf[0] = reg >> 8;
-    buf[1] = reg & 0xff;
-
-    msg[0].addr  = OV5640_DEFAULT_SLAVE_ID;
-    msg[0].flags = RT_I2C_WR;
-    msg[0].buf   = buf;
-    msg[0].len   = 2;
-
-    msg[1].addr  = OV5640_DEFAULT_SLAVE_ID;
-    msg[1].flags = RT_I2C_RD;
-    msg[1].buf   = val;
-    msg[1].len   = 1;
-
-    if (rt_i2c_transfer(client, msg, 2) != 2) {
+    if (rt_i2c_read_reg16(sensor->iic, OV5640_DEFAULT_SLAVE_ID, reg, val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, *val);
         return -1;
     }
@@ -623,29 +594,27 @@ static int ov5640_read_reg(struct ov5640_dev *sensor, u16 reg, u8 *val)
 
 static int ov5640_read_reg16(struct ov5640_dev *sensor, u16 reg, u16 *val)
 {
-    u8 hi = 0, lo = 0;
-    int ret;
+    u16 temp = 0;
 
-    ret = ov5640_read_reg(sensor, reg, &hi);
-    if (ret)
-        return ret;
-    ret = ov5640_read_reg(sensor, reg + 1, &lo);
-    if (ret)
-        return ret;
+    if (rt_i2c_read_reg16(sensor->iic, OV5640_DEFAULT_SLAVE_ID, reg, (u8 *)&temp, 2) != 2) {
+        LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, temp);
+        return -1;
+    }
+    *val = (u16)(temp << 8) | (u16)(temp >> 8);
 
-    *val = ((u16)hi << 8) | (u16)lo;
     return 0;
 }
 
 static int ov5640_write_reg16(struct ov5640_dev *sensor, u16 reg, u16 val)
 {
-    int ret;
+    u16 temp = (u16)(val >> 8) | (u16)(val << 8);
 
-    ret = ov5640_write_reg(sensor, reg, val >> 8);
-    if (ret)
-        return ret;
+    if (rt_i2c_write_reg16(sensor->iic, OV5640_DEFAULT_SLAVE_ID, reg, (u8 *)&temp, 2) != 2) {
+        LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
+        return -1;
+    }
 
-    return ov5640_write_reg(sensor, reg + 1, val & 0xff);
+    return 0;
 }
 
 static int ov5640_mod_reg(struct ov5640_dev *sensor, u16 reg, u8 mask, u8 val)
@@ -1910,39 +1879,27 @@ out:
     return ret;
 }
 
-static int ov5640_iic_init(struct ov5640_dev *sensor)
-{
-    char name[8] = "";
-
-    snprintf(name, 8, "i2c%d", AIC_CAMERA_I2C_CHAN);
-    sensor->iic = rt_i2c_bus_device_find(name);
-    if (sensor->iic == RT_NULL) {
-        LOG_E("Failed to open %s", name);
-        return -ENODEV;
-    }
-
-    sensor->pending_mode_change = true;
-    return 0;
-}
-
 static void ov5640_power(struct ov5640_dev *sensor, bool enable)
 {
 #ifndef FPGA_BOARD_ARTINCHIP
-    rt_pin_write(sensor->pwdn_pin, enable ? 0 : 1);
+    if (enable)
+        camera_pin_set_low(sensor->pwdn_pin);
+    else
+        camera_pin_set_high(sensor->pwdn_pin);
 #endif
 }
 
 static int ov5640_set_power_on(struct ov5640_dev *sensor)
 {
 #ifndef FPGA_BOARD_ARTINCHIP
-    rt_pin_write(sensor->rst_pin, PIN_LOW);
+    camera_pin_set_low(sensor->rst_pin);
 
     ov5640_power(sensor, 0);
     rt_thread_mdelay(10);
     ov5640_power(sensor, 1);
     rt_thread_mdelay(10);
 
-    rt_pin_write(sensor->rst_pin, PIN_HIGH);
+    camera_pin_set_high(sensor->rst_pin);
     rt_thread_mdelay(2);
     pr_info("power on\n");
 #endif
@@ -2194,22 +2151,22 @@ power_off:
     return ret;
 }
 
-static int ov5640_set_xclk(u32 freq)
-{
-    g_ov5640_dev.xclk_freq = freq;
-    return 0;
-}
-
 static rt_err_t ov5640_init(rt_device_t dev)
 {
     int ret = 0;
     struct ov5640_dev *sensor = &g_ov5640_dev;
 
-    ret = ov5640_iic_init(sensor);
-    if (ret != 0)
+    sensor->iic = camera_i2c_get();
+    if (!sensor->iic)
         return -RT_EINVAL;
 
-    ov5640_set_xclk(24000000);
+    sensor->pending_mode_change = true;
+
+    sensor->xclk_freq = camera_xclk_rate_get();
+    if (!sensor->xclk_freq) {
+        LOG_E("Must set XCLK freq first!\n");
+        return -RT_EINVAL;
+    }
 
     sensor->current_mode = &ov5640_mode_data[OV5640_MODE];
     sensor->last_mode = sensor->current_mode;
@@ -2223,10 +2180,10 @@ static rt_err_t ov5640_init(rt_device_t dev)
     sensor->current_fr = OV5640_FPS;
     sensor->ae_target = 52;
 
-    sensor->rst_pin = rt_pin_get(AIC_CAMERA_RST_PIN);
-    sensor->pwdn_pin = rt_pin_get(AIC_CAMERA_PWDN_PIN);
-    rt_pin_mode(sensor->rst_pin, PIN_MODE_OUTPUT);
-    rt_pin_mode(sensor->pwdn_pin, PIN_MODE_OUTPUT);
+    sensor->rst_pin = camera_rst_pin_get();
+    sensor->pwdn_pin = camera_pwdn_pin_get();
+    if (!sensor->rst_pin || !sensor->pwdn_pin)
+        return -RT_EINVAL;
 
     ret = ov5640_check_chip_id(sensor);
     if (ret)

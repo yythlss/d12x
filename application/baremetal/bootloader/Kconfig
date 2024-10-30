@@ -8,18 +8,25 @@ config AIC_BOOTLOADER
     select AIC_USING_UMM_HEAP
 
 menu "Memory"
+    config AIC_BOOTLOADER_MEM_AUTO
+        bool "Bootloader memory auto config"
+        default y
+
     config AIC_BOOTLOADER_TEXT_BASE
         hex "BootLoader link address"
         default 0
+        depends on !AIC_BOOTLOADER_MEM_AUTO
     config AIC_BOOTLOADER_TEXT_SIZE
         hex "BootLoader code memory size"
-        default 0
+        default 0x3FF00
+
     config AIC_BOOTLOADER_HEAP_BASE
         hex "BootLoader heap address"
         default 0
+        depends on !AIC_BOOTLOADER_MEM_AUTO
     config AIC_BOOTLOADER_HEAP_SIZE
         hex "BootLoader heap size"
-        default 0
+        default 0xC0000
 endmenu
 
 menu "Console"

@@ -12,6 +12,7 @@
 extern "C" {
 #endif
 
+#include <rtconfig.h>
 #include "mpp_types.h"
 
 /*
@@ -25,9 +26,20 @@ extern "C" {
 
 */
 
-// #define USE_DRAW_BUF
-#define DRAW_BUF_WIDTH          1024
-#define DRAW_BUF_HEIGHT         600
+#if defined(LV_DISPLAY_ROTATE_EN)
+#ifndef USE_DRAW_BUF
+#define USE_DRAW_BUF
+#endif // USE_DRAW_BUF
+
+#ifndef DRAW_BUF_WIDTH
+#define DRAW_BUF_WIDTH fbdev_get_screen_width()
+#endif // DRAW_BUF_WIDTH
+
+#ifndef DRAW_BUF_HEIGHT
+#define DRAW_BUF_HEIGHT fbdev_get_screen_height()
+#endif // DRAW_BUF_HEIGHT
+
+#endif // LV_DISPLAY_ROTATE_EN
 
 #define MAX_FRAME_NUM 2
 
@@ -47,6 +59,10 @@ int fbdev_get_bpp(void);
 int fbdev_get_pitch(void);
 
 int draw_buf_size(int *width, int *height);
+
+unsigned int fbdev_get_screen_width();
+
+unsigned int fbdev_get_screen_height();
 
 enum mpp_pixel_format draw_buf_fmt(void);
 

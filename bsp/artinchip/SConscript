@@ -88,9 +88,12 @@ if GetDepend('AIC_QSPI_DRV'):
     ver = ver.replace('"','')
     if GetDepend('DRIVER_DRV_EN'):
         src += Glob('drv/qspi/*.c')
+        src += Glob('drv/spi/*.c')
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/qspi/*.c', exclude=['hal/qspi/*_v*.c'])
         src += Glob('hal/qspi/*_v%sx.c' % (ver[0]))
+    if GetDepend('DRIVER_BARE_DRV_EN') and GetDepend('AIC_QSPI_DRV_TEST'):
+        src += Glob('drv_bare/qspi/*.c')
 
 # XSPI driver
 if GetDepend('AIC_XSPI_DRV'):
@@ -378,6 +381,8 @@ if GetDepend('AIC_PWM_DRV'):
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/pwm/*.c')
 
+        src += Glob('drv/xpwm/xpwm_info_v11.c')
+    if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/xpwm/*.c')
 
 if GetDepend('AIC_HRTIMER_DRV_V12'):
@@ -442,6 +447,13 @@ if GetDepend('AIC_CE_DRV'):
         src += Glob('drv/ce/*.c')
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/ce/*.c')
+
+# DCE driver
+if GetDepend('AIC_DCE_DRV'):
+    if GetDepend('DRIVER_DRV_EN'):
+        src += Glob('drv/dce/*.c')
+    if GetDepend('DRIVER_HAL_EN'):
+        src += Glob('hal/dce/*.c')
 
 # TOUCH driver
 if GetDepend('AIC_USING_TOUCH') and GetDepend('KERNEL_BAREMETAL'):

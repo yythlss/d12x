@@ -1370,11 +1370,17 @@ def mkimage_prebuild(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_def
     TARGET_BIN = aic_pack_dir + 'bootloader.bin'
     if prj_kernel == 'baremetal' and "bootloader" == prj_app:
         POST_ACTION += '@cp -r ' + SOURCE_BIN + ' ' + TARGET_BIN + '\n'
+        from calc_linked_addr import calc_link_addr
+        calc_link_addr(aic_pack_dir + 'image_cfg.json',
+                '.config', aic_pack_dir + '.image_cfg.json.tmp')
     else:
         if len(MKFS_ACTION):
             POST_ACTION += MKFS_ACTION
         # packaged ddr files
         POST_ACTION += '@cp -r ' + aic_pack_dir + '* ' + prj_out_dir + '\n'
+        if os.path.exists(aic_pack_dir + '.image_cfg.json.tmp'):
+            POST_ACTION += '@cp ' + aic_pack_dir + '.image_cfg.json.tmp ' \
+                    + prj_out_dir + 'image_cfg.json\n'
         if platform.system() == 'Linux':
             MAKE_DDR_TOOL = 'python3 ' + aic_script_dir + 'mk_private_resource.py'
         elif platform.system() == 'Windows':

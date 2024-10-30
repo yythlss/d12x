@@ -36,6 +36,16 @@ config CPU_BASE
     default 0xE0000000 if QEMU_RUN
     depends on AIC_CHIP_D12X
 
+config CPU_PSRAM_BASE
+    hex
+    default 0x40000000
+    depends on AIC_CHIP_D12X
+
+config CPU_SRAM_BASE
+    hex
+    default 0x30040000
+    depends on AIC_CHIP_D12X
+
 #--------------------------------------------
 # cmu driver global option
 #--------------------------------------------

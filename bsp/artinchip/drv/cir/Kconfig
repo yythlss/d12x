@@ -3,7 +3,7 @@
 #-----------------------------
 
 menu "CIR protocol select"
-    depends on AIC_USING_CIR
+    depends on (AIC_USING_CIR || AIC_USING_R_CIR)
 
     config AIC_CIR_NEC
         bool "NEC protocol"

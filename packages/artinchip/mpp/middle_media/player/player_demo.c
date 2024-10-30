@@ -545,6 +545,7 @@ static int player_demo_test(int argc, char **argv)
     rt_device_t render_dev = RT_NULL;
     struct aicfb_alpha_config alpha_bak = {0};
     struct aicfb_alpha_config alpha = {0};
+    struct aicfb_layer_data layer = {0};
 
     rt_device_t uart_dev = RT_NULL;
     struct video_player_ctx *ctx = NULL;
@@ -590,6 +591,16 @@ static int player_demo_test(int argc, char **argv)
     alpha.mode = 1;
     alpha.value = ctx->alpha_value;
     rt_device_control(render_dev, AICFB_UPDATE_ALPHA_CONFIG, &alpha);
+
+    // store ui layer before playing
+    if (strcmp(PRJ_CHIP, "d12x") == 0) {
+        layer.layer_id = AICFB_LAYER_TYPE_UI;
+        if (rt_device_control(render_dev, AICFB_GET_LAYER_CONFIG, &layer) < 0) {
+            loge("get ui layer config failed\n");
+            ret = -1;
+            goto _EXIT_;
+        }
+    }
 
 #ifdef _THREAD_TRACE_INFO_
     memset(&thread_trace_infos,0x00,sizeof(struct thread_trace_info));
@@ -694,6 +705,11 @@ _EXIT_:
             mpp_free(ctx->files.file_path[i]);
             ctx->files.file_path[i] = NULL;
         }
+    }
+
+    if (strcmp(PRJ_CHIP, "d12x") == 0 && render_dev) {
+        // restore ui layer after playing
+        rt_device_control(render_dev,AICFB_UPDATE_LAYER_CONFIG,&layer);
     }
 
     if (render_dev) {

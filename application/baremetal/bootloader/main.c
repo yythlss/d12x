@@ -63,7 +63,7 @@ struct hal_axicfg_table axi_cfg_table[HAL_AXICFG_PORT_MAX] = {
 
 static void aic_board_heap_init(enum boot_device bd)
 {
-    size_t heap_size, heap_start, real_ram_size = 0;
+    size_t real_ram_size = 0;
 
 #if AIC_PSRAM_SIZE
     config_ram_size = AIC_PSRAM_SIZE;
@@ -79,15 +79,7 @@ static void aic_board_heap_init(enum boot_device bd)
     if (config_ram_size != real_ram_size)
         pr_warn("config ram size(0x%x) is not equal real ram size(0x%x)\n", (u32)config_ram_size, (u32)real_ram_size);
 
-    heap_size = ((size_t)&__heap_end) - ((size_t)&__heap_start);
-
-    /* Limit bootloader's heap to 2MB */
-    if (bd != BD_UDISK && bd != BD_SDFAT32 && bd != BD_USB && heap_size > 0x200000)
-            heap_size = 0x200000;
-
-    heap_start = (size_t)&__heap_end - heap_size;
-
-    heap_init((void *)heap_start, heap_size);
+    heap_init();
 }
 
 static int board_init(enum boot_device bd)

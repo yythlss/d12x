@@ -18,6 +18,7 @@
 #include "mpp_vin.h"
 
 #include "drv_camera.h"
+#include "camera_inner.h"
 
 /* Default format configuration of OV2659 */
 #define OV2659_DFT_FRAMESIZE    OV2659_SIZE_VGA
@@ -178,16 +179,11 @@ enum ov2659_size {
     OV2659_SIZE_UXGA,
 };
 
-struct sensor_register {
-    u16 addr;
-    u8 value;
-};
-
 struct ov2659_framesize {
     u16 width;
     u16 height;
     u16 max_exp_lines;
-    const struct sensor_register *regs;
+    const struct reg16_info *regs;
 };
 
 struct ov2659_pll_ctrl {
@@ -199,7 +195,7 @@ struct ov2659_pll_ctrl {
 struct ov2659_pixfmt {
     u32 code;
     /* Output format Register Value (REG_FORMAT_CTRL00) */
-    struct sensor_register *format_ctrl_regs;
+    struct reg16_info *format_ctrl_regs;
 };
 
 struct pll_ctrl_reg {
@@ -217,7 +213,7 @@ struct ov2659_dev {
     u32 link_freq;
     struct mpp_video_fmt fmt;
     const struct ov2659_framesize *frame_size;
-    struct sensor_register *format_ctrl_regs;
+    struct reg16_info *format_ctrl_regs;
     struct ov2659_pll_ctrl pll;
 
     bool streaming;
@@ -225,7 +221,7 @@ struct ov2659_dev {
 
 static struct ov2659_dev g_ov2659_dev = {0};
 
-static const struct sensor_register ov2659_init_regs[] = {
+static const struct reg16_info ov2659_init_regs[] = {
     { REG_IO_CTRL00, 0x03 },
     { REG_IO_CTRL01, 0xff },
     { REG_IO_CTRL02, 0xe0 },
@@ -387,7 +383,7 @@ static const struct sensor_register ov2659_init_regs[] = {
 };
 
 /* 1280X720 720p */
-static struct sensor_register ov2659_720p[] = {
+static struct reg16_info ov2659_720p[] = {
     { REG_TIMING_HS_H, 0x00 },
     { REG_TIMING_HS_L, 0xa0 },
     { REG_TIMING_VS_H, 0x00 },
@@ -422,7 +418,7 @@ static struct sensor_register ov2659_720p[] = {
 };
 
 /* 1600X1200 UXGA */
-static struct sensor_register ov2659_uxga[] = {
+static struct reg16_info ov2659_uxga[] = {
     { REG_TIMING_HS_H, 0x00 },
     { REG_TIMING_HS_L, 0x00 },
     { REG_TIMING_VS_H, 0x00 },
@@ -470,7 +466,7 @@ static struct sensor_register ov2659_uxga[] = {
 };
 
 /* 1280X1024 SXGA */
-static struct sensor_register ov2659_sxga[] = {
+static struct reg16_info ov2659_sxga[] = {
     { REG_TIMING_HS_H, 0x00 },
     { REG_TIMING_HS_L, 0x00 },
     { REG_TIMING_VS_H, 0x00 },
@@ -518,7 +514,7 @@ static struct sensor_register ov2659_sxga[] = {
 };
 
 /* 1024X768 SXGA */
-static struct sensor_register ov2659_xga[] = {
+static struct reg16_info ov2659_xga[] = {
     { REG_TIMING_HS_H, 0x00 },
     { REG_TIMING_HS_L, 0x00 },
     { REG_TIMING_VS_H, 0x00 },
@@ -566,7 +562,7 @@ static struct sensor_register ov2659_xga[] = {
 };
 
 /* 800X600 SVGA */
-static struct sensor_register ov2659_svga[] = {
+static struct reg16_info ov2659_svga[] = {
     { REG_TIMING_HS_H, 0x00 },
     { REG_TIMING_HS_L, 0x00 },
     { REG_TIMING_VS_H, 0x00 },
@@ -614,7 +610,7 @@ static struct sensor_register ov2659_svga[] = {
 };
 
 /* 640X480 VGA */
-static struct sensor_register ov2659_vga[] = {
+static struct reg16_info ov2659_vga[] = {
     { REG_TIMING_HS_H, 0x00 },
     { REG_TIMING_HS_L, 0x00 },
     { REG_TIMING_VS_H, 0x00 },
@@ -662,7 +658,7 @@ static struct sensor_register ov2659_vga[] = {
 };
 
 /* 320X240 QVGA */
-static  struct sensor_register ov2659_qvga[] = {
+static  struct reg16_info ov2659_qvga[] = {
     { REG_TIMING_HS_H, 0x00 },
     { REG_TIMING_HS_L, 0x00 },
     { REG_TIMING_VS_H, 0x00 },
@@ -785,25 +781,25 @@ static const struct ov2659_framesize ov2659_framesizes[] = {
 };
 
 /* YUV422 YUYV*/
-static struct sensor_register ov2659_format_yuyv[] = {
+static struct reg16_info ov2659_format_yuyv[] = {
     { REG_FORMAT_CTRL00, 0x30 },
     { REG_NULL, 0x0 },
 };
 
 /* YUV422 UYVY  */
-static struct sensor_register ov2659_format_uyvy[] = {
+static struct reg16_info ov2659_format_uyvy[] = {
     { REG_FORMAT_CTRL00, 0x32 },
     { REG_NULL, 0x0 },
 };
 
 /* Raw Bayer BGGR */
-static struct sensor_register ov2659_format_bggr[] = {
+static struct reg16_info ov2659_format_bggr[] = {
     { REG_FORMAT_CTRL00, 0x00 },
     { REG_NULL, 0x0 },
 };
 
 /* RGB565 */
-static struct sensor_register ov2659_format_rgb565[] = {
+static struct reg16_info ov2659_format_rgb565[] = {
     { REG_FORMAT_CTRL00, 0x60 },
     { REG_NULL, 0x0 },
 };
@@ -826,19 +822,7 @@ static const struct ov2659_pixfmt ov2659_formats[] = {
 
 static int ov2659_write_reg(struct rt_i2c_bus_device *i2c, u16 reg, u8 val)
 {
-    u8 buf[3];
-    struct rt_i2c_msg msgs;
-
-    buf[0] = reg >> 8;
-    buf[1] = reg & 0xff;
-    buf[2] = val;
-
-    msgs.addr = OV2659_I2C_SLAVE_ID;
-    msgs.flags = RT_I2C_WR;
-    msgs.buf = buf;
-    msgs.len = 3;
-
-    if (rt_i2c_transfer(i2c, &msgs, 1) != 1) {
+    if (rt_i2c_write_reg16(i2c, OV2659_I2C_SLAVE_ID, reg, &val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
         return -1;
     }
@@ -848,23 +832,7 @@ static int ov2659_write_reg(struct rt_i2c_bus_device *i2c, u16 reg, u8 val)
 
 static int ov2659_read_reg(struct rt_i2c_bus_device *i2c, u16 reg, u8 *val)
 {
-    struct rt_i2c_msg msg[2];
-    u8 buf[2] = {0};
-
-    buf[0] = reg >> 8;
-    buf[1] = reg & 0xff;
-
-    msg[0].addr  = OV2659_I2C_SLAVE_ID;
-    msg[0].flags = RT_I2C_WR;
-    msg[0].buf   = buf;
-    msg[0].len   = 2;
-
-    msg[1].addr  = OV2659_I2C_SLAVE_ID;
-    msg[1].flags = RT_I2C_RD;
-    msg[1].buf   = val;
-    msg[1].len   = 1;
-
-    if (rt_i2c_transfer(i2c, msg, 2) != 2) {
+    if (rt_i2c_read_reg16(i2c, OV2659_I2C_SLAVE_ID, reg, val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, *val);
         return -1;
     }
@@ -873,12 +841,12 @@ static int ov2659_read_reg(struct rt_i2c_bus_device *i2c, u16 reg, u8 *val)
 }
 
 static int ov2659_write_array(struct rt_i2c_bus_device *i2c,
-                              const struct sensor_register *regs)
+                              const struct reg16_info *regs)
 {
     int i, ret = 0;
 
-    for (i = 0; ret == 0 && regs[i].addr; i++)
-        ret = ov2659_write_reg(i2c, regs[i].addr, regs[i].value);
+    for (i = 0; ret == 0 && regs[i].reg; i++)
+        ret = ov2659_write_reg(i2c, regs[i].reg, regs[i].val);
 
     return ret;
 }
@@ -924,7 +892,7 @@ static void ov2659_pll_calc_params(struct ov2659_dev *sensor)
 
 static int ov2659_set_pixel_clock(struct ov2659_dev *sensor)
 {
-    struct sensor_register pll_regs[] = {
+    struct reg16_info pll_regs[] = {
         {REG_SC_PLL_CTRL1, sensor->pll.ctrl1},
         {REG_SC_PLL_CTRL2, sensor->pll.ctrl2},
         {REG_SC_PLL_CTRL3, sensor->pll.ctrl3},
@@ -1006,40 +974,20 @@ out:
     return ret;
 }
 
-static int ov2659_i2c_init(struct ov2659_dev *sensor)
-{
-    char name[8] = "";
-
-    snprintf(name, 8, "i2c%d", AIC_CAMERA_I2C_CHAN);
-    sensor->i2c = rt_i2c_bus_device_find(name);
-    if (sensor->i2c == RT_NULL) {
-        LOG_E("Failed to open %s", name);
-        return -ENODEV;
-    }
-
-    return 0;
-}
-
-static int ov2659_set_xclk(u32 freq)
-{
-    g_ov2659_dev.xclk_freq = freq;
-    return 0;
-}
-
 static int ov2659_power_off(struct ov2659_dev *sensor)
 {
-    rt_pin_write(sensor->pwdn_pin, 1);
+    camera_pin_set_high(sensor->pwdn_pin);
     return 0;
 }
 
 static int ov2659_power_on(struct ov2659_dev *sensor)
 {
-    rt_pin_write(sensor->pwdn_pin, 0);
+    camera_pin_set_low(sensor->pwdn_pin);
 
     if (sensor->rst_pin) {
-        rt_pin_write(sensor->rst_pin, PIN_LOW);
+        camera_pin_set_low(sensor->rst_pin);
         rt_thread_mdelay(1);
-        rt_pin_write(sensor->rst_pin, PIN_HIGH);
+        camera_pin_set_high(sensor->rst_pin);
         rt_thread_mdelay(3);
     }
 
@@ -1084,17 +1032,20 @@ static rt_err_t ov2659_init(rt_device_t dev)
     int ret = 0;
     struct ov2659_dev *sensor = &g_ov2659_dev;
 
-    ret = ov2659_i2c_init(sensor);
-    if (ret != 0)
+    sensor->i2c = camera_i2c_get();
+    if (!sensor->i2c)
         return -RT_EINVAL;
 
-    if (ov2659_set_xclk(24000000))
+    sensor->xclk_freq = camera_xclk_rate_get();
+    if (!sensor->xclk_freq) {
+        LOG_E("Must set XCLK freq first!\n");
         return -RT_EINVAL;
+    }
 
-    sensor->rst_pin = rt_pin_get(AIC_CAMERA_RST_PIN);
-    sensor->pwdn_pin = rt_pin_get(AIC_CAMERA_PWDN_PIN);
-    rt_pin_mode(sensor->rst_pin, PIN_MODE_OUTPUT);
-    rt_pin_mode(sensor->pwdn_pin, PIN_MODE_OUTPUT);
+    sensor->rst_pin = camera_rst_pin_get();
+    sensor->pwdn_pin = camera_pwdn_pin_get();
+    if (!sensor->rst_pin || !sensor->pwdn_pin)
+        return -RT_EINVAL;
 
     ov2659_get_default_format(&sensor->fmt);
     sensor->frame_size = &ov2659_framesizes[OV2659_DFT_FRAMESIZE];

@@ -313,21 +313,26 @@ config AIC_CIR_DRV_TEST
     depends on AIC_CIR_DRV
 
 config AIC_AUDIO_DRV_TEST
-    bool "Enable audio driver test command"
+    bool "Enable Audio driver test command"
     default n
     depends on AIC_AUDIO_DRV
     select RT_USING_LEGACY
 
 config AIC_I2S_DRV_TEST
-    bool "Enable i2s driver test command"
+    bool "Enable I2S driver test command"
     default n
     depends on AIC_I2S_DRV
     select RT_USING_LEGACY
 
 config AIC_I2C_DRV_TEST
-    bool "Enable i2c driver test command"
+    bool "Enable I2C driver test command"
     default n
     depends on AIC_I2C_DRV
+
+config AIC_CAMERA_DRV_TEST
+    bool "Enable Camera driver test command"
+    default n
+    depends on AIC_USING_CAMERA
 
 config AIC_DVP_TEST
     bool "Enable DVP driver test command"
@@ -399,6 +404,11 @@ config AIC_QEP_DRV_TEST
     bool "Enable QEP driver test command"
     default n
     depends on AIC_QEP_DRV
+
+config AIC_DCE_DRV_TEST
+    bool "Enable Dce driver test command"
+    default n
+    depends on AIC_DCE_DRV
 
 config AIC_ADCIM_DM_TEST
     bool "Enable ADCIM DM test command"

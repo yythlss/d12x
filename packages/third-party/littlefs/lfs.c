@@ -5266,6 +5266,19 @@ cleanup:
 
 #endif
 
+#ifdef RT_DEBUG
+static bool lfs_mlist_isopen(struct lfs_mlist *head,
+        struct lfs_mlist *node)
+{
+    for (struct lfs_mlist **p = &head; *p; p = &(*p)->next) {
+        if (*p == (struct lfs_mlist*)node) {
+            return true;
+        }
+    }
+
+    return false;
+}
+#endif
 
 /// Public API wrappers ///
 

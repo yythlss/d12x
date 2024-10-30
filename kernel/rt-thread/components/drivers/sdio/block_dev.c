@@ -23,7 +23,7 @@
 #include <rtdbg.h>
 
 #ifdef AIC_AB_SYSTEM_INTERFACE
-#include <absystem.h>
+#include <absystem_os.h>
 #include <boot_param.h>
 #endif
 
@@ -622,7 +622,7 @@ rt_int32_t rt_mmcsd_blk_probe(struct rt_mmcsd_card *card)
             rt_snprintf(dname, sizeof(dname), "mmc%d", host_id);
         else
             rt_snprintf(dname, sizeof(dname), "sd%d", host_id);
-        blk_dev = rt_mmcsd_create_blkdev(card, (const char*)dname, &part);
+        blk_dev = rt_mmcsd_create_blkdev(card, (const char*)dname, NULL);
         if ( blk_dev == RT_NULL )
         {
             err = -RT_ENOMEM;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -20,6 +20,9 @@ enum {
     GPIO_GROUP_MAX,
 };
 
+extern const int aic_gpio_groups_list[];
+extern const int aic_gpio_group_size;
+
 #define PA_BASE  0
 #define PB_BASE  32
 #define PC_BASE  64
@@ -34,7 +37,7 @@ enum {
 #define PL_BASE  352
 #define PM_BASE  384
 #define PN_BASE  416
-#define PO_BASE  448
+#define PU_BASE  448
 #define GPIOA(n) (PA_BASE + (n))
 #define GPIOB(n) (PB_BASE + (n))
 #define GPIOC(n) (PC_BASE + (n))
@@ -49,7 +52,7 @@ enum {
 #define GPIOL(n) (PL_BASE + (n))
 #define GPIOM(n) (PM_BASE + (n))
 #define GPION(n) (PN_BASE + (n))
-#define GPIOO(n) (PO_BASE + (n))
+#define GPIOU(n) (PO_BASE + (n))
 
 typedef enum {
     PA0  = GPIOA(0),

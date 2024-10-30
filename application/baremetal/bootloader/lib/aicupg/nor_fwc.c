@@ -137,7 +137,7 @@ s32 nor_fwc_data_write(struct fwc_info *fwc, u8 *buf, s32 len)
     int i, calc_len = 0, ret = 0;
     u8 *rdbuf;
 
-    rdbuf = aicos_malloc_align(0, len, CACHE_LINE_SIZE);
+    rdbuf = aicupg_malloc_align(len, CACHE_LINE_SIZE);
     if (!rdbuf) {
         pr_err("Error: malloc buffer failed.\n");
         return 0;
@@ -201,12 +201,12 @@ s32 nor_fwc_data_write(struct fwc_info *fwc, u8 *buf, s32 len)
     fwc->trans_size += len;
     pr_debug("%s, data len %d, trans len %d\n", __func__, len, fwc->trans_size);
 
-    aicos_free_align(0, rdbuf);
+    aicupg_free_align(rdbuf);
     return len;
 
 out:
     if (rdbuf)
-        aicos_free_align(0, rdbuf);
+        aicupg_free_align(rdbuf);
     return ret;
 }
 

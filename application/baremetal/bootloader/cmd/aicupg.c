@@ -544,7 +544,9 @@ err:
 
 static void do_brom_upg(void)
 {
+#ifdef AIC_WRI_DRV
     aic_set_reboot_reason(REBOOT_REASON_UPGRADE);
+#endif
 
     reboot_device();
 }

@@ -263,6 +263,16 @@ config LV_CACHE_IMG_NUM
     default 2
     depends on LPKG_USING_LVGL
 
+config LV_CACHE_DEF_SIZE
+    hex "LVGL image cached size"
+    default 0x800000
+    depends on LVGL_V_9
+
+config LV_IMAGE_HEADER_CACHE_DEF_CNT
+    int "LVGL image header cached number"
+    default 20
+    depends on LVGL_V_9
+
 config LV_DISPLAY_ROTATE_EN
     bool "LVGL enable display rotation"
     default n
@@ -293,6 +303,21 @@ config LV_ROTATE_DEGREE
     default 90 if LV_ROTATE_90
     default 180 if LV_ROTATE_180
     default 270 if LV_ROTATE_270
+
+config MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE
+    bool "Limit the output size of MPP JPEG decoder"
+    default n
+    depends on LPKG_USING_LVGL
+
+if MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE
+    config MPP_JPEG_DEC_MAX_OUT_WIDTH
+        int "Max output width of MPP JPEG decoder"
+        default 2048
+
+    config MPP_JPEG_DEC_MAX_OUT_HEIGHT
+        int "Max output height of MPP JPEG decoder"
+        default 2048
+endif
 
 # Parameters for LVGL meter demo
 if AIC_LVGL_METER_DEMO

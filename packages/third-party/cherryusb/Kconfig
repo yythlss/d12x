@@ -504,14 +504,6 @@ if LPKG_USING_CHERRYUSB
                         bool "ARGB8888"
                 endchoice
 
-                config AIC_USB_DISP_SCALE_DOWN_X
-                    int "scale down for X two sides"
-                    default 0
-
-                config AIC_USB_DISP_SCALE_DOWN_Y
-                    int "scale down for Y two sides"
-                    default 0
-
                 config AIC_USB_DISP_SW_GPIO_EN
                     bool "Using gpio switch"
                     default n

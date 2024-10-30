@@ -86,9 +86,9 @@ static void camera_ui_cb(lv_event_t * e)
 #if defined(AIC_CHIP_D12X)
     if (LV_HOR_RES == 480)
         return;
+#endif
     if (LV_HOR_RES == 1024)
         return;
-#endif
     app_entrance(APP_CAMERA, 1);
 }
 

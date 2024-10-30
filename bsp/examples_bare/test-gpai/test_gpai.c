@@ -14,7 +14,6 @@
 
 #include "hal_adcim.h"
 #include "hal_gpai.h"
-#include "test_gpai.h"
 
 /* The default voltages are set to D21x->3.0V, D31x、D12x->2.5V */
 #define AIC_GPAI_DEFAULT_VOLTAGE        3

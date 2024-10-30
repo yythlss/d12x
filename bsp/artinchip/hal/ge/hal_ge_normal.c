@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -381,8 +381,8 @@ static int check_bitblt(struct aic_ge_data *data, struct ge_bitblt *blt)
     }
 
     if (blt->src_buf.crop_en) {
-        if (src_rect->x < 0 ||
-            src_rect->y < 0 ||
+        if (src_rect->x < 0 || !src_rect->width ||
+            src_rect->y < 0 || !src_rect->height ||
             src_rect->x >= src_size->width ||
             src_rect->y >= src_size->height) {
             hal_log_err("%s failed, invalid src crop\n",
@@ -392,14 +392,20 @@ static int check_bitblt(struct aic_ge_data *data, struct ge_bitblt *blt)
     }
 
     if (blt->dst_buf.crop_en) {
-        if (dst_rect->x < 0 ||
-            dst_rect->y < 0 ||
+        if (dst_rect->x < 0 || !dst_rect->width ||
+            dst_rect->y < 0 || !dst_rect->height ||
             dst_rect->x >= dst_size->width ||
             dst_rect->y >= dst_size->height) {
             hal_log_err("%s failed, invalid dst crop\n",
                 __func__);
             return -1;
         }
+    }
+
+    if (!src_size->width || !src_size->height ||
+        !dst_size->width || !dst_size->height) {
+        hal_log_err("Invalid size\n");
+        return -1;
     }
 
     if (!blt->src_buf.crop_en) {

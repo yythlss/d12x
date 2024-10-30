@@ -100,6 +100,45 @@
 
 
 #include <stdio.h>
+#include <rtconfig.h>
+
+#if defined(KERNEL_BAREMETAL)
+#include <unistd.h>
+#include <fcntl.h>
+
+#define FT_FILE     int
+static inline FT_FILE *ft_fopen(const char *pathname, const char *mode)
+{
+    (void)mode;
+    int file;
+    file = open(pathname, O_RDONLY);
+    if (file < 0)
+        return NULL;
+    else
+        return (FT_FILE *)(long)file;
+}
+
+static inline int ft_fclose(FT_FILE *stream)
+{
+    return close((int)(long)stream);
+}
+
+static inline size_t ft_fread(void *ptr, size_t size, size_t nmemb, FT_FILE *stream)
+{
+    return read((int)(long)stream, ptr, size * nmemb);
+}
+
+static inline int ft_fseek(FT_FILE *stream, size_t offset, int whence)
+{
+    return lseek((int)(long)stream, offset, whence);
+}
+
+static inline long ft_ftell(FT_FILE *stream)
+{
+    return lseek((int)(long)stream, 0, SEEK_CUR);
+}
+
+#else
 
 #define FT_FILE     FILE
 #define ft_fclose   fclose
@@ -107,6 +146,8 @@
 #define ft_fread    fread
 #define ft_fseek    fseek
 #define ft_ftell    ftell
+#endif
+
 #define ft_sprintf  sprintf
 
 
@@ -128,11 +169,56 @@
    *
    */
 
+#ifndef TT_USE_MEM_PSRAM_SW_HEAP
 
 #define ft_scalloc   calloc
 #define ft_sfree     free
 #define ft_smalloc   malloc
 #define ft_srealloc  realloc
+#else
+#include "aic_osal.h"
+
+static inline void *ft_smalloc(size_t size)
+{
+    return aicos_malloc(MEM_PSRAM_SW, size);
+}
+
+static inline void *ft_scalloc(size_t count, size_t size)
+{
+    void *p = ft_smalloc(count * size);
+    if (p) {
+        memset(p, 0, count * size);
+    }
+    return p;
+}
+
+static inline void ft_sfree(void *rmem)
+{
+    aicos_free(MEM_PSRAM_SW, rmem);
+}
+
+static inline void *ft_srealloc(void *rmem, size_t newsize)
+{
+    (void)rmem;
+    (void)newsize;
+    return NULL;
+}
+
+static inline void *ft_srealloc_cur(long cur_size, long new_size, void *rmem)
+{
+    void *p = 0;
+    if (new_size > cur_size) {
+        p = ft_smalloc(new_size);
+        if(p) {
+            memcpy(p, rmem, cur_size);
+            ft_sfree(rmem);
+        }
+    } else {
+        p = rmem;
+    }
+    return p;
+}
+#endif
 
 
   /**************************************************************************

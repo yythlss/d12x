@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -57,7 +57,7 @@ static struct aic_qspi qspi_controller[] = {
 #endif
     },
 #endif
-#if defined(AIC_USING_QSPI1)
+#if defined(AIC_USING_QSPI1) && !defined(AIC_QSPI1_BUS_SPI)
     {
         .name = "qspi1",
         .idx = 1,
@@ -75,7 +75,7 @@ static struct aic_qspi qspi_controller[] = {
 #endif
     },
 #endif
-#if defined(AIC_USING_QSPI2)
+#if defined(AIC_USING_QSPI2) && !defined(AIC_QSPI2_BUS_SPI)
     {
         .name = "qspi2",
         .idx = 2,
@@ -93,7 +93,7 @@ static struct aic_qspi qspi_controller[] = {
 #endif
     },
 #endif
-#if defined(AIC_USING_QSPI3)
+#if defined(AIC_USING_QSPI3) && !defined(AIC_QSPI3_BUS_SPI)
     {
         .name = "qspi3",
         .idx = 3,
@@ -111,7 +111,7 @@ static struct aic_qspi qspi_controller[] = {
 #endif
     },
 #endif
-#if defined(AIC_USING_QSPI4)
+#if defined(AIC_USING_QSPI4) && !defined(AIC_QSPI4_BUS_SPI)
     {
         .name = "qspi4",
         .idx = 4,

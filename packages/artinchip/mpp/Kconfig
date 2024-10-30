@@ -20,6 +20,11 @@ config AIC_MPP_AVI_DEMUX
     default n
     depends on LPKG_MPP && AIC_MPP_PLAYER_INTERFACE
 
+config AIC_MPP_FLAC_DEMUX
+    bool "Enable flac demux"
+    default n
+    depends on LPKG_MPP && AIC_MPP_PLAYER_INTERFACE && LPKG_USING_LIBFLAC
+
 config AIC_MPP_RECORDER_INTERFACE
     bool "Enable recorder interface and demo"
     default n

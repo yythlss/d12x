@@ -1,3 +1,12 @@
+/*
+ * Copyright (C) 2024, ArtInChip Technology Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Authors: Zequan Liang <zequan.liang@artinchip.com>
+ *          Ning Fang <ning.fang@artinchip.com>
+ */
+
 #include "aic_lv_ffmpeg.h"
 
 #if LV_USE_FFMPEG == 0 && defined(AIC_MPP_PLAYER_INTERFACE)
@@ -450,7 +459,7 @@ static void lv_ffmpeg_player_protect_disp_area(lv_obj_t *obj, lv_point_t *pos,
     }
 
     if (pos->y + *height > LV_VER_RES) {
-        *height = (LV_HOR_RES - pos->y);
+        *height = (LV_VER_RES - pos->y);
         LV_LOG_ERROR("lv obj height too large!");
     }
 

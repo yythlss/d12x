@@ -177,6 +177,10 @@
 # define MAX(x,y) ((x)>(y)?(x):(y))
 # endif
 
+#ifdef ARCH_RISCV_FPU_S
+#define double	float
+#endif
+
 #ifndef STREAM_TYPE
 #define STREAM_TYPE double
 #endif

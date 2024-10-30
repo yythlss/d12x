@@ -159,6 +159,8 @@ enum mpp_dec_errno {
 	// if frame manager not create, mpp_dec_get_frame return DEC_ERR_FM_NOT_CREATE.
 	// app should wait a minute to get frame
 	DEC_ERR_FM_NOT_CREATE			= -3,
+
+	DEC_ERR_NOT_CREATE			= -4,
 };
 
 #endif

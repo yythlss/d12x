@@ -19,7 +19,7 @@ extern "C" {
 /* Luban-Lite version information */
 #define LL_VERSION      1               /**< major version number */
 #define LL_SUBVERSION   1               /**< minor version number */
-#define LL_REVISION     0               /**< revise version number */
+#define LL_REVISION     1               /**< revise version number */
 
 typedef __signed__ char     s8;
 typedef unsigned char       u8;
@@ -384,6 +384,9 @@ typedef enum {
 #endif
 #ifdef AIC_DRAM_CMA_EN
     MEM_DRAM_CMA,
+#endif
+#ifdef AIC_BOOTLOADER
+    MEM_RESERVED,
 #endif
     MAX_MEM_REGION,
 } aic_mem_region_t;

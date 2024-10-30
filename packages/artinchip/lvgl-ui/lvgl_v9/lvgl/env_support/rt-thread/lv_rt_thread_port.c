@@ -35,6 +35,7 @@
 extern void lv_port_disp_init(void);
 extern void lv_port_indev_init(void);
 extern void lv_user_gui_init(void);
+extern void lv_wait_sdcard_mounted(void);
 
 static struct rt_thread lvgl_thread;
 
@@ -45,7 +46,7 @@ static struct rt_thread lvgl_thread;
 #endif
 
 #ifndef LV_MAIN_THREAD_STACK_SIZE
-    #define LV_MAIN_THREAD_STACK_SIZE (4096 * 2)
+    #define LV_MAIN_THREAD_STACK_SIZE LPKG_LVGL_THREAD_STACK_SIZE
 #endif /* LV_MAIN_THREAD_STACK_SIZE */
 
 static rt_uint8_t lvgl_thread_stack[LV_MAIN_THREAD_STACK_SIZE];
@@ -60,6 +61,7 @@ static void lv_rt_log(lv_log_level_t level, const char *buf)
 
 static void lvgl_thread_entry(void *parameter)
 {
+    lv_wait_sdcard_mounted();
 #if LV_USE_LOG
     lv_log_register_print_cb(lv_rt_log);
 #endif /* LV_USE_LOG */

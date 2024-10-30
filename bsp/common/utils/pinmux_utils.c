@@ -21,45 +21,31 @@
 #include <of.h>
 #endif
 
+extern const int aic_gpio_groups_list[];
+
 int list_pinmux(int argc, char *argv[])
 {
-    unsigned int group, pin, func, i;
+    unsigned int group, pin, func, i, j;
     pin_name_t pin_name, pin_name_max;
 
-    for (i = 0; i < GPIO_GROUP_MAX; i++)
-    {
-        switch (i)
-        {
-            case PA_GROUP:
-            case PB_GROUP:
-            case PC_GROUP:
-            case PD_GROUP:
-            case PE_GROUP:
-            #ifndef AIC_CHIP_D12X
-            case PF_GROUP:
-            case PG_GROUP:
-            case PO_GROUP:
-            #endif
-                pin_name = PA_BASE + i * GPIO_GROUP_SIZE;
-                pin_name_max = pin_name + GPIO_GROUP_SIZE;
+    for (i = 0, j = 0; i < GPIO_GROUP_MAX && j < aic_gpio_group_size; i++) {
+        if (i == aic_gpio_groups_list[j]) {
+            pin_name = PA_BASE + i * GPIO_GROUP_SIZE;
+            pin_name_max = pin_name + GPIO_GROUP_SIZE;
 
-                while (pin_name < pin_name_max)
-                {
-                    group = GPIO_GROUP(pin_name);
-                    pin = GPIO_GROUP_PIN(pin_name);
-                    func = 0;
+            while (pin_name < pin_name_max) {
+                group = GPIO_GROUP(pin_name);
+                pin = GPIO_GROUP_PIN(pin_name);
+                func = 0;
 
-                    hal_gpio_get_func(group, pin, &func);
-                    if (func)
-                    {
-                        printf("P%c%d: function: %d\n", group + 'A', pin, func);
-                    }
+                hal_gpio_get_func(group, pin, &func);
+                if (func)
+                    printf("P%c%u: function: %u\n", group + 'A', pin, func);
 
-                    pin_name++;
-                }
-                break;
-            default:
-                break;
+                pin_name++;
+            }
+
+            j++;
         }
     }
 

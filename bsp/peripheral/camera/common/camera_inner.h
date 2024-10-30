@@ -15,6 +15,12 @@ extern "C" {
 
 #include "rtdef.h"
 
+#define REG8_ADDR_INVALID   0xFF
+#define REG16_ADDR_INVALID   0xFFFF
+
+#define PERCENT_TO_INT(min, max, p)     ((min) + ((max) - (min)) * (p) / 100)
+#define PERCENT_IS_INVALID(p)           (p > 100)
+
 struct rt_i2c_bus_device *camera_i2c_get(void);
 
 u32 camera_xclk_rate_get(void);
@@ -23,6 +29,8 @@ void camera_xclk_disable(void);
 
 u32 camera_rst_pin_get(void);
 u32 camera_pwdn_pin_get(void);
+void camera_pin_set_high(u32 pin);
+void camera_pin_set_low(u32 pin);
 
 struct reg8_info {
     u8 reg;

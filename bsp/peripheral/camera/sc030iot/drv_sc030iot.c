@@ -31,7 +31,6 @@
 #define SC030_SENSOR_ID_HIGH_REG 0xF7
 #define SC030_SENSOR_ID_LOW_REG  0xF8
 
-
 // 640*480, xclk=20M, fps=50fps, xclk=10M, fps=25fps
 static const struct reg8_info sc030iot_init_regs[] = {
     {0xf0, 0x30},
@@ -257,18 +256,7 @@ static struct sc03_dev g_sc03_dev = {0};
 
 static int sc030_write_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 val)
 {
-    u8 buf[2];
-    struct rt_i2c_msg msgs;
-
-    buf[0] = reg;
-    buf[1] = val;
-
-    msgs.addr = SC030IOT_I2C_SLAVE_ID;
-    msgs.flags = RT_I2C_WR;
-    msgs.buf = buf;
-    msgs.len = 2;
-
-    if (rt_i2c_transfer(i2c, &msgs, 1) != 1) {
+    if (rt_i2c_write_reg(i2c, SC030IOT_I2C_SLAVE_ID, reg, &val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
         return -1;
     }
@@ -278,20 +266,7 @@ static int sc030_write_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 val)
 
 static int sc030_read_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 *val)
 {
-    struct rt_i2c_msg msg[2];
-    u8 buf = reg;
-
-    msg[0].addr  = SC030IOT_I2C_SLAVE_ID;
-    msg[0].flags = RT_I2C_WR;
-    msg[0].buf   = &buf;
-    msg[0].len   = 1;
-
-    msg[1].addr  = SC030IOT_I2C_SLAVE_ID;
-    msg[1].flags = RT_I2C_RD;
-    msg[1].buf   = val;
-    msg[1].len   = 1;
-
-    if (rt_i2c_transfer(i2c, msg, 2) != 2) {
+    if (rt_i2c_read_reg(i2c, SC030IOT_I2C_SLAVE_ID, reg, val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, *val);
         return -1;
     }
@@ -332,7 +307,7 @@ static void sc030iot_power_on(struct sc03_dev *sensor)
     if (sensor->on)
         return;
 
-    rt_pin_write(sensor->pwdn_pin, PIN_HIGH);
+    camera_pin_set_high(sensor->pwdn_pin);
     aicos_udelay(2);
 
     sensor->on = true;
@@ -344,7 +319,7 @@ static void sc030iot_power_off(struct sc03_dev *sensor)
     if (!sensor->on)
         return;
 
-    rt_pin_write(sensor->pwdn_pin, PIN_LOW);
+    camera_pin_set_low(sensor->pwdn_pin);
 
     sensor->on = false;
 #endif

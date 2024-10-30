@@ -65,7 +65,7 @@ static int fat_direct_spinand_write_boot(char *fpath, struct mtd_dev *mtd)
         return -1;
     }
 
-    buf = aicos_malloc_align(0, MAX_WRITE_SIZE, FRAME_LIST_SIZE);
+    buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     soffset = 0;
     while (1) {
         actread = 0;
@@ -91,7 +91,7 @@ static int fat_direct_spinand_write_boot(char *fpath, struct mtd_dev *mtd)
     }
 
     if (buf)
-        aicos_free_align(0, buf);
+        aicupg_free_align(buf);
     return 0;
 }
 
@@ -103,7 +103,7 @@ static int fat_direct_spinand_write_data(char *fpath, struct mtd_dev *mtd,
     u32 soffset;
     ulong dolen, actread, writecnt;
 
-    buf = aicos_malloc_align(0, MAX_WRITE_SIZE, FRAME_LIST_SIZE);
+    buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     soffset = 0;
     writecnt = 0;
 
@@ -155,7 +155,7 @@ static int fat_direct_spinand_write_data(char *fpath, struct mtd_dev *mtd,
     }
 
     if (buf)
-        aicos_free_align(0, buf);
+        aicupg_free_align(buf);
     return ret;
 }
 
@@ -216,7 +216,7 @@ static int fat_direct_spinand_write_nftl(char *fpath, u32 doffset)
         goto out;
     }
 
-    buf = aicos_malloc_align(0, MAX_WRITE_SIZE, FRAME_LIST_SIZE);
+    buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     if (!buf) {
         pr_err("Failed to malloc buffer.\n");
         ret = -1;
@@ -255,7 +255,7 @@ static int fat_direct_spinand_write_nftl(char *fpath, u32 doffset)
 
 out:
     if (buf)
-        aicos_free_align(0, buf);
+        aicupg_free_align(buf);
     if (nftl && nftl->nandt)
         aicos_free(MEM_CMA, nftl->nandt);
     if (nftl)

@@ -24,7 +24,7 @@
 #define AUDIO_TRANSFER_TYPE_AMIC            6
 
 #define MAX_VOLUME_0DB                      160
-#define AIC_AMIC_DEF_VAL                    220
+#define AIC_AMIC_DEF_VAL                    200
 
 struct aic_audio_config
 {

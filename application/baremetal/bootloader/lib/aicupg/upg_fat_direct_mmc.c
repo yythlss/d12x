@@ -28,7 +28,7 @@ static int fat_direct_mmc_write_raw(struct aic_sdmc *host, char *fpath,
 
     printf("Programming %s to 0x%x\n", fpath, doffset);
     printf("\t");
-    buf = aicos_malloc_align(0, MAX_WRITE_SIZE, FRAME_LIST_SIZE);
+    buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     soffset = 0;
     writecnt = 0;
 
@@ -62,7 +62,7 @@ static int fat_direct_mmc_write_raw(struct aic_sdmc *host, char *fpath,
     }
 
     if (buf)
-        aicos_free_align(0, buf);
+        aicupg_free_align(buf);
     printf("\n");
     return ret;
 }
@@ -79,7 +79,7 @@ static int fat_direct_mmc_write_sparse(struct aic_sdmc *host, char *fpath,
 
     printf("Programming %s to 0x%x\n", fpath, doffset);
     printf("\t");
-    buf = aicos_malloc_align(0, MAX_WRITE_SIZE, FRAME_LIST_SIZE);
+    buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     soffset = 0;
 
     dolen = MAX_WRITE_SIZE;
@@ -149,8 +149,8 @@ static int fat_direct_mmc_write_sparse(struct aic_sdmc *host, char *fpath,
 
                 /* Read raw chunk data */
                 if (chunk_data_sz > MAX_WRITE_SIZE) {
-                    aicos_free_align(0, buf);
-                    buf = aicos_malloc_align(0, chunk_data_sz, FRAME_LIST_SIZE);
+                    aicupg_free_align(buf);
+                    buf = aicupg_malloc_align(chunk_data_sz, FRAME_LIST_SIZE);
                     p = buf;
                 }
 
@@ -225,7 +225,7 @@ static int fat_direct_mmc_write_sparse(struct aic_sdmc *host, char *fpath,
 
 out:
     if (buf)
-        aicos_free_align(0, buf);
+        aicupg_free_align(buf);
     printf("\n");
     return ret;
 }

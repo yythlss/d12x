@@ -272,7 +272,7 @@ static lv_res_t jpeg_decoder_info(lv_img_decoder_t *decoder, const void *src, lv
         return LV_RES_INV;
     }
 
-#if MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE == 1
+#if defined(MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE)
     int shift = jpeg_size_limit(width, height);
     header->w = width >> shift;
     header->h = height >> shift;
@@ -694,7 +694,7 @@ static lv_res_t aic_decoder_open(lv_img_decoder_t *decoder, lv_img_decoder_dsc_t
     alloc_frame->buf.buf_type = MPP_PHY_ADDR;
 
     int size_shift = 0;
-#if MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE == 1
+#if defined(MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE)
     if (type == MPP_CODEC_VIDEO_DECODER_MJPEG)
         size_shift = jpeg_size_limit(width, height);
 #endif

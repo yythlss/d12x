@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -249,6 +249,8 @@ int hal_qspi_slave_transfer_abort(qspi_slave_handle *h);
 int hal_qspi_slave_transfer_count(qspi_slave_handle *h);
 void hal_qspi_slave_fifo_reset(qspi_slave_handle *h, u32 fifo);
 
+void hal_qspi_show_ists(u32 id, u32 sts);
+
 #endif //AIC_QSPI_DRV_V11
 
 int hal_qspi_master_init(qspi_master_handle *h, struct qspi_master_config *cfg);
@@ -263,6 +265,10 @@ int hal_qspi_master_transfer_async(qspi_master_handle *h, struct qspi_transfer *
 int hal_qspi_master_get_status(qspi_master_handle *h);
 void hal_qspi_master_irq_handler(qspi_master_handle *h);
 void hal_qspi_master_fifo_reset(qspi_master_handle *h, u32 fifo);
+void hal_qspi_fifo_reset(u32 base, u32 fifo);
+
+int hal_spi_master_transfer_sync(qspi_master_handle *h, struct qspi_transfer *t);
+int hal_spi_master_transfer_async(qspi_master_handle *h, struct qspi_transfer *t);
 
 int hal_qspi_master_transfer_bit_mode(qspi_master_handle *h, struct qspi_bm_transfer *t);
 

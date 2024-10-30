@@ -32,8 +32,8 @@
 /* All data should be 4 bytes aligned. */
 #define CMD_SIZE 4
 #define STATUS_SIZE 4
-#define PKT_SIZE TEST_BUF_SIZE
-// #define PKT_SIZE 256
+// #define PKT_SIZE TEST_BUF_SIZE
+#define PKT_SIZE 256
 
 int test_qspi_slave_controller_init(u32 id, u32 bus_width,
                                     qspi_slave_async_cb cb, void *priv,

@@ -117,16 +117,23 @@ struct aic_i2c_bus {
     struct rt_completion cmd_complete;
 };
 
-static struct aic_i2c_bus g_aic_i2c_dev[AIC_I2C_CH_NUM];
+static struct aic_i2c_bus g_aic_i2c_dev[I2C_MAX_CHAN];
 
 irqreturn_t aic_i2c_slave_irqhandler(int irq, void * data)
 {
-    int index = irq - I2C0_IRQn;
+    int i, index = 0;
     uint32_t intr_stat;
     uint8_t val;
     uint8_t fifo_num;
     struct slave_param parm;
     aic_i2c_ctrl *i2c_dev;
+
+    for (i = 0; i < I2C_MAX_CHAN; i++) {
+        if (irq == g_aic_i2c_dev[i].aic_bus.irq_index) {
+            index = i;
+            break;
+        }
+    }
 
     i2c_dev = &g_aic_i2c_dev[index].aic_bus;
     intr_stat = hal_i2c_get_raw_interrupt_state(i2c_dev);
@@ -280,9 +287,16 @@ static void aic_i2c_handle_write(struct aic_i2c_ctrl *i2c_dev)
 
 irqreturn_t aic_i2c_irqhandler(int irq, void * data)
 {
-    int index = irq - I2C0_IRQn;
+    int i, index = 0;
     uint32_t status = 0;
     aic_i2c_ctrl *i2c_dev;
+
+    for (i = 0; i < I2C_MAX_CHAN; i++) {
+        if (irq == g_aic_i2c_dev[i].aic_bus.irq_index) {
+            index = i;
+            break;
+        }
+    }
 
     i2c_dev = &g_aic_i2c_dev[index].aic_bus;
     status = hal_i2c_get_raw_interrupt_state(i2c_dev);
@@ -386,7 +400,7 @@ static rt_size_t aic_i2c_master_xfer(struct rt_i2c_bus_device *bus,
     }
     hal_i2c_module_disable(i2c_dev);
 
-    return (ret < 0) ? ret : num;
+    return (ret < 0) ? 0 : num;
 }
 #else
 static rt_size_t aic_i2c_master_xfer(struct rt_i2c_bus_device *bus,

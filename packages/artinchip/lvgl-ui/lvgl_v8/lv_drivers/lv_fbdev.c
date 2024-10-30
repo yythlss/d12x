@@ -91,6 +91,16 @@ int fbdev_get_size(int *width, int *height)
     return 0;
 }
 
+unsigned int fbdev_get_screen_width()
+{
+    return g_info.width;
+}
+
+unsigned int fbdev_get_screen_height()
+{
+    return g_info.height;
+}
+
 enum mpp_pixel_format fbdev_get_fmt(void)
 {
     if (g_info.bits_per_pixel == 32)

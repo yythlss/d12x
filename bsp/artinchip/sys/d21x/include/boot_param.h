@@ -85,6 +85,7 @@ enum boot_controller aic_get_boot_controller(void);
 int aic_get_boot_image_id(void);
 unsigned long aic_timer_get_us(void);
 void *aic_get_boot_resource(void);
+void aic_set_boot_resource(void *res_addr);
 void *aic_get_boot_resource_from_nand(void *dev, unsigned long pagesize,
                                       nand_read fn);
 void *aic_get_boot_args(void);

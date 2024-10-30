@@ -16,15 +16,21 @@ extern "C" {
 
 /* ------------------------------------------------------------------------ */
 
-extern void  umm_init_heap(void *ptr, size_t size);
-extern void  umm_init(void);
+typedef struct umm_heap_config {
+    void *pheap;
+    size_t heap_size;
+    uint16_t numblocks;
+} umm_heap;
 
-extern void *umm_malloc(size_t size);
-extern void *umm_calloc(size_t num, size_t size);
-extern void *umm_realloc(void *ptr, size_t size);
-extern void  umm_free(void *ptr);
-extern void *umm_malloc_align(size_t size, size_t align);
-extern void  umm_free_align(void *ptr);
+extern void  umm_init_heap(umm_heap *heap, void *ptr, size_t size);
+extern void  umm_init(umm_heap *heap);
+
+extern void *umm_malloc(umm_heap *heap, size_t size);
+extern void *umm_calloc(umm_heap *heap, size_t num, size_t size);
+extern void *umm_realloc(umm_heap *heap, void *ptr, size_t size);
+extern void  umm_free(umm_heap *heap, void *ptr);
+extern void *umm_malloc_align(umm_heap *heap, size_t size, size_t align);
+extern void  umm_free_align(umm_heap *heap, void *ptr);
 
 /* ------------------------------------------------------------------------ */
 

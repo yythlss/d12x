@@ -66,6 +66,12 @@ source "bsp/artinchip/drv/uart/Kconfig.dev"
 # i2c device global option
 #---------------------------
 
+config AIC_USING_SOFT_I2C
+    bool "Using SOFT_I2C"
+    default n
+    select RT_USING_I2C_BITOPS
+    select AIC_I2C_DRV
+
 config AIC_USING_I2C0
     bool "Using I2C0"
     default n
@@ -387,6 +393,12 @@ menu "SPI1 Parameter"
         bool "Dynamic DMA channel SPI1"
         default n
 
+    config AIC_QSPI1_BUS_SPI
+        bool "Work in SPI BUS Mode"
+        default n
+        select AIC_QSPI_DRV
+        depends on AIC_QSPI1_BUS_WIDTH_1
+
 endmenu
 
 config AIC_USING_QSPI2
@@ -422,6 +434,11 @@ menu "SPI2 Parameter"
         bool "Dynamic DMA channel SPI2"
         default n
 
+    config AIC_QSPI2_BUS_SPI
+        bool "Work in SPI BUS Mode"
+        default y
+        select AIC_QSPI_DRV
+
 endmenu
 
 config AIC_USING_QSPI3
@@ -456,6 +473,11 @@ menu "SPI3 Parameter"
         depends on AIC_USING_DMA
         bool "Dynamic DMA channel SPI3"
         default n
+
+    config AIC_QSPI3_BUS_SPI
+        bool "Work in SPI BUS Mode"
+        default y
+        select AIC_QSPI_DRV
 
 endmenu
 

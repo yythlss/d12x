@@ -688,15 +688,20 @@ static void aicfb_fb_info_setup(struct aicfb_info *fbi)
     fbi->fb_rotate = 0;
 #endif
 
+#ifdef AIC_SCREEN_CROP
+    active_w = AIC_SCREEN_CROP_WIDTH;
+    active_h = AIC_SCREEN_CROP_HEIGHT;
+#else
+    active_w = fbi->panel->timings->hactive;
+    active_h = fbi->panel->timings->vactive;
+#endif
+
     if (fbi->fb_rotate == 90 || fbi->fb_rotate == 270)
     {
-        active_w = fbi->panel->timings->vactive;
-        active_h = fbi->panel->timings->hactive;
-    }
-    else
-    {
-        active_w = fbi->panel->timings->hactive;
-        active_h = fbi->panel->timings->vactive;
+        u32 tmp = active_w;
+
+        active_w = active_h;
+        active_h = tmp;
     }
 
     stride = ALIGN_8B(active_w * bpp / 8);
@@ -724,8 +729,8 @@ static void fb_color_block(struct aicfb_info *fbi)
     };
     unsigned char *pos = (unsigned char *)fbi->fb_start;
 
-    width = fbi->panel->timings->hactive;
-    height = fbi->panel->timings->vactive;
+    width = fbi->width;
+    height = fbi->height;
 
     switch (fbi->bits_per_pixel) {
 #if defined(AICFB_ARGB8888) || defined(AICFB_ABGR8888) || defined(AICFB_XRGB8888)
@@ -818,7 +823,6 @@ static void aicfb_update_alpha(struct aicfb_info *fbi)
 static void aicfb_update_layer(struct aicfb_info *fbi)
 {
     struct platform_driver *de = fbi->de;
-    struct aic_panel *panel = fbi->panel;
     struct aicfb_layer_data layer = {0};
 
     layer.layer_id = AICFB_LAYER_TYPE_UI;
@@ -830,11 +834,10 @@ static void aicfb_update_layer(struct aicfb_info *fbi)
     switch (fbi->fb_rotate)
     {
     case 0:
-        layer.buf.size.width = panel->timings->hactive;
-        layer.buf.size.height = panel->timings->vactive;
+        layer.buf.size.width = fbi->width;
+        layer.buf.size.height = fbi->height;
         layer.buf.stride[0] = fbi->stride;
         layer.buf.phy_addr[0] = (uintptr_t)fbi->fb_start;
-        layer.buf.format = AICFB_FORMAT;
         break;
 #ifdef AIC_FB_ROTATE_EN
     case 90:
@@ -843,16 +846,15 @@ static void aicfb_update_layer(struct aicfb_info *fbi)
         unsigned int stride = ALIGN_8B(fbi->height * fbi->bits_per_pixel / 8);
 
         layer.buf.phy_addr[0] = (uintptr_t)fbi->fb_start + fbi->fb_size * AIC_FB_DRAW_BUF_NUM;
-        layer.buf.size.width = panel->timings->hactive;
-        layer.buf.size.height = panel->timings->vactive;
+        layer.buf.size.width = fbi->height;
+        layer.buf.size.height = fbi->width;
         layer.buf.stride[0] = stride;
         break;
     }
     case 180:
-        pr_info("rotate 180\n");
         layer.buf.phy_addr[0] = (uintptr_t)fbi->fb_start + fbi->fb_size * AIC_FB_DRAW_BUF_NUM;
-        layer.buf.size.width = panel->timings->hactive;
-        layer.buf.size.height = panel->timings->vactive;
+        layer.buf.size.width = fbi->width;
+        layer.buf.size.height = fbi->height;
         layer.buf.stride[0] = fbi->stride;
         break;
 #endif

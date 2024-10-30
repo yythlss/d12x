@@ -451,3 +451,13 @@ void media_data_write_end(struct fwc_info *fwc)
             break;
     }
 }
+
+void *aicupg_malloc_align(u32 size, size_t align)
+{
+    return aicos_malloc_align(MEM_RESERVED, size, align);
+}
+
+void aicupg_free_align(void *ptr)
+{
+    aicos_free_align(MEM_RESERVED, ptr);
+}

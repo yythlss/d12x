@@ -14,7 +14,7 @@ source "bsp/artinchip/drv/gpio/Kconfig.dev"
 # Interface Class
 #================================================
 
-comment "Interface Related: "
+comment "Interface Related:"
 
 #---------------------------
 # uart device global option
@@ -65,6 +65,12 @@ source "bsp/artinchip/drv/uart/Kconfig.dev"
 #---------------------------
 # i2c device global option
 #---------------------------
+
+config AIC_USING_SOFT_I2C
+    bool "Using SOFT_I2C"
+    default n
+    select RT_USING_I2C_BITOPS
+    select AIC_I2C_DRV
 
 config AIC_USING_I2C0
     bool "Using I2C0"
@@ -331,7 +337,7 @@ source "packages/third-party/lwip/contrib/ports/drv/aic/Kconfig.dev"
 # Storage Class
 #================================================
 
-comment "Storage Related: "
+comment "Storage Related:"
 
 #--------------------------------------------
 # qspi device global option
@@ -406,6 +412,12 @@ menu "SPI1 Parameter"
         bool "Dynamic DMA channel SPI1"
         default n
 
+    config AIC_QSPI1_BUS_SPI
+        bool "Work in SPI BUS Mode"
+        default n
+        select AIC_QSPI_DRV
+        depends on AIC_QSPI1_BUS_WIDTH_1
+
 endmenu
 
 config AIC_USING_QSPI2
@@ -440,6 +452,11 @@ menu "SPI2 Parameter"
         depends on AIC_USING_DMA
         bool "Dynamic DMA channel SPI2"
         default n
+
+    config AIC_QSPI2_BUS_SPI
+        bool "Work in SPI BUS Mode"
+        default y
+        select AIC_QSPI_DRV
 
 endmenu
 
@@ -476,6 +493,11 @@ menu "SPI3 Parameter"
         bool "Dynamic DMA channel SPI3"
         default n
 
+    config AIC_QSPI3_BUS_SPI
+        bool "Work in SPI BUS Mode"
+        default y
+        select AIC_QSPI_DRV
+
 endmenu
 
 source "bsp/artinchip/drv/qspi/Kconfig.dev"
@@ -511,7 +533,7 @@ source "bsp/peripheral/wireless/Kconfig"
 # Analog Class
 #================================================
 
-comment "Analog Related: "
+comment "Analog Related:"
 
 #---------------------------
 # TSEN device global option
@@ -599,7 +621,7 @@ endmenu
 # MutiMedia Class
 #================================================
 
-comment "MutiMedia Related: "
+comment "MutiMedia Related:"
 
 #--------------------------------------------
 # DE device global option
@@ -688,7 +710,7 @@ endif
 # System Class
 #================================================
 
-comment "System Related: "
+comment "System Related:"
 
 #---------------------------
 # DMA device global option
@@ -1085,7 +1107,7 @@ source "bsp/artinchip/drv/pm/Kconfig"
 # Security Class
 #================================================
 
-comment "Security Related: "
+comment "Security Related:"
 
 #--------------------------------------------
 # spienc device global option

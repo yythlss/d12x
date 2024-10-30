@@ -31,6 +31,7 @@ extern "C" {
 #include "usb_drv.h"
 #endif
 #include "wdt.h"
+#include "gpai.h"
 
 #ifdef __cplusplus
 }

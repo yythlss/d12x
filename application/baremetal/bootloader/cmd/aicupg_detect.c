@@ -190,10 +190,11 @@ static bool force_upg_check(void)
 
 int upg_type_check(enum boot_device bd)
 {
-    enum aic_reboot_reason r;
-
     upg_type = UPG_TYPE_NONE;
     upg_mode = UPG_MODE_NORMAL;
+
+#ifdef AIC_WRI_DRV
+    enum aic_reboot_reason r;
 
     r = aic_get_reboot_reason();
     /*
@@ -218,6 +219,7 @@ int upg_type_check(enum boot_device bd)
         aic_clr_reboot_reason();
         return 0;
     }
+#endif
 
     if (bd == BD_USB) {
         if (usbd_connect_pc_check()) {

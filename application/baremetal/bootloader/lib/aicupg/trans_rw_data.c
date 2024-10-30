@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -59,10 +59,10 @@ s32 trans_layer_rw_proc(struct phy_data_rw *rw, u8 *buffer, u32 len)
 
     if (!trans_pkt_buf) {
         trans_pkt_siz = TRANS_DATA_BUFF_MAX_SIZE;
-        trans_pkt_buf = aicos_malloc_align(0, trans_pkt_siz, CACHE_LINE_SIZE);
+        trans_pkt_buf = aicupg_malloc_align(trans_pkt_siz, CACHE_LINE_SIZE);
         if (!trans_pkt_buf) {
             trans_pkt_siz = TRANS_DATA_BUFF_MIN_SIZE;
-            trans_pkt_buf = aicos_malloc_align(0, trans_pkt_siz, CACHE_LINE_SIZE);
+            trans_pkt_buf = aicupg_malloc_align(trans_pkt_siz, CACHE_LINE_SIZE);
             if (!trans_pkt_buf) {
                 pr_err("malloc trans pkt buf(%u) failed.\n", trans_pkt_siz);
                 return -1;

@@ -29,6 +29,10 @@ struct rt_i2c_bit_ops
     rt_uint32_t timeout;   /* in tick */
 };
 
+rt_size_t i2c_bit_xfer(struct rt_i2c_bus_device *bus,
+                              struct rt_i2c_msg  msgs[],
+                              rt_uint32_t        num);
+
 rt_err_t rt_i2c_bit_add_bus(struct rt_i2c_bus_device *bus,
                             const char               *bus_name);
 

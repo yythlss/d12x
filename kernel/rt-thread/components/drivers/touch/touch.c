@@ -126,9 +126,6 @@ static rt_size_t rt_touch_read(rt_device_t dev, rt_off_t pos, void *buf, rt_size
 {
     rt_touch_t touch;
     rt_size_t result = 0;
-    rt_uint8_t index;
-    rt_uint16_t temp = 0;
-    struct rt_touch_data *read_data = RT_NULL;
     RT_ASSERT(dev != RT_NULL);
     touch = (rt_touch_t)dev;
 
@@ -138,32 +135,6 @@ static rt_size_t rt_touch_read(rt_device_t dev, rt_off_t pos, void *buf, rt_size
     }
 
     result = touch->ops->touch_readpoint(touch, buf, len);
-
-    read_data = (struct rt_touch_data *)buf;
-
-    for (index = 0; index < len; index++) {
-#ifdef AIC_TOUCH_X_FILP
-        read_data[index].x_coordinate = (rt_int16_t)AIC_TOUCH_X_COORDINATE_RANGE -
-                                            read_data[index].x_coordinate;
-#endif
-#ifdef AIC_TOUCH_Y_FILP
-        read_data[index].y_coordinate = (rt_int16_t)AIC_TOUCH_Y_COORDINATE_RANGE -
-                                            read_data[index].y_coordinate;
-#endif
-#ifdef AIC_TOUCH_90_DEGREE_ROTATION
-        temp = read_data[index].x_coordinate;
-        read_data[index].x_coordinate = (rt_int16_t)AIC_TOUCH_Y_COORDINATE_RANGE -
-                                            read_data[index].y_coordinate;
-        read_data[index].y_coordinate = temp;
-#endif
-#ifdef AIC_TOUCH_270_DEGREE_ROTATION
-        temp = read_data[index].x_coordinate;
-        read_data[index].x_coordinate = read_data[index].y_coordinate;
-        read_data[index].y_coordinate = (rt_int16_t)AIC_TOUCH_X_COORDINATE_RANGE - temp;
-#endif
-        (void)read_data;
-        (void)temp;
-    }
     return result;
 }
 

@@ -366,9 +366,9 @@ static rt_err_t i2c_bit_send_address(struct rt_i2c_bus_device *bus,
     return RT_EOK;
 }
 
-static rt_size_t i2c_bit_xfer(struct rt_i2c_bus_device *bus,
-                              struct rt_i2c_msg         msgs[],
-                              rt_uint32_t               num)
+rt_size_t i2c_bit_xfer(struct rt_i2c_bus_device *bus,
+                              struct rt_i2c_msg  msgs[],
+                              rt_uint32_t        num)
 {
     struct rt_i2c_msg *msg;
     struct rt_i2c_bit_ops *ops = (struct rt_i2c_bit_ops *)bus->priv;

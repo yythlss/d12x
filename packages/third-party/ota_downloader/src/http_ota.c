@@ -19,7 +19,7 @@
 #include "webclient.h"
 #include <env.h>
 #include <ota.h>
-#include <absystem.h>
+#include <absystem_os.h>
 
 #ifdef LPKG_USING_HTTP_OTA
 

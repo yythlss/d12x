@@ -106,7 +106,7 @@ int get_fb_info(void)
 
     ret = mpp_fb_ioctl(g_fb, AICFB_GET_SCREENINFO, &g_fb_info);
     if (ret < 0)
-        pr_err("ioctl() failed! errno: -%d\n", -ret);
+        pr_err("Failed to get screen info! errno: -%d\n", -ret);
 #endif
     pr_info("Screen width: %d, height %d\n",
             g_fb_info.width, g_fb_info.height);
@@ -125,7 +125,7 @@ int set_ui_layer_alpha(int val)
     alpha.value = val;
     ret = mpp_fb_ioctl(g_fb, AICFB_UPDATE_ALPHA_CONFIG, &alpha);
     if (ret < 0)
-        pr_err("ioctl() failed! errno: -%d\n", -ret);
+        pr_err("Failed to update alpha! errno: -%d\n", -ret);
 #endif
     return ret;
 }
@@ -137,7 +137,7 @@ int sensor_get_fmt(void)
 
     ret = mpp_dvp_ioctl(DVP_IN_G_FMT, &f);
     if (ret < 0) {
-        pr_err("ioctl() failed! err -%d\n", -ret);
+        pr_err("Failed to get sensor format! err -%d\n", -ret);
         // return -1;
     }
 
@@ -155,7 +155,7 @@ int dvp_subdev_set_fmt(void)
 
     ret = mpp_dvp_ioctl(DVP_IN_S_FMT, &g_vdata.src_fmt);
     if (ret < 0) {
-        pr_err("ioctl() failed! err -%d\n", -ret);
+        pr_err("Failed to set DVP in-format! err -%d\n", -ret);
         return -1;
     }
 
@@ -174,7 +174,7 @@ int dvp_cfg(int width, int height, int format)
 
     ret = mpp_dvp_ioctl(DVP_OUT_S_FMT, &f);
     if (ret < 0) {
-        pr_err("ioctl() failed! err -%d\n", -ret);
+        pr_err("Failed to set DVP out-format! err -%d\n", -ret);
         return -1;
     }
 
@@ -183,10 +183,10 @@ int dvp_cfg(int width, int height, int format)
 
 int dvp_request_buf(struct vin_video_buf *vbuf)
 {
-    int i;
+    int i, min_num = 3;
 
     if (mpp_dvp_ioctl(DVP_REQ_BUF, (void *)vbuf) < 0) {
-        pr_err("ioctl() failed!\n");
+        pr_err("Failed to request buf!\n");
         return -1;
     }
 
@@ -197,6 +197,16 @@ int dvp_request_buf(struct vin_video_buf *vbuf)
             vbuf->planes[i * vbuf->num_planes].len,
             vbuf->planes[i * vbuf->num_planes + 1].buf,
             vbuf->planes[i * vbuf->num_planes + 1].len);
+    }
+
+#ifdef SUPPORT_ROTATION
+    if (g_vdata.rotation)
+        min_num++;
+#endif
+
+    if (vbuf->num_buffers < min_num) {
+        pr_err("The number of video buf must >= %d!\n", min_num);
+        return -1;
     }
 
     return 0;
@@ -221,7 +231,7 @@ void dvp_release_buf(int num)
 int dvp_queue_buf(int index)
 {
     if (mpp_dvp_ioctl(DVP_Q_BUF, (void *)(ptr_t)index) < 0) {
-        pr_err("ioctl() failed!\n");
+        pr_err("Q failed! Maybe buf state is invalid.\n");
         return -1;
     }
 
@@ -234,7 +244,7 @@ int dvp_dequeue_buf(int *index)
 
     ret = mpp_dvp_ioctl(DVP_DQ_BUF, (void *)index);
     if (ret < 0) {
-        pr_err("ioctl() failed! err -%d\n", -ret);
+        pr_err("DQ failed! Maybe cannot receive data from Camera. err -%d\n", -ret);
         return -1;
     }
 
@@ -247,7 +257,7 @@ int dvp_start(void)
 
     ret = mpp_dvp_ioctl(DVP_STREAM_ON, NULL);
     if (ret < 0) {
-        pr_err("ioctl() failed! err -%d\n", -ret);
+        pr_err("Failed to start streaming! err -%d\n", -ret);
         return -1;
     }
 
@@ -260,7 +270,7 @@ int dvp_stop(void)
 
     ret = mpp_dvp_ioctl(DVP_STREAM_OFF, NULL);
     if (ret < 0) {
-        pr_err("ioctl() failed! err -%d\n", -ret);
+        pr_err("Failed to stop streaming! err -%d\n", -ret);
         return -1;
     }
 
@@ -277,7 +287,7 @@ int video_layer_disable(void)
     layer.enable = 0;
     ret = mpp_fb_ioctl(g_fb, AICFB_UPDATE_LAYER_CONFIG, &layer);
     if (ret < 0)
-	pr_err("g_fb ioctl AICFB_UPDATE_LAYER_CONFIG failed !");
+        pr_err("Failed to disable video layer!");
 
 #endif
     return ret;
@@ -403,7 +413,7 @@ int video_layer_set(struct aic_dvp_data *vdata, int index)
     }
 
     if (mpp_fb_ioctl(g_fb, AICFB_UPDATE_LAYER_CONFIG, &layer) < 0) {
-        pr_err("ioctl() failed!\n");
+        pr_err("Failed to update layer config!\n");
         return -1;
     }
 #endif

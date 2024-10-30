@@ -17,6 +17,7 @@
 #include "mpp_vin.h"
 
 #include "drv_camera.h"
+#include "camera_inner.h"
 
 /* Default format configuration of GM7150 */
 #define GM7150_DFT_WIDTH        PAL_WIDTH
@@ -26,6 +27,11 @@
 
 #define GM7150_I2C_SLAVE_ID     0x5C // or 0x5D
 #define GM7150_CHIP_ID          0x7150
+
+#define GM7150_BRIGHTNESS_REG   0x09
+#define GM7150_SATURATION_REG   0x0A
+#define GM7150_HUE_REG          0x0B
+#define GM7150_CONTRAST_REG     0x0C
 
 struct gm7150_dev {
     struct rt_device dev;
@@ -40,20 +46,21 @@ struct gm7150_dev {
 
 static struct gm7150_dev g_gm7150_dev = {0};
 
+static struct reg8_info gm7150_bt656_regs[] = {
+    {0x03, 0x0D},
+    {0x11, 0x04},
+    {0x12, 0x00},
+    {0x13, 0x04},
+    {0x14, 0x00},
+    {0xA0, 0x55},
+    {0xA1, 0xAA},
+    {0x69, 0x40},
+    {0x6D, 0x90},
+};
+
 static int gm7150_write_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 val)
 {
-    u8 buf[2];
-    struct rt_i2c_msg msgs;
-
-    buf[0] = reg;
-    buf[1] = val;
-
-    msgs.addr = GM7150_I2C_SLAVE_ID;
-    msgs.flags = RT_I2C_WR;
-    msgs.buf = buf;
-    msgs.len = 2;
-
-    if (rt_i2c_transfer(i2c, &msgs, 1) != 1) {
+    if (rt_i2c_write_reg(i2c, GM7150_I2C_SLAVE_ID, reg, &val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
         return -1;
     }
@@ -63,20 +70,7 @@ static int gm7150_write_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 val)
 
 static int gm7150_read_reg(struct rt_i2c_bus_device *i2c, u8 reg, u8 *val)
 {
-    struct rt_i2c_msg msg[2];
-    u8 buf = reg;
-
-    msg[0].addr  = GM7150_I2C_SLAVE_ID;
-    msg[0].flags = RT_I2C_WR;
-    msg[0].buf   = &buf;
-    msg[0].len   = 1;
-
-    msg[1].addr  = GM7150_I2C_SLAVE_ID;
-    msg[1].flags = RT_I2C_RD;
-    msg[1].buf   = val;
-    msg[1].len   = 1;
-
-    if (rt_i2c_transfer(i2c, msg, 2) != 2) {
+    if (rt_i2c_read_reg(i2c, GM7150_I2C_SLAVE_ID, reg, val, 1) != 1) {
         LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, *val);
         return -1;
     }
@@ -94,15 +88,11 @@ static void gm7150_select_ch(struct gm7150_dev *sensor, u32 ch)
 
 static void gm7150_out_bt656(struct gm7150_dev *sensor)
 {
-    gm7150_write_reg(sensor->i2c, 0x03, 0x0D);
-    gm7150_write_reg(sensor->i2c, 0x11, 0x04);
-    gm7150_write_reg(sensor->i2c, 0x12, 0x00);
-    gm7150_write_reg(sensor->i2c, 0x13, 0x04);
-    gm7150_write_reg(sensor->i2c, 0x14, 0x00);
-    gm7150_write_reg(sensor->i2c, 0xA0, 0x55);
-    gm7150_write_reg(sensor->i2c, 0xA1, 0xAA);
-    gm7150_write_reg(sensor->i2c, 0x69, 0x40);
-    gm7150_write_reg(sensor->i2c, 0x6D, 0x90);
+    struct reg8_info *info = gm7150_bt656_regs;
+    int i;
+
+    for (i = 0; i < ARRAY_SIZE(gm7150_bt656_regs); i++, info++)
+        gm7150_write_reg(sensor->i2c, info->reg, info->val);
 }
 
 static void gm7150_cur_status(struct gm7150_dev *sensor)
@@ -131,9 +121,9 @@ static int gm7150_probe(struct gm7150_dev *sensor)
     u8 id_h = 0, id_l = 0;
 
     aicos_msleep(30);
-    rt_pin_write(sensor->pwdn_pin, 0);  //SET PDN LOW BY GPIO OF MCU
+    camera_pin_set_low(sensor->pwdn_pin);
     aicos_msleep(10);
-    rt_pin_write(sensor->pwdn_pin, 1);   //SET PDN HIGH BY GPIO OF MCU
+    camera_pin_set_high(sensor->pwdn_pin);
 
     aicos_msleep(30);
 
@@ -152,27 +142,13 @@ static int gm7150_probe(struct gm7150_dev *sensor)
     return 0;
 }
 
-static int gm7150_i2c_init(struct gm7150_dev *sensor)
-{
-    char name[8] = "";
-
-    snprintf(name, 8, "i2c%d", AIC_CAMERA_I2C_CHAN);
-    sensor->i2c = rt_i2c_bus_device_find(name);
-    if (sensor->i2c == RT_NULL) {
-        LOG_E("Failed to open %s", name);
-        return -ENODEV;
-    }
-
-    return 0;
-}
-
 static rt_err_t gm7150_init(rt_device_t dev)
 {
     int ret = 0;
     struct gm7150_dev *sensor = &g_gm7150_dev;
 
-    ret = gm7150_i2c_init(sensor);
-    if (ret != 0)
+    sensor->i2c = camera_i2c_get();
+    if (!sensor->i2c)
         return -RT_EINVAL;
 
     sensor->fmt.code   = GM7150_DFT_CODE;
@@ -184,8 +160,9 @@ static rt_err_t gm7150_init(rt_device_t dev)
                         MEDIA_SIGNAL_PCLK_SAMPLE_RISING |
                         MEDIA_SIGNAL_INTERLACED_MODE;
 
-    sensor->pwdn_pin = rt_pin_get(AIC_CAMERA_PWDN_PIN);
-    rt_pin_mode(sensor->pwdn_pin, PIN_MODE_OUTPUT);
+    sensor->pwdn_pin = camera_pwdn_pin_get();
+    if (!sensor->pwdn_pin)
+        return -RT_EINVAL;
 
     ret = gm7150_probe(sensor);
     if (ret)
@@ -205,10 +182,8 @@ static rt_err_t gm7150_close(rt_device_t dev)
     return RT_EOK;
 }
 
-static int gm7150_get_fmt(rt_device_t dev, struct mpp_video_fmt *cfg)
+static int gm7150_get_fmt(struct gm7150_dev *sensor, struct mpp_video_fmt *cfg)
 {
-    struct gm7150_dev *sensor = (struct gm7150_dev *)dev;
-
     cfg->code   = sensor->fmt.code;
     cfg->width  = sensor->fmt.width;
     cfg->height = sensor->fmt.height;
@@ -227,15 +202,53 @@ static int gm7150_stop(rt_device_t dev)
     return 0;
 }
 
+static int gm7150_set_brightness(struct gm7150_dev *sensor, u32 percent)
+{
+    u8 val = PERCENT_TO_INT(0, 255, percent);
+
+    return gm7150_write_reg(sensor->i2c, GM7150_BRIGHTNESS_REG, val);
+}
+
+static int gm7150_set_saturation(struct gm7150_dev *sensor, u32 percent)
+{
+    u8 val = PERCENT_TO_INT(0, 255, percent);
+
+    return gm7150_write_reg(sensor->i2c, GM7150_SATURATION_REG, val);
+}
+
+static int gm7150_set_hue(struct gm7150_dev *sensor, u32 percent)
+{
+    s8 val = PERCENT_TO_INT((s8)0x80, (s8)0x7F, percent);
+
+    return gm7150_write_reg(sensor->i2c, GM7150_HUE_REG, val);
+}
+
+static int gm7150_set_contrast(struct gm7150_dev *sensor, u32 percent)
+{
+    u8 val = PERCENT_TO_INT(0, 255, percent);
+
+    return gm7150_write_reg(sensor->i2c, GM7150_CONTRAST_REG, val);
+}
+
 static rt_err_t gm7150_control(rt_device_t dev, int cmd, void *args)
 {
+    struct gm7150_dev *sensor = (struct gm7150_dev *)dev;
+
     switch (cmd) {
     case CAMERA_CMD_START:
         return gm7150_start(dev);
     case CAMERA_CMD_STOP:
         return gm7150_stop(dev);
     case CAMERA_CMD_GET_FMT:
-        return gm7150_get_fmt(dev, (struct mpp_video_fmt *)args);
+        return gm7150_get_fmt(sensor, (struct mpp_video_fmt *)args);
+    case CAMERA_CMD_SET_CONTRAST:
+        return gm7150_set_contrast(sensor, *(u32 *)args);
+    case CAMERA_CMD_SET_BRIGHTNESS:
+        return gm7150_set_brightness(sensor, *(u32 *)args);
+    case CAMERA_CMD_SET_HUE:
+        return gm7150_set_hue(sensor, *(u32 *)args);
+    case CAMERA_CMD_SET_SATURATION:
+        return gm7150_set_saturation(sensor, *(u32 *)args);
     default:
         LOG_I("Unsupported cmd: 0x%x", cmd);
         return -RT_EINVAL;

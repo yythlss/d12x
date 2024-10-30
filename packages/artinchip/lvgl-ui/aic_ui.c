@@ -66,11 +66,6 @@ void aic_ui_init()
     dashboard_ui_init();
 #endif
 
-#ifdef AIC_LVGL_DASHBOARD_SMALL_DEMO
-    extern lv_obj_t* dashboard_ui_init(void);
-    dashboard_ui_init();
-#endif
-
 #ifdef AIC_LVGL_DEMO_HUB_DEMO
     extern void demo_hub_init(void);
     demo_hub_init();
@@ -116,11 +111,6 @@ void aic_ui_init()
 #ifdef AIC_LVGL_IMAGE_DEMO
     extern void image_ui_init(void);
     image_ui_init();
-#endif
-
-#ifdef AIC_LVGL_86BOX_DEMO
-    extern void a_86_box_ui_init(void);
-    a_86_box_ui_init();
 #endif
 
 #ifdef AIC_USE_TOUCH_MONKEY_TEST

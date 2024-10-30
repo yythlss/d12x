@@ -683,6 +683,17 @@ s32 nand_fwc_spl_write(struct fwc_info *fwc, u8 *buf, s32 len)
     return len;
 }
 
+s32 nand_fwc_spl_end(struct aicupg_nand_priv *priv)
+{
+    struct aicupg_nand_spl *spl;
+
+    spl = &g_nand_spl;
+    if (spl->image_buf)
+        free(spl->image_buf);
+
+    return 0;
+}
+
 int nand_spl_get_candidate_blocks(u32 *blks, u32 size)
 {
     if (!blks || size < SPL_CANDIDATE_BLOCK_NUM) {

@@ -16,7 +16,9 @@
 #ifdef AIC_MPP_AVI_DEMUX
 #include "aic_avi_parser.h"
 #endif
-
+#ifdef AIC_MPP_FLAC_DEMUX
+#include "aic_flac_parser.h"
+#endif
 
 struct aic_parser_create_tbl {
 	char  file_type[7];
@@ -32,6 +34,9 @@ struct aic_parser_create_tbl create_tbl[] = {
 	{"wav", 3, aic_wav_parser_create},
 #ifdef AIC_MPP_AVI_DEMUX
 	{"avi", 3, aic_avi_parser_create},
+#endif
+#ifdef AIC_MPP_FLAC_DEMUX
+	{"flac", 4, aic_flac_parser_create},
 #endif
 };
 s32 aic_parser_create(unsigned char *uri, struct aic_parser **parser)

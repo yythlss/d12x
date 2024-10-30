@@ -7,7 +7,7 @@ cwd = GetCurrentDir()
 objs = []
 list = os.listdir(cwd)
 
-prio = ['ota', 'aic-startup-ui', 'lvgl-ui']
+prio = ['env', 'aic-startup-ui', 'lvgl-ui']
 remain_dirs = [d for d in list if d not in prio]
 
 for d in prio:

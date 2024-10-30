@@ -18,6 +18,7 @@
 #include "mpp_vin.h"
 
 #include "drv_camera.h"
+#include "camera_inner.h"
 
 /* Default format configuration of OV7670 */
 #define OV7670_DFT_WIN          OV7670_WIN_VGA
@@ -191,11 +192,6 @@ enum ov7670_model {
     MODEL_OV7675,
 };
 
-struct regval_list {
-    unsigned char reg_num;
-    unsigned char value;
-};
-
 struct ov7670_win_size {
     int width;
     int height;
@@ -204,7 +200,7 @@ struct ov7670_win_size {
     int hstop;      /* that they do not always make complete */
     int vstart;     /* sense to humans, but evidently the sensor */
     int vstop;      /* will do the right thing... */
-    struct regval_list *regs; /* Regs to tweak */
+    struct reg8_info *regs; /* Regs to tweak */
 };
 
 struct ov7670_format_struct;  /* coming later */
@@ -240,7 +236,7 @@ struct ov7670_devtype {
 
 static struct ov7670_dev g_ov7670_dev = {0};
 
-static struct regval_list ov7670_default_regs[] = {
+static struct reg8_info ov7670_default_regs[] = {
     { REG_COM7, COM7_RESET },
 /*
  * Clock scale: 3 = 15fps
@@ -367,7 +363,7 @@ static struct regval_list ov7670_default_regs[] = {
  * IMPORTANT RULE: the first entry must be for COM7, see ov7670_s_fmt for why.
  */
 
-static struct regval_list ov7670_fmt_yuv422[] = {
+static struct reg8_info ov7670_fmt_yuv422[] = {
     { REG_COM7, 0x0 },  /* Selects YUV mode */
     { REG_RGB444, 0 },  /* No RGB444 please */
     { REG_COM1, 0 },    /* CCIR601 */
@@ -383,7 +379,7 @@ static struct regval_list ov7670_fmt_yuv422[] = {
     { 0xff, 0xff },
 };
 
-static struct regval_list ov7670_fmt_rgb565[] = {
+static struct reg8_info ov7670_fmt_rgb565[] = {
     { REG_COM7, COM7_RGB }, /* Selects RGB mode */
     { REG_RGB444, 0 },  /* No RGB444 please */
     { REG_COM1, 0x0 },  /* CCIR601 */
@@ -399,7 +395,7 @@ static struct regval_list ov7670_fmt_rgb565[] = {
     { 0xff, 0xff },
 };
 
-static struct regval_list ov7670_fmt_rgb444[] = {
+static struct reg8_info ov7670_fmt_rgb444[] = {
     { REG_COM7, COM7_RGB }, /* Selects RGB mode */
     { REG_RGB444, R444_ENABLE },    /* Enable xxxxrrrr ggggbbbb */
     { REG_COM1, 0x0 },  /* CCIR601 */
@@ -415,7 +411,7 @@ static struct regval_list ov7670_fmt_rgb444[] = {
     { 0xff, 0xff },
 };
 
-static struct regval_list ov7670_fmt_raw[] = {
+static struct reg8_info ov7670_fmt_raw[] = {
     { REG_COM7, COM7_BAYER },
     { REG_COM13, 0x08 }, /* No gamma, magic rsvd bit */
     { REG_COM16, 0x3d }, /* Edge enhancement, denoise */
@@ -430,7 +426,7 @@ static struct regval_list ov7670_fmt_raw[] = {
  */
 static struct ov7670_format_struct {
     u32 mbus_code;
-    struct regval_list *regs;
+    struct reg8_info *regs;
     int cmatrix[CMATRIX_LEN];
 } ov7670_formats[] = {
     {
@@ -466,7 +462,7 @@ static struct ov7670_format_struct {
  * which is allegedly provided by the sensor.  So here's the weird register
  * settings.
  */
-static struct regval_list ov7670_qcif_regs[] = {
+static struct reg8_info ov7670_qcif_regs[] = {
     { REG_COM3, COM3_SCALEEN|COM3_DCWEN },
     { REG_COM3, COM3_DCWEN },
     { REG_COM14, COM14_DCWEN | 0x01 },
@@ -551,58 +547,36 @@ static struct ov7670_win_size ov7675_win_sizes[] = {
 };
 
 static int ov7670_read_reg(struct rt_i2c_bus_device *i2c, unsigned char reg,
-                           unsigned char *value)
+                           unsigned char *val)
 {
-    u8 data = reg;
-    struct rt_i2c_msg msg;
-    int ret = 0;
-
-    msg.addr = OV7670_I2C_SLAVE_ID;
-    msg.flags = RT_I2C_WR;
-    msg.len = 1;
-    msg.buf = &data;
-    ret = rt_i2c_transfer(i2c, &msg, 1);
-    if (ret < 0) {
-        LOG_E("Error %d on register write\n", ret);
-        return ret;
+    if (rt_i2c_read_reg(i2c, OV7670_I2C_SLAVE_ID, reg, val, 1) != 1) {
+        LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, *val);
+        return -1;
     }
 
-    msg.flags = RT_I2C_RD;
-    ret = rt_i2c_transfer(i2c, &msg, 1);
-    if (ret >= 0) {
-        *value = data;
-        ret = 0;
-    }
-    return ret;
+    return 0;
 }
 
 static int ov7670_write_reg(struct rt_i2c_bus_device *i2c, unsigned char reg,
-                            unsigned char value)
+                            unsigned char val)
 {
-    struct rt_i2c_msg msg;
-    unsigned char data[2] = { reg, value };
-    int ret = 0;
+    if (rt_i2c_write_reg(i2c, OV7670_I2C_SLAVE_ID, reg, &val, 1) != 1) {
+        LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
+        return -1;
+    }
 
-    msg.addr = OV7670_I2C_SLAVE_ID;
-    msg.flags = RT_I2C_WR;
-    msg.len = 2;
-    msg.buf = data;
-    ret = rt_i2c_transfer(i2c, &msg, 1);
-    if (ret > 0)
-        ret = 0;
-
-    if (reg == REG_COM7 && (value & COM7_RESET))
+    if (reg == REG_COM7 && (val & COM7_RESET))
         aicos_msleep(5);  /* Wait for reset to run */
-    return ret;
+
+    return 0;
 }
 
 /* Write a list of register settings; ff/ff stops the process. */
-static int ov7670_write_array(struct ov7670_dev *sensor, struct regval_list *vals)
+static int ov7670_write_array(struct ov7670_dev *sensor, struct reg8_info *vals)
 {
-    while (vals->reg_num != 0xff || vals->value != 0xff) {
-        int ret = ov7670_write_reg(sensor->i2c, vals->reg_num, vals->value);
-        if (ret < 0)
-            return ret;
+    while (vals->reg != 0xff || vals->val != 0xff) {
+        if (ov7670_write_reg(sensor->i2c, vals->reg, vals->val))
+            return -1;
         vals++;
     }
     return 0;
@@ -700,7 +674,7 @@ static int ov7670_apply_fmt(struct ov7670_dev *sensor)
      * to set it absolutely here, as long as the format-specific
      * register sets list it first.
      */
-    com7 = sensor->ov_fmt->regs[0].value;
+    com7 = sensor->ov_fmt->regs[0].val;
     com7 |= wsize->com7_bit;
     ret = ov7670_write_reg(sensor->i2c, REG_COM7, com7);
     if (ret)
@@ -811,11 +785,11 @@ static void ov7670_power_on(struct ov7670_dev *sensor)
         return;
 
     if (sensor->pwdn_pin)
-        rt_pin_write(sensor->pwdn_pin, 0);
+        camera_pin_set_low(sensor->pwdn_pin);
     if (sensor->rst_pin) {
-        rt_pin_write(sensor->rst_pin, PIN_LOW);
+        camera_pin_set_low(sensor->rst_pin);
         aicos_msleep(1);
-        rt_pin_write(sensor->rst_pin, PIN_HIGH);
+        camera_pin_set_high(sensor->rst_pin);
     }
     if (sensor->pwdn_pin || sensor->rst_pin || sensor->clk)
         aicos_msleep(3);
@@ -829,7 +803,7 @@ static void ov7670_power_off(struct ov7670_dev *sensor)
         return;
 
     if (sensor->pwdn_pin)
-        rt_pin_write(sensor->pwdn_pin, 1);
+        camera_pin_set_high(sensor->pwdn_pin);
 
     sensor->on = false;
 }
@@ -863,49 +837,27 @@ static void ov7670_get_default_format(struct ov7670_dev *sensor)
                            MEDIA_SIGNAL_PCLK_SAMPLE_FALLING;
 }
 
-static int ov7670_i2c_init(struct ov7670_dev *sensor)
-{
-    char name[8] = "";
-
-    snprintf(name, 8, "i2c%d", AIC_CAMERA_I2C_CHAN);
-    sensor->i2c = rt_i2c_bus_device_find(name);
-    if (sensor->i2c == RT_NULL) {
-        LOG_E("Failed to open %s", name);
-        return -ENODEV;
-    }
-
-    return 0;
-}
-
-static int ov7670_set_xclk(u32 freq)
-{
-    g_ov7670_dev.clock_speed = freq / 1000000;
-    if (g_ov7670_dev.clock_speed < 10 || g_ov7670_dev.clock_speed > 48) {
-        LOG_E("xclk rate %d is out of range", g_ov7670_dev.clock_speed);
-        return -EINVAL;
-    }
-
-    return 0;
-}
-
 static rt_err_t ov7670_init(rt_device_t dev)
 {
     int ret = 0;
     struct ov7670_dev *sensor = &g_ov7670_dev;
 
-    ret = ov7670_i2c_init(sensor);
-    if (ret != 0)
+    sensor->i2c = camera_i2c_get();
+    if (!sensor->i2c)
         return -RT_EINVAL;
 
-    if (ov7670_set_xclk(24000000))
-        return -RT_EINVAL;
+    sensor->clock_speed = camera_xclk_rate_get() / 1000000;
+    if (sensor->clock_speed < 10 || sensor->clock_speed > 48) {
+        LOG_E("XCLK rate %d is out of range", sensor->clock_speed);
+        return -EINVAL;
+    }
 
     ov7670_get_default_format(sensor);
 
-    sensor->rst_pin = rt_pin_get(AIC_CAMERA_RST_PIN);
-    sensor->pwdn_pin = rt_pin_get(AIC_CAMERA_PWDN_PIN);
-    rt_pin_mode(sensor->rst_pin, PIN_MODE_OUTPUT);
-    rt_pin_mode(sensor->pwdn_pin, PIN_MODE_OUTPUT);
+    sensor->rst_pin = camera_rst_pin_get();
+    sensor->pwdn_pin = camera_pwdn_pin_get();
+    if (!sensor->rst_pin || !sensor->pwdn_pin)
+        return -RT_EINVAL;
 
     ov7670_power_on(sensor);
     ret = ov7670_detect(sensor);

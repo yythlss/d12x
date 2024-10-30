@@ -168,19 +168,24 @@ rt_size_t rt_i2c_write_reg(struct rt_i2c_bus_device *bus,
                            rt_uint8_t               *buf,
                            rt_uint32_t               count)
 {
+    rt_size_t ret = 0;
     rt_uint8_t cmd[AIC_I2C_CMD_BUF_LEN] = {0};
     RT_ASSERT(bus != RT_NULL);
     RT_ASSERT(buf != RT_NULL);
 
     if (count == 0 || count > (AIC_I2C_CMD_BUF_LEN - 1)) {
         LOG_E("rt_i2c_write_reg: write buf len out of range\n");
-        return -RT_EINVAL;
+        return 0;
     }
 
     cmd[0] = reg;
     rt_memcpy(&cmd[1], buf, count);
 
-    return rt_i2c_master_send(bus, addr, RT_I2C_WR, cmd, count + 1);
+    ret = rt_i2c_master_send(bus, addr, RT_I2C_WR, cmd, count + 1);
+    if (ret != (count + 1))
+        return 0;
+
+    return count;
 }
 
 rt_size_t rt_i2c_write_reg16(struct rt_i2c_bus_device *bus,
@@ -189,20 +194,25 @@ rt_size_t rt_i2c_write_reg16(struct rt_i2c_bus_device *bus,
                              rt_uint8_t               *buf,
                              rt_uint32_t               count)
 {
+    rt_size_t ret = 0;
     rt_uint8_t cmd[AIC_I2C_CMD_BUF_LEN] = {0};
     RT_ASSERT(bus != RT_NULL);
     RT_ASSERT(buf != RT_NULL);
 
     if (count == 0 || count > (AIC_I2C_CMD_BUF_LEN - 2)) {
         LOG_E("rt_i2c_write_reg16: write buf len out of range\n");
-        return -RT_EINVAL;
+        return 0;
     }
 
     cmd[0] = (rt_uint8_t)(reg >> 8);
     cmd[1] = (rt_uint8_t)(reg & 0xff);
     rt_memcpy(&cmd[2], buf, count);
 
-    return rt_i2c_master_send(bus, addr, RT_I2C_WR, cmd, count + 2);
+    ret = rt_i2c_master_send(bus, addr, RT_I2C_WR, cmd, count + 2);
+    if (ret != (count + 2))
+        return 0;
+
+    return count;
 }
 
 rt_size_t rt_i2c_read_reg(struct rt_i2c_bus_device *bus,
@@ -217,7 +227,7 @@ rt_size_t rt_i2c_read_reg(struct rt_i2c_bus_device *bus,
 
     if (count == 0) {
         LOG_E("rt_i2c_read_reg: read buf len out of range\n");
-        return -RT_EINVAL;
+        return 0;
     }
 
     ret = rt_i2c_master_send(bus, addr, RT_I2C_WR, &reg, 1);
@@ -240,7 +250,7 @@ rt_size_t rt_i2c_read_reg16(struct rt_i2c_bus_device *bus,
 
     if (count == 0) {
         LOG_E("rt_i2c_read_reg16: read buf len out of range\n");
-        return -RT_EINVAL;
+        return 0;
     }
 
     cmd[0] = (rt_uint8_t)(reg >> 8);

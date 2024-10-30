@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -15,6 +15,10 @@
 #include <hw_symmetric.h>
 #include <hw_bignum.h>
 #include <hal_ce.h>
+#ifdef AIC_DCE_DRV
+#include <hal_dce.h>
+#include <hw_crc.h>
+#endif
 
 #define AES_BLOCK_SIZE   16
 #define AES_MAX_KEY_LEN  32
@@ -649,6 +653,66 @@ static const struct hwcrypto_hash_ops hash_ops = {
     .finish = drv_hash_finish,
 };
 
+#ifdef AIC_DCE_DRV
+#define CRC_32_POLY     0x04C11DB7
+rt_err_t drv_crc_init(struct rt_hwcrypto_ctx *ctx)
+{
+    rt_err_t res = RT_EOK;
+
+    res = hal_dce_init();
+    if (res)
+        res = -RT_ERROR;
+
+    return res;
+}
+
+static rt_uint32_t drv_crc_update(struct hwcrypto_crc *ctx, const rt_uint8_t *in,
+                                rt_size_t length)
+{
+    rt_uint32_t crc_result = 0, ret;
+
+    if (ctx->crc_cfg.poly != CRC_32_POLY) {
+        pr_err("Artinchip hardware crc only support CRC_32_POLY.\n");
+        return -RT_ERROR;
+    }
+
+    if (ctx->crc_cfg.xorout)
+        hal_dce_crc32_xor_val(ctx->crc_cfg.xorout);
+    if (ctx->crc_cfg.flags)
+        hal_dce_crc32_cfg((ctx->crc_cfg.flags & CRC_FLAG_REFIN), 0,
+            (ctx->crc_cfg.flags & CRC_FLAG_REFIN),
+            (ctx->crc_cfg.flags & CRC_FLAG_REFOUT));
+
+    hal_dce_crc32_start(ctx->crc_cfg.last_val, (u8 *)in, length);
+    ret = hal_dce_crc32_wait();
+    if (!ret) {
+        crc_result = hal_dce_crc32_result();
+    } else {
+        pr_err("\t%s error: time out\n", __func__);
+        return -RT_ERROR;
+    }
+
+    ctx->crc_cfg.last_val = crc_result;
+    return crc_result;
+}
+
+void drv_crc_uninit(struct rt_hwcrypto_ctx *ctx)
+{
+    if (!ctx)
+        return;
+
+    if (ctx->contex) {
+        aicos_free_align(0, ctx->contex);
+        ctx->contex = NULL;
+    }
+    hal_dce_deinit();
+}
+
+static const struct hwcrypto_crc_ops crc_ops = {
+    .update = drv_crc_update,
+};
+#endif
+
 static rt_err_t aic_hwcrypto_create(struct rt_hwcrypto_ctx *ctx)
 {
     rt_err_t res = RT_EOK;
@@ -677,6 +741,12 @@ static rt_err_t aic_hwcrypto_create(struct rt_hwcrypto_ctx *ctx)
             /* Setup HASH operation */
             ((struct hwcrypto_hash *)ctx)->ops = &hash_ops;
             break;
+#ifdef AIC_DCE_DRV
+        case HWCRYPTO_TYPE_CRC:
+            drv_crc_init(ctx);
+            ((struct hwcrypto_crc *)ctx)->ops = &crc_ops;
+            break;
+#endif
         default:
             res = -RT_ERROR;
             break;
@@ -703,6 +773,11 @@ static void aic_hwcrypto_destroy(struct rt_hwcrypto_ctx *ctx)
         case HWCRYPTO_TYPE_SHA2:
             drv_sha_uninit(ctx);
             break;
+#ifdef AIC_DCE_DRV
+        case HWCRYPTO_TYPE_CRC:
+            drv_crc_uninit(ctx);
+            break;
+#endif
         default:
             break;
     }
@@ -743,7 +818,6 @@ static void aic_hwcrypto_reset(struct rt_hwcrypto_ctx *ctx)
             break;
         case HWCRYPTO_TYPE_RC4:
         case HWCRYPTO_TYPE_RNG:
-        case HWCRYPTO_TYPE_CRC:
             break;
         case HWCRYPTO_TYPE_BIGNUM:
             drv_rsa_init(ctx);
@@ -754,6 +828,11 @@ static void aic_hwcrypto_reset(struct rt_hwcrypto_ctx *ctx)
             drv_sha_init(ctx);
             drv_sha_start(ctx);
             break;
+#ifdef AIC_DCE_DRV
+        case HWCRYPTO_TYPE_CRC:
+            drv_crc_init(ctx);
+            break;
+#endif
         default:
             break;
     }

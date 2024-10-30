@@ -17,7 +17,7 @@
 #define DBG_TAG "gt911"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
-
+#include "../../common/touch_common.h"
 #include "gt911.h"
 
 static struct rt_i2c_client gt911_client;
@@ -318,6 +318,11 @@ static rt_size_t gt911_read_point(struct rt_touch_device *touch, void *buf,
             input_w =
                 read_buf[off_set + 5] | (read_buf[off_set + 6] << 8); /* size */
 
+            aic_touch_flip(&input_x, &input_y);
+            aic_touch_rotate(&input_x, &input_y);
+            aic_touch_scale(&input_x, &input_y);
+            if (!aic_touch_crop(&input_x, &input_y))
+                continue;
             gt911_touch_down(buf, read_id, input_x, input_y, input_w);
         }
     } else if (pre_touch) {

@@ -1,7 +1,9 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (C) 2023-2024 ArtInChip Technology Co.,Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * Author: Dehuang Wu <dehuang.wu@artinchip.com>
  */
 
 #ifndef __BL_HEAP_H_
@@ -11,7 +13,7 @@
 extern "C" {
 #endif
 
-int heap_init(void *ptr, size_t size);
+int heap_init(void);
 
 #ifdef __cplusplus
 }

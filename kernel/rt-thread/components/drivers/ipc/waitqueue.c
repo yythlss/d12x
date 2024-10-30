@@ -134,8 +134,6 @@ void rt_wqueue_wakeup_all(rt_wqueue_t *queue, void *key)
     queue_list = &(queue->waiting_list);
 
     level = rt_hw_interrupt_disable();
-    /* set wakeup flag in the queue */
-    queue->flag = RT_WQ_FLAG_WAKEUP;
 
     if (!(rt_list_isempty(queue_list)))
     {
@@ -159,6 +157,8 @@ void rt_wqueue_wakeup_all(rt_wqueue_t *queue, void *key)
                     LOG_D("%s: Thread resume failed", __func__);
                 }
                 node = node->next;
+
+                rt_wqueue_remove(entry);
             }
             else
             {
@@ -211,12 +211,6 @@ int rt_wqueue_wait(rt_wqueue_t *queue, int condition, int msec)
     /* reset thread error */
     tid->error = RT_EOK;
 
-    if (queue->flag == RT_WQ_FLAG_WAKEUP)
-    {
-        /* already wakeup */
-        goto __exit_wakeup;
-    }
-
     rt_wqueue_add(queue, &__wait);
     rt_thread_suspend(tid);
 
@@ -232,14 +226,6 @@ int rt_wqueue_wait(rt_wqueue_t *queue, int condition, int msec)
     rt_hw_interrupt_enable(level);
 
     rt_schedule();
-
-    level = rt_hw_interrupt_disable();
-
-__exit_wakeup:
-    queue->flag = RT_WQ_FLAG_CLEAN;
-    rt_hw_interrupt_enable(level);
-
-    rt_wqueue_remove(&__wait);
 
     return tid->error;
 }

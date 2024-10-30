@@ -32,6 +32,16 @@ config CPU_BASE
     default 0x4000000000 if QEMU_RUN
     depends on AIC_CHIP_D21X
 
+config CPU_DRAM_BASE
+    hex
+    default 0x40000000
+    depends on AIC_CHIP_D21X
+
+config CPU_SRAM_BASE
+    hex
+    default 0x00100000
+    depends on AIC_CHIP_D21X
+
 #--------------------------------------------
 # cmu driver global option
 #--------------------------------------------

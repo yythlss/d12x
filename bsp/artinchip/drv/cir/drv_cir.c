@@ -180,6 +180,15 @@ int rt_hw_aic_cir_init(void)
     aic_cir_dev.dev.type = RT_Device_Class_Char;
 #endif
 
+#ifdef AIC_USING_R_CIR
+    aic_cir_dev.aic_cir_ctrl.cir_base = R_CIR_BASE;
+    aic_cir_dev.aic_cir_ctrl.irq_num = R_CIR_IRQn;
+#else
+    aic_cir_dev.aic_cir_ctrl.cir_base = CIR_BASE;
+    aic_cir_dev.aic_cir_ctrl.irq_num = CIR_IRQn;
+#endif
+    aic_cir_dev.aic_cir_ctrl.clk_idx = CLK_CIR;
+
     rt_mutex_init(&aic_cir_dev.lock, "cir_mutex", RT_IPC_FLAG_PRIO);
     rt_device_register(&aic_cir_dev.dev, "cir", 0);
     LOG_I("ArtInChip CIR device register success\n");

@@ -379,11 +379,6 @@ void lv_port_disp_init(void)
     disp_drv.draw_ctx_deinit = lv_draw_aic_ctx_deinit;
     disp_drv.draw_ctx_size = sizeof(lv_draw_aic_ctx_t);
 
-    /* when define USE_DRAW_BUF, disp_drv.rotated can be
-      LV_DISP_ROT_90/LV_DISP_ROT_180/LV_DISP_ROT_270
-    */
-    //disp_drv.rotated = LV_DISP_ROT_90;
-
     /*Finally register the driver*/
 #ifdef AIC_LVGL_METER_DEMO
     lv_disp_t *disp = lv_disp_drv_register(&disp_drv);
@@ -391,6 +386,10 @@ void lv_port_disp_init(void)
     lv_obj_set_style_bg_opa(lv_scr_act(), LV_OPA_0, 0);
 #else
     lv_disp_drv_register(&disp_drv);
+#endif
+
+#if defined(LV_DISPLAY_ROTATE_EN) && defined(LV_ROTATE_DEGREE)
+    lv_disp_set_rotation(lv_disp_get_default(), LV_ROTATE_DEGREE / 90);
 #endif
 
 #ifndef AIC_MONKEY_TEST

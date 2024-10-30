@@ -13,15 +13,22 @@
 extern "C" {
 #endif
 
+#include <rtconfig.h>
 #include <stdint.h>
 #include <mpp_list.h>
 #include "lvgl.h"
 
 #ifndef MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE
-#define MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE 0
+#define MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE
 #endif
+
+#ifndef MPP_JPEG_DEC_MAX_OUT_WIDTH
 #define MPP_JPEG_DEC_MAX_OUT_WIDTH  2048
+#endif
+
+#ifndef MPP_JPEG_DEC_MAX_OUT_HEIGHT
 #define MPP_JPEG_DEC_MAX_OUT_HEIGHT 2048
+#endif
 
 static inline int jpeg_width_limit(int width)
 {

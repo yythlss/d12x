@@ -798,6 +798,21 @@ static void mm_audio_render_set_attr(mm_audio_render_data *p_audio_render_data)
                                             p_audio_render_data->dev_id);
     }
 
+    if (p_audio_render_data->volume_change) {
+        if (p_audio_render_data->render->set_volume(
+                p_audio_render_data->render,
+                p_audio_render_data->volume) == 0) {
+            p_audio_render_data->volume_change = 0;
+        } else {
+            loge("set_volume error\n");
+        }
+    } else {
+        p_audio_render_data->volume =
+            p_audio_render_data->render->get_volume(
+                p_audio_render_data->render);
+        logd("volume :%d\n", p_audio_render_data->volume);
+    }
+
     /*initial state and attr not changed need do set new attr, avoid cost too much time*/
     ret = p_audio_render_data->render->get_attr(p_audio_render_data->render, &ao_attr);
     ao_attr.bits_per_sample = p_audio_render_data->frame.bits_per_sample;
@@ -815,20 +830,6 @@ static void mm_audio_render_set_attr(mm_audio_render_data *p_audio_render_data)
     ao_attr.smples_per_frame = 32 * 1024;
     p_audio_render_data->audio_render_attr = ao_attr;
 
-    if (p_audio_render_data->volume_change) {
-        if (p_audio_render_data->render->set_volume(
-                p_audio_render_data->render,
-                p_audio_render_data->volume) == 0) {
-            p_audio_render_data->volume_change = 0;
-        } else {
-            loge("set_volume error\n");
-        }
-    } else {
-        p_audio_render_data->volume =
-            p_audio_render_data->render->get_volume(
-                p_audio_render_data->render);
-        logd("volume :%d\n", p_audio_render_data->volume);
-    }
     p_audio_render_data->audio_render_init_flag = 1;
     logd("[%s:%d]bits_per_sample:%d,channels:%d,sample_rate:%d,pts:"FMT_d64"\n",
            __FUNCTION__, __LINE__, p_audio_render_data->frame.bits_per_sample,

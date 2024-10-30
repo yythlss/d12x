@@ -20,6 +20,7 @@
 #include "mpp_vin.h"
 
 #include "drv_camera.h"
+#include "camera_inner.h"
 #include "tp2802_def.h"
 #include "tp2825b.h"
 
@@ -108,65 +109,26 @@ unsigned int ConvertACPV1Data(unsigned char dat)
     return tmp;
 }
 
-void tp28xx_byte_write(unsigned char chip,
-                       unsigned char reg_addr,
-                       unsigned char value)
+void tp28xx_byte_write(u8 chip, u8 reg, u8 val)
 {
-    unsigned char buf[2] = {0};
-    struct rt_i2c_bus_device *client = tp28xx_client0;
-    struct rt_i2c_msg msg = {0};
-    int ret = 0;
-
-    // if (id[chip] == 0xffff) return;
-
-    msg.addr = tp2802_i2c_addr[chip];
-    msg.flags = RT_I2C_WR;
-    msg.len = 2;
-    msg.buf = buf;
-
-    buf[0] = reg_addr;
-    buf[1] = value;
-
-    ret = rt_i2c_transfer(client, &msg, 1);
-    if (ret < 0) {
-        LOG_E("Failed to write I2C. reg 0x%02x, val 0x%x\n", reg_addr, value);
+    if (rt_i2c_write_reg(tp28xx_client0, tp2802_i2c_addr[chip], reg, &val, 1) != 1) {
+        LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
         return;
     }
+
     aicos_udelay(300);
 }
 
-unsigned char tp28xx_byte_read(unsigned char chip, unsigned char reg_addr)
+unsigned char tp28xx_byte_read(u8 chip, u8 reg)
 {
-    struct rt_i2c_bus_device *client = tp28xx_client0;
-    struct rt_i2c_msg msg[2] = {{0}};
-    unsigned int  data_width = 1;
-    unsigned char buffer[2] = {0};
-    unsigned char ret_data = 0xFF;
-    int ret = 0;
+    unsigned char val = 0xFF;
 
-    //if (id[chip] == 0xffff) return 0xff;
-
-    buffer[0] = reg_addr & 0xFF;
-
-    msg[0].addr = tp2802_i2c_addr[chip];
-    msg[0].flags = RT_I2C_WR;
-    msg[0].len = 1;
-    msg[0].buf = buffer;
-
-    msg[1].addr = tp2802_i2c_addr[chip];
-    msg[1].flags = RT_I2C_RD;
-    msg[1].len = 1;
-    msg[1].buf = buffer;
-
-    ret = rt_i2c_transfer(client, msg, 2);
-    if (ret != 2) {
-        LOG_E("[%s %d] hi_i2c_transfer error, ret=%d.\n", __FUNCTION__, __LINE__, ret);
-        return 0xff;
+    if (rt_i2c_read_reg(tp28xx_client0, tp2802_i2c_addr[chip], reg, &val, 1) != 1) {
+        LOG_E("%s: error: reg = 0x%x, val = 0x%x", __func__, reg, val);
+        return 0xFF;
     }
 
-    memcpy(&ret_data, buffer, data_width);
-
-    return ret_data;
+    return val;
 }
 
 static void tp2802_write_table(unsigned char chip,
@@ -2551,38 +2513,24 @@ static int tp2825_s_stream(struct tp2825_dev *sensor, int enable)
     return SUCCESS;
 }
 
-static int tp2825_i2c_init(struct tp2825_dev *sensor)
-{
-    char name[8] = "";
-
-    snprintf(name, 8, "i2c%d", AIC_CAMERA_I2C_CHAN);
-    sensor->i2c = rt_i2c_bus_device_find(name);
-    if (sensor->i2c == RT_NULL) {
-        LOG_E("Failed to open %s", name);
-        return -ENODEV;
-    }
-
-    return SUCCESS;
-}
-
 static rt_err_t tp2825_init(rt_device_t dev)
 {
     struct tp2825_dev *sensor = (struct tp2825_dev *)dev;
     struct mpp_video_fmt *fmt = &sensor->fmt;
     int ret = 0;
 
-    ret = tp2825_i2c_init(sensor);
-    if (ret != 0)
+    sensor->i2c = camera_i2c_get();
+    if (!sensor->i2c)
         return -RT_EINVAL;
 
     tp28xx_client0 = sensor->i2c;
 
     /* request optional power down pin */
-    sensor->pwdn_pin = rt_pin_get(AIC_CAMERA_PWDN_PIN);
-    if (sensor->pwdn_pin > 0) {
-        rt_pin_mode(sensor->pwdn_pin, PIN_MODE_OUTPUT);
-        rt_pin_write(sensor->pwdn_pin, 1);
-    }
+    sensor->pwdn_pin = camera_pwdn_pin_get();
+    if (!sensor->pwdn_pin)
+        return -RT_EINVAL;
+
+    camera_pin_set_high(sensor->pwdn_pin);
 
     ret = tp2802_module_init();
     if (ret)

@@ -108,9 +108,13 @@
               void*      block )
   {
     FT_UNUSED( memory );
+#ifdef TT_USE_MEM_PSRAM_SW_HEAP
+    return ft_srealloc_cur(cur_size, new_size, block);
+#else
     FT_UNUSED( cur_size );
 
     return ft_srealloc( block, (size_t)new_size );
+#endif
   }
 
 

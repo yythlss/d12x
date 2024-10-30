@@ -137,10 +137,26 @@ static void on_app_exit(void) {
   log_info("on_app_exit\n");
 }
 
+static void aic_fb_enable(void)
+{
+#ifndef AIC_DISP_COLOR_BLOCK
+  static bool first_frame = true;
+  /* enable display power after flush first frame */
+  if (first_frame) {
+    if (g_fb.fb)
+      mpp_fb_ioctl(g_fb.fb, AICFB_POWERON, 0);
+    first_frame = false;
+  }
+#endif
+}
+
 static ret_t (*lcd_mem_rtos_flush_default)(lcd_t* lcd);
 static ret_t lcd_mem_rtos_flush(lcd_t* lcd) {
   fb_info_t* fb = &g_fb;
   int dummy = 0;
+
+  aic_fb_enable();
+
   mpp_fb_ioctl(fb->fb, AICFB_WAIT_FOR_VSYNC, &dummy);
   if (lcd_mem_rtos_flush_default) {
     lcd_mem_rtos_flush_default(lcd);
@@ -156,6 +172,9 @@ static ret_t lcd_swap_sync(lcd_t* lcd) {
   fb_info_t* fb = &g_fb;
 
   mpp_fb_ioctl(fb->fb, AICFB_PAN_DISPLAY, &swap_lcd);
+
+  aic_fb_enable();
+
   mpp_fb_ioctl(fb->fb, AICFB_WAIT_FOR_VSYNC, 0);
 
   swap_lcd = swap_lcd == 1 ? 0 : 1;
@@ -468,7 +487,11 @@ static void fbswap_thread(void* ctx) {
     rt_mutex_release(g_lck_fblist);
 
     fbid = ready_fb->fbid;
+
     mpp_fb_ioctl(fb->fb, AICFB_PAN_DISPLAY, &fbid);
+
+    aic_fb_enable();
+
     mpp_fb_ioctl(fb->fb, AICFB_WAIT_FOR_VSYNC, 0);
 
     rt_mutex_take(g_lck_fblist, RT_WAITING_NO);

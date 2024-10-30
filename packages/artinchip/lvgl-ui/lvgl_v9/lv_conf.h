@@ -44,7 +44,7 @@
 #endif
 
 #define LV_USE_MEM_MONITOR 0
-#define LV_USE_PERF_MONITOR 1
+#define LV_USE_PERF_MONITOR 0
 #define LV_USE_SYSMON   1
 #define LV_INDEV_DEF_READ_PERIOD 10
 
@@ -103,9 +103,13 @@
 
 #define LV_USE_GIF 1
 
-#define LV_CACHE_DEF_SIZE 10 * 1024 * 1024
+#ifndef LV_CACHE_DEF_SIZE
+#define LV_CACHE_DEF_SIZE 8 * 1024 * 1024
+#endif
 
+#ifndef LV_IMAGE_HEADER_CACHE_DEF_CNT
 #define LV_IMAGE_HEADER_CACHE_DEF_CNT  20
+#endif
 
 #define LV_DEF_REFR_PERIOD 10
 

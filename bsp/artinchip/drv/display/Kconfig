@@ -225,3 +225,26 @@ endif
 config AIC_PANEL_SPI_EMULATION
     bool
     default n
+
+config AIC_SCREEN_CROP
+    bool "Enable screen crop"
+    default n
+    help
+        Some LCD screen need to be cropped, the effective area displayed is less
+        than the timing signal.
+        If unsure select "N".
+
+if AIC_SCREEN_CROP
+    config AIC_SCREEN_CROP_POS_X
+        int "screen crop x position of pixels"
+        default 0
+    config AIC_SCREEN_CROP_POS_Y
+        int "screen crop y position of pixels"
+        default 0
+    config AIC_SCREEN_CROP_WIDTH
+        int "screen crop width"
+        default 0
+    config AIC_SCREEN_CROP_HEIGHT
+        int "screen crop height"
+        default 0
+endif

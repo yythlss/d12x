@@ -44,6 +44,58 @@ def is_pkg_special_config(config_str):
             return True
     return False
 
+
+def get_config_val(src, name):
+    try:
+        config = open(src, 'r')
+    except:
+        print('open config:%s failed' % src)
+        return None
+
+    for line in config:
+        line = line.lstrip(' ').replace('\n', '').replace('\r', '')
+
+        if len(line) == 0:
+            continue
+
+        if line[0] == '#':
+            continue
+        else:
+            setting = line.split('=')
+            if len(setting) >= 2:
+                if setting[0] == name:
+                    return setting[1]
+    return None
+
+
+def get_heap_base(filename):
+    heap_size = get_config_val(filename, 'CONFIG_AIC_BOOTLOADER_HEAP_SIZE')
+    if get_config_val(filename, 'CONFIG_AIC_PSRAM_SIZE') and \
+            int(get_config_val(filename, 'CONFIG_AIC_PSRAM_SIZE'), 16) > 0:
+        ram_base = get_config_val(filename, 'CONFIG_CPU_PSRAM_BASE')
+        ram_size = get_config_val(filename, 'CONFIG_AIC_PSRAM_SIZE')
+    elif get_config_val(filename, 'CONFIG_AIC_DRAM_TOTAL_SIZE') and \
+            int(get_config_val(filename, 'CONFIG_AIC_DRAM_TOTAL_SIZE'), 16) > 0:
+        ram_base = get_config_val(filename, 'CONFIG_CPU_DRAM_BASE')
+        ram_size = get_config_val(filename, 'CONFIG_AIC_DRAM_TOTAL_SIZE')
+    elif get_config_val(filename, 'CONFIG_AIC_SRAM_TOTAL_SIZE') and \
+            int(get_config_val(filename, 'CONFIG_AIC_SRAM_TOTAL_SIZE'), 16) > 0:
+        ram_base = get_config_val(filename, 'CONFIG_CPU_SRAM_BASE')
+        ram_size = get_config_val(filename, 'CONFIG_AIC_SRAM_TOTAL_SIZE')
+    elif get_config_val(filename, 'CONFIG_AIC_SRAM_SIZE') and \
+            int(get_config_val(filename, 'CONFIG_AIC_SRAM_SIZE'), 16) > 0:
+        ram_base = get_config_val(filename, 'CONFIG_CPU_SRAM_BASE')
+        ram_size = get_config_val(filename, 'CONFIG_AIC_SRAM_SIZE')
+
+    return (int(ram_base, 16) + int(ram_size, 16) - int(heap_size, 16))
+
+
+def get_text_base(filename):
+    text_size = get_config_val(filename, 'CONFIG_AIC_BOOTLOADER_TEXT_SIZE')
+    heap_base = get_heap_base(filename)
+    return (heap_base - int(text_size, 16))
+
+
 def mk_rtconfig(filename):
     try:
         config = open(filename, 'r')
@@ -97,6 +149,24 @@ def mk_rtconfig(filename):
 
     if os.path.isfile('rtconfig_project.h'):
         rtconfig.write('#include "rtconfig_project.h"\n')
+
+    # Auto calc bootloader memory
+    val = get_config_val(filename, 'CONFIG_AIC_BOOTLOADER_MEM_AUTO')
+    if val == 'y':
+        heap_base = get_heap_base(filename)
+        text_base = get_text_base(filename)
+
+        comment = '\n/* Automatically calc generated */\n\n'
+        heap_base_def = '#define AIC_BOOTLOADER_HEAP_BASE (0x%x)\n' % (heap_base)
+        text_base_def = '#define AIC_BOOTLOADER_TEXT_BASE (0x%x)\n' % (text_base)
+
+        rtconfig.write(comment)
+        rtconfig.write(heap_base_def)
+        rtconfig.write(text_base_def)
+
+        print('Insert macro definition into rtconfig.h\n')
+        print(heap_base_def)
+        print(text_base_def)
 
     rtconfig.write('\n')
     rtconfig.write('#endif\n')
@@ -257,6 +327,7 @@ def menuconfig(RTT_ROOT):
     fn_old = '.config.old'
 
     kconfig_cmd = os.path.join(RTT_ROOT, 'tools', 'kconfig-frontends', 'kconfig-mconf')
+    print(kconfig_cmd + ' Kconfig')
     os.system(kconfig_cmd + ' Kconfig')
 
     if os.path.isfile(fn):

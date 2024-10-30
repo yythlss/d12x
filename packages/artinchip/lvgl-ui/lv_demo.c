@@ -17,13 +17,15 @@
 #include <dfs_fs.h>
 #include "aic_time.h"
 
-void lv_user_gui_init(void)
+void lv_wait_sdcard_mounted(void)
 {
-    // wait sdcard mounted
     if (!strcmp(LVGL_STORAGE_PATH, "/sdcard")) {
         aicos_msleep(1000);
     }
+}
 
+void lv_user_gui_init(void)
+{
     aic_ui_init();
 }
 

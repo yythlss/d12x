@@ -746,6 +746,18 @@ static int de_vi_layer_config_format(struct aic_de_comp *comp,
     return -EINVAL;
 }
 
+static void de_vi_layer_config_crop_pos(struct aic_de_comp *comp,
+                          struct aicfb_layer_data *layer_data)
+{
+#ifdef AIC_SCREEN_CROP
+    u32 x_offset = layer_data->pos.x + AIC_SCREEN_CROP_POS_X;
+    u32 y_offset = layer_data->pos.y + AIC_SCREEN_CROP_POS_Y;
+
+    reg_write(comp->regs + VIDEO_LAYER_OFFSET,
+          VIDEO_LAYER_OFFSET_SET(x_offset, y_offset));
+#endif
+}
+
 int config_video_layer(struct aic_de_comp *comp,
                   struct aicfb_layer_data *layer_data)
 {
@@ -766,6 +778,7 @@ int config_video_layer(struct aic_de_comp *comp,
     }
 
     de_vi_layer_config_format(comp, format_info, layer_data);
+    de_vi_layer_config_crop_pos(comp, layer_data);
 
     return 0;
 }

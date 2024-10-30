@@ -11,6 +11,8 @@ import sys
 import platform
 import argparse
 import subprocess
+import json
+from collections import OrderedDict
 
 
 def mkimage_get_resource_size(srcdir, cluster_siz):
@@ -43,6 +45,48 @@ def mkimage_get_part_size(outfile):
     print('Image {} is not used in any partition'.format(imgname))
     print('please check your project\'s image_cfg.json')
     return size
+
+
+def parse_image_cfg(cfgfile):
+    """ Load image configuration file
+    Args:
+        cfgfile: Configuration file name
+    """
+    with open(cfgfile, "r") as f:
+        lines = f.readlines()
+        jsonstr = ""
+        for line in lines:
+            sline = line.strip()
+            if sline.startswith("//"):
+                continue
+            slash_start = sline.find("//")
+            if slash_start > 0:
+                jsonstr += sline[0:slash_start].strip()
+            else:
+                jsonstr += sline
+        # Use OrderedDict is important, we need to iterate FWC in order.
+        jsonstr = jsonstr.replace(",}", "}").replace(",]", "]")
+        cfg = json.loads(jsonstr, object_pairs_hook=OrderedDict)
+    return cfg
+
+
+def check_is_nftl_part(outfile):
+    imgname = os.path.basename(outfile)
+    partjson = os.path.join(os.path.dirname(outfile), 'partition.json')
+    if not os.path.exists(partjson):
+        return False
+
+    cfg = parse_image_cfg(partjson)
+    nftl_value = cfg["partitions"].get("nftl")
+    if nftl_value is None:
+        return False
+
+    imgname = os.path.basename(outfile)
+    parts = imgname.split('.')
+    nftl_part = parts[0] + ':'
+    if nftl_part in nftl_value:
+        return True
+    return False
 
 
 def run_cmd(cmdstr):
@@ -192,6 +236,15 @@ if __name__ == "__main__":
         imgsiz = rsvd_siz + 2 * fat_siz + root_ent_cnt + data_region_sz
         # Round to cluster alignment
         imgsiz = cluster_siz * int(((imgsiz + cluster_siz - 1) / cluster_siz))
+        if check_is_nftl_part(args.outfile):
+            # Space reserved for bad block management in NFTL
+            NFTL_RESERVED = 51 * 64 * 2048
+            imgsiz = part_size - NFTL_RESERVED
+            if imgsiz < 0:
+                print('Error, partition size: {} is less than NFTL reserved: {}.'.format(part_size, NFTL_RESERVED))
+                sys.exit(1)
+            # Round to cluster alignment
+            imgsiz = cluster_siz * int(((imgsiz + cluster_siz - 1) / cluster_siz))
     elif args.fullpart:
         imgsiz = part_size
     else:
