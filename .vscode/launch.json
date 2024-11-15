@@ -50,6 +50,12 @@
 					"text": "file e:/workspace/luban-lite/output/d13x_demo88-nand_rt-thread_helloworld/images/d13x.elf"	// FIXME
 				},
 				{
+					"text": "set $a0=0"
+				},
+				{
+					"text": "set $a1=0"
+				},
+				{
 					// FIXME
 					"text": "b rt_hw_board_init"
 				}
@@ -132,6 +138,12 @@
 				{
 					// MUST use full path
 					"text": "file e:/workspace/luban-lite/output/d21x_demo88-nand_rt-thread_helloworld/images/d21x.elf"	// FIXME
+				},
+				{
+					"text": "set $a0=0"
+				},
+				{
+					"text": "set $a1=0"
 				},
 				{
 					// FIXME
