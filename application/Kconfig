@@ -199,6 +199,10 @@ choice
     default AIC_LVGL_BASE_DEMO
     depends on AIC_LVGL_DEMO
 
+config AIC_LVGL_UI_BUILDER
+    select LPKG_USING_FREETYPE
+    bool "Support AiUIBuider"
+
 config AIC_LVGL_BASE_DEMO
     bool "LVGL demo with basic function"
 
@@ -308,6 +312,13 @@ config MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE
     bool "Limit the output size of MPP JPEG decoder"
     default n
     depends on LPKG_USING_LVGL
+
+if !AIC_LVGL_MUSIC_DEMO && !AIC_LVGL_DEMO_WIDGETS && !AIC_LVGL_DEMO_BENCHMARK
+    config LV_USE_CONF_CUSTOM
+        bool "LVGL use custom config"
+        default y
+        depends on LPKG_USING_LVGL
+endif
 
 if MPP_JPEG_DEC_OUT_SIZE_LIMIT_ENABLE
     config MPP_JPEG_DEC_MAX_OUT_WIDTH

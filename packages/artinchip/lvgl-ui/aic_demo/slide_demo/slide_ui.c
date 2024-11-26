@@ -23,3 +23,8 @@ void slide_ui_init()
     scr_slide = hor_screen_init();
     lv_scr_load(scr_slide);
 }
+
+void ui_init(void)
+{
+    slide_ui_init();
+}

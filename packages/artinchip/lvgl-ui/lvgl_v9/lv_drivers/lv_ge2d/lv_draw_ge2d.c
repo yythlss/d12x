@@ -197,6 +197,10 @@ static int32_t ge2d_evaluate(lv_draw_unit_t *u, lv_draw_task_t *t)
         case LV_DRAW_TASK_TYPE_LAYER: {
                 const lv_draw_image_dsc_t *draw_dsc = (lv_draw_image_dsc_t *)t->draw_dsc;
                 lv_layer_t *layer= (lv_layer_t *)draw_dsc->src;
+                lv_draw_buf_t *dest_buf = draw_dsc->base.layer->draw_buf;
+
+                if (!dest_buf)
+                    return 0;
 
                 if (!ge2d_src_fmt_supported(layer->color_format))
                     return 0;
@@ -213,6 +217,10 @@ static int32_t ge2d_evaluate(lv_draw_unit_t *u, lv_draw_task_t *t)
 
         case LV_DRAW_TASK_TYPE_IMAGE: {
                 lv_draw_image_dsc_t *draw_dsc = (lv_draw_image_dsc_t *)t->draw_dsc;
+                lv_draw_buf_t *dest_buf = draw_dsc->base.layer->draw_buf;
+
+                if (!dest_buf)
+                    return 0;
 
                 if (!ge2d_src_fmt_supported(draw_dsc->header.cf))
                     return 0;

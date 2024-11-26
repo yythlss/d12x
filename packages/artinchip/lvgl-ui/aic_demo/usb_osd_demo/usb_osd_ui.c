@@ -454,3 +454,8 @@ void usb_osd_ui_init(void)
 
     lv_timer_create(usb_osd_ui_callback, 200, 0);
 }
+
+void ui_init(void)
+{
+    usb_osd_ui_init();
+}

@@ -386,3 +386,7 @@ void simple_player_ui_init()
     lv_timer_create(player_callback, 20, 0);
 }
 
+void ui_init(void)
+{
+    simple_player_ui_init();
+}

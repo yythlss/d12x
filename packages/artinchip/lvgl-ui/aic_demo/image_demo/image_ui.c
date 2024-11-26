@@ -124,3 +124,8 @@ void image_ui_init(void)
     lv_timer_create(change_file_image_callback, 1000, 0);
 #endif
 }
+
+void ui_init(void)
+{
+    image_ui_init();
+}

@@ -1,7 +1,11 @@
 /*
- * Copyright (C) 2023-2024 ArtinChip Technology Co., Ltd.
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Authors:  Ning Fang <ning.fang@artinchip.com>
  */
+
 
 #ifndef DASHBOARD_H
 #define DASHBOARD_H

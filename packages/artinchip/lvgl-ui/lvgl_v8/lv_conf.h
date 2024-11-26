@@ -119,4 +119,9 @@
 /*1: Enable Monkey test*/
 #define LV_USE_MONKEY   1
 
+// should at the end of lv_conf.h
+#if defined(LV_USE_CONF_CUSTOM)
+#include "lv_conf_custom.h"
+#endif
+
 #endif // LV_CONF_H

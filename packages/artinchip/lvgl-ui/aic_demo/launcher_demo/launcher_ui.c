@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (C) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -26,4 +26,9 @@ void launcher_ui_init()
     scr_camera = camera_screen_init();
 
     lv_scr_load(scr_launcher);
+}
+
+void ui_init(void)
+{
+    launcher_ui_init();
 }

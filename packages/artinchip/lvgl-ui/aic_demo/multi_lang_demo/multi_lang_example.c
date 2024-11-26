@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (C) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -46,4 +46,9 @@ void lv_multi_lang_example(void)
     init_screen_dark();
 
     lv_scr_load(screen_white);
+}
+
+void ui_init(void)
+{
+    lv_multi_lang_example();
 }

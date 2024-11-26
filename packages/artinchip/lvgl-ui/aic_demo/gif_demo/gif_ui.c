@@ -44,3 +44,8 @@ void gif_ui_init()
     lv_obj_add_event_cb(img, gif_event, LV_EVENT_ALL, NULL);
     printf("gif_ini_ok\n");
 }
+
+void ui_init(void)
+{
+    gif_ui_init();
+}

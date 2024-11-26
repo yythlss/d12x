@@ -38,79 +38,18 @@ static void use_touch_monkey_test(void)
 
 void aic_ui_init()
 {
-/* qc test demo is only for aic internal qc testing, please ignore it. */
-
-#ifdef AIC_LVGL_VSCODE_DEMO
-    extern void vscode_ui_init();
-    vscode_ui_init();
-    return;
-#endif
-
-#ifdef AIC_LVGL_BASE_DEMO
-#include "base_ui.h"
-    base_ui_init();
-#endif
-
-#ifdef AIC_LVGL_METER_DEMO
-#include "meter_ui.h"
-    meter_ui_init();
-#endif
-
-#ifdef AIC_LVGL_LAUNCHER_DEMO
-    extern void launcher_ui_init();
-    launcher_ui_init();
-#endif
-
-#ifdef AIC_LVGL_DASHBOARD_DEMO
-    extern void dashboard_ui_init(void);
-    dashboard_ui_init();
-#endif
-
-#ifdef AIC_LVGL_DEMO_HUB_DEMO
-    extern void demo_hub_init(void);
-    demo_hub_init();
-#endif
-
-#ifdef AIC_LVGL_ELEVATOR_DEMO
-#include "elevator_ui.h"
-    elevator_ui_init();
-#endif
-
-#ifdef AIC_LVGL_USB_OSD_DEMO
-#include "usb_osd_ui.h"
-    usb_osd_ui_init();
-#endif
-
-#ifdef AIC_LVGL_SLIDE_DEMO
-    extern void slide_ui_init(void);
-    slide_ui_init();
-#endif
-
-#ifdef AIC_LVGL_GIF_DEMO
-    extern void gif_ui_init(void);
-    gif_ui_init();
-#endif
-
-#ifdef AIC_LVGL_SIMPLE_PLAYER_DEMO
-    extern void simple_player_ui_init(void);
-    simple_player_ui_init();
-#endif
-
-#ifdef AIC_LVGL_MUSIC_DEMO
+#if defined(AIC_LVGL_QC_TEST_DEMO)
+    extern int qc_test_init();
+    qc_test_init();
+#elif defined(AIC_LVGL_MUSIC_DEMO)
     lv_demo_music();
-#endif
-
-#ifdef AIC_LVGL_DEMO_BENCHMARK
+#elif defined(AIC_LVGL_DEMO_BENCHMARK)
     lv_demo_benchmark();
-#endif
-
-#ifdef AIC_LVGL_DEMO_WIDGETS
+#elif defined(AIC_LVGL_DEMO_WIDGETS)
     lv_demo_widgets();
-#endif
-
-#ifdef AIC_LVGL_IMAGE_DEMO
-    extern void image_ui_init(void);
-    image_ui_init();
+#else
+    extern void ui_init(void);
+    ui_init();
 #endif
 
 #ifdef AIC_USE_TOUCH_MONKEY_TEST

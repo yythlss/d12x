@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (C) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -21,4 +21,9 @@ void vscode_ui_init(void)
     extern void template_ui_init();
     template_ui_init();
 #endif
+}
+
+void ui_init(void)
+{
+    vscode_ui_init();
 }

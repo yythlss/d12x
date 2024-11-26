@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2023-2024 ArtinChip Technology Co., Ltd.
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Authors:  Ning Fang <ning.fang@artinchip.com>
  */
 
@@ -382,4 +385,9 @@ void dashboard_ui_init()
     lv_timer_create(speed_callback, 60, 0);
     lv_timer_create(trip_callback, 1000 * 5, 0);
     lv_timer_create(signal_callback, 500, 0);
+}
+
+void ui_init(void)
+{
+    dashboard_ui_init();
 }

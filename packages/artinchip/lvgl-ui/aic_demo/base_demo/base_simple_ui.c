@@ -411,3 +411,8 @@ void base_ui_init()
 
     lv_obj_add_event_cb(main_tabview, main_tapview_event, LV_EVENT_ALL, NULL);
 }
+
+void ui_init(void)
+{
+    base_ui_init();
+}

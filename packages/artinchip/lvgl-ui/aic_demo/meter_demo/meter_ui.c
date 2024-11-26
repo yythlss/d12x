@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (C) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -624,4 +624,9 @@ void meter_ui_init()
     speed_timer = lv_timer_create(speed_callback, 100, 0);
 
     return;
+}
+
+void ui_init(void)
+{
+    meter_ui_init();
 }

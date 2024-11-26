@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2023-2024 ArtinChip Technology Co., Ltd.
+ * Copyright (C) 2023-2024 ArtInChip Technology Co., Ltd.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Authors:  Keliang Liu <keliang.liu@artinchip.com>
  *          Huahui Mai <huahui.mai@artinchip.com>
  */
@@ -18,7 +21,7 @@
 
 #include "elevator_uart.h"
 
-FAKE_IMAGE_DECLARE(ELEVATOR_BG_WHITE)
+FAKE_IMAGE_DECLARE(ELEVATOR_BG_WHITE);
 
 LV_FONT_DECLARE(ui_font_h1);
 LV_FONT_DECLARE(ui_font_regular);
@@ -577,3 +580,7 @@ void elevator_ui_init()
 #endif
 }
 
+void ui_init(void)
+{
+    elevator_ui_init();
+}

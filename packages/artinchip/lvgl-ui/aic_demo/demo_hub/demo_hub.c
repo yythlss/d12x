@@ -121,3 +121,8 @@ void layer_sys_ui_invisible(int flag)
 {
     lv_obj_add_flag(sys_ui.home_btn, LV_OBJ_FLAG_HIDDEN);
 }
+
+void ui_init(void)
+{
+    demo_hub_init();
+}
