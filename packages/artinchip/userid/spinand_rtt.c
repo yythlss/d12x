@@ -42,7 +42,7 @@ static int read_userid(struct rt_mtd_nand_device *mtd, size_t offset, u8 *buf, s
     if (erasesize < USERID_MAX_SIZE)
         remain = erasesize;
     else
-        remain = USERID_MAX_SIZE;
+        remain = size;
     ptr = buf;
 
     while ((remain > 0) && (offset < end)) {

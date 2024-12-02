@@ -37,7 +37,7 @@ static int read_userid(struct mtd_dev *mtd, size_t offset, u8 *buf, size_t size)
     if (mtd->erasesize < USERID_MAX_SIZE)
         remain = mtd->erasesize;
     else
-        remain = USERID_MAX_SIZE;
+        remain = size;
     ptr = buf;
 
     while ((remain > 0) && (offset < end)) {
