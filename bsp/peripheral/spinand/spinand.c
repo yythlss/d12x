@@ -737,7 +737,7 @@ int spinand_continuous_read(struct aic_spinand *flash, u32 page, u8 *data,
     u16 blk;
 
     if (size <= flash->info->page_size) {
-        pr_err("[Error] continuous read size:%d less then page size:%d\n", page,
+        pr_err("[Error] continuous read size:%d less then page size:%d\n", size,
                flash->info->page_size);
         return -SPINAND_ERR;
     }

@@ -96,3 +96,20 @@ if AIC_QSPI4_DEVICE_SPINAND
 
 endif
 
+menuconfig AIC_SPINAND_BLOCK_CACHE
+    bool "spinand block device cache"
+    depends on LPKG_USING_SPINAND
+    select AIC_SPINAND_DRV
+    default y
+
+if AIC_SPINAND_BLOCK_CACHE
+    config AIC_SPINAND_BLOCK_CACHE_SIZE
+        int "spinand block device cache size"
+    default 512
+
+    config AIC_SPINAND_BLOCK_CACHE_NUM
+        int "spinand block device cache number"
+    default 4
+
+endif
+

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -87,127 +87,246 @@ rt_err_t rt_spinand_nftl_close(rt_device_t dev)
 }
 #endif
 
+static u32 spinand_start_page_calculate(rt_device_t dev, rt_off_t pos)
+{
+    struct spinand_blk_device *blk_dev = (struct spinand_blk_device *)dev;
+    struct rt_mtd_nand_device *mtd_dev = blk_dev->mtd_device;
+    const u8 SECTORS_PP = mtd_dev->page_size / blk_dev->geometry.bytes_per_sector;
+    u32 start_page = 0, block, pos_block;
+
+    start_page = pos / SECTORS_PP + mtd_dev->block_start * mtd_dev->pages_per_block;
+    if (!(start_page % mtd_dev->pages_per_block)) {
+        block = start_page / mtd_dev->pages_per_block;
+        pos_block = mtd_dev->ops->get_block_status(mtd_dev, block);
+        pr_debug("block = %d, pos_block = %d\n", block, pos_block);
+        if (pos_block != 0) {
+            block += pos_block;
+            pos += pos_block * mtd_dev->pages_per_block * SECTORS_PP;
+            start_page = pos / SECTORS_PP + mtd_dev->block_start * mtd_dev->pages_per_block;
+        }
+    }
+
+    return start_page;
+}
+
+static void spinand_nonftl_cache_write(struct spinand_blk_device *blk_dev, void *copybuf, u32 copy_cnt, rt_off_t pos)
+{
+    u32 cache_cnt = 0;
+    u32 cur_pos = pos;
+
+    pr_debug(" copy_cnt = %d", copy_cnt);
+    copy_cnt = copy_cnt > BLOCK_CACHE_NUM ? BLOCK_CACHE_NUM : copy_cnt;
+    for (cache_cnt = 0; cache_cnt < copy_cnt; cache_cnt++) {
+        pr_debug(" blk_cache[%d].pos: %d", cache_cnt, cur_pos);
+        rt_memcpy(blk_dev->blk_cache[cache_cnt].buf, copybuf, BLOCK_CACHE_SIZE);
+        blk_dev->blk_cache[cache_cnt].pos = cur_pos++;
+        copybuf += BLOCK_CACHE_SIZE;
+    }
+}
+
+static rt_size_t spinand_nonftl_cache_read(struct spinand_blk_device *blk_dev, rt_off_t *pos, void *buffer, rt_size_t size)
+{
+    rt_size_t sectors_read = 0;
+    u32 cnt = 0;
+
+    for (cnt = 0; cnt < BLOCK_CACHE_NUM; cnt++) {
+        if (blk_dev->blk_cache[cnt].pos == *pos) {
+             break;
+        }
+    }
+
+    if (cnt == BLOCK_CACHE_NUM)
+        return 0;
+    while (cnt < BLOCK_CACHE_NUM) {
+        if (blk_dev->blk_cache[cnt].pos == *pos) {
+            pr_debug(" copy[%d] pos = %d", cnt, *pos);
+            rt_memcpy(buffer, blk_dev->blk_cache[cnt].buf, BLOCK_CACHE_SIZE);
+            cnt++;
+            *pos += 1;
+            sectors_read++;
+            buffer += BLOCK_CACHE_SIZE;
+            if (sectors_read == size)
+                return size;
+        } else {
+            break;
+        }
+    }
+    return sectors_read;
+}
+
+static rt_size_t spinand_read_nonftl_nalign(rt_device_t dev, rt_off_t *pos, void *buffer, rt_size_t size)
+{
+    struct spinand_blk_device *blk_dev = (struct spinand_blk_device *)dev;
+    struct rt_mtd_nand_device *mtd_dev = blk_dev->mtd_device;
+    const u8 SECTORS_PP = mtd_dev->page_size / blk_dev->geometry.bytes_per_sector;
+    const u32 POS_SECTOR_OFFS = (*pos) % SECTORS_PP;
+    rt_size_t copysize = 0, sectors_read = 0;
+    u32 start_page = 0;
+    u8 *copybuf = NULL;
+    int ret = 0;
+
+    start_page = spinand_start_page_calculate(dev, *pos);
+
+    memset(blk_dev->pagebuf, 0xFF, mtd_dev->page_size);
+    pr_debug("read_page: %d\n", start_page);
+    ret = mtd_dev->ops->read_page(mtd_dev, start_page, blk_dev->pagebuf,
+                                    mtd_dev->page_size, NULL, 0);
+    if (ret != RT_EOK) {
+        pr_err("read_page failed!\n");
+        return -RT_ERROR;
+    }
+
+    copybuf = blk_dev->pagebuf + POS_SECTOR_OFFS * blk_dev->geometry.bytes_per_sector;
+    if (size > (SECTORS_PP - POS_SECTOR_OFFS))
+        sectors_read += (SECTORS_PP - POS_SECTOR_OFFS);
+    else
+        sectors_read += size;
+
+    copysize = sectors_read * blk_dev->geometry.bytes_per_sector;
+    *pos += sectors_read;
+    rt_memcpy(buffer, copybuf, copysize);
+
+    /* if copy not end align, store the remaining part to cache */
+    if (size < (SECTORS_PP - POS_SECTOR_OFFS)) {
+        spinand_nonftl_cache_write(blk_dev, (copybuf + copysize), ((SECTORS_PP - POS_SECTOR_OFFS) - size),  *pos);
+    }
+
+    return sectors_read;
+}
+
+static rt_size_t spinand_read_nonftl_align(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size, rt_size_t sectors_read)
+{
+    struct spinand_blk_device *blk_dev = (struct spinand_blk_device *)dev;
+    struct rt_mtd_nand_device *mtd_dev = blk_dev->mtd_device;
+    const u8 SECTORS_PP = mtd_dev->page_size / blk_dev->geometry.bytes_per_sector;
+    rt_size_t copysize = 0, copy_sectors = 0;
+    u32 start_page = 0;
+    int ret = 0;
+
+    start_page = spinand_start_page_calculate(dev, pos);
+
+    while (size > sectors_read) {
+        start_page = spinand_start_page_calculate(dev, pos);
+
+        memset(blk_dev->pagebuf, 0xFF, mtd_dev->page_size);
+        pr_debug("read_page: %d\n", start_page);
+        ret = mtd_dev->ops->read_page(mtd_dev, start_page, blk_dev->pagebuf,
+                                        mtd_dev->page_size, NULL, 0);
+        if (ret != RT_EOK) {
+            pr_err("read_page failed!\n");
+            return -RT_ERROR;
+        }
+
+        if ((size - sectors_read) > SECTORS_PP) {
+            copysize = SECTORS_PP * blk_dev->geometry.bytes_per_sector;
+            sectors_read += SECTORS_PP;
+            pos += SECTORS_PP;
+        } else {
+            copy_sectors = (size - sectors_read);
+            copysize = copy_sectors * blk_dev->geometry.bytes_per_sector;
+            sectors_read += copy_sectors;
+            pos += copy_sectors;
+        }
+
+        rt_memcpy(buffer, blk_dev->pagebuf, copysize);
+        buffer += copysize;
+        start_page++;
+    }
+
+    /* if copy not end align, store the remaining part to cache */
+    if (copy_sectors) {
+        spinand_nonftl_cache_write(blk_dev, (blk_dev->pagebuf + copysize), (SECTORS_PP - copy_sectors),  pos);
+    }
+
+    return sectors_read;
+}
+
+#ifdef AIC_SPINAND_CONT_READ
+// to do: elm filesystem read 1K size once, do not use continuous reading
+#define SPINAND_BLK_CONT_READ   0
+#if SPINAND_BLK_CONT_READ
+static rt_size_t spinand_continuous_read_nonftl(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size, rt_size_t sectors_read)
+{
+    struct spinand_blk_device *blk_dev = (struct spinand_blk_device *)dev;
+    struct rt_mtd_nand_device *mtd_dev = blk_dev->mtd_device;
+    const u8 SECTORS_PP = mtd_dev->page_size / blk_dev->geometry.bytes_per_sector;
+    rt_size_t copysize = 0, read_size = 0;
+    rt_uint8_t *data_ptr = RT_NULL;
+    u32 start_page = 0;
+    int ret = 0;
+
+    /* size is less than a pagesize, not use continuous read */
+    if ((size - sectors_read) > SECTORS_PP)
+        return sectors_read;
+
+    copysize =  (size - sectors_read) * blk_dev->geometry.bytes_per_sector;
+    read_size = copysize > mtd_dev->page_size ? copysize : mtd_dev->page_size;
+    data_ptr = (rt_uint8_t *)rt_malloc_align(read_size, CACHE_LINE_SIZE);
+    if (data_ptr == RT_NULL) {
+        pr_err("data_ptr: no memory\n");
+        return sectors_read;
+    }
+
+    rt_memset(data_ptr, 0, read_size);
+    start_page = spinand_start_page_calculate(dev, pos);
+    ret = mtd_dev->ops->continuous_read(mtd_dev, start_page, data_ptr, read_size);
+    if (ret != RT_EOK) {
+        pr_err("continuous_read failed!\n");
+        goto cont_read_error;
+    }
+
+    rt_memcpy(buffer, data_ptr, copysize);
+    sectors_read += size - sectors_read;
+
+cont_read_error:
+    if (data_ptr)
+        rt_free_align(data_ptr);
+
+    return sectors_read;
+}
+#else
+static rt_size_t spinand_continuous_read_nonftl(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size, rt_size_t sectors_read)
+{
+    return sectors_read;
+}
+#endif
+#endif  // AIC_SPINAND_CONT_READ
+
 rt_size_t rt_spinand_read_nonftl(rt_device_t dev, rt_off_t pos,
                                        void *buffer, rt_size_t size)
 {
-    int ret = 0;
-    struct spinand_blk_device *part = (struct spinand_blk_device *)dev;
-    struct rt_mtd_nand_device *device = part->mtd_device;
-    u8 *copybuf = NULL;
-    int start_page = 0;
-    u32 pos_block = 0;
-    u16 copysize;
+    struct spinand_blk_device *blk_dev = (struct spinand_blk_device *)dev;
+    struct rt_mtd_nand_device *mtd_dev = blk_dev->mtd_device;
+    const u8 SECTORS_PP = mtd_dev->page_size / blk_dev->geometry.bytes_per_sector;
     rt_size_t sectors_read = 0;
-    u8 sectors_per_page = device->page_size / part->geometry.bytes_per_sector;
-    rt_uint32_t block;
 
-    assert(part != RT_NULL);
+    assert(blk_dev != RT_NULL);
 
     pr_debug("pos = %d, size = %d\n", pos, size);
 
-    start_page = pos / sectors_per_page + device->block_start * device->pages_per_block;
-    block = start_page / device->pages_per_block;
-    pos_block = device->ops->get_block_status(device, block);
-    pr_debug("block = %d, pos_block = %d\n", block, pos_block);
-    block += pos_block;
-    pos += pos_block * device->pages_per_block * sectors_per_page;
-    start_page = pos / sectors_per_page + device->block_start * device->pages_per_block;
-
-    /*pos is not aligned with page, read unalign part first*/
-    if (pos % sectors_per_page) {
-        memset(part->pagebuf, 0xFF, device->page_size);
-        ret = device->ops->read_page(device, start_page, part->pagebuf,
-                                     device->page_size, NULL, 0);
-        if (ret != RT_EOK) {
-            pr_err("read_page failed!\n");
-            return -RT_ERROR;
+    /* pos is not aligned with page, read unalign part first */
+    if (pos % SECTORS_PP) {
+        sectors_read = spinand_nonftl_cache_read(blk_dev, &pos, buffer, size);
+        if (sectors_read == 0) {
+            sectors_read = spinand_read_nonftl_nalign(dev, &pos, buffer, size);
         }
+        buffer += sectors_read * blk_dev->geometry.bytes_per_sector;
 
-        copybuf = part->pagebuf +
-                  (pos % sectors_per_page) * part->geometry.bytes_per_sector;
-        if (size > (sectors_per_page - pos % sectors_per_page)) {
-            copysize = (sectors_per_page - pos % sectors_per_page) *
-                       part->geometry.bytes_per_sector;
-            sectors_read += (sectors_per_page - pos % sectors_per_page);
-        } else {
-            copysize = size * part->geometry.bytes_per_sector;
-            sectors_read += size;
-        }
-
-        rt_memcpy(buffer, copybuf, copysize);
-
-        buffer += copysize;
-        start_page++;
+        if (sectors_read == size)
+            return size;
     }
-
-    if (size - sectors_read == 0)
-        return size;
 
 #ifdef AIC_SPINAND_CONT_READ
-    if ((size - sectors_read) > sectors_per_page) {
-        rt_uint8_t *data_ptr = RT_NULL;
-        rt_uint32_t copydata =
-            (size - sectors_read) * part->geometry.bytes_per_sector;
-
-        data_ptr = (rt_uint8_t *)rt_malloc_align(copydata, CACHE_LINE_SIZE);
-        if (data_ptr == RT_NULL) {
-            pr_err("data_ptr: no memory\n");
-            goto exit_rt_spinand_read_malloc;
-        }
-
-        rt_memset(data_ptr, 0, copydata);
-
-        ret = device->ops->continuous_read(device, start_page, data_ptr,
-                                           copydata);
-        if (ret != RT_EOK) {
-            pr_err("continuous_read failed!\n");
-            goto exit_rt_spinand_read;
-        }
-
-        rt_memcpy(buffer, data_ptr, copydata);
-
-        if (data_ptr)
-            rt_free_align(data_ptr);
-
+    sectors_read = spinand_continuous_read_nonftl(dev, pos, buffer, size, sectors_read);
+    if (sectors_read == size)
         return size;
-
-    exit_rt_spinand_read:
-        if (data_ptr)
-            rt_free_align(data_ptr);
-    }
-exit_rt_spinand_read_malloc:
 #endif
 
-    /*pos is aligned with page*/
-    while (size > sectors_read) {
-        if (start_page / device->pages_per_block != block) {
-            block = start_page / device->pages_per_block;
-            if (device->ops->check_block(device, block)) {
-                pos_block = device->ops->get_block_status(device, block);
-                block += pos_block;
-                start_page += pos_block * device->pages_per_block;
-            }
-        }
-
-        memset(part->pagebuf, 0xFF, device->page_size);
-        ret = device->ops->read_page(device, start_page, part->pagebuf,
-                                     device->page_size, NULL, 0);
-        if (ret != RT_EOK) {
-            pr_err("read_page failed!\n");
-            return -RT_ERROR;
-        }
-
-        if ((size - sectors_read) > sectors_per_page) {
-            copysize = sectors_per_page * part->geometry.bytes_per_sector;
-            sectors_read += sectors_per_page;
-        } else {
-            copysize = (size - sectors_read) * part->geometry.bytes_per_sector;
-            sectors_read += (size - sectors_read);
-        }
-
-        rt_memcpy(buffer, part->pagebuf, copysize);
-        buffer += copysize;
-        start_page++;
+    /* pos is aligned with page */
+    sectors_read = spinand_read_nonftl_align(dev, pos, buffer, size, sectors_read);
+    if (sectors_read != size) {
+        pr_err("ERROR: read not compete sectors_read: %d, size: %d.\n", sectors_read, size);
+        return sectors_read;
     }
 
     return size;
@@ -216,7 +335,9 @@ exit_rt_spinand_read_malloc:
 rt_size_t rt_spinand_write_nonftl(rt_device_t dev, rt_off_t pos,
                                         const void *buffer, rt_size_t size)
 {
-    return size;
+    struct spinand_blk_device *blk_dev = (struct spinand_blk_device *)dev;
+    pr_err("ERROR: %s write failed, please check!\n", blk_dev->name);
+    return -RT_ERROR;
 }
 
 rt_err_t rt_spinand_init_nonftl(rt_device_t dev)
@@ -357,6 +478,7 @@ int rt_blk_nand_register_device(const char *name,
     if (!blk_dev) {
         pr_err("Error: no memory for create SPI NAND block device");
     }
+    rt_memset(blk_dev, 0, sizeof(struct spinand_blk_device));
 
     blk_dev->mtd_device = device;
     blk_dev->parent.type = RT_Device_Class_Block;
