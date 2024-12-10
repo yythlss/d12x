@@ -125,6 +125,7 @@ int32_t hal_usart_config_baudrate(usart_handle_t handle, uint32_t baud)
     USART_NULL_PARAM_CHK(handle);
     aic_usart_priv_t *usart_priv = handle;
     aic_usart_reg_t *addr = (aic_usart_reg_t *)(usart_priv->base);
+    uint32_t timecount = 0;
 
     /* baudrate=(seriak clock freq)/(16*divisor); algorithm :rounding*/
     uint32_t divisor = ((hal_clk_get_freq(CLK_UART0 + usart_priv->idx)  * 10) / baud) >> 4;
@@ -134,6 +135,16 @@ int32_t hal_usart_config_baudrate(usart_handle_t handle, uint32_t baud)
     } else {
         divisor = divisor / 10;
     }
+
+    addr->FCR = FCR_FIFO_EN | FCR_RX_FIFO_RST | FCR_TX_FIFO_RST;
+    while (addr->USR & USR_UART_BUSY) {
+        timecount++;
+        if (timecount >= UART_BUSY_TIMEOUT)
+        {
+            hal_log_info("Uart controller busy, waiting for timeout\n");
+            return ERR_USART(DRV_ERROR_TIMEOUT);
+        }
+    };
 
     addr->HALT |= (HALT_CHCFG_AT_BUSY);
 
@@ -325,30 +336,21 @@ static void hal_usart_get_dma_flag(void)
 #endif
 }
 
-int32_t hal_usart_config_fifo(usart_handle_t handle, usart_func_e func)
+int32_t hal_usart_config_fifo(usart_handle_t handle)
 {
     USART_NULL_PARAM_CHK(handle);
     aic_usart_priv_t *usart_priv = handle;
     aic_usart_reg_t *addr = (aic_usart_reg_t *)(usart_priv->base);
 
-    if (func == USART_MODE_RS232_AUTO_FLOW_CTRL ||
-        func == USART_MODE_RS232_UNAUTO_FLOW_CTRL ||
-        func == USART_MODE_RS232_SW_FLOW_CTRL ||
-        func == USART_MODE_RS232_SW_HW_FLOW_CTRL)
-    {
-        addr->FCR = (FCR_FIFO_EN | FCR_RX_FIFO_RST | FCR_TX_FIFO_RST | FRC_RX_FIFO_SET(3));
-    }
-    else
-    {
-        addr->FCR = (FCR_FIFO_EN | FCR_RX_FIFO_RST | FCR_TX_FIFO_RST);
-    }
-
     hal_usart_get_dma_flag();
     /* if use dma reconfigure the fcr reg */
     if (dma_flag[usart_priv->idx].dma_enable == 1) {
-        addr->FCR = (FCR_TX_FIFO_RST | FCR_RX_FIFO_RST);
-        addr->FCR = (AIC_UART_DMA_MODE(1) | FRC_TX_FIFO_SET(3)| FRC_RX_FIFO_SET(2) | FCR_FIFO_EN);
+        addr->FCR = FCR_TX_FIFO_RST | FCR_RX_FIFO_RST;
+        addr->FCR = AIC_UART_DMA_MODE(1) | FRC_TX_FIFO_SET(3) | FRC_RX_FIFO_SET(2) | FCR_FIFO_EN;
+    } else {
+        addr->FCR = FCR_FIFO_EN | FCR_RX_FIFO_RST | FCR_TX_FIFO_RST | FRC_RX_FIFO_SET(3);
     }
+
     return 0;
 }
 
@@ -909,7 +911,7 @@ int32_t hal_usart_config(usart_handle_t handle,
     }
 
     /* control fifo */
-    ret = hal_usart_config_fifo(handle, func);
+    ret = hal_usart_config_fifo(handle);
 
     if (ret < 0)
     {

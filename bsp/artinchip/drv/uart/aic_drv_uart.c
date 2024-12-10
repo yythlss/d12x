@@ -126,9 +126,26 @@ static  usart_handle_t uart_handle[AIC_UART_DEV_NUM];
 static struct rt_serial_device g_serial[AIC_UART_DEV_NUM];
 
 #if defined (AIC_SERIAL_USING_DMA)
-static uint32_t uart_rx_fifo[AIC_UART_RX_FIFO_SIZE] __attribute__((aligned(64)));
-static uint32_t uart_tx_fifo[AIC_UART_TX_FIFO_SIZE] __attribute__((aligned(64)));
-static uint32_t rx_size = 0;
+#define UART_ALIGN_SIZE     CACHE_LINE_SIZE
+struct aic_uart_info {
+    uint32_t *uart_tx_fifo;
+    uint32_t *uart_rx_fifo;
+    uint8_t rx_size;
+    rt_sem_t tx_semaphore;
+};
+static struct aic_uart_info g_info[AIC_UART_DEV_NUM] = {0};
+
+char uart_sem_name[][9] = {
+    "uart_tx0",
+    "uart_tx1",
+    "uart_tx2",
+    "uart_tx3",
+    "uart_tx4",
+    "uart_tx5",
+    "uart_tx6",
+    "uart_tx7",
+};
+
 #endif
 
 struct uart_freq_baud
@@ -245,9 +262,8 @@ void drv_usart_irqhandler(int irq, void * data)
         {
         case AIC_IIR_RECV_DATA:
         case AIC_IIR_CHAR_TIMEOUT:
-            rx_size = hal_usart_get_rx_fifo_num(uart);
-            // rt_kprintf("%d,%d\n",rx_size,status);
-            hal_uart_rx_dma_config(uart, (uint8_t *)uart_rx_fifo, rx_size);
+            g_info[index].rx_size = hal_usart_get_rx_fifo_num(uart);
+            hal_uart_rx_dma_config(uart, (uint8_t *)g_info[index].uart_rx_fifo, g_info[index].rx_size);
             break;
 
         default:
@@ -478,21 +494,23 @@ static void drv_uart_callback(aic_usart_priv_t *uart, void *arg)
     {
     case AIC_UART_TX_INT:
         rt_hw_serial_isr(&g_serial[uart->idx], RT_SERIAL_EVENT_TX_DMADONE);
+        rt_sem_release(g_info[uart->idx].tx_semaphore);
         break;
 
     case AIC_UART_RX_INT:
         rx_fifo = (struct rt_serial_rx_fifo *)g_serial[uart->idx].serial_rx;
-        if (rx_fifo->put_index + rx_size < g_serial[uart->idx].config.bufsz) {
-            memcpy((rx_fifo->buffer + rx_fifo->put_index), (rt_uint8_t *)uart_rx_fifo, rx_size);
+        aicos_dcache_invalid_range((void *)g_info[uart->idx].uart_rx_fifo, AIC_UART_RX_FIFO_SIZE);
+        if (rx_fifo->put_index + g_info[uart->idx].rx_size < g_serial[uart->idx].config.bufsz) {
+            memcpy((rx_fifo->buffer + rx_fifo->put_index), (rt_uint8_t *)g_info[uart->idx].uart_rx_fifo, g_info[uart->idx].rx_size);
         } else {
-            memcpy((rx_fifo->buffer + rx_fifo->put_index), (rt_uint8_t *)uart_rx_fifo,
+            memcpy((rx_fifo->buffer + rx_fifo->put_index), (rt_uint8_t *)g_info[uart->idx].uart_rx_fifo,
                     g_serial->config.bufsz - rx_fifo->put_index);
-            memcpy((rx_fifo->buffer), ((rt_uint8_t *)uart_rx_fifo + g_serial->config.bufsz -
-                    rx_fifo->put_index), rx_size + rx_fifo->put_index - g_serial->config.bufsz);
+            memcpy((rx_fifo->buffer), ((rt_uint8_t *)g_info[uart->idx].uart_rx_fifo + g_serial->config.bufsz -
+                    rx_fifo->put_index), g_info[uart->idx].rx_size + rx_fifo->put_index - g_serial->config.bufsz);
         }
         hal_usart_set_interrupt(uart, USART_INTR_READ, 1);
 
-        rt_hw_serial_isr(&g_serial[uart->idx], RT_SERIAL_EVENT_RX_DMADONE | (rx_size << 8));
+        rt_hw_serial_isr(&g_serial[uart->idx], RT_SERIAL_EVENT_RX_DMADONE | (g_info[uart->idx].rx_size << 8));
         break;
 
     default:
@@ -505,14 +523,16 @@ static rt_size_t drv_uart_dma_transmit(struct rt_serial_device *serial, rt_uint8
                                         rt_size_t size, int direction)
 {
     usart_handle_t uart;
-
+    rt_uint8_t index;
     RT_ASSERT(serial != RT_NULL);
     uart = (usart_handle_t)serial->parent.user_data;
+    index = serial->config.uart_index;
 
     if (direction == RT_SERIAL_DMA_TX) {
-        memcpy((rt_uint8_t *)uart_tx_fifo, buf, size);
-
-        if (hal_uart_send_by_dma(uart, (rt_uint8_t *)uart_tx_fifo, size) == 0) {
+        memcpy((rt_uint8_t *)g_info[index].uart_tx_fifo, buf, size);
+        aicos_dcache_clean_range((void *)g_info[index].uart_tx_fifo, AIC_UART_TX_FIFO_SIZE);
+        if (hal_uart_send_by_dma(uart, (rt_uint8_t *)g_info[index].uart_tx_fifo, size) == 0) {
+            rt_sem_take(g_info[index].tx_semaphore, RT_WAITING_FOREVER);
             return size;
         }
     }
@@ -693,6 +713,15 @@ int drv_usart_init(void)
                                         drv_uart_callback, NULL);
             hal_usart_set_interrupt((aic_usart_priv_t *)g_serial[u].parent.user_data,
                                         USART_INTR_READ, 1);
+
+            g_info[u].uart_rx_fifo = (uint32_t *)aicos_malloc_align(0, AIC_UART_RX_FIFO_SIZE, UART_ALIGN_SIZE);
+            g_info[u].uart_tx_fifo = (uint32_t *)aicos_malloc_align(0, AIC_UART_TX_FIFO_SIZE, UART_ALIGN_SIZE);
+            RT_ASSERT(g_info[u].uart_rx_fifo != RT_NULL);
+            RT_ASSERT(g_info[u].uart_tx_fifo != RT_NULL);
+
+            g_info[u].tx_semaphore = rt_sem_create(uart_sem_name[u], 0, RT_IPC_FLAG_FIFO);
+            if (!g_info[u].tx_semaphore)
+                return -RT_ERROR;
         }
 #endif
         drv_usart_function_init(i, u);
