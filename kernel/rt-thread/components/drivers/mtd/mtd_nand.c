@@ -181,4 +181,22 @@ rt_err_t rt_mtd_nand_mark_badblock(struct rt_mtd_nand_device *device, rt_uint32_
     }
 }
 
+rt_err_t rt_mtd_nand_map_user(
+    struct rt_mtd_nand_device *device,
+    rt_uint8_t *oobbuf, rt_uint8_t *data,
+    rt_base_t start, rt_base_t nbytes)
+{
+    RT_ASSERT(device->ops->map_user);
+    return device->ops->map_user(device, oobbuf, data, start, nbytes);
+}
+
+rt_err_t rt_mtd_nand_unmap_user(
+    struct rt_mtd_nand_device *device,
+    rt_uint8_t *dst, rt_uint8_t *src,
+    rt_base_t start, rt_base_t nbytes)
+{
+    RT_ASSERT(device->ops->map_user);
+    return device->ops->unmap_user(device, dst, src, start, nbytes);
+}
+
 #endif /* RT_USING_MTD_NAND */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -171,7 +171,7 @@ void aic_tlsf_free_sethook(void (*hook)(void *ptr))
     tlsf_free_hook = hook;
 }
 
-#define TLSF_HOOK_CALL(__hook, argv) do {if ((__hook) != NULL) __hook argv; } while (0)
+#define TLSF_HOOK_CALL(__hook, argv) do {if ((__hook) != NULL) __hook argv;} while (0)
 #else
 #define TLSF_HOOK_CALL(__hook, argv)
 #endif
@@ -210,8 +210,10 @@ void aic_tlsf_heap_test(void)
     u32 free_m = 0;
     u32 max_used = 0;
     u32 max_free = 0;
+#if (MAX_MEM_REGION > 1)
     void * tmp[10];
     u32 len[10] = {13, 1000, 64, 300, 5000, 20000, 14, 5, 451, 1000};
+#endif
 
     pr_debug("\n\nMem heap info:\n\n");
 #if !defined(KERNEL_FREERTOS)
@@ -225,8 +227,9 @@ void aic_tlsf_heap_test(void)
                 __func__, i, total_m, used_m, max_used, free_m, max_free);
     }
 
+#if (MAX_MEM_REGION > 1)
     pr_debug("\n\nStart malloc:\n\n");
-    for (i=0; i<10; i++){
+    for (i=0; i<10; i++) {
         tmp[i] = aic_tlsf_malloc(MEM_CMA, len[i]);
         pr_debug("%s: heap region %d malloc %d len.\n ",  __func__, MEM_CMA, len[i]);
         aic_tlsf_mem_info(MEM_CMA, &total_m, &used_m, &max_used, &free_m, &max_free);
@@ -235,13 +238,14 @@ void aic_tlsf_heap_test(void)
     }
 
     pr_debug("\n\nStart free:\n\n");
-    for (i=0; i<10; i++){
+    for (i=0; i<10; i++) {
         aic_tlsf_free(MEM_CMA, tmp[i]);
         pr_debug("%s: heap region %d free %d len.\n ",  __func__, MEM_CMA, len[i]);
         aic_tlsf_mem_info(MEM_CMA, &total_m, &used_m, &max_used, &free_m, &max_free);
         pr_debug("%s: heap region %d total=%d, used=%d, max_used=%d, free=%d, max_free=%d.\n",
                 __func__, MEM_CMA, total_m, used_m, max_used, free_m, max_free);
     }
+#endif
 }
 
 void aic_tlsf_heap_init(void)
@@ -286,12 +290,12 @@ void *aic_tlsf_malloc(u32 mem_type, u32 nbytes)
     tlsf_t heap = NULL;
     int i = 0;
 
-    for (i=0; i<sizeof(heap_def)/sizeof(heap_def_t); i++){
+    for (i=0; i<sizeof(heap_def)/sizeof(heap_def_t); i++) {
         if (heap_def[i].type == mem_type)
             break;
     }
 
-    if (i >= MAX_MEM_REGION){
+    if (i >= MAX_MEM_REGION) {
         pr_err("%s: mem_type = %d err.\n", __func__, mem_type);
         return NULL;
     }
@@ -322,12 +326,12 @@ void aic_tlsf_free(u32 mem_type, void *ptr)
     tlsf_t heap = NULL;
     int i = 0;
 
-    for (i=0; i<sizeof(heap_def)/sizeof(heap_def_t); i++){
+    for (i=0; i<sizeof(heap_def)/sizeof(heap_def_t); i++) {
         if (heap_def[i].type == mem_type)
             break;
     }
 
-    if (i >= MAX_MEM_REGION){
+    if (i >= MAX_MEM_REGION) {
         pr_err("%s: mem_type = %d err.\n", __func__, mem_type);
         return;
     }
@@ -357,12 +361,12 @@ void *aic_tlsf_realloc(u32 mem_type, void *ptr, u32 nbytes)
     tlsf_t heap = NULL;
     int i = 0;
 
-    for (i=0; i<sizeof(heap_def)/sizeof(heap_def_t); i++){
+    for (i=0; i<sizeof(heap_def)/sizeof(heap_def_t); i++) {
         if (heap_def[i].type == mem_type)
             break;
     }
 
-    if (i >= MAX_MEM_REGION){
+    if (i >= MAX_MEM_REGION) {
         pr_err("%s: mem_type = %d err.\n", __func__, mem_type);
         return NULL;
     }
@@ -392,7 +396,7 @@ void *aic_tlsf_calloc(u32 mem_type, u32 count, u32 size)
     void *ptr = NULL;
     u32 total_size;
 
-    if (mem_type >= MAX_MEM_REGION){
+    if (mem_type >= MAX_MEM_REGION) {
         pr_err("%s: mem_type = %d err.\n", __func__, mem_type);
         return NULL;
     }
@@ -413,12 +417,12 @@ void *aic_tlsf_malloc_align(u32 mem_type, u32 size, u32 align)
     tlsf_t heap = NULL;
     int i = 0;
 
-    for (i=0; i<sizeof(heap_def)/sizeof(heap_def_t); i++){
+    for (i=0; i<sizeof(heap_def)/sizeof(heap_def_t); i++) {
         if (heap_def[i].type == mem_type)
             break;
     }
 
-    if (i >= MAX_MEM_REGION){
+    if (i >= MAX_MEM_REGION) {
         pr_err("%s: mem_type = %d err.\n", __func__, mem_type);
         return NULL;
     }
@@ -457,7 +461,7 @@ static void mem_info(void *ptr, size_t size, int used, void *user)
 
         if (size > h->max_used_mem)
             h->max_used_mem = size;
-    }else{
+    } else {
         h->free_mem += size;
 
         if (size > h->max_free_mem)
@@ -473,7 +477,7 @@ void aic_tlsf_mem_info(u32 mem_type, u32 *total, u32 *used,
     struct list_head *pos;
     pool_list_t *pool_node;
 
-    if (mem_type >= MAX_MEM_REGION){
+    if (mem_type >= MAX_MEM_REGION) {
         pr_err("%s: mem_type = %d err.\n", __func__, mem_type);
         return;
     }
@@ -487,7 +491,7 @@ void aic_tlsf_mem_info(u32 mem_type, u32 *total, u32 *used,
 
     tlsf_walk_pool(h->pool_list.pool, mem_info, (void *)(unsigned long)mem_type);
 
-    list_for_each(pos, &h->pool_list.list){
+    list_for_each(pos, &h->pool_list.list) {
         pool_node = container_of(pos, pool_list_t, list);
         tlsf_walk_pool(pool_node->pool, mem_info, (void *)(unsigned long)mem_type);
     }

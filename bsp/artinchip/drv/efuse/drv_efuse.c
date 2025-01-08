@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -84,6 +84,47 @@ int drv_efuse_read_chip_id(void *data)
     return 0;
 }
 
+int drv_efuse_read_reserved_1(void *data)
+{
+    int version = 0;
+
+    version = hal_efuse_get_version();
+    switch (version) {
+        case 0x100:
+        case 0x101:
+        case 0x102:
+        case 0x103:
+        case 0x105:
+            drv_efuse_read(0x90, data, 0x10);
+            break;
+        default:
+            pr_err("not support read reserved 1");
+            return -1;
+    }
+    return 0;
+}
+
+int drv_efuse_read_reserved_2(void *data)
+{
+    int version = 0;
+
+    version = hal_efuse_get_version();
+    switch (version) {
+        case 0x100:
+        case 0x101:
+        case 0x102:
+        case 0x103:
+        case 0x105:
+            drv_efuse_read(0xC0, data, 0x40);
+            break;
+        default:
+            pr_err("not support read reserved 2");
+            return -1;
+    }
+
+    return 0;
+}
+
 int drv_efuse_program(u32 addr, const void *data, u32 size)
 {
     u32 wid, wval, rest, cnt;
@@ -122,6 +163,16 @@ int drv_efuse_program(u32 addr, const void *data, u32 size)
     }
 
     return (int)(size - rest);
+}
+
+int drv_sjtag_auth(u32 *key, u32 kwlen)
+{
+    return hal_sjtag_auth(key, kwlen);
+}
+
+int drv_szone_auth(u32 *key, u32 kwlen)
+{
+    return hal_szone_auth(key, kwlen);
 }
 
 INIT_DEVICE_EXPORT(drv_efuse_init);

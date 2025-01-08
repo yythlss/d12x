@@ -6,7 +6,7 @@ from building import *
 Import('rtconfig')
 
 cwd     = GetCurrentDir()
-src     = Glob('*.c')
+src     = Glob('main.c')
 CPPPATH = [cwd, cwd + '/include']
 CPPPATH = []
 

@@ -49,7 +49,7 @@ extern void  rtos_msleep(uint16_t ticks);
 #define __inf		pr_info
 #define __wrn		pr_warn
 #define __err		pr_err
-#define __log		pr_info
+#define __log		pr_debug
 
 extern __s32 aic_com_uart_init(void);
 extern __s32 aic_com_uart_deinit(void);

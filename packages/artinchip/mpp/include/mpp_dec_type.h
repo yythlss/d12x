@@ -131,6 +131,7 @@ enum mpp_dec_cmd {
 	MPP_DEC_INIT_CMD_SET_CROP_INFO,
 	MPP_DEC_INIT_CMD_SET_OUTPUT_POS,
 	MPP_DEC_INIT_CMD_SET_EXT_PACKET_ALLOCATOR,// packet buffer allocator
+	MPP_DEC_INIT_CMD_SET_PARAMS,
 };
 
 enum mpp_dec_errno {

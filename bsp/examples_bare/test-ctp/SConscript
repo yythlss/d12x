@@ -5,7 +5,7 @@ from building import *
 cwd = GetCurrentDir()
 CPPPATH = []
 src = []
-if GetDepend('KERNEL_BAREMETAL') and GetDepend('AIC_TP_DRV_TEST'):
+if GetDepend('KERNEL_BAREMETAL') and GetDepend('AIC_TP_BARE_TEST'):
     src += Glob('test_ctp.c')
 
 group = DefineGroup('test-ctp', src, depend = [''], CPPPATH = CPPPATH)

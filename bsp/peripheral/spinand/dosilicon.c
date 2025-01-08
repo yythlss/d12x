@@ -11,15 +11,29 @@
 
 #define SPINAND_MFR_DOSILICON 0xE5
 
+static int ds35q1ga_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    if (section > 3)
+      return -SPINAND_ERR;
+
+    region->offset = (16 * section) + 4;
+    region->length = 4;
+
+    return 0;
+}
+
 const struct aic_spinand_info dosilicon_spinand_table[] = {
     /*devid page_size oob_size block_per_lun pages_per_eraseblock planes_per_lun
     is_die_select*/
     /*DS35Q1GA-IB*/
     { DEVID(0x71), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
-      DIE(0), "dosilicon 128MB: 2048+64@64@1024", cmd_cfg_table },
+      DIE(0), "dosilicon 128MB: 2048+64@64@1024", cmd_cfg_table,
+      NULL, ds35q1ga_ooblayout_user },
     /*DS35Q2GA-IB*/
     { DEVID(0x72), PAGESIZE(2048), OOBSIZE(64), BPL(2048), PPB(64), PLANENUM(2),
-      DIE(0), "dosilicon 256MB: 2048+64@64@2048", cmd_cfg_table },
+      DIE(0), "dosilicon 256MB: 2048+64@64@2048", cmd_cfg_table,
+      NULL, ds35q1ga_ooblayout_user },
 };
 
 const struct aic_spinand_info *

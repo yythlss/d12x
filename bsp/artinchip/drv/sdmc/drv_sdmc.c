@@ -20,7 +20,8 @@
 
 #define MSEC_PER_SEC        1000
 
-struct aic_sdmc *g_host = NULL;
+#define MAX_MMC_DEV_NUM  3
+static struct aic_sdmc *g_aic_sdmc_host[MAX_MMC_DEV_NUM] = {NULL};
 
 struct aic_sdmc_pdata {
     ulong base;
@@ -28,6 +29,7 @@ struct aic_sdmc_pdata {
     int clk;
     int clk_freq;
     u32 is_sdio;
+    u32 is_hotplug;
     u8 id;
     u8 buswidth;
     u8 drv_phase;
@@ -591,6 +593,9 @@ static struct aic_sdmc_pdata sdmc_pdata[] = {
 #ifdef AIC_SDMC0_BUSWIDTH8
         .buswidth = SDMC_CTYPE_8BIT,
 #endif
+#ifdef AIC_SDMC0_IS_SDIO
+        .is_sdio = 1,
+#endif
         .drv_phase = AIC_SDMC0_DRV_PHASE,
         .smp_phase = AIC_SDMC0_SMP_PHASE,
 #ifdef AIC_SDMC0_DDR_MODE
@@ -616,6 +621,9 @@ static struct aic_sdmc_pdata sdmc_pdata[] = {
 #endif
 #ifdef AIC_SDMC1_IS_SDIO
         .is_sdio = 1,
+#endif
+#ifdef AIC_SDMC1_USING_HOTPLUG
+        .is_hotplug = 1,
 #endif
         .drv_phase = AIC_SDMC1_DRV_PHASE,
         .smp_phase = AIC_SDMC1_SMP_PHASE,
@@ -676,15 +684,17 @@ s32 aic_sdmc_probe(struct aic_sdmc_pdata *pdata)
     host->host.fifoth_val = MSIZE(2) | RX_WMARK(7) | TX_WMARK(8);
     host->host.is_sdio = pdata->is_sdio;
     host->rthost = rthost;
+    host->rthost->sd_hotplug = pdata->is_hotplug;
     rthost->private_data = host;
     aic_sdmc_setup_cfg(rthost);
 
     aic_sdmc_init(host);
     pr_info("SDMC%d driver loaded\n", pdata->id);
 
-    g_host = host;
+    g_aic_sdmc_host[pdata->id] = host;
 
     mmcsd_change(rthost);
+
     return 0;
 
 err:
@@ -698,9 +708,10 @@ err:
     return -RT_ENOMEM;
 }
 
-void aic_mmcsd_change(void)
+void aic_mmcsd_change(u8 id)
 {
-    mmcsd_change(g_host->rthost);
+    if (g_aic_sdmc_host[id]->rthost->sd_hotplug)
+        mmcsd_change(g_aic_sdmc_host[id]->rthost);
 }
 
 static int drv_sdmc_init(void)

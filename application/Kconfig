@@ -201,7 +201,7 @@ choice
 
 config AIC_LVGL_UI_BUILDER
     select LPKG_USING_FREETYPE
-    bool "Support AiUIBuider"
+    bool "LVGL Support AiUIBuider"
 
 config AIC_LVGL_BASE_DEMO
     bool "LVGL demo with basic function"
@@ -252,6 +252,8 @@ config AIC_LVGL_DEMO_BENCHMARK
 config AIC_LVGL_USB_OSD_DEMO
     bool "LVGL usb osd demo"
     select LPKG_LVGL_USING_DEMOS
+    select LPKG_USING_CJSON
+    select AIC_PWM_BACKLIGHT_BYPASS if AIC_PWM_BACKLIGHT
 
 config AIC_LVGL_IMAGE_DEMO
     bool "LVGL image demo"
@@ -366,9 +368,26 @@ endif # AIC_LVGL_ELEVATOR_DEMO
 
 # Parameters for LVGL usb osd demo
 if AIC_LVGL_USB_OSD_DEMO
+    choice
+        prompt "Select LOGO Type"
+        default LV_USB_OSD_LOGO_TYPE_IMAGE
+
+        config LV_USB_OSD_LOGO_TYPE_IMAGE
+            bool "Image"
+
+        config LV_USB_OSD_LOGO_TYPE_VIDEO
+            bool "Video"
+    endchoice
+
     config LV_USB_OSD_LOGO_IMAGE
         string "LOGO Image Name"
+        depends on LV_USB_OSD_LOGO_TYPE_IMAGE
         default "logo.png"
+
+    config LV_USB_OSD_LOGO_VIDEO
+        string "Video resource Name"
+        depends on LV_USB_OSD_LOGO_TYPE_VIDEO
+        default "logo.mp4"
 
     config LV_USB_OSD_SCREEN_LOCK_TIME
         int "Default Screen Lock Time(s), 0 to Never Lock"
@@ -415,7 +434,7 @@ if AIC_LVGL_USB_OSD_DEMO
     config LV_USB_OSD_PLAY_VIDEO
         bool
         default n if AIC_SPINOR_DRV
-        default y if AIC_SPINAND_DRV
+        default y if AIC_SPINAND_DRV && !LV_USB_OSD_LOGO_TYPE_VIDEO
 
 endif # AIC_LVGL_USB_OSD_DEMO
 

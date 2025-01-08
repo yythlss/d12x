@@ -5,10 +5,6 @@ cwd = GetCurrentDir()
 group = []
 src = Glob('*.c')
 
-if GetDepend(['AIC_LVGL_DEMO']):
-    src += Glob('./aic_ui.c')
-    src += Glob('./lv_demo.c')
-
 CPPPATH = [cwd]
 
 list = os.listdir(cwd)

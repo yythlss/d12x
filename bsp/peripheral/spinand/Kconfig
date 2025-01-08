@@ -93,4 +93,10 @@ config SPI_NAND_XINCUN
 	default n
 	help
 	  Enable this driver for XINCUN SPI NAND flash.
+
+config SPI_NAND_FUDANMICRO
+	bool "Support FUDANMICRO SPI NAND"
+	default n
+	help
+	  Enable this driver for FUDANMICRO SPI NAND flash.
 endif

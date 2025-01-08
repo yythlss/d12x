@@ -15,8 +15,12 @@
 #include <hal_syscfg.h>
 #include <aic_core.h>
 #include <aic_drv_bare.h>
+#ifdef AIC_DISPLAY_DRV
 #include <artinchip_fb.h>
+#endif
+#ifdef AIC_VE_DRV
 #include "aic_hal_ve.h"
+#endif
 #include "aic_reboot_reason.h"
 #include <aic_log.h>
 #ifdef AIC_DMA_DRV
@@ -28,6 +32,10 @@
 
 #ifdef AIC_USING_SID
 #include "efuse.h"
+#endif
+
+#ifdef AIC_ADCIM_DRV
+#include "hal_adcim.h"
 #endif
 
 #ifdef AIC_OSR_CE_DRV
@@ -308,6 +316,10 @@ int main(void)
         #endif
         usbh_hub_poll();
     }
+#endif
+
+#ifdef AIC_ADCIM_DRV
+    hal_adcim_probe();
 #endif
 
 #ifdef AIC_CONSOLE_BARE_DRV

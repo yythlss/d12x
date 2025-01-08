@@ -2,7 +2,7 @@
     "spi-nor": { // Device, The name should be the same with string in image:info:media:type
         "size": "2m", // Size of SPI NOR
         "partitions": {
-            "spl":        { "size": "256k" },
+            "spl":        { "size": "512k" },
             "env":        { "size": "128k" },
             "os":         { "size": "1m" },
 

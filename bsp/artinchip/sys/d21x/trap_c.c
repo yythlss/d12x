@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <rtconfig.h>
 #include <csi_core.h>
+#if defined(KERNEL_RTTHREAD) && defined(AIC_BACKTRACE_DEBUG)
+#include <rtthread.h>
+#endif
 
 void (*trap_c_callback)(void);
 
@@ -69,7 +72,95 @@ void trap_c(uint64_t *regs)
     {
         trap_c_callback();
     }
-
-    while (1);
+#ifndef AIC_BACKTRACE_DEBUG
+    while (1) {};
+#endif
 }
 
+#if defined(KERNEL_RTTHREAD) && defined(AIC_BACKTRACE_DEBUG)
+
+#define CMB_CALL_STACK_MAX_DEPTH 32
+extern size_t __stext;
+extern size_t __etext;
+extern rt_ubase_t g_base_irqstack;
+extern rt_ubase_t g_top_irqstack;
+
+void print_stack(uint64_t *stack_point,uint64_t*stack_point1,uint64_t epc)
+{
+    int i = 0;
+    uint64_t sp = (uint64_t)stack_point;
+    uint64_t pc;
+    uint64_t base_irqstack = (uint64_t)&g_base_irqstack;
+    uint64_t top_irqstack = (uint64_t)&g_top_irqstack;
+    uint64_t stack_addr = (uint64_t) rt_thread_self()->stack_addr;
+    uint64_t stack_size =  rt_thread_self()->stack_size;
+
+    printf("__stext:%p __etext:%p,stack:\n", &__stext, &__etext);
+    if (sp >= base_irqstack && sp <= top_irqstack) {
+        for (; sp < top_irqstack; sp += sizeof(uint64_t)) {
+            pc  = *((uint64_t *)sp);
+            printf("0x%016lx ", pc);
+            if ((i % 4) == 3) {
+                printf("\n");
+            }
+            i++;
+        }
+        sp = (uint64_t)stack_point1;
+        printf("\n");
+    }
+
+    for (i = 0; sp < stack_addr + stack_size; sp += sizeof(uint64_t)) {
+        pc  = *((uint64_t *)sp);
+        printf("0x%016lx ", pc);
+        if ((i % 4) == 3) {
+            printf("\n");
+        }
+        i++;
+    }
+    printf("\n\n");
+}
+
+void print_back_trace(int32_t n,rt_ubase_t *regs)
+{
+    int i = 0;
+    printf("back_trace:\n");
+    for(i = 0; i < n; i++) {
+        printf("0x%016lx\n", regs[i]);
+    }
+}
+
+void backtrace_call_stack(rt_ubase_t *stack_point,rt_ubase_t*stack_point1,rt_ubase_t epc)
+{
+    int depth = 0;
+    rt_ubase_t sp = (rt_ubase_t)stack_point;
+    rt_ubase_t pc;
+    size_t code_start_addr = (size_t)&__stext;
+    size_t code_end_addr = (size_t)&__etext;
+    rt_ubase_t base_irqstack = (rt_ubase_t)&g_base_irqstack;
+    rt_ubase_t top_irqstack = (rt_ubase_t)&g_top_irqstack;
+    rt_ubase_t stack_addr = (rt_ubase_t) rt_thread_self()->stack_addr;
+    rt_ubase_t stack_size =  rt_thread_self()->stack_size;
+
+    printf("backtrace:\n");
+    printf("0x%016lx\n", epc);
+
+    if (sp >= base_irqstack && sp <= top_irqstack) {
+        for (; sp < top_irqstack; sp += sizeof(rt_ubase_t)) {
+            pc  = *((rt_ubase_t *)sp);
+            if((pc >= code_start_addr) && (pc <= code_end_addr) && (depth < CMB_CALL_STACK_MAX_DEPTH)) {
+                printf("%16lx\n", pc);
+                depth++;
+            }
+        }
+        sp = (rt_ubase_t)stack_point1;
+    }
+    depth = 0;
+    for (; sp < stack_addr + stack_size; sp += sizeof(rt_ubase_t)) {
+        pc  = *((rt_ubase_t *)sp);
+        if((pc >= code_start_addr) && (pc <= code_end_addr) && (depth < CMB_CALL_STACK_MAX_DEPTH)) {
+            printf("0x%016lx\n", pc);
+             depth++;
+        }
+    }
+}
+#endif  // defined(KERNEL_RTTHREAD) && defined(AIC_BACKTRACE_DEBUG)

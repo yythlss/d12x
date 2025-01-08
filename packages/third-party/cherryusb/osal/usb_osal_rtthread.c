@@ -7,6 +7,7 @@
 #include "usb_errno.h"
 #include <rtthread.h>
 #include <rthw.h>
+#include <aic_osal.h>
 
 usb_osal_thread_t usb_osal_thread_create(const char *name, uint32_t stack_size, uint32_t prio, usb_thread_entry_t entry, void *args)
 {
@@ -135,4 +136,14 @@ void usb_osal_leave_critical_section(size_t flag)
 void usb_osal_msleep(uint32_t delay)
 {
     rt_thread_mdelay(delay);
+}
+
+void *usb_osal_malloc_align(uint32_t mem_type, size_t size, size_t align)
+{
+    return aicos_malloc_align(mem_type, size, align);
+}
+
+void usb_osal_free_align(uint32_t mem_type, void *mem)
+{
+    aicos_free_align(mem_type, mem);
 }

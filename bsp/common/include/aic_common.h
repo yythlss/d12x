@@ -19,7 +19,7 @@ extern "C" {
 /* Luban-Lite version information */
 #define LL_VERSION      1               /**< major version number */
 #define LL_SUBVERSION   1               /**< minor version number */
-#define LL_REVISION     1               /**< revise version number */
+#define LL_REVISION     2               /**< revise version number */
 
 typedef __signed__ char     s8;
 typedef unsigned char       u8;

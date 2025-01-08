@@ -10,14 +10,12 @@ config AIC_RTP_MAX_PRESSURE
     depends on AIC_USING_RTP
 
 config AIC_RTP_X_PLATE
-    int "The x-plate value of RTP touchscreen"
-    range 0 1024
+    int "The X-plate value of RTP touchscreen"
     default 235
     depends on AIC_USING_RTP
 
 config AIC_RTP_Y_PLATE
     int "The Y-plate value of RTP touchscreen"
-    range 0 1024
     default 665
     depends on AIC_USING_RTP
 

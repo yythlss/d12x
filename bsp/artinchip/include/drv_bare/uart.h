@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -97,6 +97,7 @@ int uart_config_update(int id, int baudrate);
 int uart_deinit(int id);
 int uart_getchar(int id);
 int uart_putchar(int id, int c);
+int uart_get_cur_baudrate(int id);
 
 #ifdef __cplusplus
 }

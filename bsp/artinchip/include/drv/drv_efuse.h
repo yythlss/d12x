@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -17,7 +17,11 @@ extern "C" {
 
 int drv_efuse_read(u32 addr, void *data, u32 size);
 int drv_efuse_read_chip_id(void *data);
+int drv_efuse_read_reserved_1(void *data);
+int drv_efuse_read_reserved_2(void *data);
 int drv_efuse_program(u32 addr, const void *data, u32 size);
+int drv_sjtag_auth(u32 *key, u32 kwlen);
+int drv_szone_auth(u32 *key, u32 kwlen);
 
 #ifdef __cplusplus
 }

@@ -93,8 +93,13 @@ void hal_dvp_set_cfg(struct aic_dvp_config *cfg)
 {
     u32 height = 0, stride0 = 0, stride1 = 0, val = 0;
 
-    if ((cfg->stride[0] == 0) || (cfg->stride[1] == 0)) {
-        hal_log_err("Invalid stride: 0x%x 0x%x\n", cfg->stride[0], cfg->stride[1]);
+    if (cfg->stride[0] == 0) {
+        hal_log_err("Invalid stride0: 0x%x\n", cfg->stride[0]);
+        return;
+    }
+
+    if ((cfg->output != DVP_OUT_RAW_PASSTHROUGH) && (cfg->stride[1] == 0)) {
+        hal_log_err("Invalid stride1: 0x%x\n", cfg->stride[1]);
         return;
     }
 
@@ -116,7 +121,10 @@ void hal_dvp_set_cfg(struct aic_dvp_config *cfg)
         val |= DVP_CTL_DROP_FRAME_EN;
     dvp_writel(val, DVP_CTL);
 
-    dvp_writel(DVP_OUT_HOR_NUM(cfg->width), DVP_OUT_HOR_SIZE);
+    if (cfg->output == DVP_OUT_RAW_PASSTHROUGH)
+        dvp_writel(DVP_OUT_HOR_NUM_RAW(cfg->width), DVP_OUT_HOR_SIZE);
+    else
+        dvp_writel(DVP_OUT_HOR_NUM(cfg->width), DVP_OUT_HOR_SIZE);
     dvp_writel(DVP_OUT_VER_NUM(height), DVP_OUT_VER_SIZE);
 
     dvp_writel(stride0, DVP_OUT_LINE_STRIDE0);

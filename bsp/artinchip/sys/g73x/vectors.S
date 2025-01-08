@@ -173,8 +173,11 @@ trap:
     csrr    t0, mcause
     blt     t0, x0, .Lirq
     addi    sp, sp, 4
-    //la      t0, g_trap_sp
+#ifndef AIC_BACKTRACE_DEBUG
+    la      t0, g_trap_sp
+#else
     mv       t0, sp
+#endif
     addi    t0, t0, -132
 
     sw      x1,    0(t0)
@@ -221,17 +224,13 @@ trap:
     la      a5, trap_c
     jalr    a5
 
-#ifdef KERNEL_RTTHREAD
+#if defined(_ENABLE_BACK_TRACE_STACK_) && defined(KERNEL_RTTHREAD)
     mv      a0, sp
     addi    a0, a0, 132
     csrr    a1, mscratch
     csrr    a2, mepc
     la      a5, print_stack
     jalr    a5
-#endif
-
-
-#if defined(_ENABLE_BACK_TRACE_STACK_) && defined(KERNEL_RTTHREAD)
 #define CALL_STACK_MAX_DEPTH 32
     la      a0, rt_current_thread
     beqz    a0, .

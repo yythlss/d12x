@@ -21,6 +21,8 @@
 #if (CONFIG_LWIP_LAYER == 1)
 #include <lwip/netif.h>
 #include "ethernetif_wlan.h"
+#else
+#include "rt_realtek_api.h"
 #endif
 #include <osdep_service.h>
 #include <wifi/wifi_util.h>
@@ -50,6 +52,8 @@ void rltk_wlan_set_netif_info(int idx_wlan, void * dev, unsigned char * dev_addr
 #if (CONFIG_LWIP_LAYER == 1)
 	rtw_memcpy(xnetif[idx_wlan].hwaddr, dev_addr, 6);
 	xnetif[idx_wlan].state = dev;
+#else
+	rtw_init_macaddr(dev_addr);
 #endif
 }
 
@@ -65,7 +69,6 @@ void rltk_wlan_set_netif_info(int idx_wlan, void * dev, unsigned char * dev_addr
 int rltk_wlan_send(int idx, struct eth_drv_sg *sg_list, int sg_len, int total_len)
 {
 	int ret = 0;
-#if (CONFIG_LWIP_LAYER == 1)
 	struct eth_drv_sg *last_sg;
 	struct sk_buff *skb = NULL;
 
@@ -138,8 +141,8 @@ exit:
 	save_and_cli();
 	rltk_wlan_tx_dec(idx);
 	restore_flags();
-#endif
-    return ret;
+
+	return ret;
 }
 
 /**
@@ -152,7 +155,6 @@ exit:
  */
 void rltk_wlan_recv(int idx, struct eth_drv_sg *sg_list, int sg_len)
 {
-#if (CONFIG_LWIP_LAYER == 1)
 	struct eth_drv_sg *last_sg;
 	struct sk_buff *skb;
 
@@ -170,7 +172,6 @@ void rltk_wlan_recv(int idx, struct eth_drv_sg *sg_list, int sg_len)
 			skb_pull(skb, sg_list->len);
 		}
 	}
-#endif
 }
 
 int netif_is_valid_IP(int idx, unsigned char *ip_dest)
@@ -214,8 +215,10 @@ int netif_is_valid_IP(int idx, unsigned char *ip_dest)
 		return 1;
 
 	pr_debug("invalid IP: %d.%d.%d.%d ",ip_dest[0],ip_dest[1],ip_dest[2],ip_dest[3]);
-#endif
 	return 0;
+#else
+	return 1;
+#endif
 }
 
 int netif_get_idx(struct netif* pnetif)
@@ -249,13 +252,15 @@ void netif_rx(int idx, unsigned int len)
 {
 #if (CONFIG_LWIP_LAYER == 1)
 	ethernetif_recv(&xnetif[idx], len);
+#else
+	wlan_recv(idx, len);
 #endif
 }
 
 void netif_post_sleep_processing(void)
 {
 #if (CONFIG_LWIP_LAYER == 1)
-    /* for rtl lib 2.0, is not needed */
+	/* for rtl lib 2.0, is not needed */
 //	lwip_POST_SLEEP_PROCESSING();	//For FreeRTOS tickless to enable Lwip ARP timer when leaving IPS - Alex Fang
 #endif
 }
@@ -263,7 +268,7 @@ void netif_post_sleep_processing(void)
 void netif_pre_sleep_processing(void)
 {
 #if (CONFIG_LWIP_LAYER == 1)
-    /* for rtl lib 2.0, is not needed */
+	/* for rtl lib 2.0, is not needed */
 //	lwip_PRE_SLEEP_PROCESSING();
 #endif
 }

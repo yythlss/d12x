@@ -364,7 +364,7 @@ void sys_bt_decode_task(void*parg)
             goto _exit_bt_decode_task;
         }
         sys_bt_decode_cmd(parg);
-        //esKRNL_TimeDly(2);
+        //rtos_msleep(2);
 
     }
     _exit_bt_decode_task:
@@ -382,7 +382,7 @@ void sys_bt_receive_task(void*parg)
             goto _exit_bt_decode_task;
         }
         sys_bt_receive_cmd(parg);
-        //esKRNL_TimeDly(2);
+        //rtos_msleep(2);
 
     }
     _exit_bt_decode_task:

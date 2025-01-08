@@ -110,8 +110,9 @@ def gen_fatfs(tooldir, srcdir, outimg, volab, imgsiz, sector_siz, cluster):
 
         run_cmd(mformat)
 
-        mcopy = '{}mcopy -i {} -s {}// ::/'.format(tooldir, outimg, srcdir)
-        run_cmd(mcopy)
+        if os.path.exists(srcdir) is True:
+            mcopy = '{}mcopy -i {} -s {}// ::/'.format(tooldir, outimg, srcdir)
+            run_cmd(mcopy)
 
         # gen sparse format
         img2simg = '{}img2simg {} {}.sparse 1024'.format(tooldir, outimg, outimg)
@@ -129,8 +130,9 @@ def gen_fatfs(tooldir, srcdir, outimg, volab, imgsiz, sector_siz, cluster):
         mformat = '{}mformat.exe -M {} -T {} -c {} -i {}'.format(tooldir, sector_siz, sector_cnt, cluster, outimg)
         run_cmd(mformat)
 
-        mcopy = '{}mcopy.exe -i {} -s {}\\\\ ::/'.format(tooldir, outimg, srcdir)
-        run_cmd(mcopy)
+        if os.path.exists(srcdir) is True:
+            mcopy = '{}mcopy.exe -i {} -s {}\\\\ ::/'.format(tooldir, outimg, srcdir)
+            run_cmd(mcopy)
 
         # gen sparse format
         img2simg = '{}img2simg.exe {} {}.sparse 1024'.format(tooldir, outimg, outimg)
@@ -154,36 +156,20 @@ def round_pow2(x):
     return value
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-a", "--auto", action='store_true',
-                        help="auto size of FAT image")
-    parser.add_argument("-f", "--fullpart", action='store_true',
-                        help="image size is partition size")
-    parser.add_argument("-i", "--inputdir", type=str,
-                        help="input directory")
-    parser.add_argument("-o", "--outfile", type=str,
-                        help="output file")
-    parser.add_argument("-g", "--imgsize", type=str,
-                        help="image size")
-    parser.add_argument("-s", "--sector", type=str,
-                        help="sector size")
-    parser.add_argument("-c", "--cluster", type=str,
-                        help="cluster size")
-    parser.add_argument("-t", "--tooldir", type=str,
-                        help="tool directory")
-    parser.add_argument("-v", "--volab", type=str,
-                        help="volume label")
-    parser.add_argument("-r", "--raw", action='store_true',
-                        help="Don't strip FAT image, keep raw image")
-    args = parser.parse_args()
-
+def main(args):
     cluster = int(args.cluster)
     # cluster should be pow of 2
     cluster = round_pow2(cluster)
     sector_siz = int(args.sector)
     calc_mini = True
     strip_siz = True
+    inputdir = args.inputdir
+    # First priority is pack folder in the same directory with output file
+    inputdir_1st = os.path.join(os.path.dirname(args.outfile), inputdir)
+    if os.path.exists(inputdir_1st):
+        inputdir = inputdir_1st
+    if os.path.exists(inputdir) is False:
+        print('Error: inputdir {} is not exist.'.format(inputdir))
     if args.auto:
         # No need to strip size in auto mode
         strip_siz = False
@@ -192,7 +178,7 @@ if __name__ == "__main__":
         strip_siz = False
     if calc_mini:
         cluster_siz = cluster * sector_siz
-        data_siz = mkimage_get_resource_size(args.inputdir, cluster_siz)
+        data_siz = mkimage_get_resource_size(inputdir, cluster_siz)
         # Size should alignment with cluster size
         data_siz = cluster_siz * int(((data_siz + cluster_siz - 1) / cluster_siz))
 
@@ -246,7 +232,17 @@ if __name__ == "__main__":
             # Round to cluster alignment
             imgsiz = cluster_siz * int(((imgsiz + cluster_siz - 1) / cluster_siz))
     elif args.fullpart:
-        imgsiz = part_size
+        if check_is_nftl_part(args.outfile):
+            # Space reserved for bad block management in NFTL
+            NFTL_RESERVED = 51 * 64 * 2048
+            imgsiz = part_size - NFTL_RESERVED
+            if imgsiz < 0:
+                print('Error, partition size: {} is less than NFTL reserved: {}.'.format(part_size, NFTL_RESERVED))
+                sys.exit(1)
+        else:
+            imgsiz = part_size
+        # Round to cluster alignment
+        imgsiz = cluster_siz * int(((imgsiz + cluster_siz - 1) / cluster_siz))
     else:
         imgsiz = int(args.imgsize)
 
@@ -256,7 +252,7 @@ if __name__ == "__main__":
         print('Error, fatfs image size is larger than partition size: {}.'.format(args.outfile))
         sys.exit(1)
 
-    gen_fatfs(args.tooldir, args.inputdir, args.outfile, args.volab, imgsiz, sector_siz, cluster)
+    gen_fatfs(args.tooldir, inputdir, args.outfile, args.volab, imgsiz, sector_siz, cluster)
     if strip_siz:
         clus_cnt = imgsiz / cluster_siz
         if clus_cnt < 65536:
@@ -278,3 +274,29 @@ if __name__ == "__main__":
         elif platform.system() == 'Windows':
             truncate = '{}truncate.exe -s {} {}'.format(args.tooldir, minimal_siz, args.outfile)
             run_cmd(truncate)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-a", "--auto", action='store_true',
+                        help="auto size of FAT image")
+    parser.add_argument("-f", "--fullpart", action='store_true',
+                        help="image size is partition size")
+    parser.add_argument("-i", "--inputdir", type=str,
+                        help="input directory")
+    parser.add_argument("-o", "--outfile", type=str,
+                        help="output file")
+    parser.add_argument("-g", "--imgsize", type=str,
+                        help="image size")
+    parser.add_argument("-s", "--sector", type=str,
+                        help="sector size")
+    parser.add_argument("-c", "--cluster", type=str,
+                        help="cluster size")
+    parser.add_argument("-t", "--tooldir", type=str,
+                        help="tool directory")
+    parser.add_argument("-v", "--volab", type=str,
+                        help="volume label")
+    parser.add_argument("-r", "--raw", action='store_true',
+                        help="Don't strip FAT image, keep raw image")
+    args = parser.parse_args()
+    main(args)

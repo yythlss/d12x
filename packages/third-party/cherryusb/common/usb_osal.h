@@ -44,4 +44,8 @@ void usb_osal_leave_critical_section(size_t flag);
 
 void usb_osal_msleep(uint32_t delay);
 
+void *usb_osal_malloc_align(uint32_t mem_type, size_t size, size_t align);
+void usb_osal_free_align(uint32_t mem_type, void *mem);
+
+
 #endif /* USB_OSAL_H */

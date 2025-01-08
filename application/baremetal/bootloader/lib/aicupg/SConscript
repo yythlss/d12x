@@ -9,11 +9,10 @@ src     = Glob('basic_cmd.c')
 src     += Glob('fwc_cmd.c')
 src     += Glob('ram_fwc.c')
 src     += Glob('upg_main.c')
-src     += Glob('trans_rw_data.c')
+src     += Glob('data_trans_layer.c')
 if GetDepend('AICUPG_UART_ENABLE'):
     src     += Glob('upg_uart.c')
-if GetDepend('AICUPG_USB_ENABLE'):
-    src     += Glob('upg_device.c')
+    src     += Glob('trans_rw_data.c')
 if GetDepend('AICUPG_MMC_ARTINCHIP'):
     src     += Glob('mmc_fwc.c')
 if GetDepend('AICUPG_NAND_ARTINCHIP'):

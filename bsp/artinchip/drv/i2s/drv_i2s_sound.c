@@ -74,7 +74,6 @@ rt_err_t drv_i2s_sound_init(struct rt_audio_device *audio)
     pi2s->rx_info.buf_info.buf_len = RX_FIFO_SIZE;
     pi2s->rx_info.buf_info.period_len = RX_FIFO_SIZE / RX_FIFO_PERIOD_COUNT;
 
-    hal_i2s_attach_callback(pi2s, drv_i2s_sound_callback, NULL);
 
     codec_init(p_snd_dev->codec);
 
@@ -106,11 +105,15 @@ rt_err_t drv_i2s_sound_start(struct rt_audio_device *audio, int stream)
     pi2s = &p_snd_dev->i2s;
     pformat = &p_snd_dev->format;
 
+    if (!audio->replay->transfer_mode)
+        hal_i2s_attach_callback(pi2s, drv_i2s_sound_callback, NULL);
+
     if (stream == AUDIO_STREAM_REPLAY)
     {
         rt_audio_tx_complete(audio);
-
-        hal_i2s_playback_start(pi2s, pformat);
+        if (!audio->replay->transfer_mode) {
+            hal_i2s_playback_start(pi2s, pformat);
+        }
         codec_start(p_snd_dev->codec, I2S_STREAM_PLAYBACK);
         /* for debug */
         // codec_dump_reg(p_snd_dev->codec);
@@ -190,6 +193,10 @@ rt_err_t drv_i2s_sound_configure(struct rt_audio_device *audio,
             volume = caps->udata.value;
             codec_set_volume(codec, volume);
             p_snd_dev->volume = volume;
+            break;
+
+        case AUDIO_MIXER_EXTEND:
+            audio->replay->transfer_mode = caps->udata.value;
             break;
 
         default:
@@ -367,6 +374,10 @@ static rt_err_t drv_i2s_sound_getcaps(struct rt_audio_device *audio,
             caps->udata.value = p_snd_dev->volume;
             break;
 
+        case AUDIO_MIXER_EXTEND:
+            caps->udata.value = audio->replay->transfer_mode;
+            break;
+
         default:
             ret = -RT_ERROR;
             break;
@@ -461,6 +472,18 @@ rt_err_t drv_i2s_sound_pause(struct rt_audio_device *audio, int enable)
     return RT_EOK;
 }
 
+static void drv_i2s_sound_direct_transfer(struct rt_audio_device *audio)
+{
+    struct aic_i2s_sound *p_snd_dev;
+    aic_i2s_ctrl *pi2s;
+    i2s_format_t *pformat;
+
+    p_snd_dev = (struct aic_i2s_sound *)audio;
+    pi2s = &p_snd_dev->i2s;
+    pformat = &p_snd_dev->format;
+
+    hal_i2s_playback_start_single(pi2s, pformat);
+}
 
 struct rt_audio_ops aic_i2s_ops =
 {
@@ -473,6 +496,7 @@ struct rt_audio_ops aic_i2s_ops =
     .buffer_info = drv_i2s_sound_buffer_info,
     .get_avail   = drv_i2s_sound_get_playback_avail,
     .pause       = drv_i2s_sound_pause,
+    .direct_transfer = drv_i2s_sound_direct_transfer,
 };
 
 int rt_hw_i2s_sound_init(void)

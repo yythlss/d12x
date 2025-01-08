@@ -9,8 +9,6 @@
 #include <aic_core.h>
 #include <aic_hal.h>
 #include "board.h"
-#include <libfdt.h>
-#include <of.h>
 #include <aic_utils.h>
 
 struct aic_pinmux aic_pinmux_config[] = {
@@ -28,6 +26,24 @@ struct aic_pinmux aic_pinmux_config[] = {
     /* can0 */
     {4, PIN_PULL_DIS, 3, "PA.4"},
     {4, PIN_PULL_DIS, 3, "PA.5"},
+#endif
+#ifdef AIC_USING_GPAI0
+    {2, PIN_PULL_DIS, 3, "PA.0"},
+#endif
+#ifdef AIC_USING_GPAI1
+    {2, PIN_PULL_DIS, 3, "PA.1"},
+#endif
+#ifdef AIC_USING_GPAI2
+    {2, PIN_PULL_DIS, 3, "PA.2"},
+#endif
+#ifdef AIC_USING_GPAI3
+    {2, PIN_PULL_DIS, 3, "PA.3"},
+#endif
+#ifdef AIC_USING_GPAI4
+    {2, PIN_PULL_DIS, 3, "PA.4"},
+#endif
+#ifdef AIC_USING_GPAI5
+    {2, PIN_PULL_DIS, 3, "PA.5"},
 #endif
 #ifdef AIC_USING_RTP
     {2, PIN_PULL_DIS, 3, "PA.8"},
@@ -264,6 +280,15 @@ struct aic_pinmux aic_pinmux_config[] = {
     {2, PIN_PULL_DIS, 3, "PD.27"},
 #endif
 #ifdef AIC_PANEL_DBI_ILI9341
+    /* spi 4 line */
+    {2, PIN_PULL_DIS, 3, "PD.20"},
+    {2, PIN_PULL_DIS, 3, "PD.21"},
+    {2, PIN_PULL_DIS, 3, "PD.24"},
+    {2, PIN_PULL_DIS, 3, "PD.26"},
+    {2, PIN_PULL_DIS, 3, "PD.27"},
+    {1, PIN_PULL_DIS, 3, "PD.23"},
+#endif
+#ifdef AIC_PANEL_DBI_ILI9327
     /* spi 4 line */
     {2, PIN_PULL_DIS, 3, "PD.20"},
     {2, PIN_PULL_DIS, 3, "PD.21"},

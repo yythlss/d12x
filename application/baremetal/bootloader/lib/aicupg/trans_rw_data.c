@@ -6,14 +6,14 @@
  * Wu Dehuang <dehuang.wu@artinchip.com>
  */
 
+#include <stdint.h>
 #include <string.h>
-#include <usbdescriptors.h>
-#include <usbdevice.h>
-#include <usb_drv.h>
 #include <aic_core.h>
 #include <aicupg.h>
-#include <trans_rw_data.h>
+#include <data_trans_layer.h>
+#include <aic_utils.h>
 
+//#define AICUPG_DEBUG
 #ifdef AICUPG_DEBUG
 #undef pr_err
 #undef pr_warn
@@ -70,7 +70,7 @@ s32 trans_layer_rw_proc(struct phy_data_rw *rw, u8 *buffer, u32 len)
         }
     }
 
-    // hexdump("CBW ", buffer, len);
+    // hexdump_msg("CBW ", buffer, len, 1);
     /* To avoid alignment issue */
     memcpy(&cbw, buffer, sizeof(struct aic_cbw));
     if (cbw.dCBWSignature != AIC_USB_SIGN_USBC) {
@@ -80,7 +80,7 @@ s32 trans_layer_rw_proc(struct phy_data_rw *rw, u8 *buffer, u32 len)
     }
 
     status = AIC_CSW_STATUS_PASSED;
-    pr_debug("\nCBW tag 0x%X\n", cbw.dCBWTag);
+    pr_debug("\nCBW tag 0x%X\n", (u32)cbw.dCBWTag);
     switch (cbw.bCommand) {
         case TRANS_LAYER_CMD_WRITE:
             data_len = cbw.dCBWDataTransferLength;

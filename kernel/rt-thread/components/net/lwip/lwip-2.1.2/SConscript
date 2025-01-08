@@ -10,6 +10,7 @@ src/core/def.c
 src/core/dns.c
 src/core/inet_chksum.c
 src/core/ip.c
+src/core/mem.c
 src/core/memp.c
 src/core/netif.c
 src/core/pbuf.c
@@ -254,6 +255,7 @@ if GetDepend(['RT_USING_LWIP_IPV6']):
 if GetDepend(['RT_LWIP_USING_PING']):
     src += lwipping_SRCS
 
-group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP', 'RT_USING_LWIP212'], CPPPATH = path)
+mycflags = ' -w'
+group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP', 'RT_USING_LWIP212'], CPPPATH = path, CFLAGS = mycflags)
 
 Return('group')

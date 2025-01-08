@@ -5,7 +5,14 @@
  *
  * Authors: zrq <ruiqi.zheng@artinchip.com>
  */
-
+#define DBG_ENABLE
+#define DBG_SECTION_NAME "ota"
+#ifdef OTA_DOWNLOADER_DEBUG
+#define DBG_LEVEL DBG_LOG
+#else
+#define DBG_LEVEL DBG_INFO
+#endif
+#define DBG_COLOR
 #include <rtconfig.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -21,15 +28,6 @@
 #include <absystem_os.h>
 #include <burn.h>
 #include <ctype.h>
-
-#define DBG_ENABLE
-#define DBG_SECTION_NAME "ota"
-#ifdef OTA_DOWNLOADER_DEBUG
-#define DBG_LEVEL DBG_LOG
-#else
-#define DBG_LEVEL DBG_INFO
-#endif
-#define DBG_COLOR
 #include <rtdbg.h>
 
 #define ALIGN_xB_UP(x, y) (((x) + (y - 1)) & ~(y - 1))
@@ -69,9 +67,9 @@ struct filehdr {
 };
 
 struct bufhdr {
-    int buflen; //effective data size
+    int valid_size; //valid data size
     int head;   //start address of valid data
-    int size;   //cache size
+    int size;   //buffer size
     char *buf;
 };
 
@@ -127,19 +125,20 @@ static void ota_buf_init(struct bufhdr *hdr, char *buf, int size)
 {
     hdr->buf = buf;
     hdr->size = size;
-    hdr->buflen = 0;
+    hdr->valid_size = 0;
     hdr->head = 0;
 }
 
 static int ota_buf_push(struct bufhdr *hdr, char *data, int len)
 {
-    if ((hdr->buflen + len) > hdr->size) {
-        LOG_E("Queue overflow,please increase buffer size\n");
+    if ((hdr->valid_size + len) > hdr->size) {
+        LOG_E("Queue overflow,please increase buffer size.data len:%d buffer total size:%d",
+            len, hdr->size);
         return -RT_ERROR;
     }
 
-    rt_memcpy(hdr->buf + hdr->buflen, data, len);
-    hdr->buflen += len;
+    rt_memcpy(hdr->buf + hdr->valid_size, data, len);
+    hdr->valid_size += len;
 
 #ifdef OTA_DOWNLOADER_DEBUG
     int i;
@@ -148,7 +147,7 @@ static int ota_buf_push(struct bufhdr *hdr, char *data, int len)
         printf("0x%x ", data[i]);
     printf("\n");
 
-    printf("%s hdr->buflen = %d\n", __func__, hdr->buflen);
+    printf("%s hdr->valid_size = %d\n", __func__, hdr->valid_size);
 #endif
 
     return RT_EOK;
@@ -194,7 +193,7 @@ static int parse_cpio_file_info(struct bufhdr *bhdr, struct filehdr *fhdr, struc
     }
 
     /*when the buffer len is insufficient, process after receive data next time*/
-    if (bhdr->buflen < OTA_CPIO_INFO_LEN)
+    if (bhdr->valid_size < OTA_CPIO_INFO_LEN)
         return 0;
 
     char *ptr = bhdr->buf;
@@ -275,15 +274,15 @@ static int parse_cpio_file_info(struct bufhdr *bhdr, struct filehdr *fhdr, struc
 #endif
 
     rt_memcpy(bhdr->buf, bhdr->buf + OTA_CPIO_INFO_LEN,
-                  bhdr->buflen - OTA_CPIO_INFO_LEN);
-    bhdr->buflen -= OTA_CPIO_INFO_LEN;
+                  bhdr->valid_size - OTA_CPIO_INFO_LEN);
+    bhdr->valid_size -= OTA_CPIO_INFO_LEN;
     /*transfer bhdr all data to shdr*/
-    ret = ota_buf_push(&shdr, bhdr->buf + bhdr->head, bhdr->buflen);
+    ret = ota_buf_push(&shdr, bhdr->buf + bhdr->head, bhdr->valid_size);
     if (ret < 0) {
         return ret;
     } else {
         /*bhdr all data has been passed to shdr*/
-        bhdr->buflen = 0;
+        bhdr->valid_size = 0;
         bhdr->head = 0;
     }
 
@@ -411,7 +410,7 @@ static int download_buf_pop(struct bufhdr *bhdr, struct filehdr *fhdr)
 
 download_buf_pop_last:
     /*Last upgrade data*/
-    if (fhdr->size - fhdr->begin_offset < bhdr->buflen) {
+    if (fhdr->size - fhdr->begin_offset < bhdr->valid_size) {
         /*upgrade in two stags*/
         if (fhdr->size - fhdr->begin_offset > OTA_BURN_LEN) {
             burn_len = OTA_BURN_LEN;
@@ -429,7 +428,7 @@ download_buf_pop_last:
         }
     } else {
         /*when the buffer len is insufficient, process after receive data next time*/
-        if (bhdr->buflen < OTA_BURN_LEN)
+        if (bhdr->valid_size < OTA_BURN_LEN)
             return 0;
         else
             burn_len = OTA_BURN_LEN;
@@ -448,31 +447,31 @@ download_buf_pop_last:
 
     if (burn_len == OTA_BURN_LEN) {
         rt_memcpy(bhdr->buf, bhdr->buf + OTA_BURN_LEN,
-                  bhdr->buflen - OTA_BURN_LEN);
-        bhdr->buflen -= OTA_BURN_LEN;
+                  bhdr->valid_size - OTA_BURN_LEN);
+        bhdr->valid_size -= OTA_BURN_LEN;
         if (fhdr->size - fhdr->begin_offset <= 0) {
             bhdr->head += fhdr->size_align;
-            bhdr->buflen -= fhdr->size_align;
+            bhdr->valid_size -= fhdr->size_align;
             /*transfer bhdr all data to shdr*/
-            ret = ota_buf_push(&shdr, bhdr->buf + bhdr->head, bhdr->buflen);
+            ret = ota_buf_push(&shdr, bhdr->buf + bhdr->head, bhdr->valid_size);
             if (ret < 0) {
                 return ret;
             } else {
                 /*bhdr all data has been passed to shdr*/
-                bhdr->buflen = 0;
+                bhdr->valid_size = 0;
                 bhdr->head = 0;
             }
         }
     } else {
         bhdr->head += (burn_len + fhdr->size_align);
-        bhdr->buflen -= (burn_len + fhdr->size_align);
+        bhdr->valid_size -= (burn_len + fhdr->size_align);
         /*transfer bhdr all data to shdr*/
-        ret = ota_buf_push(&shdr, bhdr->buf + bhdr->head, bhdr->buflen);
+        ret = ota_buf_push(&shdr, bhdr->buf + bhdr->head, bhdr->valid_size);
         if (ret < 0) {
             return ret;
         } else {
             /*bhdr all data has been passed to shdr*/
-            bhdr->buflen = 0;
+            bhdr->valid_size = 0;
             bhdr->head = 0;
         }
     }
@@ -621,21 +620,21 @@ static int head_buf_pop(struct bufhdr *bhdr, struct bufhdr *shdr,
 
     /*Remove cpio header info*/
     shdr->head += len;
-    shdr->buflen -= len;
+    shdr->valid_size -= len;
 
-    if (shdr->buflen > 0) {
+    if (shdr->valid_size > 0) {
 #ifdef OTA_DOWNLOADER_DEBUG
         int i;
-        printf("%s shdr->buflen = %d, len = %d\n", __func__, shdr->buflen, len);
+        printf("%s shdr->valid_size = %d, len = %d\n", __func__, shdr->valid_size, len);
         printf("%s:\n", __func__);
         for (i = 0; i < 20; i++)
             printf("0x%x ", (shdr->buf + shdr->head)[i]);
 #endif
-        ret = ota_buf_push(bhdr, shdr->buf + shdr->head, shdr->buflen);
+        ret = ota_buf_push(bhdr, shdr->buf + shdr->head, shdr->valid_size);
         if (ret)
             return ret;
 
-        shdr->buflen = 0;
+        shdr->valid_size = 0;
         shdr->head = 0;
     } else {
         shdr->head = 0;
@@ -705,15 +704,15 @@ int ota_shard_download_fun(char *buffer, int length)
 
     ota_shard_download_handle_last:
 
-        if (shdr.buflen < len) {
-            LOG_I("Incomplete header info! shdr.buflen = %d", shdr.buflen);
+        if (shdr.valid_size < len) {
+            LOG_I("Incomplete header info! shdr.valid_size = %d", shdr.valid_size);
             goto __download_exit;
         }
 
         /*
          * Find complete header info, if not, direct return
          */
-        ret = find_cpio_data(&fhdr, shdr.buf, shdr.buflen);
+        ret = find_cpio_data(&fhdr, shdr.buf, shdr.valid_size);
         if (ret < 0) {
             LOG_E("Not find file info\n");
             goto __download_exit;
@@ -740,7 +739,7 @@ int ota_shard_download_fun(char *buffer, int length)
             } else if (ret == 0) {
 #ifdef OTA_DOWNLOADER_DEBUG
                 printf("data is not enough to parse, continue to store data!\n");
-                printf("bhdr.buflen:%d bhdr.size:%d bhdr.head:%d\n", bhdr.buflen, bhdr.size, bhdr.head);
+                printf("bhdr.valid_size:%d bhdr.size:%d bhdr.head:%d\n", bhdr.valid_size, bhdr.size, bhdr.head);
 #endif
             } else {
                 LOG_I("Parsing cpio file info once is sufficient and successful!");
@@ -787,7 +786,7 @@ int ota_shard_download_fun(char *buffer, int length)
             } else if (ret == 0) {
 #ifdef OTA_DOWNLOADER_DEBUG
                 printf("data is not enough to parse, continue to store data!\n");
-                printf("bhdr.buflen:%d bhdr.size:%d bhdr.head:%d\n", bhdr.buflen, bhdr.size, bhdr.head);
+                printf("bhdr.valid_size:%d bhdr.size:%d bhdr.head:%d\n", bhdr.valid_size, bhdr.size, bhdr.head);
 #endif
             } else {
                 LOG_I("Parsing cpio file info is successful!");

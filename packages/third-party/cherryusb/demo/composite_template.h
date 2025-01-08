@@ -16,5 +16,6 @@ void usbd_comp_func_register(const uint8_t *desc,
                                 void *data);
 extern void usbd_comp_func_release(const uint8_t *desc, void *data);
 extern bool usbd_compsite_is_inited(void);
-
+extern uint8_t usbd_compsite_set_dev_num(uint8_t num);
+extern uint8_t usbd_compsite_get_dev_num(void);
 #endif

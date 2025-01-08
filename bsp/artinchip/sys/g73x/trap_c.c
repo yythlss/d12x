@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <rtconfig.h>
 
-#ifdef KERNEL_RTTHREAD
+#if defined(KERNEL_RTTHREAD) && defined(AIC_BACKTRACE_DEBUG)
 #include <rtthread.h>
 #endif
 
@@ -38,21 +38,21 @@ void trap_c(uint32_t *regs)
     }
 
     printf("\n");
-    printf("mcause : %08lx\n", __get_MCAUSE());
-    printf("mtval  : %08lx\n", __get_MTVAL());
-    printf("mepc   : %08lx\n", regs[31]);
-    printf("mstatus: %08lx\n", regs[32]);
+    printf("mcause : 0x%08lx\n", __get_MCAUSE());
+    printf("mtval  : 0x%08lx\n", __get_MTVAL());
+    printf("mepc   : 0x%08lx\n", regs[31]);
+    printf("mstatus: 0x%08lx\n", regs[32]);
     printf("\n");
 
     if (trap_c_callback) {
         trap_c_callback();
     }
-
-    //while (1);
+#ifndef AIC_BACKTRACE_DEBUG
+    while (1) {};
+#endif
 }
 
-
-#ifdef KERNEL_RTTHREAD
+#if defined(KERNEL_RTTHREAD) && defined(AIC_BACKTRACE_DEBUG)
 
 #define CMB_CALL_STACK_MAX_DEPTH 32
 extern size_t __stext;
@@ -122,7 +122,7 @@ void backtrace_call_stack(rt_ubase_t *stack_point,rt_ubase_t*stack_point1,rt_uba
 
     printf("[%s:%d]__stext:%p __etext:%p\r\n",__FUNCTION__,__LINE__, &__stext, &__etext);
 
-    printf("%08lx\n", epc);
+    printf("0x%08lx\n", epc);
 
     if (sp >= base_irqstack && sp <= top_irqstack) {
         for (; sp < top_irqstack; sp += sizeof(rt_ubase_t)) {
@@ -139,9 +139,9 @@ void backtrace_call_stack(rt_ubase_t *stack_point,rt_ubase_t*stack_point1,rt_uba
     for (; sp < stack_addr + stack_size; sp += sizeof(rt_ubase_t)) {
         pc  = *((rt_ubase_t *)sp);
         if((pc >= code_start_addr) && (pc <= code_end_addr) && (depth < CMB_CALL_STACK_MAX_DEPTH)) {
-            printf("%08lx\n", pc);
+            printf("0x%08lx\n", pc);
              depth++;
         }
     }
 }
-#endif
+#endif  // defined(KERNEL_RTTHREAD) && defined(AIC_BACKTRACE_DEBUG)

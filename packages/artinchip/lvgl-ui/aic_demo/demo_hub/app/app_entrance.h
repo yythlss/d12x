@@ -23,6 +23,7 @@ enum {
     APP_STRESS,
     APP_WIDGETS,
     APP_PHOTO_FRAME,
+    APP_INPUT_TEST,
     APP_NONE,
 };
 typedef int app_index_t;

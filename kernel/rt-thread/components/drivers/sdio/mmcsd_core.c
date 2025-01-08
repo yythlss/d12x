@@ -736,7 +736,10 @@ void mmcsd_detect(void *param)
                     if (init_sd(host, ocr))
                         mmcsd_power_off(host);
                     mmcsd_host_unlock(host);
-#ifndef AIC_SD_USING_HOTPLUG
+#ifdef AIC_SDMC_DRV
+                    if (host->sd_hotplug == 0)
+                        rt_mb_send(&mmcsd_hotpluge_mb, (rt_ubase_t)host);
+#else
                     rt_mb_send(&mmcsd_hotpluge_mb, (rt_ubase_t)host);
 #endif
                     continue;
@@ -751,7 +754,12 @@ void mmcsd_detect(void *param)
                     if (init_mmc(host, ocr))
                         mmcsd_power_off(host);
                     mmcsd_host_unlock(host);
+#ifdef AIC_SDMC_DRV
+                    if (host->sd_hotplug == 0)
+                        rt_mb_send(&mmcsd_hotpluge_mb, (rt_ubase_t)host);
+#else
                     rt_mb_send(&mmcsd_hotpluge_mb, (rt_ubase_t)host);
+#endif
                     continue;
                 }
                 mmcsd_host_unlock(host);
@@ -772,10 +780,13 @@ void mmcsd_detect(void *param)
                     host->card = RT_NULL;
                 }
                 mmcsd_host_unlock(host);
-#ifndef AIC_SD_USING_HOTPLUG
-                rt_mb_send(&mmcsd_hotpluge_mb, (rt_ubase_t)host);
+#ifdef AIC_SDMC_DRV
+                if (host->sd_hotplug == 0)
+                    rt_mb_send(&mmcsd_hotpluge_mb, (rt_ubase_t)host);
+                else
+                    mmcsd_power_off(host);
 #else
-                mmcsd_power_off(host);
+                rt_mb_send(&mmcsd_hotpluge_mb, (rt_ubase_t)host);
 #endif
             }
         }

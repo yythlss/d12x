@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -80,6 +80,11 @@ static void qep_reg_enable(int addr, int bit, int enable)
         tmp &= ~bit;
 
     writel(tmp, (ulong)addr);
+}
+
+u32 hal_qep_get_cnt(u32 ch)
+{
+    return readl(QEP_POS_CNT_V(ch));
 }
 
 u32 hal_qep_int_stat(u32 ch)

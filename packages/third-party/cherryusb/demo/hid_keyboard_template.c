@@ -14,7 +14,7 @@
 
 #define HID_INT_EP          0x81
 #define HID_INT_EP_SIZE     8
-#define HID_INT_EP_INTERVAL 10
+#define HID_INT_EP_INTERVAL 2
 
 #define USB_HID_CONFIG_DESC_SIZ       34
 #define HID_KEYBOARD_REPORT_DESC_SIZE 63
@@ -191,7 +191,89 @@ static const uint8_t hid_keyboard_report_desc[HID_KEYBOARD_REPORT_DESC_SIZE] = {
     0xc0        // END_COLLECTION
 };
 
+/* ASCII */
+const uint32_t hid_keyboard_map[128] = {
+    [0] = HID_KBD_USAGE_NONE, [1] = HID_KBD_USAGE_NONE, [2] = HID_KBD_USAGE_NONE, [3] = HID_KBD_USAGE_NONE,
+    [4] = HID_KBD_USAGE_NONE, [5] = HID_KBD_USAGE_NONE, [6] = HID_KBD_USAGE_NONE, [7] = HID_KBD_USAGE_NONE,
+    [8] = HID_KBD_USAGE_NONE, [9] = HID_KBD_USAGE_NONE, [10] = HID_KBD_USAGE_NONE, [11] = HID_KBD_USAGE_NONE,
+    [12] = HID_KBD_USAGE_NONE,
+    [13] = HID_KBD_USAGE_ENTER, // Enter
+    [14] = HID_KBD_USAGE_NONE, [15] = HID_KBD_USAGE_NONE, [16] = HID_KBD_USAGE_NONE, [17] = HID_KBD_USAGE_NONE,
+    [18] = HID_KBD_USAGE_NONE, [19] = HID_KBD_USAGE_NONE, [20] = HID_KBD_USAGE_NONE, [21] = HID_KBD_USAGE_NONE,
+    [22] = HID_KBD_USAGE_NONE, [23] = HID_KBD_USAGE_NONE, [24] = HID_KBD_USAGE_NONE, [25] = HID_KBD_USAGE_NONE,
+    [26] = HID_KBD_USAGE_NONE, [27] = HID_KBD_USAGE_NONE, [28] = HID_KBD_USAGE_NONE, [29] = HID_KBD_USAGE_NONE,
+    [30] = HID_KBD_USAGE_NONE, [31] = HID_KBD_USAGE_NONE, [127] = HID_KBD_USAGE_NONE,
+
+    ['0'] = HID_KBD_USAGE_0, ['1'] = HID_KBD_USAGE_1, ['2'] = HID_KBD_USAGE_1 + 1,
+    ['3'] = HID_KBD_USAGE_1 + 2, ['4'] = HID_KBD_USAGE_1 + 3, ['5'] = HID_KBD_USAGE_1 + 4,
+    ['6'] = HID_KBD_USAGE_1 + 5, ['7'] = HID_KBD_USAGE_1 + 6, ['8'] = HID_KBD_USAGE_1 + 7,
+    ['9'] = HID_KBD_USAGE_1 + 8,
+
+    ['A'] = (HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_A),       ['B'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 1)),
+    ['C'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 2)), ['D'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 3)),
+    ['E'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 4)), ['F'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 5)),
+    ['G'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 6)), ['H'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 7)),
+    ['I'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 8)), ['J'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 9)),
+    ['K'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 10)), ['L'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 11)),
+    ['M'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 12)), ['N'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 13)),
+    ['O'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 14)), ['P'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 15)),
+    ['Q'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 16)), ['R'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 17)),
+    ['S'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 18)), ['T'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 19)),
+    ['U'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 20)), ['V'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 21)),
+    ['W'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 22)), ['X'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 23)),
+    ['Y'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 24)), ['Z'] = (HID_KBD_USAGE_POSTFAIL << 16 | (HID_KBD_USAGE_A + 25)),
+
+    ['a'] = HID_KBD_USAGE_A, ['b'] = HID_KBD_USAGE_A + 1, ['c'] = HID_KBD_USAGE_A + 2,
+    ['d'] = HID_KBD_USAGE_A + 3, ['e'] = HID_KBD_USAGE_A + 4, ['f'] = HID_KBD_USAGE_A + 5,
+    ['g'] = HID_KBD_USAGE_A + 6, ['h'] = HID_KBD_USAGE_A + 7, ['i'] = HID_KBD_USAGE_A + 8,
+    ['j'] = HID_KBD_USAGE_A + 9, ['k'] = HID_KBD_USAGE_A + 10, ['l'] = HID_KBD_USAGE_A + 11,
+    ['m'] = HID_KBD_USAGE_A + 12, ['n'] = HID_KBD_USAGE_A + 13, ['o'] = HID_KBD_USAGE_A + 14,
+    ['p'] = HID_KBD_USAGE_A + 15, ['q'] = HID_KBD_USAGE_A + 16, ['r'] = HID_KBD_USAGE_A + 17,
+    ['s'] = HID_KBD_USAGE_A + 18, ['t'] = HID_KBD_USAGE_A + 19, ['u'] = HID_KBD_USAGE_A + 20,
+    ['v'] = HID_KBD_USAGE_A + 21, ['w'] = HID_KBD_USAGE_A + 22, ['x'] = HID_KBD_USAGE_A + 23,
+    ['y'] = HID_KBD_USAGE_A + 24, ['z'] = HID_KBD_USAGE_A + 25,
+
+    [' '] = HID_KBD_USAGE_SPACE,
+    ['\t'] = HID_KBD_USAGE_TAB,
+    ['!'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_EXCLAM,
+    ['"'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_DQUOUTE,
+    ['#'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_POUND,
+    ['$'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_DOLLAR,
+    ['%'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_PERCENT,
+    ['&'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_AMPERSAND,
+    ['\''] = HID_KBD_USAGE_DQUOUTE,
+    ['('] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_LPAREN,
+    [')'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_RPAREN,
+    ['*'] = HID_KBD_USAGE_KPDMUL,
+    ['+'] = HID_KBD_USAGE_KPDPLUS,
+    [','] = HID_KBD_USAGE_COMMON,
+    ['-'] = HID_KBD_USAGE_HYPHEN,
+    ['.'] = HID_KBD_USAGE_PERIOD,
+    ['/'] = HID_KBD_USAGE_KPDDIV,
+    [':'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_COLON,
+    [';'] = HID_KBD_USAGE_COLON,
+    ['<'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_LT,
+    ['='] = HID_KBD_USAGE_EQUAL,
+    ['>'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_GT,
+    ['?'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_QUESTION,
+    ['@'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_AT,
+    ['['] = HID_KBD_USAGE_LBRACKET,
+    ['\\'] = HID_KBD_USAGE_BSLASH,
+    [']'] = HID_KBD_USAGE_RBRACKET,
+    ['^'] = HID_KBD_USAGE_KPDEXP,
+    ['_'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_UNDERSCORE,
+    ['`'] = HID_KBD_USAGE_NONUSPOUND,
+    ['{'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_LBRACKET,
+    ['|'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_BSLASH,
+    ['}'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_RBRACKET,
+    ['~'] = HID_KBD_USAGE_POSTFAIL << 16 | HID_KBD_USAGE_TILDE,
+};
+
+#ifdef LPKG_CHERRYUSB_DEVICE_COMPOSITE
+void usbd_comp_keyboard_event_handler(uint8_t event)
+#else
 void usbd_event_handler(uint8_t event)
+#endif
 {
     switch (event) {
         case USBD_EVENT_RESET:
@@ -225,12 +307,8 @@ USB_NOCACHE_RAM_SECTION USB_MEM_ALIGNX uint8_t write_buffer[64];
 
 void usbd_hid_int_callback(uint8_t ep, uint32_t nbytes)
 {
-    if (hid_state == HID_STATE_BUSY) {
-        memset(write_buffer, 0, 8);
-        usbd_ep_start_write(HID_INT_EP, write_buffer, 8);
-    }
-
-    hid_state = HID_STATE_IDLE;
+    if (hid_state == HID_STATE_BUSY)
+        hid_state = HID_STATE_IDLE;
 }
 
 static struct usbd_endpoint hid_in_ep = {
@@ -238,28 +316,94 @@ static struct usbd_endpoint hid_in_ep = {
     .ep_addr = HID_INT_EP
 };
 
-struct usbd_interface intf0;
+static struct usbd_interface intf0;
+
+#ifdef LPKG_CHERRYUSB_DEVICE_COMPOSITE
+#include "composite_template.h"
+int usbd_comp_keyboard_init(uint8_t *ep_table, void *data)
+{
+    hid_in_ep.ep_addr = ep_table[0];
+    usbd_add_interface(usbd_hid_init_intf(&intf0, hid_keyboard_report_desc, HID_KEYBOARD_REPORT_DESC_SIZE));
+    usbd_add_endpoint(&hid_in_ep);
+    return 0;
+}
+#endif
 
 void hid_keyboard_init(void)
 {
+
+#ifndef LPKG_CHERRYUSB_DEVICE_COMPOSITE
     usbd_desc_register(hid_descriptor);
     usbd_add_interface(usbd_hid_init_intf(&intf0, hid_keyboard_report_desc, HID_KEYBOARD_REPORT_DESC_SIZE));
     usbd_add_endpoint(&hid_in_ep);
 
     usbd_initialize();
+#else
+    usbd_comp_func_register(hid_descriptor,
+                            usbd_comp_keyboard_event_handler,
+                            usbd_comp_keyboard_init, "keyboard");
+#endif
+
+}
+
+int usbd_keyboard_putchar(const char str)
+{
+    uint8_t index = (uint8_t)str;
+
+    if (index > 128 || index < 0) {
+        return -index;
+    }
+
+    USB_LOG_DBG("[%d]: %c -> %#x\n", index, str, hid_keyboard_map[index]);
+
+    /* keydown */
+    write_buffer[0] = (uint8_t)(hid_keyboard_map[index] >> 16);
+    write_buffer[1] = 0x00;
+    write_buffer[2] = (uint8_t)hid_keyboard_map[index];
+
+    int ret = usbd_ep_start_write(hid_in_ep.ep_addr, write_buffer, 8);
+    if (ret < 0) {
+        USB_LOG_WRN("USB send data failed. %d\n", ret);
+        return ret;
+    }
+
+    hid_state = HID_STATE_BUSY;
+    while (hid_state == HID_STATE_BUSY) {
+    }
+
+    /* keyup */
+    memset(write_buffer, 0, 8);
+    ret = usbd_ep_start_write(hid_in_ep.ep_addr, write_buffer, 8);
+    if (ret < 0) {
+        USB_LOG_WRN("USB send data failed. %d\n", ret);
+        return ret;
+    }
+
+    hid_state = HID_STATE_BUSY;
+    while (hid_state == HID_STATE_BUSY) {
+    }
+
+    return 0;
+}
+
+int usbd_keyboard_putnchar(const char *str, int n)
+{
+    int i, ret;
+
+    for (i = 0; i < n; i++) {
+        ret = usbd_keyboard_putchar(str[i]);
+        if (ret < 0) {
+            USB_LOG_WRN("This character cannot printed! index: %d\n", i);
+        }
+    }
+
+    return n;
 }
 
 void hid_keyboard_test(void)
 {
-    const uint8_t sendbuffer[8] = { 0x00, 0x00, HID_KBD_USAGE_A, 0x00, 0x00, 0x00, 0x00, 0x00 };
-
-    memcpy(write_buffer, sendbuffer, 8);
-    int ret = usbd_ep_start_write(HID_INT_EP, write_buffer, 8);
-    if (ret < 0) {
-        return;
-    }
-    hid_state = HID_STATE_BUSY;
-    while (hid_state == HID_STATE_BUSY) {
+    for (int i = 0; i < 128; i++) {
+        usbd_keyboard_putchar((char)i);
     }
 }
 
@@ -279,9 +423,14 @@ INIT_DEVICE_EXPORT(usbd_hid_keyboard_init);
 
 int test_usbd_hid_keyboard(int argc, char **argv)
 {
-    hid_keyboard_test();
+    if (argc > 1) {
+        usbd_keyboard_putnchar(argv[1], sizeof(argv[1]));
+    } else {
+        hid_keyboard_test();
+    }
+
     return 0;
 }
-MSH_CMD_EXPORT_ALIAS(test_usbd_hid_keyboard, test_usbd_hid_keyboard, test usb device hid mouse);
+MSH_CMD_EXPORT_ALIAS(test_usbd_hid_keyboard, test_usbd_hid_keyboard, test usb device hid keyboard);
 #endif
 #endif

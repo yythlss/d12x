@@ -626,7 +626,9 @@ int ZEXPORT inflate(z_streamp strm, int flush) {
             }
             NEEDBITS(16);
 #ifdef GUNZIP
-            if ((state->wrap & 2) && hold == 0x8b1f) {  /* gzip header */
+            // if ((state->wrap & 2) && hold == 0x8b1f) {  /* gzip header */
+            // gzip tool compressed file, bit: (state->wrap & 2) is not set
+            if (hold == 0x8b1f) {  /* gzip header */
                 if (state->wbits == 0)
                     state->wbits = 15;
                 state->check = crc32(0L, Z_NULL, 0);

@@ -86,6 +86,10 @@ static rt_err_t _adc_control(rt_device_t dev, int cmd, void *args)
     {
         return adc->ops->get_dma_data(adc, (rt_uint32_t)(long)args);
     }
+    else if (cmd == RT_ADC_CMD_STOP_DMA && adc->ops->stop_dma)
+    {
+        return adc->ops->stop_dma(adc, (rt_uint32_t)(long)args);
+    }
     else if (cmd == RT_ADC_CMD_GET_MODE && adc->ops->get_mode)
     {
         return adc->ops->get_mode(adc, args);

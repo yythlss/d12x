@@ -159,6 +159,7 @@ struct aic_i2s_ctrl
     uint32_t irq_num;
     uint32_t clk_id;
     uint32_t idx;
+    uint32_t start_flag;
     struct aic_i2s_transfer_info tx_info;
     struct aic_i2s_transfer_info rx_info;
     i2s_callback callback;
@@ -379,6 +380,7 @@ void hal_i2s_channel_select(struct aic_i2s_ctrl *i2s,
                             i2s_sound_channel_t channel, i2s_stream_t stream);
 int hal_i2s_set_format(aic_i2s_ctrl *i2s, i2s_format_t *fmt);
 void hal_i2s_playback_start(aic_i2s_ctrl *i2s, i2s_format_t *format);
+void hal_i2s_playback_start_single(aic_i2s_ctrl *i2s, i2s_format_t *format);
 void hal_i2s_record_start(aic_i2s_ctrl *i2s, i2s_format_t *format);
 void hal_i2s_playback_stop(aic_i2s_ctrl *i2s);
 void hal_i2s_record_stop(aic_i2s_ctrl *i2s);

@@ -102,7 +102,7 @@ void mmc_fwc_start(struct fwc_info *fwc)
         goto out;
     }
 
-    priv->parts = mmc_create_gpt_part();
+    priv->parts = mmc_create_gpt_part2(mmc_id);
     if (!priv->parts) {
         pr_err("sdmc %d create gpt part failed.\n", mmc_id);
         goto out;
@@ -156,6 +156,7 @@ s32 mmc_fwc_sparse_fill(struct aicupg_mmc_priv *priv, struct aic_partition *part
             pr_err("Write failed, block %llu[%d]\n", (parts->start / MMC_BLOCK_SIZE) + priv->blkstart, remain_blks);
             goto out;
         }
+        priv->blkstart += blks;
         fill_blks += blks;
 
         // 2. Erase by group for faster speed,
@@ -165,6 +166,7 @@ s32 mmc_fwc_sparse_fill(struct aicupg_mmc_priv *priv, struct aic_partition *part
             pr_err("Erase failed, block %llu[%d]\n", (parts->start / MMC_BLOCK_SIZE) + priv->blkstart, erase_group * 0x400);
             goto out;
         }
+        priv->blkstart += blks;
         fill_blks += blks;
 
         // 3. Fill of remaining blocks
@@ -174,6 +176,7 @@ s32 mmc_fwc_sparse_fill(struct aicupg_mmc_priv *priv, struct aic_partition *part
             pr_err("Write failed, block %llu[%d]\n", (parts->start / MMC_BLOCK_SIZE) + priv->blkstart, redund_blks);
             goto out;
         }
+        priv->blkstart += blks;
         fill_blks += blks;
     } else {
         fill_buf_num_blks = SPARSE_FILLBUF_SIZE / MMC_BLOCK_SIZE;
@@ -187,6 +190,7 @@ s32 mmc_fwc_sparse_fill(struct aicupg_mmc_priv *priv, struct aic_partition *part
                 pr_err("Write failed, block %llu[%d]\n", (parts->start / MMC_BLOCK_SIZE) + priv->blkstart, j);
                 goto out;
             }
+            priv->blkstart += blks;
             fill_blks += blks;
             i += j;
         }
@@ -349,7 +353,7 @@ s32 mmc_fwc_sparse_write(struct fwc_info *fwc, u8 *buf, s32 len)
                     goto out;
                 }
 
-                priv->blkstart += blks;
+                priv->cur_chunk_remain_data_sz -= blks * MMC_BLOCK_SIZE;
                 total_blocks += DIV_ROUND_UP(chunk_data_sz, sheader->blk_sz);
 
                 break;

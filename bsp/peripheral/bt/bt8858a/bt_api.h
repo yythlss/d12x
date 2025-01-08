@@ -87,7 +87,7 @@ typedef enum
 typedef enum
 {
 	BT_SPP_STATE_INIT = 0,
-	BT_SPP_STATE_NOTCONNECTE,
+	BT_SPP_STATE_DISCONNECTED,
 	BT_SPP_STATE_CONNECTED,
 	BT_SPP_STATE_MAX,
 }bt_spp_connect_flag_t;
@@ -95,10 +95,18 @@ typedef enum
 typedef enum
 {
 	BT_BLE_STATE_INIT = 0,
-	BT_BLE_STATE_NOTCONNECTE,
+	BT_BLE_STATE_DISCONNECTED,
 	BT_BLE_STATE_CONNECTED,
 	BT_BLE_STATE_MAX,
 }bt_ble_connect_flag_t;
+
+typedef enum
+{
+	BT_HID_STATE_INIT = 0,
+	BT_HID_STATE_DISCONNECTED,
+	BT_HID_STATE_CONNECTED,
+	BT_HID_STATE_MAX,
+}bt_hid_connect_flag_t;
 
 //蓝牙电话状态
 typedef enum
@@ -308,7 +316,7 @@ extern __s32 bt_phone_recall(void);
 extern __s32  bt_is_connected(void);
 
 //重新连接BT
-extern __s32 bt_reconnect_set(void);
+extern __s32 bt_connect_set(void);
 
 //断开连接BT
 extern __s32 bt_disconnect_set(void);
@@ -367,7 +375,7 @@ extern __s32 bt_spp_rx_data(char *CmdStr,unsigned char len);
 
 extern __s32 bt_spp_rfcomm_is_connected(void);
 
-extern __s32 bt_spp_rfcomm_reconnect(void);
+extern __s32 bt_spp_rfcomm_connect(void);
 
 extern __s32 bt_spp_rfcomm_disconnect(void);
 
@@ -385,13 +393,48 @@ extern __s32 bt_spp_rx_data_rfcomm(char *CmdStr,unsigned char len);
 
 //extern __s32 bt_ble_rfcomm_is_connected(void);
 
-//extern __s32 bt_ble_rfcomm_is_reconnect(void);
+//extern __s32 bt_ble_rfcomm_is_connect(void);
 
 //extern __s32 bt_ble_rfcomm_disconnect(void);
 
-extern __s32 bt_ble_tx_data_rfcomm(char *CmdStr,unsigned char len);
+//extern __s32 bt_ble_tx_data_rfcomm(char *CmdStr,unsigned char len);
 
 //extern __s32 bt_ble_rx_data_rfcomm(char *CmdStr,unsigned char len);
+
+/*********************HID COMM******************************/
+
+//"AT#@"打头的指令透传通道
+//发送数据
+extern __s32 bt_hid_tx_data(char *CmdStr,unsigned char len);
+
+//接收bt数据
+extern __s32 bt_hid_rx_data(char *CmdStr,unsigned char len);
+
+//HID是否连接
+extern __s32 bt_hid_is_connected(void);
+
+// 注册HID连接callback
+extern void bt_hid_request_connect_cb(void *cb(int status));
+
+//连接HID
+extern __s32 bt_hid_connect(void);
+
+//断开HID
+extern __s32 bt_hid_disconnect(void);
+
+//设置手机光标指针的坐标位置给蓝牙
+extern __s32 bt_hid_set_cursor_pos(s16 x_pos,s16 y_pos);
+
+//发送触摸滑动点坐标相对变化值(需要减去上一次坐标值)给bt
+//action 0:指针移动；1:鼠标左键按下；2:鼠标左键抬起；3:鼠标中键按下；4:鼠标中键抬起；
+//5:鼠标右键按下；6:鼠标右键抬起；
+extern __s32 bt_hid_set_cursor_xy(u8 action,s16 x_diff,s16 y_diff);
+
+//重置手机光标指针的坐标位置给蓝牙，这个时候的光标位置就是bt_hid_set_cursor_pos函数设置的坐标
+extern __s32 bt_hid_reset_cursor_pos(void);
+
+//测试鼠标滑动点击效果给bt
+extern __s32 bt_hid_mouse_test(void);
 
 /*********************FMRX COMM******************************/
 //搜台

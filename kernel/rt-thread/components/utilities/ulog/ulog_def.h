@@ -113,7 +113,7 @@ extern "C" {
     {                                                                         \
         ulog_output(LOG_LVL_ASSERT, LOG_TAG, RT_TRUE, "(%s) has assert failed at %s:%ld.", #EXPR, __FUNCTION__, __LINE__); \
         ulog_flush();                                                         \
-        while (1);                                                            \
+        return 0;                                                             \
     }
 #else
     #define ULOG_ASSERT(EXPR)

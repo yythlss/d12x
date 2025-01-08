@@ -35,20 +35,20 @@ static s32 __mjpeg_encode_init(struct mpp_encoder *ctx, struct encode_config *co
 
 	mjpeg_build_huffman_codes(impl->huff_size_dc_luminance,
 		impl->huff_code_dc_luminance,
-		avpriv_mjpeg_bits_dc_luminance,
-		avpriv_mjpeg_val_dc);
+		bits_dc_luma,
+		val_dc);
 	mjpeg_build_huffman_codes(impl->huff_size_dc_chrominance,
 		impl->huff_code_dc_chrominance,
-		avpriv_mjpeg_bits_dc_chrominance,
-		avpriv_mjpeg_val_dc);
+		bits_dc_chroma,
+		val_dc);
 	mjpeg_build_huffman_codes(impl->huff_size_ac_luminance,
 		impl->huff_code_ac_luminance,
-		avpriv_mjpeg_bits_ac_luminance,
-		avpriv_mjpeg_val_ac_luminance);
+		bits_ac_luminance,
+		val_ac_luminance);
 	mjpeg_build_huffman_codes(impl->huff_size_ac_chrominance,
 		impl->huff_code_ac_chrominance,
-		avpriv_mjpeg_bits_ac_chrominance,
-		avpriv_mjpeg_val_ac_chrominance);
+		bits_ac_chroma,
+		val_ac_chroma);
 
 	return 0;
 }
@@ -105,14 +105,14 @@ static void jpeg_table_header(struct jpeg_ctx* s, struct put_bit_ctx *p)
 	put_bits(p, 4, 0); /* 8 bit precision */
 	put_bits(p, 4, 0); /* table 0 */
 	for (i = 0; i < 64; i++) {
-		j = zigzag_direct[i];
+		j = zigzag_dir[i];
 		put_bits(p, 8, s->luma_quant_table[j]);
 	}
 
 	put_bits(p, 4, 0); /* 8 bit precision */
 	put_bits(p, 4, 1); /* table 1 */
 	for (i = 0; i < 64; i++) {
-		j = zigzag_direct[i];
+		j = zigzag_dir[i];
 		put_bits(p, 8, s->chroma_quant_table[j]);
 	}
 
@@ -123,15 +123,15 @@ static void jpeg_table_header(struct jpeg_ctx* s, struct put_bit_ctx *p)
 	put_bits(p, 16, 0); /* patched later */
 	size = 2;
 
-	size += put_huffman_table(p, 0, 0, avpriv_mjpeg_bits_dc_luminance,
-		avpriv_mjpeg_val_dc);
-	size += put_huffman_table(p, 0, 1, avpriv_mjpeg_bits_dc_chrominance,
-		avpriv_mjpeg_val_dc);
+	size += put_huffman_table(p, 0, 0, bits_dc_luma,
+		val_dc);
+	size += put_huffman_table(p, 0, 1, bits_dc_chroma,
+		val_dc);
 
-	size += put_huffman_table(p, 1, 0, avpriv_mjpeg_bits_ac_luminance,
-		avpriv_mjpeg_val_ac_luminance);
-	size += put_huffman_table(p, 1, 1, avpriv_mjpeg_bits_ac_chrominance,
-		avpriv_mjpeg_val_ac_chrominance);
+	size += put_huffman_table(p, 1, 0, bits_ac_luminance,
+		val_ac_luminance);
+	size += put_huffman_table(p, 1, 1, bits_ac_chroma,
+		val_ac_chroma);
 
 	ptr[0] = (size >> 8) & 0xff;
 	ptr[1] = (size) & 0xff;
@@ -242,13 +242,13 @@ static void set_quality(struct jpeg_ctx* s)
 	}
 
 	for (i=0; i<64; i++) {
-		s->luma_quant_table[i] = (std_luminance_quant_tbl[i] * s->quality + 50) / 100;
+		s->luma_quant_table[i] = (std_luma_quant_table[i] * s->quality + 50) / 100;
 		if (s->luma_quant_table[i] <= 0)
 			s->luma_quant_table[i] = 1;
 		if (s->luma_quant_table[i] > 255)
 			s->luma_quant_table[i] = 255;
 
-		s->chroma_quant_table[i] = (std_chrominance_quant_tbl[i] * s->quality + 50) / 100;
+		s->chroma_quant_table[i] = (std_chroma_quant_table[i] * s->quality + 50) / 100;
 		if (s->chroma_quant_table[i] <= 0)
 			s->chroma_quant_table[i] = 1;
 		if (s->chroma_quant_table[i] > 255)

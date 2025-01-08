@@ -24,6 +24,7 @@ extern lv_obj_t *coffee_ui_init(void);
 extern lv_obj_t *steam_box_ui_init(void);
 extern lv_obj_t *a_86_box_ui_init(void);
 extern lv_obj_t *photo_frame_ui_init(void);
+extern lv_obj_t *input_test_ui_init(void);
 
 static char cur_screen[64];
 
@@ -118,6 +119,12 @@ void app_entrance(app_index_t index, int auto_del)
             scr = photo_frame_ui_init();
             demo_hub_default_theme_set(scr, false);
             strncpy(cur_screen, "photo_frame", sizeof(cur_screen));
+            break;
+        case APP_INPUT_TEST:
+            scr = input_test_ui_init();
+            layer_sys_ui_visible(0);
+            demo_hub_default_theme_set(scr, false);
+            strncpy(cur_screen, "input_test", sizeof(cur_screen));
             break;
         default:
             break;

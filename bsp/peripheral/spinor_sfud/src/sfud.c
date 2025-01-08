@@ -69,12 +69,12 @@ static sfud_err hardware_init(sfud_flash *flash);
 static sfud_err page256_or_1_byte_write(const sfud_flash *flash, uint32_t addr, size_t size, uint16_t write_gran,
         const uint8_t *data);
 static sfud_err aai_write(const sfud_flash *flash, uint32_t addr, size_t size, const uint8_t *data);
-static sfud_err wait_busy(const sfud_flash *flash);
+static sfud_err wait_busy(const sfud_flash *flash, size_t tmo_us);
 static sfud_err reset(const sfud_flash *flash);
 static sfud_err read_jedec_id(sfud_flash *flash);
 sfud_err set_write_enabled(const sfud_flash *flash, bool enabled);
 static sfud_err set_4_byte_address_mode(sfud_flash *flash, bool enabled);
-static void make_adress_byte_array(const sfud_flash *flash, uint32_t addr, uint8_t *array);
+static int make_adress_byte_array(const sfud_flash *flash, uint32_t addr, uint8_t *array);
 static sfud_err check_wp_mode(sfud_flash *flash);
 
 /**
@@ -95,10 +95,10 @@ sfud_err sfud_device_init(sfud_flash *flash) {
 
     if (result == SFUD_SUCCESS) {
         flash->init_ok = true;
-        SFUD_INFO("%s flash device is initialize success.", flash->name);
+        SFUD_INFO("%s flash device initialized successfully.", flash->name);
     } else {
         flash->init_ok = false;
-        SFUD_INFO("Error: %s flash device is initialize fail.", flash->name);
+        SFUD_INFO("Error: %s flash device initialization failed.", flash->name);
     }
 
 #if defined(AIC_SPIENC_DRV)
@@ -186,7 +186,11 @@ static void qspi_set_read_cmd_format(sfud_flash *flash, uint8_t ins, uint8_t ins
         flash->read_cmd_format.instruction = ins;
         flash->read_cmd_format.address_size = 24;
     } else {
-        flash->read_cmd_format.instruction = ins + 1;
+        if (ins == SFUD_CMD_READ_DATA) {
+            flash->read_cmd_format.instruction = ins + 0x10;
+        } else {
+            flash->read_cmd_format.instruction = ins + 1;
+        }
         flash->read_cmd_format.address_size = 32;
     }
 
@@ -510,7 +514,7 @@ sfud_err sfud_read(const sfud_flash *flash, uint32_t addr, size_t size, uint8_t 
         spi->lock(spi);
     }
 
-    result = wait_busy(flash);
+    result = wait_busy(flash, SFUD_CHECK_BUSY_TIMEOUT);
 
     /* Default to use user's data buffer */
     copy_flag = 0;
@@ -607,7 +611,7 @@ sfud_err sfud_chip_erase(const sfud_flash *flash) {
         SFUD_INFO("Error: Flash chip erase SPI communicate error.");
         goto __exit;
     }
-    result = wait_busy(flash);
+    result = wait_busy(flash, SFUD_CHIP_ERASE_TIMEOUT);
 
 __exit:
     /* set the flash write disable */
@@ -688,7 +692,7 @@ sfud_err sfud_erase(const sfud_flash *flash, uint32_t addr, size_t size) {
             SFUD_INFO("Error: Flash erase SPI communicate error.");
             goto __exit;
         }
-        result = wait_busy(flash);
+        result = wait_busy(flash, SFUD_SECTOR_ERASE_TIMEOUT);
         if (result != SFUD_SUCCESS) {
             goto __exit;
         }
@@ -803,7 +807,7 @@ static sfud_err page256_or_1_byte_write(const sfud_flash *flash, uint32_t addr, 
             SFUD_INFO("Error: Flash write SPI communicate error.");
             goto __exit;
         }
-        result = wait_busy(flash);
+        result = wait_busy(flash, SFUD_PAGE_PROGRAM_TIMEOUT);
         if (result != SFUD_SUCCESS) {
             goto __exit;
         }
@@ -897,7 +901,7 @@ static sfud_err aai_write(const sfud_flash *flash, uint32_t addr, size_t size, c
             goto __exit;
         }
 
-        result = wait_busy(flash);
+        result = wait_busy(flash, SFUD_PAGE_PROGRAM_TIMEOUT);
         if (result != SFUD_SUCCESS) {
             goto __exit;
         }
@@ -980,9 +984,7 @@ static sfud_err reset(const sfud_flash *flash) {
 
     cmd_data[0] = SFUD_CMD_ENABLE_RESET;
     result = spi->wr(spi, cmd_data, 1, NULL, 0);
-    if (result == SFUD_SUCCESS) {
-        result = wait_busy(flash);
-    } else {
+    if (result != SFUD_SUCCESS) {
         SFUD_INFO("Error: Flash device reset failed.");
         return result;
     }
@@ -991,14 +993,12 @@ static sfud_err reset(const sfud_flash *flash) {
     result = spi->wr(spi, &cmd_data[1], 1, NULL, 0);
 
     if (result == SFUD_SUCCESS) {
-        result = wait_busy(flash);
-    }
-
-    if (result == SFUD_SUCCESS) {
         SFUD_DEBUG("Flash device reset success.");
     } else {
         SFUD_INFO("Error: Flash device reset failed.");
     }
+
+    aic_udelay(300);
 
     return result;
 }
@@ -1020,6 +1020,12 @@ static sfud_err read_jedec_id(sfud_flash *flash) {
                 flash->chip.mf_id, flash->chip.type_id, flash->chip.capacity_id);
     } else {
         SFUD_INFO("Error: Read flash device JEDEC ID error.");
+    }
+
+    if ((flash->chip.mf_id == 0xff && flash->chip.type_id == 0xff) || (flash->chip.mf_id == 0x00 && flash->chip.type_id == 0x00)) {
+        SFUD_INFO("Error: flash device unsupport. ID: 0x%02X, 0x%02X, 0x%02X.",
+                flash->chip.mf_id, flash->chip.type_id, flash->chip.capacity_id);
+        return SFUD_ERR_NOT_FOUND;
     }
 
     return result;
@@ -1132,10 +1138,9 @@ sfud_err sfud_read_cr(const sfud_flash *flash, uint8_t *status) {
     return flash->spi.wr(&flash->spi, &cmd, 1, status, 1);
 }
 
-static sfud_err wait_busy(const sfud_flash *flash) {
+static sfud_err wait_busy(const sfud_flash *flash, size_t tmo_us) {
     sfud_err result = SFUD_SUCCESS;
     uint8_t status;
-    size_t retry_times = flash->retry.times;
 
     SFUD_ASSERT(flash);
 
@@ -1147,7 +1152,7 @@ static sfud_err wait_busy(const sfud_flash *flash) {
         if (status & SFUD_WRITE_PROTECTION_MASK)
             SFUD_WP_INFO("Flash is in write protection state: 0x%x.\n", status);
         /* retry counts */
-        SFUD_RETRY_PROCESS(flash->retry.delay, retry_times, result);
+        SFUD_RETRY_PROCESS(flash->retry.delay, tmo_us, result);
     }
 
     if (result != SFUD_SUCCESS || ((status & SFUD_STATUS_REGISTER_BUSY)) != 0) {
@@ -1157,7 +1162,7 @@ static sfud_err wait_busy(const sfud_flash *flash) {
     return result;
 }
 
-static void make_adress_byte_array(const sfud_flash *flash, uint32_t addr, uint8_t *array) {
+static int make_adress_byte_array(const sfud_flash *flash, uint32_t addr, uint8_t *array) {
     uint8_t len, i;
 
     SFUD_ASSERT(flash);
@@ -1168,6 +1173,8 @@ static void make_adress_byte_array(const sfud_flash *flash, uint32_t addr, uint8
     for (i = 0; i < len; i++) {
         array[i] = (addr >> ((len - (i + 1)) * 8)) & 0xFF;
     }
+
+    return 0;
 }
 
 /**
@@ -1204,7 +1211,7 @@ sfud_err sfud_write_status(const sfud_flash *flash, bool is_volatile, uint8_t st
     }
 
     if (result == SFUD_SUCCESS)
-        return wait_busy(flash);
+        return wait_busy(flash, SFUD_WRITE_STATUS_TIMEOUT);
     else
         return result;
 }
@@ -1247,7 +1254,7 @@ sfud_err sfud_write_status_ext(const sfud_flash *flash, bool is_volatile, uint8_
     }
 
     if (result == SFUD_SUCCESS)
-        return wait_busy(flash);
+        return wait_busy(flash, SFUD_WRITE_STATUS_TIMEOUT);
     else
         return result;
 }
@@ -1273,7 +1280,7 @@ sfud_err sfud_write_status2(const sfud_flash *flash, uint8_t *status) {
     }
 
     if (result == SFUD_SUCCESS)
-        return wait_busy(flash);
+        return wait_busy(flash, SFUD_WRITE_STATUS_TIMEOUT);
     else
         return result;
 }
@@ -1283,7 +1290,7 @@ sfud_err sfud_write_cr(const sfud_flash *flash, uint8_t *cr) {
 
     result = sfud_write_reg(flash, SFUD_CMD_WRITE_STATUS2_REGISTER, cr);
     if (result == SFUD_SUCCESS)
-        return wait_busy(flash);
+        return wait_busy(flash, SFUD_WRITE_STATUS_TIMEOUT);
     else
         return result;
 }
@@ -1348,3 +1355,167 @@ static sfud_err check_wp_mode(sfud_flash *flash) {
 
     return result;
 }
+
+#ifdef SFUD_USING_SECURITY_REGISTER
+static void make_secur_adress_array(const sfud_flash *flash, uint32_t reg_num, uint8_t *array) {
+    uint8_t len;
+
+    SFUD_ASSERT(flash);
+    SFUD_ASSERT(array);
+
+    len = flash->addr_in_4_byte ? 5 : 4;
+
+    memset(array, 0x00, len);
+    array[1] = (reg_num & 0x0F) << 4;
+    array[len - 1] = SFUD_DUMMY_DATA;
+
+}
+
+/**
+ * read flash Security Registers
+ *
+ * @param flash flash device
+ * @param reg security registers num
+ * @param data read data pointer
+ *
+ * @return result
+ */
+sfud_err sfud_read_secur(const sfud_flash *flash, uint8_t reg, uint8_t *data)
+{
+    sfud_err result = SFUD_SUCCESS;
+    const sfud_spi *spi = &flash->spi;
+    uint8_t cmd_data[6], cmd_size;
+
+    /* lock SPI */
+    if (spi->lock) {
+        spi->lock(spi);
+    }
+
+    result = wait_busy(flash, SFUD_CHECK_BUSY_TIMEOUT);
+    if (result)
+        return result;
+
+    cmd_data[0] = SFUD_CMD_READ_SECURITY_REGISTER;
+    make_secur_adress_array(flash, reg, &cmd_data[1]);
+    cmd_size = flash->addr_in_4_byte ? 6 : 5;
+    result = spi->wr(spi, cmd_data, cmd_size, data, 256);
+
+    /* unlock SPI */
+    if (spi->unlock) {
+        spi->unlock(spi);
+    }
+
+    return result;
+}
+
+/**
+ * erase security register data
+ *
+ * @param flash flash device
+ * @param reg security registers num
+ *
+ * @return result
+ */
+sfud_err sfud_erase_secur(const sfud_flash *flash, uint8_t reg) {
+    sfud_err result = SFUD_SUCCESS;
+    const sfud_spi *spi = &flash->spi;
+    uint8_t cmd_data[5], cmd_size;
+
+    SFUD_ASSERT(flash);
+    /* must be call this function after initialize OK */
+    SFUD_ASSERT(flash->init_ok);
+    /* lock SPI */
+    if (spi->lock) {
+        spi->lock(spi);
+    }
+
+    /* set the flash write enable */
+    result = set_write_enabled(flash, true);
+    if (result != SFUD_SUCCESS) {
+        goto __exit;
+    }
+
+    cmd_data[0] = SFUD_CMD_ERASE_SECURITY_REGISTER;
+    make_secur_adress_array(flash, reg, &cmd_data[1]);
+    cmd_size = flash->addr_in_4_byte ? 5 : 4;
+    result = spi->wr(spi, cmd_data, cmd_size, NULL, 0);
+    if (result != SFUD_SUCCESS) {
+        SFUD_INFO("Error: Security register %u erase error.", reg);
+        goto __exit;
+    }
+    result = wait_busy(flash, SFUD_SECTOR_ERASE_TIMEOUT);
+
+__exit:
+    /* set the flash write disable */
+    set_write_enabled(flash, false);
+    /* unlock SPI */
+    if (spi->unlock) {
+        spi->unlock(spi);
+    }
+
+    return result;
+}
+
+/**
+ * write flash Security Registers
+ *
+ * @param flash flash device
+ * @param reg ecurity registers num
+ * @param size write size
+ * @param data write data
+ *
+ * @return result
+ */
+sfud_err sfud_write_secur(const sfud_flash *flash, uint8_t reg, size_t size, const uint8_t *data) {
+    sfud_err result = SFUD_SUCCESS;
+    const sfud_spi *spi = &flash->spi;
+    /* Make the write buffer always cache line aligned */
+    static uint8_t cmd_data[5 + SFUD_WRITE_MAX_PAGE_SIZE] __attribute__((aligned(CACHE_LINE_SIZE)));
+    uint8_t cmd_size;
+
+    SFUD_ASSERT(flash);
+    /* must be call this function after initialize OK */
+    SFUD_ASSERT(flash->init_ok);
+    /* check the flash address bound */
+    if (size > SFUD_WRITE_MAX_PAGE_SIZE) {
+        SFUD_INFO("Error: Security Register write size out of bound.");
+        return SFUD_ERR_NOT_FOUND;
+    }
+    /* lock SPI */
+    if (spi->lock) {
+        spi->lock(spi);
+    }
+
+    /* set the flash write enable */
+    result = set_write_enabled(flash, true);
+    if (result != SFUD_SUCCESS) {
+        goto __exit;
+    }
+    cmd_data[0] = SFUD_CMD_SECURITY_REGISTER_PROGRAM;
+    make_secur_adress_array(flash, reg, &cmd_data[1]);
+    cmd_size = flash->addr_in_4_byte ? 5 : 4;
+
+    memcpy(&cmd_data[cmd_size], data, size);
+
+    result = spi->wr(spi, cmd_data, cmd_size + size, NULL, 0);
+
+    if (result != SFUD_SUCCESS) {
+        SFUD_INFO("Error: Flash write SPI communicate error.");
+        goto __exit;
+    }
+    result = wait_busy(flash, SFUD_PAGE_PROGRAM_TIMEOUT);
+    if (result != SFUD_SUCCESS) {
+        goto __exit;
+    }
+
+__exit:
+    /* set the flash write disable */
+    set_write_enabled(flash, false);
+    /* unlock SPI */
+    if (spi->unlock) {
+        spi->unlock(spi);
+    }
+
+    return result;
+}
+#endif // SFUD_USING_SECURITY_REGISTER

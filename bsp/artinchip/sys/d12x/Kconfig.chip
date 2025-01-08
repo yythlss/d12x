@@ -414,6 +414,10 @@ config AIC_GPAI_CH_NUM
     int
     default 6 if AIC_GPAI_DRV_V11
 
+config AIC_GPAI_CH_NUM_MASK
+    hex
+    default 0x7 if AIC_GPAI_DRV_V11
+
 #--------------------------------------------
 # PWM driver global option
 #--------------------------------------------

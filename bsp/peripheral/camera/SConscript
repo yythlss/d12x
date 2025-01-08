@@ -35,6 +35,12 @@ if GetDepend('AIC_USING_CAMERA_GM7150'):
 if GetDepend('AIC_USING_CAMERA_SC030IOT'):
     src += Glob('sc030iot/*.c')
 
+if GetDepend('AIC_USING_CAMERA_SC031GS'):
+    src += Glob('sc031gs/*.c')
+
+if GetDepend('AIC_USING_CAMERA_SC035HGS'):
+    src += Glob('sc035/*.c')
+
 if GetDepend('AIC_USING_CAMERA_TP2825'):
     src += Glob('tp2825b/tp2825bx.c')
 

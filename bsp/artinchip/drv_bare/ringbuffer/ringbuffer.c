@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -7,6 +7,16 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include "ringbuffer.h"
+
+void ringbuf_init(ringbuf_t *fifo, uint8_t *buf, uint32_t size)
+{
+    if (!fifo || !buf || !size)
+        return;
+
+    memset(fifo, 0, sizeof(ringbuf_t));
+    fifo->size = size;
+    fifo->buffer = buf;
+}
 
 /**
   * \brief  Removes the entire FIFO contents.

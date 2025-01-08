@@ -13,6 +13,7 @@
 #include "usb_osd_ui.h"
 #include "usb_osd_video.h"
 #include "usb_osd_settings.h"
+#include "aic_lv_ffmpeg.h"
 #include "lv_tpc_run.h"
 
 //#define USB_OSD_LOG
@@ -39,6 +40,10 @@ static struct mpp_fb *g_fb = NULL;
 static unsigned int disp_osd_flags = 0;
 static bool screen_blank = false;
 static rt_sem_t osd_sem = NULL;
+
+#ifdef LV_USB_OSD_LOGO_TYPE_VIDEO
+static lv_obj_t *ffmpeg = NULL;
+#endif
 
 #define ClrBit(reg, bit)         ((reg) &= ~(bit))
 #define SetBit(reg, bit)         ((reg) |= (bit))
@@ -427,6 +432,32 @@ int usb_disp_get_suspend_ms(void)
     return suspend_ms;
 }
 
+static void usb_osd_ui_display_logo(void)
+{
+#if defined(LV_USB_OSD_LOGO_IMAGE)
+    char logo_image_src[64];
+    snprintf(logo_image_src, sizeof(logo_image_src), LVGL_PATH(%s), USB_OSD_UI_LOGO_IMAGE);
+
+    logo_screen = lv_scr_act();
+    lv_obj_t * logo_img = lv_img_create(logo_screen);
+    lv_img_set_src(logo_img, logo_image_src);
+    lv_obj_set_pos(logo_img, 0, 0);
+#elif defined(LV_USB_OSD_LOGO_VIDEO)
+    char logo_video_src[64];
+    snprintf(logo_video_src, sizeof(logo_video_src), "%s%s",
+            USB_OSD_UI_LOGO_VIDEO_PATH, USB_OSD_UI_LOGO_VIDEO);
+
+    logo_screen = lv_scr_act();
+    ffmpeg = lv_ffmpeg_player_create(logo_screen);
+    lv_obj_set_style_transform_angle(ffmpeg, USB_OSD_UI_LOGO_VIDEO_ROTATE, LV_PART_MAIN);
+    lv_obj_add_flag(ffmpeg, LV_OBJ_FLAG_HIDDEN);
+
+    lv_ffmpeg_player_set_src(ffmpeg, logo_video_src);
+    lv_ffmpeg_player_set_cmd_ex(ffmpeg, LV_FFMPEG_PLAYER_CMD_START, NULL);
+    lv_ffmpeg_player_set_auto_restart(ffmpeg, false);
+#endif
+}
+
 void usb_osd_ui_init(void)
 {
     usb_osd_open_mpp_fb();
@@ -435,13 +466,7 @@ void usb_osd_ui_init(void)
     usb_osd_ui_alpha_set();
     usb_osd_wakeup_key_register();
 
-    char logo_image_src[64];
-    snprintf(logo_image_src, sizeof(logo_image_src), LVGL_PATH(%s), USB_OSD_UI_LOGO);
-
-    logo_screen = lv_scr_act();
-    lv_obj_t * logo_img = lv_img_create(logo_screen);
-    lv_img_set_src(logo_img, logo_image_src);
-    lv_obj_set_pos(logo_img, 0, 0);
+    usb_osd_ui_display_logo();
 
     osd_sem = rt_sem_create("osdsem", 0, RT_IPC_FLAG_PRIO);
     if (osd_sem == RT_NULL) {

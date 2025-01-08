@@ -25,6 +25,7 @@
 #define AUDIO_CTL_GETBUFFERINFO             _AUDIO_CTL(5)
 #define AUDIO_CTL_GETAVAIL                  _AUDIO_CTL(6)
 #define AUDIO_CTL_PAUSE                     _AUDIO_CTL(7)
+#define AUDIO_CTL_DIRECT_TRANSFER           _AUDIO_CTL(8)
 
 /* Audio Device Types */
 #define AUDIO_TYPE_QUERY                    0x00
@@ -112,6 +113,7 @@ struct rt_audio_ops
     void (*buffer_info)(struct rt_audio_device *audio, struct rt_audio_buf_info *info);
     rt_size_t (*get_avail)(struct rt_audio_device *audio);
     rt_err_t (*pause)(struct rt_audio_device *audio, int enable);
+    void (*direct_transfer)(struct rt_audio_device *audio);
 };
 
 struct rt_audio_configure
@@ -146,6 +148,7 @@ struct rt_audio_replay
     rt_uint16_t read_index;
     rt_uint32_t pos;
     rt_uint8_t event;
+    rt_uint8_t transfer_mode;
     rt_bool_t activated;
 };
 

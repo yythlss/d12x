@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,26 +11,45 @@
 struct rt_device_pwm *pwm_dev = RT_NULL;
 rt_device_t qep_dev = RT_NULL;
 rt_uint32_t pwm_ch;
+rt_thread_t tid;
+rt_uint32_t pulse_count;
 
 /* callback function */
 static rt_err_t qep_cb(rt_device_t dev, void *buffer)
 {
+    rt_pwm_disable(pwm_dev, pwm_ch);
+
+    rt_device_close(qep_dev);
+
 #ifdef ULOG_USING_ISR_LOG
     rt_uint32_t *temp = (rt_uint32_t *)buffer;
     rt_kprintf("qep %d callback\n", temp[0]);
 #endif
 
-    rt_pwm_disable(pwm_dev, pwm_ch);
-
-    rt_device_close(qep_dev);
-
     return RT_EOK;
+}
+
+static void qep_thread(void *parameter)
+{
+    rt_uint32_t read_data = 0;
+
+    while (1) {
+        rt_device_read(qep_dev, 0, &read_data, 0);
+
+        if (rt_get_errno() < 0)
+            break;
+
+        rt_kprintf("this is return pluse cnt:%d/%d\n", read_data, pulse_count);
+
+        rt_thread_mdelay(200);
+    }
+
+    rt_thread_delete(tid);
 }
 
 int test_qep(int argc, char **argv)
 {
     char device_name[8] = {"qep"};
-    rt_uint32_t pulse_count;
     rt_uint32_t period_ns, duty_ns;
     int ret;
 
@@ -57,6 +76,13 @@ int test_qep(int argc, char **argv)
         rt_kprintf("Failed to open %s device!\n", device_name);
         return ret;
     }
+
+    tid = rt_thread_create("test-qep", qep_thread, RT_NULL,
+                           1024, RT_THREAD_PRIORITY_MAX - 2, 20);
+    if (tid != RT_NULL)
+        rt_thread_startup(tid);
+    else
+        rt_kprintf("create test-qep thread err!\n");
 
     //set the pulse count
     pulse_count = atoi(argv[5]);

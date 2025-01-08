@@ -3,8 +3,6 @@
 *
 */
 
-#include <rtthread.h>
-
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -13,8 +11,12 @@
 #include <unistd.h>
 
 #include <sys/time.h>
-#include <sys/socket.h>
+#ifdef RT_USING_POSIX_SELECT
 #include <sys/select.h>
+#endif
+#ifdef RT_USING_POSIX_SOCKET
+#include <sys/socket.h>
+#endif
 #include <netdb.h>
 
 #define DBG_SECTION_NAME               "iperf"
@@ -146,7 +148,7 @@ static void iperf_udp_server(void *thread_param)
             }
             tick2 = rt_tick_get();
         }
-        if (sentlen > 0)
+        if (sentlen > 0 && (int)pcount > 0)
         {
             long data;
             int integer, decimal;
@@ -156,7 +158,7 @@ static void iperf_udp_server(void *thread_param)
             data = sentlen * RT_TICK_PER_SECOND / 125 / (tick2 - tick1);
             integer = data/1000;
             decimal = data%1000;
-            LOG_I("%s: %d.%03d0 Mbps! lost:%d total:%d\n", tid->name, integer, decimal, lost, total);
+            LOG_I("%s: %d.%03d0 Mbps! lost:%u total:%u\n", tid->name, integer, decimal, lost, total);
         }
     }
     rt_free(buffer);
@@ -499,7 +501,7 @@ int iperf(int argc, char **argv)
                 }
             }
 
-            tid = rt_thread_create(tid_name, function, RT_NULL, 2048, 20, 100);
+            tid = rt_thread_create(tid_name, function, RT_NULL, 4096, 20, 100);
             if (tid) rt_thread_startup(tid);
         }
     }

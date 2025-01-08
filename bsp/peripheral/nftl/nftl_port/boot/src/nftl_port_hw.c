@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -55,6 +55,7 @@ int _nftl_port_hw_erase_block(void *device, struct physical_op_info *p)
 int _nftl_port_hw_read_page(void *device, struct physical_op_info *p)
 {
     struct mtd_dev *nand = (struct mtd_dev *)device;
+    u8 src_buf[64];
     int ret;
     int this_pages_per_block = nand->erasesize / nand->writesize;
     int page =
@@ -63,9 +64,14 @@ int _nftl_port_hw_read_page(void *device, struct physical_op_info *p)
     int offset = page * nand->writesize;
     ret = mtd_read_oob(nand, offset, p->user_data_addr, nand->writesize,
                            p->spare_data_addr, 64);
-    memcpy(p->spare_data_addr + 8, p->spare_data_addr + 16, 8);
-    memset(p->spare_data_addr + 16, 0xFF, 8);
+    memcpy(src_buf, p->spare_data_addr, 64);
+    ret = mtd_unmap_oob_user_region(nand, p->spare_data_addr, src_buf, 0, 16);
+    if (ret) {
+        PORT_HW_LOG("[NE] failed to unmap data from oob user regions. ret = %d!\n", ret);
+        return ret;
+    }
 
+    memset(p->spare_data_addr + 16, 0xFF, 8);
 
     PORT_HW_LOG("%s:%d ...\n", __FUNCTION__, __LINE__);
     return ret;
@@ -74,16 +80,20 @@ int _nftl_port_hw_read_page(void *device, struct physical_op_info *p)
 int _nftl_port_hw_write_page(void *device, struct physical_op_info *p)
 {
     struct mtd_dev *nand = (struct mtd_dev *)device;
-    int ret;
+    u8 src_buf[16];
+    int ret = 0;
     int this_pages_per_block = nand->erasesize / nand->writesize;
     int page =
         p->physical_page.block_num * this_pages_per_block + p->physical_page.page_num;
     int offset = page * nand->writesize;
     PORT_HW_LOG("%s:%d ...\n", __FUNCTION__, __LINE__);
 
-    memcpy(p->spare_data_addr + 16, p->spare_data_addr + 8, 8);
-    memset(p->spare_data_addr + 8, 0xFF, 8);
-
+    memcpy(src_buf, p->spare_data_addr, 16);
+    ret = mtd_map_oob_user_region(nand, p->spare_data_addr, src_buf, 0, 16);
+    if (ret) {
+        PORT_HW_LOG("[NE] failed to map data to oob user regions. ret = %d!\n", ret);
+        return ret;
+    }
 
     ret = mtd_write_oob(nand, offset, p->user_data_addr, nand->writesize,
                         p->spare_data_addr, 64);

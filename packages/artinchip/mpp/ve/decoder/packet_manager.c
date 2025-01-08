@@ -433,19 +433,22 @@ int pm_enqueue_empty_packet(struct packet_manager *pm, struct packet *packet)
 
 int pm_get_empty_packet_num(struct packet_manager *pm)
 {
+    if (!pm)
+        return -1;
     return pm->empty_num;
 }
 
 int pm_get_ready_packet_num(struct packet_manager *pm)
 {
+    if (!pm)
+        return -1;
     return pm->ready_num;
 }
 
 int pm_reset(struct packet_manager *pm)
 {
-    if (!pm) {
+    if (!pm)
         return -1;
-    }
 
     aicos_mutex_take(pm->lock,AICOS_WAIT_FOREVER);
     if (!mpp_list_empty(&pm->ready_list)) {

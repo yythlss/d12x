@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -70,7 +70,7 @@ static int do_mmc_boot(int argc, char *argv[])
         return -1;
     }
 
-    parts = mmc_create_gpt_part();
+    parts = mmc_create_gpt_part2(mmc_id);
     if (!parts) {
         pr_err("sdmc %d create gpt part failed.\n", mmc_id);
         goto out;

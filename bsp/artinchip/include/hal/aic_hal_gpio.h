@@ -59,9 +59,9 @@ enum gpio_check_pincfg_type {
 };
 
 #define GPIO_GROUP_SIZE               32
-#define GPIO_GROUP(pin_name)     ((pin_name) / GPIO_GROUP_SIZE)
-#define GPIO_GROUP_PIN(pin_name) ((pin_name) % GPIO_GROUP_SIZE)
-#define GPIO_PIN_NAME(_g, _offset) (((_g) * GPIO_GROUP_SIZE) + (_offset))
+#define GPIO_GROUP(pin_name)          ((pin_name) / GPIO_GROUP_SIZE)
+#define GPIO_GROUP_PIN(pin_name)      ((pin_name) % GPIO_GROUP_SIZE)
+#define GPIO_PIN_NAME(_g, _offset)    (((_g) * GPIO_GROUP_SIZE) + (_offset))
 
 struct gpio_cfg {
     uint8_t port;
@@ -79,7 +79,7 @@ struct gpio_cfg {
 #define AIC_PINMUX_DOWN(port, pin, func) \
                         AIC_PINMUX_BASE(port, pin, func, PIN_PULL_DOWN, 3)
 
-unsigned int hal_gpio_name2pin(const char *name);
+int hal_gpio_name2pin(const char *name);
 int hal_gpio_get_value(unsigned int group, unsigned int pin,
                        unsigned int *pvalue);
 int hal_gpio_set_value(unsigned int group, unsigned int pin,

@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+#define GPIO_GROUP_BEGIN        'A'
+
 enum {
     PA_GROUP = 0,
     PB_GROUP = 1,

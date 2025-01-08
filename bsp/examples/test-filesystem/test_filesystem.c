@@ -35,12 +35,16 @@ u32 ENUM_DATA_LEN[] = {
     "fs help : Get this information.\n" \
     "fs read <filename> : Test filesystem write speed.\n" \
     "fs write <filename> : Test filesystem write speed.\n" \
+    "fs open <filename> : Test filesystem open speed.\n" \
+    "fs close : Test filesystem close speed.\n" \
     "example:\n" \
     "fs write data auto\n" \
     "fs read data auto\n" \
+    "fs write data/testfile.txt 2048\n" \
     "fs read data/testfile.txt\n" \
     "fs read rodata/testfile.txt\n" \
-    "fs write rodata/testfile.txt\n" \
+    "fs open /data/testfile.txt\n" \
+    "fs close \n" \
     "fs write\n"
 
 static void fs_usage(void)
@@ -154,9 +158,10 @@ read_err:
     return;
 }
 
+/* fs write data/testfile.txt 2048 */
 static void test_fs_write(int argc, char **argv)
 {
-    uint32_t start_us;
+    uint32_t start_us, write_len;
     char *data;
     FILE *fp;
     char file_path[128] = { 0 };
@@ -183,17 +188,60 @@ static void test_fs_write(int argc, char **argv)
         aicos_free_align(0, data);
         return;
     }
+    write_len = DATA_LEN_64K;
+    if (argc > 2)
+        write_len = strtoul(argv[2], NULL, 0);
 
     start_us = aic_get_time_us();
-    if (DATA_LEN_64K != fwrite(data, sizeof(char), DATA_LEN_64K, fp)) {
+    if (write_len != fwrite(data, sizeof(char), write_len, fp)) {
         printf("Fs write data failed!");
         goto write_err;
     }
-    show_speed("write", DATA_LEN_64K, aic_get_time_us() - start_us);
+    show_speed("write", write_len, aic_get_time_us() - start_us);
 
 write_err:
     fclose(fp);
     aicos_free_align(0, data);
+    return;
+}
+
+static FILE *g_fp = NULL;
+
+static void test_fs_open(int argc, char **argv)
+{
+    u64 start_us;
+    char file_path[128] = { 0 };
+
+    if (argc > 1)
+        rt_sprintf(file_path, "%s", argv[1]);
+    else
+        rt_sprintf(file_path, "%s", "data/testfile.txt");
+
+    printf("start open file %s\n", file_path);
+    start_us = aic_get_time_us();
+    g_fp = fopen(file_path, "rb");
+    if (g_fp == NULL) {
+        printf("Open file %s failed!\n", file_path);
+        return;
+    }
+    printf("open a new file take: %llu us\n", (aic_get_time_us() - start_us));
+
+    return;
+}
+
+static void test_fs_close(int argc, char **argv)
+{
+    u64 start_us;
+
+    if (g_fp == NULL) {
+        printf("Error: there is not file opened.\n");
+        return;
+    }
+
+    start_us = aic_get_time_us();
+    fclose(g_fp);
+    printf("close file take: %llu us\n", (aic_get_time_us() - start_us));
+
     return;
 }
 
@@ -209,6 +257,12 @@ static void cmd_test_fs(int argc, char **argv)
         return;
     } else if (!rt_strcmp(argv[1], "write")) {
         test_fs_write(argc - 1, &argv[1]);
+        return;
+    } else if (!rt_strcmp(argv[1], "open")) {
+        test_fs_open(argc - 1, &argv[1]);
+        return;
+    } else if (!rt_strcmp(argv[1], "close")) {
+        test_fs_close(argc - 1, &argv[1]);
         return;
     }
 help:

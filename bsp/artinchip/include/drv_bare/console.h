@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2020-2024, ArtInChip Technology Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
 #ifndef __CONSOLE_H_
 #define __CONSOLE_H_
 
@@ -35,7 +40,7 @@ struct console_cmd {
 };
 
 void console_init(void);
-void console_loop(void);
+int console_loop(void);
 void console_set_usrname(const char *usrname);
 int console_run_cmd(const char *cmdstr);
 struct console_cmd *console_find_cmd_by_name(const char *name);

@@ -107,9 +107,14 @@ struct rt_mmcsd_host {
     struct rt_semaphore  sem_ack;
 
     rt_uint32_t       sdio_irq_num;
-    struct rt_semaphore    *sdio_irq_sem;
-    struct rt_thread     *sdio_irq_thread;
 
+    struct rt_event        *sdio_irq_event;
+    struct rt_semaphore    *sdio_irq_delete_sem;
+
+    struct rt_thread     *sdio_irq_thread;
+#ifdef AIC_SDMC_DRV
+    rt_uint32_t sd_hotplug;
+#endif
     void *private_data;
 };
 

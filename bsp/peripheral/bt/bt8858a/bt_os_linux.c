@@ -1,29 +1,50 @@
-#ifdef __cplusplus
-extern "C" {
-#endif
+
 #include "bt_config.h"
 #include "bt_api.h"
 #include "bt_os.h"
 #include "bt_core.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
 #if LINUX
 
-
-static __krnl_stmr_t   			*bt_receivecmd_timer;
-static __krnl_stmr_t   			*bt_decodecmd_timer;
+static int32_t   	bt_receivecmd_timer;
+static int32_t   	bt_decodecmd_timer;
 
 static pthread_t   	uart_recive_task_id;
 static pthread_t   	uart_decode_task_id;
 
 
 #if (runmode == 1)//线程运行
-#if 0
+
+void sys_bt_decode_task(void*parg)
+{
+    while(1)
+    {
+        sys_bt_decode_cmd(parg);
+
+    }
+
+}
+void sys_bt_receive_task(void*parg)
+{
+    while(1)
+    {
+        sys_bt_receive_cmd(parg);
+
+    }
+
+}
+
 __s32 bt_task_start(void)//task
 {
         int     err;
         
-		printf("uart_key_start\n");
-		err = pthread_create(&uart_decode_task_id, NULL, sys_bt_decode_cmd, (void*)NULL);
+		printf("bt_task_start\n");
+		err = pthread_create(&uart_decode_task_id, NULL, sys_bt_decode_task, (void*)NULL);
         if (err) 
         {
             printf("decode_task pthread_create error!");
@@ -31,16 +52,14 @@ __s32 bt_task_start(void)//task
         }
         printf("create uart_decode_task_id:0x%x", uart_decode_task_id);
        
-		err = pthread_create(&uart_recive_task_id, NULL, sys_bt_receive_cmd, (void*)NULL);
+		err = pthread_create(&uart_recive_task_id, NULL, sys_bt_receive_task, (void*)NULL);
         if (err) 
         {
-            printf("decode_task pthread_create error!");
+            printf("recive_task pthread_create error!");
             return EPDK_FAIL;
         }
         printf("create uart_recive_task_id:0x%x", uart_recive_task_id);
-		uart_recive_task_id = esKRNL_TCreate(sys_bt_receive_cmd, (void*)NULL, 0x800, KRNL_priolevel1);
-
-		printf("uart_key_start");
+        
 	    return EPDK_OK;	
 }
 
@@ -48,124 +67,100 @@ __s32 bt_task_stop(void)
 {
 	if(uart_recive_task_id != 0)
     {
-        do  
-        {
-            esKRNL_TimeDlyResume(uart_recive_task_id);
-            esKRNL_TimeDly(1);
-        } while (OS_TASK_NOT_EXIST != esKRNL_TDelReq(uart_recive_task_id));
+        pthread_cancel(uart_recive_task_id);
         uart_recive_task_id = 0;
     }
     if(uart_decode_task_id != 0)
     {
-        do  
-        {
-            esKRNL_TimeDlyResume(uart_decode_task_id);
-            esKRNL_TimeDly(1);
-        } while (OS_TASK_NOT_EXIST != esKRNL_TDelReq(uart_decode_task_id));
+        pthread_cancel(uart_decode_task_id);
         uart_decode_task_id = 0;
     }
 	return EPDK_OK;
 }
-#else
-__s32 bt_task_start(void)//task
-{
 
-		printf("uart_key_start\n");
-		uart_decode_task_id = esKRNL_TCreate(sys_bt_decode_cmd, (void*)NULL, 0x800, KRNL_priolevel2);
-		if(uart_decode_task_id == NULL)
-		{
-			printf("create uart_decode_task_id failed\n");
-			return EPDK_FAIL;
-		}
-		
-		
-		uart_recive_task_id = esKRNL_TCreate(sys_bt_receive_cmd, (void*)NULL, 0x800, KRNL_priolevel1);
-		if(uart_recive_task_id == NULL)
-		{
-			printf("create uart_recive_task_id failed\n");
-			return EPDK_FAIL;
-		}
-		printf("uart_key_start");
-	    return EPDK_OK;	
-}
-
-__s32 bt_task_stop(void)
-{
-	if(uart_recive_task_id != 0)
-    {
-        do  
-        {
-            esKRNL_TimeDlyResume(uart_recive_task_id);
-            esKRNL_TimeDly(1);
-        } while (OS_TASK_NOT_EXIST != esKRNL_TDelReq(uart_recive_task_id));
-        uart_recive_task_id = 0;
-    }
-    if(uart_decode_task_id != 0)
-    {
-        do  
-        {
-            esKRNL_TimeDlyResume(uart_decode_task_id);
-            esKRNL_TimeDly(1);
-        } while (OS_TASK_NOT_EXIST != esKRNL_TDelReq(uart_decode_task_id));
-        uart_decode_task_id = 0;
-    }
-	return EPDK_OK;
-}
-#endif
 #elif(runmode == 0)//定时器运行
-__s32 bt_task_start(void) timer
+__s32 bt_task_start(void) //timer
 {
+        struct itimerspec its1;    
+        timer_t timerid1;     // 初始化 itimerspec 结构体    
+        struct sigevent se1;
+        struct itimerspec its2;    
+        timer_t timerid2;     // 初始化 itimerspec 结构体    
+        struct sigevent se2;
+         // 设置定时器事件    
+        se1.sigev_notify = SIGEV_THREAD;  // 使用线程处理方式    
+        se1.sigev_notify_function = sys_bt_decode_cmd;  // 设置线程处理函数    
+        se1.sigev_notify_attributes = NULL;
 
-		printf("esTIME_StartTimer bt_decodecmd_timer\n");
-		bt_decodecmd_timer = esKRNL_TmrCreate(20,OS_TMR_OPT_PRIO_HIGH | OS_TMR_OPT_PERIODIC,sys_bt_decode_cmd, NULL);
-		if(bt_decodecmd_timer == NULL)
+		printf("timer_create bt_decodecmd_timer\n");
+		timer_create(CLOCK_REALTIME, &se1, &timerid1)
+		if(timerid1 == NULL)
 		{
 			printf("create bt_decodecmd_timer failed\n");
-
 			return EPDK_FAIL;
 		}
-		esKRNL_TmrStart(bt_decodecmd_timer);
-			printf("esTIME_StartTimer bt_receivecmd_timer\n");
-		bt_receivecmd_timer = esKRNL_TmrCreate(80,OS_TMR_OPT_PRIO_LOW | OS_TMR_OPT_PERIODIC,sys_bt_receive_cmd, NULL);
+		        
+        its1.it_value.tv_sec = 0;   //设置定时器的初始超时时间为10ms   
+        its1.it_value.tv_nsec = 10*1000;    
+        its1.it_interval.tv_sec = 0;  // 设置定时器的间隔时间为20ms  
+        its1.it_interval.tv_nsec = 20*1000;  
+        timer_settime(timerid1, 0, &its1, NULL);
+        
+        // 设置定时器事件    
+        se2.sigev_notify = SIGEV_THREAD;  // 使用线程处理方式    
+        se2.sigev_notify_function = sys_bt_receive_cmd;  // 设置线程处理函数    
+        se2.sigev_notify_attributes = NULL;
+         
+		printf("timer_create bt_receivecmd_timer\n");
+		timer_create(CLOCK_REALTIME, &se2, &timerid2);	
 		if(bt_receivecmd_timer == NULL)
 		{
 			printf("create bt_receivecmd_timer failed\n");
-
 			return EPDK_FAIL;
 		}
-		esKRNL_TmrStart(bt_receivecmd_timer);
+		        
+        its2.it_value.tv_sec = 0;   //设置定时器的初始超时时间为70ms   
+        its2.it_value.tv_nsec = 70*1000;    
+        its2.it_interval.tv_sec = 0;  // 设置定时器的间隔时间为80ms  
+        its2.it_interval.tv_nsec = 80*1000;  
+		timer_settime(timerid2, 0, &its2, NULL);
 	
-	    printf("esKRNL_TmrStart end\n");
+	    printf("timer_settime end\n");
+	    
 	    return EPDK_OK;
 start_exit:
-    if(bt_receivecmd_timer!=RT_NULL)
-	{
-		esKRNL_TmrStop(bt_receivecmd_timer,OS_TMR_OPT_PRIO_LOW | OS_TMR_OPT_PERIODIC,NULL);
-		esKRNL_TmrDel(bt_receivecmd_timer);
-		bt_receivecmd_timer = RT_NULL;
-	}
-	if(bt_decodecmd_timer!=RT_NULL)
-	{
-		esKRNL_TmrStop(bt_decodecmd_timer,OS_TMR_OPT_PRIO_LOW | OS_TMR_OPT_PERIODIC,NULL);
-		esKRNL_TmrDel(bt_decodecmd_timer);
-		bt_decodecmd_timer = RT_NULL;
+    {
+        struct itimerspec its = {{0, 0}, {0, 0}};     
+    	if(bt_receivecmd_timer!=0)
+    	{
+            timer_settime(bt_receivecmd_timer, 0, &its, NULL);
+            timer_delete(bt_receivecmd_timer);//对于存放定时器相关数据的结构体可以清空
+            bt_receivecmd_timer = 0; 
+    	}
+    	if(bt_decodecmd_timer!=0)
+    	{
+    	    timer_settime(bt_decodecmd_timer, 0, &its, NULL);
+            timer_delete(bt_decodecmd_timer);//对于存放定时器相关数据的结构体可以清空
+            bt_decodecmd_timer = 0; 
+    	}
 	}
 	return EPDK_FAIL;
 }
 
 __s32 bt_task_stop(void)
 {
-	if(bt_receivecmd_timer!=RT_NULL)
+    struct itimerspec its = {{0, 0}, {0, 0}};     
+	if(bt_receivecmd_timer!=0)
 	{
-		esKRNL_TmrStop(bt_receivecmd_timer,OS_TMR_OPT_PRIO_LOW | OS_TMR_OPT_PERIODIC,NULL);
-		esKRNL_TmrDel(bt_receivecmd_timer);
-		bt_receivecmd_timer = RT_NULL;
+        timer_settime(bt_receivecmd_timer, 0, &its, NULL);
+        timer_delete(bt_receivecmd_timer);//对于存放定时器相关数据的结构体可以清空
+        bt_receivecmd_timer = 0; 
 	}
-	if(bt_decodecmd_timer!=RT_NULL)
+	if(bt_decodecmd_timer!=0)
 	{
-		esKRNL_TmrStop(bt_decodecmd_timer,OS_TMR_OPT_PRIO_LOW | OS_TMR_OPT_PERIODIC,NULL);
-		esKRNL_TmrDel(bt_decodecmd_timer);
-		bt_decodecmd_timer = RT_NULL;
+	    timer_settime(bt_decodecmd_timer, 0, &its, NULL);
+        timer_delete(bt_decodecmd_timer);//对于存放定时器相关数据的结构体可以清空
+        bt_decodecmd_timer = 0; 
 	}
 	return EPDK_OK;
 }

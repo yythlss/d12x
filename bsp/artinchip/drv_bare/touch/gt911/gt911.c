@@ -8,6 +8,9 @@
 
 #define TOUCH_NAME      "gt911"
 #define I2C_BASE(n)     (I2C0_BASE + (n * 0x1000))
+#define I2C_CLK_ID(x)   (CLK_I2C0 + x)
+#define I2C_RATE        400000
+
 
 aic_i2c_ctrl g_i2c_dev;
 static struct aic_i2c_msg g_msgs;
@@ -346,15 +349,16 @@ int gt911_init(struct touch *touch)
         return TOUCH_ERROR;
     }
 
-    id = touch_get_i2c_chan_id(GT911_I2C_CHAN);
+    id = touch_get_i2c_chan_id(AIC_TOUCH_GT911_I2C_CHA);
 
     g_msgs.buf = g_buf;
     g_i2c_dev.index = id;
     g_i2c_dev.reg_base = I2C_BASE(id);
     g_i2c_dev.msg = &g_msgs;
     g_i2c_dev.addr_bit = I2C_7BIT_ADDR;
-    g_i2c_dev.speed_mode = I2C_400K_SPEED;
+    g_i2c_dev.target_rate = I2C_RATE;
     g_i2c_dev.bus_mode = I2C_MASTER_MODE;
+    g_i2c_dev.clk_id = I2C_CLK_ID(id);
 
     hal_i2c_init(&g_i2c_dev);
 

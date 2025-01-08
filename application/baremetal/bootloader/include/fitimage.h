@@ -58,6 +58,10 @@ struct spl_load_info {
 #define FIT_ENTRY_PROP      "entry"
 #define FIT_LOAD_PROP       "load"
 
+#define FIT_HASH_NODE_PROP  "hash"
+#define FIT_HASH_ALGO_PROP  "algo"
+#define FIT_HASH_VALUE_PROP "value"
+
 /* configuration node */
 #define FIT_KERNEL_PROP     "kernel"
 #define FIT_RAMDISK_PROP    "ramdisk"

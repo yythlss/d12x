@@ -21,6 +21,7 @@ bt_phone_type_t		bt_phone_type;   //手机连接类型
 bt_connect_flag_t 	bt_connect_flag = BT_STATE_INIT;
 bt_spp_connect_flag_t 	bt_spp_connect_flag = BT_SPP_STATE_INIT;
 bt_ble_connect_flag_t 	bt_ble_connect_flag = BT_BLE_STATE_INIT;
+bt_hid_connect_flag_t 	bt_hid_connect_flag = BT_HID_STATE_INIT;
 bt_time_t           bt_time;//蓝牙时间
 
 bt_phonebook_state		        *bt_phonebook_para = NULL;
@@ -36,7 +37,7 @@ bt_fmrx_list_t		bt_fmrx_list;//节目的频点列表
 
 //蓝牙时间需要蓝牙外挂32.768K晶振
  __s32 sys_bt_set_time(u8* time)
-{	
+{
 	#if 0
 	__u8 i;
 	__msg("date time:");
@@ -51,15 +52,15 @@ bt_fmrx_list_t		bt_fmrx_list;//节目的频点列表
 	bt_time.day=time[2];
 	bt_time.hour=time[3];
 	bt_time.minute=time[4];
-	
+
 	sys_bt_get_time_to_app(&bt_time);
-	
+
 	return EPDK_OK;
 }
 
 __s32 sys_bt_get_time_to_app(bt_time_t *time)
 {
-#if RTOS	
+#if RTOS
 	//以下是把BT获取的时间设置给GUI指示时间
 	{
 		tui_time_t tui_time;
@@ -67,12 +68,12 @@ __s32 sys_bt_get_time_to_app(bt_time_t *time)
 		tui_time.mon = bt_time.month;
 		tui_time.mday = bt_time.day;
 		tui_time.hour = bt_time.hour;
-		tui_time.min= bt_time.minute;				
+		tui_time.min= bt_time.minute;
 		tui_time.sec= 0;
 		//printf("set time: year =%d,mday =%d,mday =%d",tui_time.year,tui_time.mon,tui_time.mday);
 		tui_set_localtime(&tui_time);
 	}
-#endif	
+#endif
     return EPDK_OK;
 }
 //app注意year变换数据类型先减2000
@@ -93,14 +94,14 @@ __s32 sys_bt_set_time_to_bt(bt_time_t *time)
 {
 #if RTOS
 	if(lcd_ctrl == '0')//关机关屏
-	{	
-		tui_sys_msg_send(TUI_DSK_MSG_SYS_POWER_OFF, NULL, NULL);	
+	{
+		tui_sys_msg_send(TUI_DSK_MSG_SYS_POWER_OFF, NULL, NULL);
 	}
 	else if(lcd_ctrl =='1')//开机开屏
-	{	
+	{
 		tui_sys_msg_send(TUI_DSK_MSG_SYS_POWER_ON, NULL, NULL);
 	}
-#endif		
+#endif
 	return;
 }
 
@@ -117,23 +118,23 @@ void sys_bt_ctrl_light(u8 light_ctrl)
     	turn_off_green();
     	turn_off_blue();
       */
-      
-      tui_sys_msg_send(TUI_DSK_MSG_SYS_BIG_LED, NULL, NULL);       
+
+      tui_sys_msg_send(TUI_DSK_MSG_SYS_BIG_LED, NULL, NULL);
     }
 	else if(light_ctrl=='1')///大灯开
 	{
 		//printf("===========big led open=========\n");
 		system_set_ill_state(ILL_STAT_ON);
-		
+
        /*
 		show_light_state();
 	   */
-	   
+
 	   //不能直接调用
-	   //dsk_display_set_lcd_brightness(LION_BRIGHT_LEVEL3);	   
-	   tui_sys_msg_send(TUI_DSK_MSG_SYS_BIG_LED, NULL, NULL);		
+	   //dsk_display_set_lcd_brightness(LION_BRIGHT_LEVEL3);
+	   tui_sys_msg_send(TUI_DSK_MSG_SYS_BIG_LED, NULL, NULL);
 	}
-#endif	
+#endif
 	return;
 }
  void sys_bt_ctrl_pev(u8 pev_ctrl)
@@ -147,7 +148,7 @@ void sys_bt_ctrl_light(u8 light_ctrl)
     	{
     	    return ;
     	}
-    	
+
     	tui_sys_msg_send(TUI_DSK_MSG_CAR_PEV_ON, NULL, NULL);
     }
     else if(pev_ctrl=='0')///exit pev
@@ -164,21 +165,21 @@ __s32 sys_bt_set_phonebook(u8 *phonebook)
 	__s32 numlen = 0;////电话号码长度
 	__s32 datelen = 0;////日期长度
 	__u8  type=0;
-	
+
 	__s32 numstart_index = 0;
 	__s32 i=0;
 	__s32 second_num_index=0;
 	__s32 second_num_cnt=0;
 	__s32 second_num_flag=0;
 	__u8  *ptr=0;
-	
+
 //	__msg("phonebook:[%s]\n",system_do_msg);
 	///取名称长度
 	namelen=phonebook[1];
 	numlen=phonebook[2];
 	datelen=phonebook[3];
 	type=phonebook[4];
-	
+
 	////指向NAME
 	ptr=&(phonebook[5]);
 	//__wrn("namelen =%d,numlen=%d,datelen =%d,type=%d",namelen,numlen,datelen,type);
@@ -200,7 +201,7 @@ __s32 sys_bt_set_phonebook(u8 *phonebook)
 		  __wrn("cur_phone_total =%d",bt_phonebook_para->cur_phone_total);
 		  if(bt_phonebook_para->cur_phone_total>=999)
 		   bt_phonebook_para->cur_phone_total= 999;
-		 
+
 		  break;
 		}
 		case 0x1://打出号码
@@ -239,9 +240,9 @@ __s32 sys_bt_set_phonebook(u8 *phonebook)
 		}
 		case 0xf0: //接收完毕,用户发送标记到GUI显示
 		{
-#if RTOS	
+#if RTOS
 			tui_sys_msg_send(TUI_USER_MSG_APP_GO_BT_BOOK_SHOW, NULL, NULL);
-#endif			
+#endif
 			break;
 		}
 		default:
@@ -258,14 +259,14 @@ __s32  sys_bt_get_phonenum(char *btstring)
 {
 	__s32 i=0;
 	char *p = &(btstring[2]);
-	
+
 	if(system_do_msg[1]!='G')
 	{
 		__msg("=====Wrong phone number====\n");
 		return 0;
 	}
 	memset(bt_callin_buf, 0, 64);
-	
+
 	for(i=0;i<60;i++,p++)
 	{
 		if(*p=='G')
@@ -293,21 +294,21 @@ void sys_bt_clear_phonebook(void)
     	//bt_phonebook_para->cur_phoneout_total=0;
     	//bt_phonebook_para->cur_phonein_total=0;
     	//bt_phonebook_para->cur_phonemiss_total=0;
-    	memset(bt_phonebook_para,0,sizeof(bt_phonebook_state));   	
+    	memset(bt_phonebook_para,0,sizeof(bt_phonebook_state));
 	}
-#endif	
+#endif
 }
 __s32 sys_bt_fm_process(void)
 {
     switch(system_do_msg[1])
     {
         case 'A'://返回节目号对应的频点
-        {            
+        {
              ChtoFreq = (system_do_msg[3]<<8)+system_do_msg[2];
         }
         break;
         case 'I':
-        {   
+        {
             bt_fmrx_info.ch_cnt = system_do_msg[2];
             bt_fmrx_list.ch_cnt =bt_fmrx_info.ch_cnt;
             bt_fmrx_info.ch_cur = system_do_msg[3];
@@ -317,8 +318,8 @@ __s32 sys_bt_fm_process(void)
         break;
         case 'L':
         {
-            u8 i;                
-            bt_fmrx_list.ch_cnt = system_do_msg[2]; //一般没有64个节目  
+            u8 i;
+            bt_fmrx_list.ch_cnt = system_do_msg[2]; //一般没有64个节目
             bt_fmrx_info.ch_cnt = bt_fmrx_list.ch_cnt;
             for(i = 0;i<bt_fmrx_list.ch_cnt;i++)
             {
@@ -361,31 +362,31 @@ __s32 sys_bt_dosomething(void)
 				bt_phone_state = BT_PHONE_INIT;
 				bt_audio_set_status(BT_STAT_IDLE);
 			    memset(phone_name_buf,0,24);
-#if RTOS			    
-                tui_obj_set_hidden(TUI_OBJ(GLOBAL_BAR_GLOBAL_VIEW_IMAGE_BTN_7), 1); 
-#endif                
+#if RTOS
+                tui_obj_set_hidden(TUI_OBJ(GLOBAL_BAR_GLOBAL_VIEW_IMAGE_BTN_7), 1);
+#endif
 			}
 			//蓝牙断开后需要退到上一个应用的
-#if RTOS				
+#if RTOS
 			if(system_get_bt_need_exit()==1)
 			{
-			    system_set_bt_need_exit(0);		    
-			    tui_sys_msg_send(TUI_DSK_MSG_RUN_PREV_AUDIO_APP, NULL, NULL);		    
+			    system_set_bt_need_exit(0);
+			    tui_sys_msg_send(TUI_DSK_MSG_RUN_PREV_AUDIO_APP, NULL, NULL);
 			}
-#endif				
+#endif
 		}
 		break;
 		case 'B'://HFP当前状态指示->连上了。
 		{
 			__msg("=====================BT_STATE_CONNECTED=====================\n");
-			///系统连上不管，连上后更新图标	
+			///系统连上不管，连上后更新图标
 			////draw not connect icon
 			bt_connect_flag	= BT_STATE_CONNECTED;
 			bt_phone_state = BT_PHONE_INIT;
 			bt_audio_set_status(BT_STAT_IDLE);
-#if RTOS			
-            tui_obj_set_hidden(TUI_OBJ(GLOBAL_BAR_GLOBAL_VIEW_IMAGE_BTN_7), 0); 
-#endif			 
+#if RTOS
+            tui_obj_set_hidden(TUI_OBJ(GLOBAL_BAR_GLOBAL_VIEW_IMAGE_BTN_7), 0);
+#endif
 		}
 		break;
 		case 'C'://蓝牙PIN码
@@ -401,13 +402,13 @@ __s32 sys_bt_dosomething(void)
 				}
 				bt_pincard_buf[i]=system_do_msg[2+i];
 				//__inf("=%x=",bt_pincard_buf[i]);
-				
+
 			}
-#if RTOS			
+#if RTOS
 			__msg("======================bt PIN :%s======================\n",bt_pincard_buf);
 			tui_sys_msg_send(TUI_USER_MSG_APP_GO_BT_SET_PIN, NULL, NULL);
 #endif
-			
+
 		}
 		break;
 		case 'D'://手机正在拔号
@@ -419,14 +420,14 @@ __s32 sys_bt_dosomething(void)
 				{
 					///__msg("=====there was no connection==============\n");
 					bt_connect_flag	= BT_STATE_CONNECTED;
-#if RTOS					
+#if RTOS
 					tui_obj_set_hidden(TUI_OBJ(GLOBAL_BAR_GLOBAL_VIEW_IMAGE_BTN_7), 0);
-#endif					
+#endif
 				}
 				bt_phone_state = BT_PHONE_OUTING;
-#if RTOS				
+#if RTOS
 				tui_sys_msg_send(TUI_DSK_MSG_PHONE_CALLING, NULL, NULL);
-#endif				
+#endif
 			}
 			else
 			{
@@ -441,14 +442,14 @@ __s32 sys_bt_dosomething(void)
 			{
 				///__msg("=====there was no connection==============\n");
 				bt_connect_flag	= BT_STATE_CONNECTED;
-#if RTOS				
+#if RTOS
 				tui_obj_set_hidden(TUI_OBJ(GLOBAL_BAR_GLOBAL_VIEW_IMAGE_BTN_7), 0);
-#endif				
+#endif
 			}
 			bt_phone_state = BT_PHONE_INIT;
-#if RTOS			
+#if RTOS
 			tui_sys_msg_send(TUI_DSK_MSG_BREAK_CALLING, NULL, NULL);
-#endif			
+#endif
 		}
 		break;
 		case 'F'://///////来电指示///无电话号码
@@ -459,20 +460,20 @@ __s32 sys_bt_dosomething(void)
 			{
 				///__msg("=====there was no connection==============\n");
 				bt_connect_flag	= BT_STATE_CONNECTED;
-				
+
 				tui_obj_set_hidden(TUI_OBJ(GLOBAL_BAR_GLOBAL_VIEW_IMAGE_BTN_7), 0);
-			
+
 			}
 			if(bt_phone_state != BT_PHONE_INING)
 			{
 				bt_phone_state = BT_PHONE_INING;
 			}
-				
+
 			__msg("===================================================\n");
 			if(system_get_lcd_state()==LCD_STAT_OFF)//当前关屏状态
 			{
 				__msg("=========bt_audio_to_phone=========\n");
-				bt_audio_to_phone();				
+				bt_audio_to_phone();
 				return 0;
 			}
 			else
@@ -519,12 +520,12 @@ __s32 sys_bt_dosomething(void)
 					}
 				}
 			}
-#endif			
+#endif
 		}
 		break;
 		case 'G'://{"ID",	4},///////来电指示///来电指示(电话打进)同时取出电话号码
 		{
-#if RTOS			
+#if RTOS
 			__msg("===================Incoming call indication=======================\n");
 			if(bt_connect_flag!=BT_STATE_CONNECTED)
 			{
@@ -545,12 +546,12 @@ __s32 sys_bt_dosomething(void)
 				///__msg("====当前是BT====\n");
 				tui_sys_msg_send(TUI_DSK_MSG_PHONE_CALLING, NULL, NULL);
 			}
-#endif			
+#endif
 		}
 		break;
 		case 'I'://{"IG",	4},///////电话接起
 		{
-#if RTOS		
+#if RTOS
 			__msg("=============================The phone has been answered777777======================\n");
 	        if(bt_connect_flag!=BT_STATE_CONNECTED)
 			{
@@ -560,7 +561,7 @@ __s32 sys_bt_dosomething(void)
 			}
 			bt_connect_flag	= BT_STATE_CONNECTED;
 			/////////////////////////////////////////////////////////////////////////////////
-			
+
 			if(bt_phone_state ==BT_PHONE_INING)
 			{
 				__msg("==================talking in===================\n");
@@ -576,14 +577,14 @@ __s32 sys_bt_dosomething(void)
 			{
 				tui_sys_msg_send(TUI_USER_MSG_APP_GO_BT_PHONENUMBER_SHOW, NULL, NULL);
 			}
-#endif			
+#endif
 		}
 		break;
 		case 'K'://正在连接的手机名
 		{
-#if RTOS		
+#if RTOS
 			__s32	i=0;
-			
+
 			__msg("=============================phone bt name======================\n");
 			for(i=0;i<24;i++)
 			{
@@ -595,16 +596,16 @@ __s32 sys_bt_dosomething(void)
 				}
 				phone_name_buf[i]=system_do_msg[2+i];
 				//__inf("=%x=",phone_name_buf[i]);
-				
+
 			}
 			__msg("=============================phone bt name:%s======================\n",phone_name_buf);
 			tui_sys_msg_send(TUI_USER_MSG_APP_GO_BT_SET_BTNAME, NULL, NULL);
-#endif			
+#endif
 		}
 		break;
 		case 'M'://{"mb",	4},///////播音乐
 		{
-#if RTOS		
+#if RTOS
 			__msg("============================play music======================\n");
 			//////////////////////////////解开机没有图标问题点/////////////////////////
 			bt_connect_flag	= BT_STATE_CONNECTED;
@@ -612,13 +613,13 @@ __s32 sys_bt_dosomething(void)
 			//bt_phone_music_state = 1;
 			bt_phone_state = BT_PHONE_INIT;
 			//bt_mute_flag=0;    ///开声音
-#endif			
+#endif
 		}
 		break;
 		case 'N'://蓝牙设备名
 		{
-#if RTOS		
-			__msg("=============================host bt name======================\n");		
+#if RTOS
+			__msg("=============================host bt name======================\n");
 			for(i=0;i<24;i++)
 			{
 				if(system_do_msg[2+i]==0xff||system_do_msg[2+i]==0x0)
@@ -629,17 +630,17 @@ __s32 sys_bt_dosomething(void)
 				}
 				bt_hostname_buf[i]=system_do_msg[2+i];
 				//__inf("=%x=",bt_hostname_buf[i]);
-				
+
 			}
             __msg("=============================host bt name:%s======================\n",bt_hostname_buf);
 			//bt_phone_music_state = 1;
 			tui_sys_msg_send(TUI_USER_MSG_APP_GO_BT_SET_HOSTNAME, NULL, NULL);
-#endif			
+#endif
 		}
 		break;
 		case 'S'://取BT STATE
 		{
-#if RTOS		
+#if RTOS
 			// BT_STATUS_CONNECTING,       /*已连接，没有电话和音乐在活动*///40
     		//BT_STATUS_TAKEING_PHONE,    /*正在电话*/
     		//BT_STATUS_PLAYING_MUSIC,    /*正在音乐*/
@@ -656,7 +657,7 @@ __s32 sys_bt_dosomething(void)
 			else if(system_do_msg[2]==41)//BT_STATUS_TAKEING_PHONE
 			{
 				///__msg("======================来电指示====================\n");
-				
+
 				if(bt_phone_state != BT_PHONE_INING)
 				{
 					bt_phone_state=BT_PHONE_INING;
@@ -687,7 +688,7 @@ __s32 sys_bt_dosomething(void)
 					}
 					else
 					{
-					
+
 						__u8 cur_app= system_get_cur_app();
 					    if(cur_app != ID_APP_BT)
 						{
@@ -706,29 +707,29 @@ __s32 sys_bt_dosomething(void)
 							bt_phone_state = BT_PHONE_INING;
 							__msg("=====show phone call in number:%s=====\n",bt_callin_buf);
 							tui_sys_msg_send(TUI_USER_MSG_APP_GO_BT_PHONENUMBER_SHOW, NULL, NULL);
-							
+
 						}
 					}
-				
+
 				}
 			}
 			else if(system_do_msg[2]==42)//BT_STATUS_PLAYING_MUSIC
 			{
-				
+
 				bt_connect_flag	= BT_STATE_CONNECTED;
 				bt_phone_state = BT_PHONE_INIT;
-				
+
 			}
-#endif			
+#endif
 		}
 		break;
 		case 'H'://蓝牙MAC ADDR
 		{
 #if RTOS
-			__msg("=============================mac addr======================\n");	
+			__msg("=============================mac addr======================\n");
 			char 	addr_buf[12]={0};
             char 	temp_buf[12]={0};
-            
+
 			for(i=0;i<24;i++)
 			{
 				if(system_do_msg[2+i]==0xff||system_do_msg[2+i]==0x0)
@@ -748,14 +749,14 @@ __s32 sys_bt_dosomething(void)
 				     sprintf(temp_buf,"%x",addr_buf[i]);
 				     strcat(bt_macaddr_buf, temp_buf);
 				}
-				
+
 				//__inf("=%x=",addr_buf[i]);
-			 
+
 			}
 			lowercase_2_uppercase(&bt_macaddr_buf);   //将小写字母部分统一转换成大写
-			
+
            __msg("=============mac addr :%s=========\n",bt_macaddr_buf);
-#endif			
+#endif
 		}
 		break;
 		default:
@@ -780,7 +781,7 @@ __s32 sys_bt_set_music_info(void)
             strncpy(bt_ID3_info->title_name, ptr, datalen+1);
             __msg("title_name =%s",bt_ID3_info->title_name);
 
-            
+
         }
         break;
         case 'S'://歌曲Artist
@@ -827,7 +828,7 @@ __s32 sys_bt_set_music_info(void)
         	{
         		sprintf(bt_ID3_info->cur_time,"%d%d",0,min);
         	}
-            
+
         	strcat(bt_ID3_info->cur_time,":");
         	if(sec > 9)
         	{
@@ -840,7 +841,7 @@ __s32 sys_bt_set_music_info(void)
            strcat(bt_ID3_info->cur_time,tmp_time);
 
            // sprintf(bt_ID3_info->cur_time,"%d/%d",min,sec);
-           
+
         }
         break;
         case 'T'://总播放时间
@@ -863,7 +864,7 @@ __s32 sys_bt_set_music_info(void)
         	{
         		sprintf(bt_ID3_info->total_time,"%d%d",0,min);
         	}
-            
+
         	 strcat(bt_ID3_info->total_time,":");
         	if(sec > 9)
         	{
@@ -874,22 +875,22 @@ __s32 sys_bt_set_music_info(void)
         		sprintf(tmp_time,"%d%d",0,sec);
         	}
            strcat(bt_ID3_info->total_time,tmp_time);
-           
+
            //sprintf(bt_ID3_info->total_time,"%d/%d",min,sec);
-           
+
         }
         break;
         default:
         __msg("id3 info err!");
 		break;
-        
+
     }
     return 0;
 }
 //蓝牙返回的音乐播放状态
  void sys_bt_set_music_status(u8 music_status)
 {
-	
+
 	__msg("=====bt music status:%x====\n",music_status);
 	if(music_status=='A')///stop
 	{
@@ -901,7 +902,7 @@ __s32 sys_bt_set_music_info(void)
 		__msg("=================bt music play==============\n");
 		bt_audio_set_status(BT_STAT_PLAY);
 	}
-		
+
 	return;
 }
 
@@ -946,8 +947,8 @@ __s32 sys_bt_spp_rfcomm_is_connected(void)
 }
 
 
-//这里需要用户端实现处理SPP接收到的数据，透传
-__s32 bt_spp_rx_data(char *CmdStr,unsigned char len) 
+//这里需要用户端实现处理SPP接收到的数据
+__s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
 {
     u8 oncecmd,seccmd;
     oncecmd = CmdStr[0];
@@ -961,7 +962,7 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
         {
             if(seccmd == 'A')
             {
-               bt_spp_rx_data_rfcomm(&CmdStr[2],len-2);   
+               bt_spp_rx_data_rfcomm(&CmdStr[2],len-2);
                sys_bt_set_phone_type(PHONE_ANDROID_AUTO);
             }
         }
@@ -970,7 +971,7 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
         {
             if(seccmd == 'V')
             {
-                    
+
             }
         }
         break;
@@ -978,7 +979,7 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
         {
             if(seccmd == 'B')//bt mac addr CmdStr[2]
             {
-                   
+
             }
         }
         break;
@@ -990,7 +991,7 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
             }
             else if(seccmd == 'B')////reconnect bt return state
             {
-                   
+
             }
         }
         break;
@@ -1004,7 +1005,7 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
                    __log("%x",CmdStr[2+i]);
                 }
                 __log("\n");
-                
+
             }
         }
         break;
@@ -1012,7 +1013,7 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
         {
             if(seccmd == 'A')//bt name CmdStr[2],等于 hostname
             {
-                   
+
             }
         }
         break;
@@ -1020,19 +1021,19 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
         {
             if(seccmd == 0)//配对开始
             {
-            
+
             }
             else if(seccmd == 1)//配对成功
             {
-            
+
             }
             else if(seccmd == 2)//配对失败
             {
-            
+
             }
            // else if(seccmd == 3)//配对结束
            // {
-            
+
            // }
         }
         break;
@@ -1040,7 +1041,7 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
         {
             if(seccmd == 'A')//phone name CmdStr[2]
             {
-            
+
             }
             else  if(seccmd == 'I')//rfcomm data CmdStr[2]
             {
@@ -1048,11 +1049,11 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
             }
             else  if(seccmd == 'V')//rfcomm connected return state
             {
-                
+                bt_spp_connect_flag = BT_SPP_STATE_CONNECTED;
             }
             else  if(seccmd == 'S')//rfcomm disconnected return state
             {
-                
+                bt_spp_connect_flag = BT_SPP_STATE_DISCONNECTED;
             }
         }
         break;
@@ -1060,7 +1061,7 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
         {
             if(seccmd == 'S')//UUID start
             {
-            
+
             }
             else  if(seccmd == 'U')//carplay UUID data CmdStr[2]
             {
@@ -1069,8 +1070,8 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
             }
             else  if(seccmd == 'E')//UUID end
             {
-                
-            }    
+
+            }
         }
         break;
         default:
@@ -1079,8 +1080,9 @@ __s32 bt_spp_rx_data(char *CmdStr,unsigned char len)
     return EPDK_OK;
 }
 
-//这里需要用户端实现处理BLE接收到的数据，透传
-__s32 bt_ble_rx_data(char *CmdStr,unsigned char len) 
+//这里需要用户端实现处理BLE接收到的数据
+#if 0
+__s32 bt_ble_rx_data(char *CmdStr,unsigned char len)
 {
 #if RTOS
    // phonelink_ble_rx(CmdStr,len);
@@ -1097,7 +1099,51 @@ __s32 bt_ble_rx_data(char *CmdStr,unsigned char len)
     }
     return EPDK_OK;
 }
+#endif
 
+static void (*connect_cb)(int status) = NULL;
+
+void bt_hid_request_connect_cb(void *cb(int status))
+{
+    connect_cb = cb;
+}
+
+//这里需要用户端实现处理HID接收到的数据
+__s32 bt_hid_rx_data(char *CmdStr,unsigned char len)
+{
+    u8 oncecmd,seccmd;
+    oncecmd = CmdStr[0];
+    seccmd = CmdStr[1];
+#if RTOS
+   // phonelink_hid_rx(CmdStr,len);
+#endif
+    switch(CmdStr[0])
+    {
+        case 'H':
+        {
+            if(seccmd == 'L')
+            {
+
+            }
+            else  if(seccmd == 'B')
+            {
+                bt_hid_connect_flag = BT_HID_STATE_CONNECTED;
+            }
+            else  if(seccmd == 'A')
+            {
+                bt_hid_connect_flag = BT_HID_STATE_DISCONNECTED;
+            }
+
+            if (connect_cb)
+                connect_cb(bt_hid_connect_flag);
+        }
+        break;
+        default:
+        break;
+
+    }
+    return EPDK_OK;
+}
 
 
 /**************************bt uart******************************
@@ -1111,13 +1157,13 @@ __s32 com_uart_init(void)
 	if(0 == uart_init)
 	{
 	    uart_init = 1;
-#if RTOS 
+#if RTOS
       rtos_com_uart_init();
 #endif
-#if RTT 
+#if RTT
       rtt_com_uart_init();
 #endif
-#if LINUX 
+#if LINUX
        linux_com_uart_init();
 #endif
     }
@@ -1128,13 +1174,13 @@ __s32 com_uart_deinit(void)
 {
     if(1 == uart_init)
 	{
-#if RTOS 
+#if RTOS
         rtos_com_uart_deinit();
 #endif
-#if RTT 
+#if RTT
         rtt_com_uart_deinit();
 #endif
-#if LINUX 
+#if LINUX
         linux_com_uart_deinit();
 #endif
         uart_init = 0;
@@ -1144,13 +1190,13 @@ __s32 com_uart_deinit(void)
 
 __s32 com_uart_write(char* pbuf, __s32 size)
 {
-#if RTOS 
+#if RTOS
     rtos_com_uart_write(pbuf, size);
 #endif
-#if RTT 
+#if RTT
     rtt_com_uart_write(pbuf, size);
 #endif
-#if LINUX 
+#if LINUX
     linux_com_uart_write(pbuf, size);
 #endif
 	return EPDK_OK;
@@ -1158,13 +1204,13 @@ __s32 com_uart_write(char* pbuf, __s32 size)
 
 __s32 com_uart_read(char* pbuf, __s32 buf_size, __s32* size)
 {
-#if RTOS 
+#if RTOS
     rtos_com_uart_read(pbuf,buf_size,size);
 #endif
-#if RTT 
+#if RTT
     rtt_com_uart_read(pbuf,buf_size,size);
 #endif
-#if LINUX 
+#if LINUX
     linux_com_uart_read(pbuf,buf_size,size);
 #endif
 	return EPDK_OK;
@@ -1172,13 +1218,13 @@ __s32 com_uart_read(char* pbuf, __s32 buf_size, __s32* size)
 
 __s32 com_uart_flush(void)
 {
-#if RTOS 
+#if RTOS
     rtos_com_uart_flush();
 #endif
-#if RTT 
+#if RTT
     rtt_com_uart_flush();
 #endif
-#if LINUX 
+#if LINUX
     linux_com_uart_flush();
 #endif
 	return EPDK_OK;
@@ -1191,30 +1237,30 @@ __s32 com_uart_state(void)
 
 __s32 bt_para_init(void)
 {
-#if RTOS  
+#if RTOS
 	bt_phonebook_para = (bt_phonebook_state *)esMEMS_Balloc(sizeof(bt_phonebook_state));
 	if(bt_phonebook_para == NULL)
 	{
-		printf("=============Request phone book fail=============\n");	
+		printf("=============Request phone book fail=============\n");
 		goto para_exit;
-	}	
+	}
 
 	bt_ID3_info = (bt_ID3_info_t *)esMEMS_Balloc(sizeof(bt_ID3_info_t));
 	if(bt_ID3_info == NULL)
 	{
-		printf("=============Request bt_ID3_info fail=============\n");	
+		printf("=============Request bt_ID3_info fail=============\n");
 		goto para_exit;
 	}
-	
+
     memset((void *)bt_phonebook_para, 0, sizeof(bt_phonebook_state));
     memset((void *)bt_ID3_info, 0, sizeof(bt_ID3_info_t));
-#endif    	
+#endif
 
     return EPDK_OK;
 para_exit:
 
-#if RTOS  
-    printf("=============Request memory fail=============\n");	
+#if RTOS
+    printf("=============Request memory fail=============\n");
     if(bt_ID3_info)
     {
          memset(bt_ID3_info, 0, sizeof(bt_ID3_info_t));
@@ -1224,16 +1270,16 @@ para_exit:
     {
          memset(bt_phonebook_para, 0, sizeof(bt_phonebook_state));
          esMEMS_Bfree(bt_phonebook_para,sizeof(bt_phonebook_state));
-    }  
-#endif    
+    }
+#endif
     return EPDK_FAIL;
-    
+
 }
 
 __s32 bt_para_exit(void)
 {
 
-#if RTOS    
+#if RTOS
     if(bt_ID3_info)
     {
          memset(bt_ID3_info, 0, sizeof(bt_ID3_info_t));
@@ -1243,36 +1289,36 @@ __s32 bt_para_exit(void)
     {
          memset(bt_phonebook_para, 0, sizeof(bt_phonebook_state));
         esMEMS_Bfree(bt_phonebook_para,sizeof(bt_phonebook_state));
-    }    
-#endif    
+    }
+#endif
     return EPDK_OK;
 }
 
 
 __s32 bt_task_start(void)
 {
-#if RTOS 
+#if RTOS
     rtos_bt_task_start();
 #endif
-#if RTT 
+#if RTT
     rtt_bt_task_start();
 #endif
-#if LINUX 
+#if LINUX
     linux_bt_task_start();
-#endif	
+#endif
 	return EPDK_OK;
 
 }
 
 __s32 bt_task_stop(void)
 {
-#if RTOS 
+#if RTOS
     rtos_bt_task_stop();
 #endif
-#if RTT 
+#if RTT
     rtt_bt_task_stop();
 #endif
-#if LINUX 
+#if LINUX
     linux_bt_task_stop();
 #endif
 	return EPDK_OK;
@@ -1282,13 +1328,13 @@ __s32 bt_task_stop(void)
 void bt_msleep(uint16_t ticks)
 {
 
-#if RTOS 
+#if RTOS
     rtos_msleep(ticks);
 #endif
-#if RTT 
+#if RTT
     rtt_msleep(ticks);
 #endif
-#if LINUX 
+#if LINUX
     linux_msleep(ticks);
 #endif
     return;

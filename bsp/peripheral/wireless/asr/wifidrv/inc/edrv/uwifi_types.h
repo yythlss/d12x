@@ -116,6 +116,6 @@
                    (NX_NB_TXQ_PER_VIF * NX_VIRT_DEV_MAX) + 1)
 
 /* A dma_addr_t can hold any valid DMA or bus address for the platform */
-typedef uint32_t dma_addr_t;
+//typedef uint32_t dma_addr_t;
 
 #endif //__UWIFI_TYPES_H__

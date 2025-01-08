@@ -73,7 +73,8 @@ static int read_dir(char* path, struct audio_file_list *files)
         if (ptr == NULL)
             continue;
 
-        if (strcmp(ptr, ".mp3") && strcmp(ptr, ".wav") && strcmp(ptr, ".flac"))
+        if (strcmp(ptr, ".mp3") && strcmp(ptr, ".wav") &&
+            strcmp(ptr, ".flac") && strcmp(ptr, ".wma"))
             continue;
 
         printf("name: %s\n", dir_file->d_name);

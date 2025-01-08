@@ -70,7 +70,7 @@ void *_mpp_alloc_(size_t len,const char *file,int line)
     }
     pthread_mutex_unlock(&g_mem_mutex);
 #endif
-	return ptr;
+    return ptr;
 }
 
 void mpp_free(void *ptr)
@@ -129,7 +129,7 @@ void show_mem_info_debug()
 #define ALIGN_1024B(x) ((x+1023)&(~1023))
 // base address of reserved buffer
 #define BASE_ADDR 0x43a00000
-#define MEMORY_NUM 32
+#define MEMORY_NUM 48
 //#define USE_CARVOUT
 
 struct phy_mem_info {

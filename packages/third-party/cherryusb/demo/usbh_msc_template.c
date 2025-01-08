@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2022, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -13,6 +13,7 @@ struct usbh_msc *active_msc_class;
 struct dfs_partition part0;
 
 #define USING_AIC_GET_PART
+#define MBR_MAX_DPT_NUM 4
 
 #ifdef USING_AIC_GET_PART
 #include <disk_part.h>
@@ -46,8 +47,33 @@ static int aic_get_part(struct dfs_partition *part)
         part->type = 0;
         part->offset = parts->start / dev_desc.blksz;
         part->size = parts->size / dev_desc.blksz;
+        pr_info("GPT: Found partition: type = %d, offet=0x%lx, size=0x%x\n",
+                    part->type, part->offset, part->size);
         aic_part_free(parts);
+        return 0;
     }
+    return -1;
+}
+
+static int aic_no_part_handle(struct dfs_partition *part)
+{
+    part->type = 0;
+    part->offset = 0x0;
+    part->size = (unsigned int)active_msc_class->blocknum;
+
+    rt_kprintf("No partition info. Using capacity info size: ");
+
+    if ((part->size >> 11) == 0) {
+        rt_kprintf("%d%s", part->size >> 1, "KB\n");
+    } else {
+        unsigned int part_size;
+        part_size = part->size >> 11;
+        if ((part_size >> 10) == 0)
+            rt_kprintf("%d.%d%s", part_size, (part->size >> 1) & 0x3FF, "MB\n");
+        else
+            rt_kprintf("%d.%d%s", part_size >> 10, part_size & 0x3FF, "GB\n");
+    }
+
     return 0;
 }
 #endif
@@ -75,7 +101,6 @@ static rt_size_t rt_udisk_read(rt_device_t dev, rt_off_t pos, void* buffer,
     rt_err_t ret;
 
     ret = usbh_msc_scsi_read10(active_msc_class, part0.offset + pos, buffer, size);
-
     if (ret != RT_EOK)
     {
         rt_kprintf("usb mass_storage read failed\n");
@@ -153,25 +178,31 @@ int udisk_init(void)
     ret = usbh_msc_scsi_read10(active_msc_class, 0, sector, 1);
     if (ret != RT_EOK) {
         rt_kprintf("usb mass_storage read failed\n");
+        USB_LOG_WRN("FAT-fs (sda1): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.\n");
         goto free_res;
     }
 
     memset(&part0, 0, sizeof(part0));
 
-    for (i=0; i<16; i++) {
+    for (i = 0; i < MBR_MAX_DPT_NUM; i++) {
         /* Get the first partition (MBR)*/
         ret = dfs_filesystem_get_partition(&part0, sector, i);
         if (ret == RT_EOK) {
             pr_info("Found partition %d: type = %d, offet=0x%lx, size=0x%x\n",
                      i, part0.type, part0.offset, part0.size);
-            break;
+            goto _finish;
         }
     }
 
 #ifdef USING_AIC_GET_PART
-    aic_get_part(&part0);
+    ret = aic_get_part(&part0);
 #endif
 
+    /* No partition */
+    if (ret != 0)
+        aic_no_part_handle(&part0);
+
+_finish:
     udisk_dev.type    = RT_Device_Class_Block;
 #ifdef RT_USING_DEVICE_OPS
     udisk_dev.ops     = &udisk_device_ops;
@@ -329,7 +360,7 @@ int udisk_init(void)
 
     memset(&part0, 0, sizeof(part0));
 
-    for (i=0; i<16; i++) {
+    for (i = 0; i < MBR_MAX_DPT_NUM; i++) {
         /* Get the first partition */
         ret = dfs_filesystem_get_partition(&part0, sector, i);
         if (ret == EOK) {
@@ -340,8 +371,13 @@ int udisk_init(void)
     }
 
 #ifdef USING_AIC_GET_PART
-    aic_get_part(&part0);
+    ret = aic_get_part(&part0);
 #endif
+
+    /* No partition */
+    if (ret != 0)
+        aic_no_part_handle(&part0);
+
 
     if (dfs_mount("udisk", "/udisk", "elm", 0, DEVICE_TYPE_USB_DISK) < 0) {
         pr_err("Failed to mount udisk with FatFS\n");

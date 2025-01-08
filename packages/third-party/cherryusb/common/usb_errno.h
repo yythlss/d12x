@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, sakumisu
+ * Copyright (c) 2023-2024, sakumisu
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -20,5 +20,6 @@
 #define USB_ERR_IO       12
 #define USB_ERR_SHUTDOWN 13
 #define USB_ERR_TIMEOUT  14
+#define USB_ERR_ALIGN    15
 
 #endif /* USB_ERRNO_H */

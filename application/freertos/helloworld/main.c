@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -10,12 +10,17 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+
 #include <board.h>
 #include <hal_syscfg.h>
 #include <aic_core.h>
 #include <aic_drv_bare.h>
+#ifdef AIC_DISPLAY_DRV
 #include <artinchip_fb.h>
+#endif
+#ifdef AIC_VE_DRV
 #include "aic_hal_ve.h"
+#endif
 #include "aic_reboot_reason.h"
 #include <aic_log.h>
 #ifdef AIC_DMA_DRV
@@ -26,6 +31,14 @@
 #include <usbh_core.h>
 #include <usbh_hub.h>
 #include <usb_hc.h>
+#endif
+
+#ifdef AIC_GPIO_DRV
+#include "aic_drv_gpio.h"
+#endif
+
+#ifdef AIC_ADCIM_DRV
+#include "hal_adcim.h"
 #endif
 
 #ifdef LPKG_USING_DFS
@@ -51,37 +64,43 @@ extern void lv_port_indev_init(void);
 extern void lv_user_gui_init(void);
 #endif
 
+void show_version(void);
+
 void show_banner(void)
 {
     printf("%s\n", BANNER);
-    printf("Welcome to ArtInChip Luban-Lite %d.%d [FreeRTOS - Built on %s %s]\n",
-               LL_VERSION, LL_SUBVERSION, __DATE__, __TIME__);
+    show_version();
 }
 
+#ifdef AIC_CONSOLE_BARE_DRV
 static void console_loop_thread(void *arg)
 {
-#ifdef AIC_CONSOLE_BARE_DRV
     /* Console shell loop */
     console_init();
     console_loop();
-#endif
 
     /* FreeRTOS Task exit */
     aicos_thread_delete(NULL);
 }
+#endif
 
 static int board_init(void)
 {
     int cons_uart;
+#ifdef AIC_CONSOLE_BARE_DRV
     aicos_thread_t tshell = NULL;
+#endif
 
+#ifdef AIC_SYSCFG_DRV
     hal_syscfg_probe();
-
+#endif
     aicos_local_irq_enable();
 
     cons_uart = AIC_BAREMETAL_CONSOLE_UART;
     uart_init(cons_uart);
+#ifdef AIC_PRINTF_BARE_DRV
     stdio_set_uart(cons_uart);
+#endif
 
     show_banner();
 
@@ -138,6 +157,10 @@ int main(void)
 #ifdef LPKG_USING_DFS_ELMFAT
     elm_init();
 #endif
+#endif
+
+#ifdef AIC_GPIO_DRV
+    drv_pin_init();
 #endif
 
 #ifdef LPKG_USING_DFS_ROMFS
@@ -237,6 +260,10 @@ int main(void)
     while (1) {
         sdcard_hotplug_act();
     }
+#endif
+
+#ifdef AIC_ADCIM_DRV
+    hal_adcim_probe();
 #endif
 
     /* FreeRTOS Task exit */

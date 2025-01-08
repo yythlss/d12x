@@ -12,12 +12,13 @@ extern "C" {
 
 static uint8_t bt_play_status = 0;
 
-static u8 tmp_spp_txdata[528]={'\0'};//spp rfcomm Í¨Ñ¶ºó·¢ËÍ¸ø³µ»úµÄÊı¾İ£¬°üº¬À¶ÑÀÃüÁî£¬µÚÈı·½¿âÍ¸´«¹ıÈ¥µÄÊı¾İµÈ
-static u8 spp_txdata[528]={'\0'};    //spp rfcomm Í¨Ñ¶ºó·¢ËÍ¸ø³µ»úµÄÊı¾İ£¬°üº¬À¶ÑÀÃüÁî£¬µÚÈı·½¿âÍ¸´«¹ıÈ¥µÄÊı¾İµÈ
- u8 spp_rxdata[512]={'\0'}; //rfcomm Í¨Ñ¶ºó´ÓÊÖ»ú½ÓÊÕÍ¸´«µÄÊı¾İ
+static u8 tmp_spp_txdata[528]={'\0'};//spp rfcomm é€šè®¯åå‘é€ç»™è½¦æœºçš„æ•°æ®ï¼ŒåŒ…å«è“ç‰™å‘½ä»¤ï¼Œç¬¬ä¸‰æ–¹åº“é€ä¼ è¿‡å»çš„æ•°æ®ç­‰
+static u8 spp_txdata[528]={'\0'};    //spp rfcomm é€šè®¯åå‘é€ç»™è½¦æœºçš„æ•°æ®ï¼ŒåŒ…å«è“ç‰™å‘½ä»¤ï¼Œç¬¬ä¸‰æ–¹åº“é€ä¼ è¿‡å»çš„æ•°æ®ç­‰
+u8 spp_rxdata[512]={'\0'}; //rfcomm é€šè®¯åä»æ‰‹æœºæ¥æ”¶é€ä¼ çš„æ•°æ®
 
 
-//½«Ğ¡Ğ´×ÖÄ¸×ª»»³É´óĞ¡×ÖÄ¸
+
+//å°†å°å†™å­—æ¯è½¬æ¢æˆå¤§å°å­—æ¯
 __s32  lowercase_2_uppercase(char *str)
 {
     char *p_str = NULL ;
@@ -86,11 +87,11 @@ void BtCmdSend (char *CmdStr,unsigned char len)
 
 	return;
 }
-///////Ò»´ÎĞÔ·¢³öµç»°ºÅÂë¡£
+///////ä¸€æ¬¡æ€§å‘å‡ºç”µè¯å·ç ã€‚
 __s32 bt_phone_call(char *phonenumber,__s32 len)
 {
 	/////AT#CW 18664959468 \r\n
-	char call_buf[BT_TEXT_LEN]={"CWN"};///ºóÃæ¸úºÅÂë¸öÊı
+	char call_buf[BT_TEXT_LEN]={"CWN"};///åé¢è·Ÿå·ç ä¸ªæ•°
 	__s32 i=0;
 
 
@@ -116,7 +117,7 @@ __s32 bt_phone_call(char *phonenumber,__s32 len)
 	////////////////////////////////////////////////////////////////////////////////////////
 	return EPDK_OK;
 }
-///////Ã¿´ÎÖ»ÄÜ°ÎÒ»Î»·Ö»úºÅ¡£
+///////æ¯æ¬¡åªèƒ½æ‹”ä¸€ä½åˆ†æœºå·ã€‚
 __s32 bt_callphone_subnum(char *num)
 {
 	/////AT#CW 18664959468 -601 \r\n
@@ -130,7 +131,7 @@ __s32 bt_callphone_subnum(char *num)
 	BtCmdSend (str_buf,3);
 	return EPDK_OK;
 }
-///////½øÈëÅä¶Ô
+///////è¿›å…¥é…å¯¹
 __s32 bt_makepair(void)
 {
 	/////AT#ca\r\n
@@ -139,7 +140,7 @@ __s32 bt_makepair(void)
 	BtCmdSend (pair,2);
 	return EPDK_OK;
 }
-///////È¡ÏûÅä¶Ô
+///////å–æ¶ˆé…å¯¹
 __s32 bt_makeunpair(void)
 {
 	/////AT#cb\r\n
@@ -148,7 +149,7 @@ __s32 bt_makeunpair(void)
 	BtCmdSend (pair,2);
 	return EPDK_OK;
 }
-///////À´µç½ÓÌı
+///////æ¥ç”µæ¥å¬
 __s32 bt_phone_incoming(void)
 {
 	/////AT#ce\r\n
@@ -157,7 +158,7 @@ __s32 bt_phone_incoming(void)
 	BtCmdSend (pair,2);
 	return EPDK_OK;
 }
-///////¾Ü½ÓÀ´µç
+///////æ‹’æ¥æ¥ç”µ
 __s32 bt_phone_reject(void)
 {
 	/////AT#cf\r\n
@@ -166,7 +167,7 @@ __s32 bt_phone_reject(void)
 	BtCmdSend (pair,2);
 	return EPDK_OK;
 }
-///////¹Ò¶Ïµç»°
+///////æŒ‚æ–­ç”µè¯
 __s32 bt_phone_break(void)
 {
 	/////AT#cg\r\n
@@ -175,7 +176,7 @@ __s32 bt_phone_break(void)
 	BtCmdSend (pair,2);
 	return EPDK_OK;
 }
-///////ÖØ²¥µç»°
+///////é‡æ’­ç”µè¯
 __s32 bt_phone_recall(void)
 {
 	/////AT#ch\r\n
@@ -205,7 +206,7 @@ __s32 bt_vol_dec(void)
 ///////mute
 __s32 bt_vol_mute(void)
 {
-	///////////////////////////////²»ÈÃÀ¶ÑÀĞ¾Æ¬³öÉùÒô//////////////
+	///////////////////////////////ä¸è®©è“ç‰™èŠ¯ç‰‡å‡ºå£°éŸ³//////////////
 	/////AT#cm\r\n
 	char pair[2]={'A','C'};
 	//__msg("======bt_vol_mute=======\n");
@@ -213,7 +214,7 @@ __s32 bt_vol_mute(void)
 	return EPDK_OK;
 }
 __s32 bt_vol_unmute(void)
-{	///////////////////////////////ÈÃÀ¶ÑÀĞ¾Æ¬³öÉùÒô//////////////
+{	///////////////////////////////è®©è“ç‰™èŠ¯ç‰‡å‡ºå£°éŸ³//////////////
 	/////AT#cm\r\n
 	char pair[2]={'A','O'};
 	//__msg("======bt_vol_unmute=======\n");
@@ -221,7 +222,7 @@ __s32 bt_vol_unmute(void)
 	return EPDK_OK;
 }
 
-///Í¨Öªbt ¹Ø»ú¡£
+///é€šçŸ¥bt å…³æœºã€‚
 __s32 bt_power_off(void)
 {
 	char pair[2]={'S','D'};//shut down
@@ -312,11 +313,11 @@ __s32  bt_is_connected(void)
 	else
 		return 0;
 }
-__s32 bt_reconnect_set(void)
+__s32 bt_connect_set(void)
 {
 	/////AT#co\r\n
 	char pair[2]={'G','R'};
-	__msg("======set bt reconnect=======\n");
+	__msg("======set bt connect=======\n");
 	BtCmdSend (pair,2);
 	return EPDK_OK;
 }
@@ -330,13 +331,13 @@ __s32 bt_disconnect_set(void)
 	return EPDK_OK;
 }
 
-///////HFP×´Ì¬²éÑ¯
-////////·µ»Ø:MG<²ÎÊı> or  ERROR
-/////////////////<²ÎÊı> :0-> ready
-/////////////////<²ÎÊı> :1-> connected
-/////////////////<²ÎÊı> :2-> outgoing call
-/////////////////<²ÎÊı> :3-> incoming call
-/////////////////<²ÎÊı> :4-> active call
+///////HFPçŠ¶æ€æŸ¥è¯¢
+////////è¿”å›:MG<å‚æ•°> or  ERROR
+/////////////////<å‚æ•°> :0-> ready
+/////////////////<å‚æ•°> :1-> connected
+/////////////////<å‚æ•°> :2-> outgoing call
+/////////////////<å‚æ•°> :3-> incoming call
+/////////////////<å‚æ•°> :4-> active call
 __s32 bt_hfpstate_get(void)
 {
 	/////AT#cy\r\n
@@ -451,7 +452,7 @@ __s32 bt_audio_change(void)
 	BtCmdSend (pair,2);
 	return EPDK_OK;
 }
-///////audio change///Ç¿ĞĞÇĞµ½ÊÖ»úÉÏ
+///////audio change///å¼ºè¡Œåˆ‡åˆ°æ‰‹æœºä¸Š
 __s32 bt_audio_to_phone(void)
 {
 	/////AT#CO  or  CP\r\n
@@ -460,7 +461,7 @@ __s32 bt_audio_to_phone(void)
 	BtCmdSend (pair,2);
 	return EPDK_OK;
 }
-///////audio change///Ç¿ĞĞÇĞµ½³µ»úÉÏ
+///////audio change///å¼ºè¡Œåˆ‡åˆ°è½¦æœºä¸Š
 __s32 bt_audio_to_machine(void)
 {
 	/////AT#CO  or  CP\r\n
@@ -585,11 +586,11 @@ __s32 bt_dac_vol_right(__u8 vol)
 	BtCmdSend (buf,3);
 	return EPDK_OK;
 }
-/*******************SPP&BLE COMM MODE±ØĞë²ÉÓÃ1»òÕß2Í¨Ñ¶·½Ê½**********************/
+/*******************SPP&BLE COMM MODEå¿…é¡»é‡‡ç”¨1æˆ–è€…2é€šè®¯æ–¹å¼**********************/
 
 /****************************spp comm********************************************/
 
-//"AT#"´òÍ·µÄÖ¸ÁîÍ¸´«Í¨µÀ
+//"AT#"æ‰“å¤´çš„æŒ‡ä»¤é€ä¼ é€šé“
 
 __s32 bt_spp_tx_data(char *CmdStr,unsigned char len)
 {
@@ -603,7 +604,7 @@ __s32 bt_spp_tx_data(char *CmdStr,unsigned char len)
     spp_txdata[3] = '#';
     memcpy(&spp_txdata[4],tmpCmdStr+3,len-(tmpCmdStr-CmdStr));
 
-#if(comm_mode ==1)//AT##±ÈAT#¶à1
+#if(comm_mode ==1)//AT##æ¯”AT#å¤š1
     spp_txdata[len+4-3] = '\r';
     spp_txdata[len+5-3] = '\n';
     __wrn("==3==bt_spp_tx cmd:%s ,str_len[%d],len:%d====\n",spp_txdata,strlen(spp_txdata),len+3);
@@ -620,7 +621,7 @@ __s32 bt_spp_tx_data(char *CmdStr,unsigned char len)
 	return EPDK_OK;
 }
 
-//ÇëÇóÀ¶ÑÀ°æ±¾ºÅ
+//è¯·æ±‚è“ç‰™ç‰ˆæœ¬å·
 __s32 bt_spp_request_bt_version(void)
 {
 	char buf[5]={'\0'};
@@ -633,7 +634,7 @@ __s32 bt_spp_request_bt_version(void)
 	bt_spp_tx_data (buf,5);
 	return EPDK_OK;
 }
-//ÇëÇóÀ¶ÑÀĞÅÏ¢£¬·µ»ØµÄÊÇÊÖ»ú name ,mac addr,bt uuid
+//è¯·æ±‚è“ç‰™ä¿¡æ¯ï¼Œè¿”å›çš„æ˜¯æ‰‹æœº name ,mac addr,bt uuid
 __s32 bt_spp_request_bt_info(void)
 {
 	char buf[5]={'\0'};
@@ -656,7 +657,7 @@ __s32 bt_spp_rfcomm_is_connected(void)
 	return EPDK_OK;
 }
 
-__s32 bt_spp_rfcomm_reconnect(void)
+__s32 bt_spp_rfcomm_connect(void)
 {
 	char buf[5]={'\0'};
 	buf[0]= 'A';
@@ -682,7 +683,7 @@ __s32 bt_spp_rfcomm_disconnect(void)
 }
 
 
-//RFCOMMÁ¬½Ó³É¹¦ºó£¬AT#SG¼ÓÉÏµÚÈı·½ÊÖ»ú»¥Áª¿â·¢¹ıÀ´µÄĞÎ³ÉÊı¾İ´®£¬×ªÎªAT##ÔÙÍ¨¹ıRFCOMM·¢ËÍ¸øÊÖ»ú
+//RFCOMMè¿æ¥æˆåŠŸåï¼ŒAT#SGåŠ ä¸Šç¬¬ä¸‰æ–¹æ‰‹æœºäº’è”åº“å‘è¿‡æ¥çš„å½¢æˆæ•°æ®ä¸²ï¼Œè½¬ä¸ºAT##å†é€šè¿‡RFCOMMå‘é€ç»™æ‰‹æœº
 //libzbt_rfcomm_data_send
 __s32 bt_spp_tx_data_rfcomm(char *CmdStr,unsigned char len)
 {
@@ -697,7 +698,7 @@ __s32 bt_spp_tx_data_rfcomm(char *CmdStr,unsigned char len)
 	return EPDK_OK;
 }
 
-//RFCOMMÁ¬½Ó³É¹¦ºó£¬ÊÖ»úÉÏ²ã·¢¹ıÀ´µÄRFCOMMÊı¾İ´®£¬ºóÃæ¿É·¢ËÍµÚÈı·½ÊÖ»ú»¥Áª¿â
+//RFCOMMè¿æ¥æˆåŠŸåï¼Œæ‰‹æœºä¸Šå±‚å‘è¿‡æ¥çš„RFCOMMæ•°æ®ä¸²ï¼Œåé¢å¯å‘é€ç¬¬ä¸‰æ–¹æ‰‹æœºäº’è”åº“
 //libzbt_rfcomm_data_recv_CB_init
 __s32 bt_spp_rx_data_rfcomm(char *CmdStr,unsigned char len)
 {
@@ -708,7 +709,36 @@ __s32 bt_spp_rx_data_rfcomm(char *CmdStr,unsigned char len)
 
 /****************************ble comm************************************/
 #if 0
+//"AT#"æ‰“å¤´çš„æŒ‡ä»¤é€ä¼ é€šé“
 
+__s32 bt_ble_tx_data(char *CmdStr,unsigned char len)
+{
+    char *tmpCmdStr = NULL;
+    tmpCmdStr = strstr(CmdStr,"AT#");
+    //__wrn("==2==bt_spp_tx cmd:%s ,str_len[%d],len:%d===\n",tmpCmdStr,strlen(tmpCmdStr),tmpCmdStr-CmdStr);
+    memset(spp_txdata,0,sizeof(spp_txdata));
+    spp_txdata[0] = 'A';
+    spp_txdata[1] = 'T';
+    spp_txdata[2] = '#';
+    spp_txdata[3] = '*';
+    memcpy(&spp_txdata[4],tmpCmdStr+3,len-(tmpCmdStr-CmdStr));
+
+#if(comm_mode ==1)//AT#*æ¯”AT#å¤š1
+    spp_txdata[len+4-3] = '\r';
+    spp_txdata[len+5-3] = '\n';
+    __wrn("==3==bt_spp_tx cmd:%s ,str_len[%d],len:%d====\n",spp_txdata,strlen(spp_txdata),len+3);
+    com_uart_write(spp_txdata, strlen(CmdStr)+3);
+#elif (comm_mode ==2)
+    spp_txdata[len+1] = '\\';
+    spp_txdata[len+2] = 'r';
+    spp_txdata[len+3] = '\\';
+    spp_txdata[len+4] = 'n';
+    __wrn("==3==bt_spp_tx cmd:%s ,str_len[%d],len:%d====\n",spp_txdata,strlen(spp_txdata),len+5);
+    com_uart_write(spp_txdata, strlen(CmdStr)+5);
+#endif
+
+	return EPDK_OK;
+}
 __s32 bt_ble_rfcomm_is_connected(void)
 {
     if(bt_ble_connect_flag	 == BT_BLE_STATE_CONNECTED)
@@ -726,8 +756,8 @@ __s32 bt_ble_rfcomm_reconnect(void)
 	buf[2]= '#';
 	buf[3]= 'S';
 	buf[4]= 'P';
-	__msg("======bt_spp_connect======\n");
-	bt_spp_tx_data (buf,5);
+	__msg("======bt_ble_connect======\n");
+	bt_ble_tx_data (buf,5);
 	return EPDK_OK;
 }
 __s32 bt_ble_rfcomm_disconnect(void)
@@ -738,23 +768,159 @@ __s32 bt_ble_rfcomm_disconnect(void)
 	buf[2]= '#';
 	buf[3]= 'S';
 	buf[4]= 'H';
-	__msg("======bt_spp_disconnect======\n");
-	bt_spp_tx_data (buf,5);
+	__msg("======bt_ble_disconnect======\n");
+	bt_ble_tx_data (buf,5);
 	return EPDK_OK;
 }
-#endif
-//RFCOMMÁ¬½Ó³É¹¦Ö®ºó£¬ÉÏ²ã·¢¹ıÀ´µÄÊÇAT#¿ªÍ·µÄÊı¾İ´®£¬×ªÎªAT##
+
+//RFCOMMè¿æ¥æˆåŠŸä¹‹åï¼Œä¸Šå±‚å‘è¿‡æ¥çš„æ˜¯AT#å¼€å¤´çš„æ•°æ®ä¸²ï¼Œè½¬ä¸ºAT#*
 __s32 bt_ble_tx_data_rfcomm(char *CmdStr,unsigned char len)
 {
 
-    bt_spp_tx_data(CmdStr,len);
+    bt_ble_tx_data(CmdStr,len);
 	return EPDK_OK;
+}
+#endif
+
+//bt hid api function
+
+__s32 bt_hid_tx_data(char *CmdStr,unsigned char len)
+{
+    char *tmpCmdStr = NULL;
+    tmpCmdStr = strstr(CmdStr,"AT#");
+    //__wrn("==2==bt_spp_tx cmd:%s ,str_len[%d],len:%d===\n",tmpCmdStr,strlen(tmpCmdStr),tmpCmdStr-CmdStr);
+    memset(spp_txdata,0,sizeof(spp_txdata));
+    spp_txdata[0] = 'A';
+    spp_txdata[1] = 'T';
+    spp_txdata[2] = '#';
+    spp_txdata[3] = '@';
+    memcpy(&spp_txdata[4],tmpCmdStr+3,len-(tmpCmdStr-CmdStr));
+
+#if(comm_mode ==1)//AT#@æ¯”AT#å¤š1
+    spp_txdata[len+4-3] = '\r';
+    spp_txdata[len+5-3] = '\n';
+    //__wrn("==3==bt_spp_tx cmd:%s ,str_len[%d],len:%d====\n",spp_txdata,strlen(spp_txdata),len+3);
+    //com_uart_write(spp_txdata, strlen(CmdStr)+3);
+    com_uart_write(spp_txdata, len+3);
+#elif (comm_mode ==2)
+    spp_txdata[len+1] = '\\';
+    spp_txdata[len+2] = 'r';
+    spp_txdata[len+3] = '\\';
+    spp_txdata[len+4] = 'n';
+    __wrn("==3==bt_spp_tx cmd:%s ,str_len[%d],len:%d====\n",spp_txdata,strlen(spp_txdata),len+5);
+    com_uart_write(spp_txdata, strlen(CmdStr)+5);
+#endif
+
+	return EPDK_OK;
+}
+
+__s32 bt_hid_is_connected(void)
+{
+    if(bt_ble_connect_flag == BT_HID_STATE_CONNECTED)
+		return 1;
+	else
+		return 0;
+
+	return EPDK_OK;
+}
+
+__s32 bt_hid_connect(void)
+{
+	char buf[5]={'\0'};
+	buf[0]= 'A';
+	buf[1]= 'T';
+	buf[2]= '#';
+	buf[3]= 'H';
+	buf[4]= 'C';
+	__msg("======bt_hid_connect======\n");
+	bt_hid_tx_data (buf,5);
+	return EPDK_OK;
+}
+
+__s32 bt_hid_disconnect(void)
+{
+	char buf[5]={'\0'};
+	buf[0]= 'A';
+	buf[1]= 'T';
+	buf[2]= '#';
+	buf[3]= 'H';
+	buf[4]= 'D';
+	__msg("======bt_hid_disconnect======\n");
+	bt_hid_tx_data (buf,5);
+	return EPDK_OK;
+}
+//è®¾ç½®æ‰‹æœºå…‰æ ‡æŒ‡é’ˆçš„åæ ‡ä½ç½®ç»™è“ç‰™
+__s32 bt_hid_set_cursor_pos(s16 x_pos,s16 y_pos)
+{
+	char buf[10]={'\0'};
+	buf[0]= 'A';
+	buf[1]= 'T';
+	buf[2]= '#';
+	buf[3]= 'H';
+	buf[4]= 'S';
+	buf[5]= x_pos&0xff;
+	buf[6]= (x_pos&0xff00)>>8;
+	buf[7]= y_pos&0xff;
+	buf[8]= (y_pos&0xff00)>>8;
+	__msg("======bt_hid_set_cursor_pos======\n");
+	bt_hid_tx_data (buf,9);
+	return EPDK_OK;
+}
+//å‘é€è§¦æ‘¸æ»‘åŠ¨ç‚¹åæ ‡ç›¸å¯¹å˜åŒ–å€¼(éœ€è¦å‡å»ä¸Šä¸€æ¬¡åæ ‡å€¼)ç»™bt
+//action 0:æŒ‡é’ˆç§»åŠ¨ï¼›1:é¼ æ ‡å·¦é”®æŒ‰ä¸‹ï¼›2:é¼ æ ‡å·¦é”®æŠ¬èµ·ï¼›3:é¼ æ ‡ä¸­é”®æŒ‰ä¸‹ï¼›4:é¼ æ ‡ä¸­é”®æŠ¬èµ·ï¼›
+//5:é¼ æ ‡å³é”®æŒ‰ä¸‹ï¼›6:é¼ æ ‡å³é”®æŠ¬èµ·ï¼›
+__s32 bt_hid_set_cursor_xy(u8 action,s16 x_diff,s16 y_diff)
+{
+	char buf[10]={'\0'};
+	buf[0]= 'A';
+	buf[1]= 'T';
+	buf[2]= '#';
+	buf[3]= 'H';
+	buf[4]= 'O';
+
+	buf[5]= action;
+	buf[6]= x_diff&0xff;
+	buf[7]= (x_diff&0xff00)>>8;
+	buf[8]= y_diff&0xff;
+	buf[9]= (y_diff&0xff00)>>8;
+	__msg("======bt_hid_set_cursor_xy======\n");
+	bt_hid_tx_data (buf,10);
+	return EPDK_OK;
+}
+//é‡ç½®æ‰‹æœºå…‰æ ‡æŒ‡é’ˆçš„åæ ‡ä½ç½®ç»™è“ç‰™ï¼Œè¿™ä¸ªæ—¶å€™çš„å…‰æ ‡ä½ç½®å°±æ˜¯bt_hid_set_cursor_poså‡½æ•°è®¾ç½®çš„åæ ‡
+
+__s32 bt_hid_reset_cursor_pos(void)
+{
+	char buf[5]={'\0'};
+	buf[0]= 'A';
+	buf[1]= 'T';
+	buf[2]= '#';
+	buf[3]= 'H';
+	buf[4]= 'P';
+
+	__msg("======bt_hid_reset_cursor_pos======\n");
+	bt_hid_tx_data (buf,5);
+	return EPDK_OK;
+}
+
+__s32 bt_hid_mouse_test(void)
+{
+	char buf[5]={'\0'};
+	buf[0]= 'A';
+	buf[1]= 'T';
+	buf[2]= '#';
+	buf[3]= 'H';
+	buf[4]= 'T';
+    __msg("======bt_hid_mouse_test======\n");
+	bt_hid_tx_data (buf,5);
+	return EPDK_OK;
+
 }
 
 //bt fm api function
 /****************************fmrx comm********************************************/
 
-//ËÑÌ¨
+//æœå°
 __s32 bt_fmrx_search (void)
 {
     char buf[5]={'\0'};
@@ -768,7 +934,7 @@ __s32 bt_fmrx_search (void)
 	return EPDK_OK;
 
 }
-//»ñÈ¡½ÚÄ¿ÆµµÀºÅĞÅÏ¢£¬Èçµ±Ç°Æµµã£¬×Ü½ÚÄ¿ÊıµÈ
+//è·å–èŠ‚ç›®é¢‘é“å·ä¿¡æ¯ï¼Œå¦‚å½“å‰é¢‘ç‚¹ï¼Œæ€»èŠ‚ç›®æ•°ç­‰
 __s32 bt_fmrx_get_info (void)
 {
     char buf[5]={'\0'};
@@ -781,7 +947,7 @@ __s32 bt_fmrx_get_info (void)
 	BtCmdSend (buf,5);
 	return EPDK_OK;
 }
-//»ñÈ¡½ÚÄ¿ÆµµÀÁĞ±íµÈ
+//è·å–èŠ‚ç›®é¢‘é“åˆ—è¡¨ç­‰
 __s32 bt_fmrx_get_list (void)
 {
     char buf[5]={'\0'};
@@ -794,7 +960,7 @@ __s32 bt_fmrx_get_list (void)
 	BtCmdSend (buf,5);
 	return EPDK_OK;
 }
-//»ñÈ¡×Ü½ÚÄ¿Êı
+//è·å–æ€»èŠ‚ç›®æ•°
 __s32 bt_fmrx_get_ch_cnt (void)
 {
     char buf[5]={'\0'};
@@ -807,11 +973,11 @@ __s32 bt_fmrx_get_ch_cnt (void)
 	BtCmdSend (buf,5);
 	return EPDK_OK;
 }
-//²¥·Å½ÚÄ¿ºÅ
+//æ’­æ”¾èŠ‚ç›®å·
 
 __s32 bt_fmrx_set_ch (__u8 ch)
 {
-    char buf[5]={'\0'};
+    char buf[6]={'\0'};
 	buf[0]= 'A';
 	buf[1]= 'T';
 	buf[2]= '#';
@@ -822,10 +988,10 @@ __s32 bt_fmrx_set_ch (__u8 ch)
 	BtCmdSend (buf,6);
 	return EPDK_OK;
 }
-//²¥·ÅÆµµã
+//æ’­æ”¾é¢‘ç‚¹
 __s32 bt_fmrx_set_freq (__u16 freq)
 {
-    char buf[5]={'\0'};
+    char buf[7]={'\0'};
 	buf[0]= 'A';
 	buf[1]= 'T';
 	buf[2]= '#';
@@ -837,10 +1003,10 @@ __s32 bt_fmrx_set_freq (__u16 freq)
 	BtCmdSend (buf,7);
 	return EPDK_OK;
 }
-//ÇĞ½ÚÄ¿ºÅ£¬dirÎª1Íù108M·½ÏòÇĞ£¬Îª0Íù78.5M·½ÏòÇĞ
+//åˆ‡èŠ‚ç›®å·ï¼Œdirä¸º1å¾€108Mæ–¹å‘åˆ‡ï¼Œä¸º0å¾€78.5Mæ–¹å‘åˆ‡
 __s32 bt_fmrx_switch_channel (__s8 dir)
 {
-    char buf[5]={'\0'};
+    char buf[6]={'\0'};
 	buf[0]= 'A';
 	buf[1]= 'T';
 	buf[2]= '#';
@@ -851,10 +1017,10 @@ __s32 bt_fmrx_switch_channel (__s8 dir)
 	BtCmdSend (buf,6);
 	return EPDK_OK;
 }
-//ÇĞÆµµã£¬dirÎª1Íù108M·½ÏòÇĞ£¬Îª0Íù78.5M·½ÏòÇĞ
+//åˆ‡é¢‘ç‚¹ï¼Œdirä¸º1å¾€108Mæ–¹å‘åˆ‡ï¼Œä¸º0å¾€78.5Mæ–¹å‘åˆ‡
 __s32 bt_fmrx_switch_freq (__s8 dir)
 {
-    char buf[5]={'\0'};
+    char buf[6]={'\0'};
 	buf[0]= 'A';
 	buf[1]= 'T';
 	buf[2]= '#';
@@ -866,10 +1032,10 @@ __s32 bt_fmrx_switch_freq (__s8 dir)
 	return EPDK_OK;
 }
 
-//»ñÈ¡½ÚÄ¿ºÅ¶ÔÓ¦µÄÆµµã
+//è·å–èŠ‚ç›®å·å¯¹åº”çš„é¢‘ç‚¹
 __s32 bt_fmrx_get_ch_to_freq (__u8 ch)
 {
-    char buf[5]={'\0'};
+    char buf[6]={'\0'};
 	buf[0]= 'A';
 	buf[1]= 'T';
 	buf[2]= '#';
@@ -880,12 +1046,12 @@ __s32 bt_fmrx_get_ch_to_freq (__u8 ch)
 	BtCmdSend (buf,6);
 	return EPDK_OK;
 }
-//ÇĞ»»À¶ÑÀµÄÓ¦ÓÃ,BTÆô¶¯Ä¬ÈÏÀ¶ÑÀÓ¦ÓÃ//
-//indexÖµÈçÏÂ:
+//åˆ‡æ¢è“ç‰™çš„åº”ç”¨,BTå¯åŠ¨é»˜è®¤è“ç‰™åº”ç”¨//
+//indexå€¼å¦‚ä¸‹:
 //0x41: FMRX;   0x42:AUX2;   0x43:BT;    0x44:MUSIC
 __s32 bt_switch_app(u8 index)
 {
-    char buf[5]={'\0'};
+    char buf[6]={'\0'};
 	buf[0]= 'A';
 	buf[1]= 'T';
 	buf[2]= '#';
@@ -907,7 +1073,7 @@ void bt_StrToHex(unsigned char *pbDest, unsigned char *pbSrc, int srcLen)
     {
         h1 = pbSrc[2*i];
         h2 = pbSrc[2*i+1];
-        s1 = eLIBs_toupper(h1) - 0x30; //Ê®Áù½øÖÆ 0x30, decÊ®½øÖÆ 48	,   Í¼ĞÎ 0
+        s1 = eLIBs_toupper(h1) - 0x30; //åå…­è¿›åˆ¶ 0x30, decåè¿›åˆ¶ 48	,   å›¾å½¢ 0
         if (s1 > 9)
             s1 -= 7;
         s2 = eLIBs_toupper(h2) - 0x30;

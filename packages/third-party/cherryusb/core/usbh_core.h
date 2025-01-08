@@ -193,6 +193,7 @@ static inline void usbh_bulk_urb_fill(struct usbh_urb *urb,
     urb->transfer_buffer = transfer_buffer;
     urb->transfer_buffer_length = transfer_buffer_length;
     urb->timeout = timeout;
+    urb->errorcode = 0;
     urb->complete = complete;
     urb->arg = arg;
 }

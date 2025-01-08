@@ -88,6 +88,13 @@ lv_obj_t *aic_video_ui_init(void)
 
     lv_obj_add_event_cb(aic_video_ui, ui_aic_video_cb, LV_EVENT_ALL, &player);
 
+    /* Enable LV_FFMPEG_PLAYED_CMD_KEEP_LAST_FRAME_EX when playing multiple video sources
+       to avoid black screens during source switching, though it will increase memory usage.
+       Alternatively, add a loading icon to indicate to users that a switch is in progress,
+       which can mitigate the impact of black screens on viewing experience.
+       Need to set before setting src. */
+    //lv_ffmpeg_player_set_cmd_ex(player.ffmpeg, LV_FFMPEG_PLAYED_CMD_KEEP_LAST_FRAME_EX, NULL);
+
     lv_ffmpeg_player_set_src(player.ffmpeg, player.cur_info.source);
     lv_ffmpeg_player_set_cmd_ex(player.ffmpeg, LV_FFMPEG_PLAYER_CMD_START, NULL);
 
@@ -288,10 +295,12 @@ static void updata_ui_info(char *last_src)
     lv_label_set_text(video_title, player.cur_info.name);
     lv_label_set_text_fmt(pass_time, "%02d:%02d", 0 ,0);
     lv_label_set_text_fmt(duration, "%02ld:%02ld", GET_MINUTES(player.cur_info.duration_ms), GET_SECONDS(player.cur_info.duration_ms));
-    if (strcmp(last_src, player.cur_info.source) == 0)
+    if (strcmp(last_src, player.cur_info.source) == 0) {
         lv_ffmpeg_player_set_cmd_ex(player.ffmpeg, LV_FFMPEG_PLAYER_CMD_SET_PLAY_TIME_EX, &seek_time);
-    else
+    } else {
         lv_ffmpeg_player_set_src(player.ffmpeg, player.cur_info.source);
+        lv_ffmpeg_player_set_cmd_ex(player.ffmpeg, LV_FFMPEG_PLAYER_CMD_START, NULL);
+    }
 }
 
 static void play_next_cb(lv_event_t *e)

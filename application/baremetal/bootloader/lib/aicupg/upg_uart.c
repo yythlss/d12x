@@ -13,7 +13,7 @@
 #include <driver.h>
 #include <uart.h>
 #include <upg_uart.h>
-#include <trans_rw_data.h>
+#include <data_trans_layer.h>
 #include <aic_utils.h>
 #include <crc16.h>
 
@@ -555,8 +555,8 @@ static int wait_host_to_send_mode(void)
 static int aic_upg_uart_recv(u8 *buf, int len)
 {
     u8 ch, *pframe, *p;
-    int ret, gotlen, timeout = 10000;
-    volatile u64 start, cur;
+    int ret, gotlen, timeout;
+    volatile u64 last, cur;
     struct dma_input in;
 
     pframe = g_uart_send_recv_buf;
@@ -567,7 +567,8 @@ static int aic_upg_uart_recv(u8 *buf, int len)
 
     gotlen = 0;
     p = buf;
-    start = aic_get_time_ms();
+    timeout = 200;
+    last = aic_get_time_ms();
     while (gotlen < len) {
         /* Peek the input buffer */
         memset(&in, 0, sizeof(in));
@@ -575,7 +576,7 @@ static int aic_upg_uart_recv(u8 *buf, int len)
         if (ret == 0) {
             /* Waiting for data */
             cur = aic_get_time_ms();
-            if ((cur - start) > timeout) {
+            if ((cur - last) > timeout) {
                 pr_err("Recv uart frame timeout, got len %d.\n", gotlen);
                 return -1;
             }
@@ -583,20 +584,33 @@ static int aic_upg_uart_recv(u8 *buf, int len)
         }
         if (in.head == DC1_SEND) {
             ch = recv_buf_read_byte(upg_uart_id); /* Consume this byte */
+            /* Update last got data time */
+            last = aic_get_time_ms();
             send_byte(upg_uart_id, ACK);
             pr_debug("Host switch to send mode.\n");
             continue;
         }
         if (in.head != SOH && in.head != STX) {
             ch = recv_buf_read_byte(upg_uart_id); /* Consume this byte */
+            /* Update last got data time */
+            last = aic_get_time_ms();
             pr_err("Recv uart frame error. unknown frame data.\n");
             return -1;
         }
 
         if (in.head == SOH) {
-            if (in.frm_len == 0) { /* frame is not ready, just wait */
+            if (in.frm_len == 0) {
+                /* frame is not ready, just wait */
+                cur = aic_get_time_ms();
+                if ((cur - last) > timeout) {
+                    pr_err("Recv uart frame timeout, got len %d.\n", gotlen);
+                    return -1;
+                }
                 continue;
+            } else {
+                last = aic_get_time_ms();
             }
+
             ret = read_short_frame_data(pframe, in.frm_len + 6);
             if (ret > 0) {
                 pr_debug("Recv %d\n", ret);
@@ -612,9 +626,18 @@ static int aic_upg_uart_recv(u8 *buf, int len)
             send_byte(upg_uart_id, ch);
             pr_debug("Ack SOH frame\n");
         } else {
-            if (in.frm_len == 0) { /* frame is not ready, just wait */
+            if (in.frm_len == 0) {
+                /* frame is not ready, just wait */
+                cur = aic_get_time_ms();
+                if ((cur - last) > timeout) {
+                    pr_err("Recv uart frame timeout, got len %d.\n", gotlen);
+                    return -1;
+                }
                 continue;
+            } else {
+                last = aic_get_time_ms();
             }
+
             ret = read_long_frame_data(pframe, in.frm_len + 5);
             if (ret > 0) {
                 pr_debug("Recv %d\n", ret);
@@ -738,8 +761,18 @@ void aic_upg_uart_baudrate_update(int baudrate)
     pr_debug("update burn baudrate:%d\n", baudrate);
 }
 
+static u32 get_current_baudrate(int id)
+{
+    usart_handle_t h;
+    h = hal_usart_initialize(id, NULL, NULL);
+
+    return hal_usart_get_cur_baudrate(h);
+}
+
 void aic_upg_uart_init(int id)
 {
+    int brate;
+
     upg_uart_id = id;
 
     memset(&uart_upg, 0, sizeof(uart_upg));
@@ -748,8 +781,14 @@ void aic_upg_uart_init(int id)
     uart_upg.proc = uart_conn_detect_proc;
     uart_upg.first_connect = 1;
 
+    brate = get_current_baudrate(id);
     uart_init(upg_uart_id);
+    if (brate > 0)
+        uart_config_update(id, brate);
     recv_buf_init();
+
+    /* Send CAN first */
+    send_byte(upg_uart_id, CAN);
 }
 
 void aic_upg_uart_loop(void)

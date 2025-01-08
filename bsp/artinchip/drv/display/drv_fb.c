@@ -114,8 +114,11 @@ static int aicfb_pan_display(struct aicfb_info *fbi, u32 buf_id)
     struct platform_driver *de = fbi->de;
 
 #if !defined(AIC_PAN_DISPLAY) && !defined(AIC_FB_ROTATE_EN)
+#ifdef AIC_BOOTLOADER_CMD_PROGRESS_BAR
+#else
     pr_err("pan display do not enabled\n");
     return -EINVAL;
+#endif
 #endif
 
     layer.layer_id = AICFB_LAYER_TYPE_UI;
@@ -219,11 +222,40 @@ aicfb_pq_set_config(struct aicfb_info *fbi, struct aicfb_pq_config *config)
         }
         break;
     }
+    case AIC_DBI_COM:
+    {
+        struct panel_dbi *dbi = config->data;
+
+        if (!panel->dbi->commands.buf) {
+            panel->dbi->commands.buf = aicos_malloc(MEM_CMA, panel->dbi->commands.len);
+            if (!panel->dbi->commands.buf) {
+                pr_err("Malloc dbi buf failed!\n");
+                return;
+            }
+        }
+
+        panel->dbi->commands.len = dbi->commands.len;
+        memcpy((u8*)panel->dbi->commands.buf, dbi->commands.buf, dbi->commands.len);
+
+        panel->dbi->type           = dbi->type;
+        panel->dbi->format         = dbi->format;
+        panel->dbi->first_line     = dbi->first_line;
+        panel->dbi->other_line     = dbi->other_line;
+
+        if (panel->dbi->spi != NULL) {
+            panel->dbi->spi->qspi_mode  = dbi->spi->qspi_mode;
+            panel->dbi->spi->vbp_num    = dbi->spi->vbp_num;
+            panel->dbi->spi->code1_cfg  = dbi->spi->code1_cfg;
+            panel->dbi->spi->code[0]    = dbi->spi->code[0];
+            panel->dbi->spi->code[1]    = dbi->spi->code[1];
+            panel->dbi->spi->code[2]    = dbi->spi->code[2];
+        }
+        break;
+    }
     default:
         break;
     }
     memcpy(panel->timings, config->timing, sizeof(struct display_timing));
-
     aicfb_reset(fbi);
 }
 
@@ -254,6 +286,36 @@ aicfb_pq_get_config(struct aicfb_info *fbi, struct aicfb_pq_config *config)
             dsi->vc_num    = fbi->panel->dsi->vc_num;
             dsi->ln_polrs  = fbi->panel->dsi->ln_polrs;
             dsi->ln_assign = fbi->panel->dsi->ln_assign;
+        }
+            break;
+        case AIC_DBI_COM:
+        {
+            struct panel_dbi *dbi = config->data;
+
+            dbi->type           = fbi->panel->dbi->type;
+            dbi->format         = fbi->panel->dbi->format;
+
+            if (fbi->panel->dbi->first_line) {
+                dbi->first_line     = fbi->panel->dbi->first_line;
+            } else {
+                dbi->first_line     = 0x2C;
+            }
+
+
+            if (fbi->panel->dbi->other_line) {
+                dbi->other_line     = fbi->panel->dbi->other_line;
+            } else {
+                dbi->other_line     = 0x3C;
+            }
+
+            if (fbi->panel->dbi->spi != NULL) {
+                dbi->spi->qspi_mode  = fbi->panel->dbi->spi->qspi_mode;
+                dbi->spi->vbp_num    = fbi->panel->dbi->spi->vbp_num;
+                dbi->spi->code1_cfg  = fbi->panel->dbi->spi->code1_cfg;
+                dbi->spi->code[0]    = fbi->panel->dbi->spi->code[0];
+                dbi->spi->code[1]    = fbi->panel->dbi->spi->code[1];
+                dbi->spi->code[2]    = fbi->panel->dbi->spi->code[2];
+            }
         }
             break;
         default:

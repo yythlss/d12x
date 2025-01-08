@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Wu Dehuang <dehuang.wu@artinchip.com>
+ * Authors: Wu Dehuang <dehuang.wu@artinchip.com>
  */
 
 #include <stdio.h>
@@ -37,6 +37,7 @@
     "  mtd oobread  <part> <addr> <offset>\n"        \
     "  mtd oobwrite <part> <addr> <offset>\n"        \
     "  mtd contread <part> <addr> <offset> <size>\n" \
+    "  mtd isbad <part> <block>\n"                     \
     "e.g.:\n"                                        \
     "  mtd alloc 4096\n"                             \
     "  # Alloc buffer: 0x3e146e0\n"                  \
@@ -423,6 +424,31 @@ static int do_mtd_oobwrite(int argc, char *argv[])
                         data + mtd->writesize, mtd->oobsize);
     return err;
 }
+
+static int do_mtd_block_isbad(int argc, char *argv[])
+{
+    int err;
+    struct mtd_dev *mtd;
+    char *name;
+    unsigned long offset;
+
+    if (argc < 3) {
+        mtd_help();
+        return -1;
+    }
+
+    name = argv[1];
+    offset = strtoul(argv[2], NULL, 0);
+
+    mtd = mtd_get_device(name);
+    if (!mtd) {
+        printf("Failed to get mtd %s\n", name);
+        mtd_help();
+        return -1;
+    }
+    err = mtd_block_isbad(mtd, offset);
+    return err;
+}
 #endif
 
 static int do_mtd(int argc, char *argv[])
@@ -459,6 +485,8 @@ static int do_mtd(int argc, char *argv[])
     else if (!strncmp(argv[1], "contread", 8))
         return do_mtd_contread(argc - 1, &argv[1]);
 #endif
+    else if (!strncmp(argv[1], "isbad", 8))
+        return do_mtd_block_isbad(argc - 1, &argv[1]);
 #endif
     mtd_help();
     return 0;

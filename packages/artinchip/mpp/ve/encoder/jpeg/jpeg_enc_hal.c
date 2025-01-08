@@ -100,7 +100,7 @@ static void ve_config_quant_matrix(struct jpeg_ctx *s)
 		write_reg_u32(s->regs_base + JPG_QMAT_INFO_REG, (comp << 6) | 3);
 		write_reg_u32(s->regs_base + JPG_QMAT_ADDR_REG, comp << 6);
 		for (i = 0; i < 64; i++) {
-			j = zigzag_direct[i];
+			j = zigzag_dir[i];
 			// qmatrix should be  (1<<19)/q
 			val = (1 << QUANT_FIXED_POINT_BITS) / quant_tab[comp][j];
 			write_reg_u32(s->regs_base + JPG_QMAT_VAL_REG, val);

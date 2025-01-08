@@ -14,6 +14,8 @@
 #include "usb_osd_ui.h"
 #include "mpp_fb.h"
 
+#define USB_OSD_CONFIG_FILE      "/data/lvgl_data/osd.config"
+
 #define USB_OSD_MENU_WIDTH  800
 #define USB_OSD_MENU_HEIGHT 300
 
@@ -68,6 +70,8 @@ static unsigned int g_image_count = 0;
 
 static unsigned int g_menu_draw_count = 0;
 static unsigned int g_hide_time_count = 0;
+
+static struct osd_settings_context g_settings_ctx = { 0 };
 
 bool lv_settings_menu_is_enabled(void)
 {
@@ -170,6 +174,27 @@ static void back_logo_screen(void)
 }
 #endif /* LV_USB_OSD_SETTINGS_MENU */
 
+static void lv_save_config_file(void)
+{
+    struct osd_settings_context *ctx = &g_settings_ctx;
+    char *json_string = NULL;
+    FILE *file = NULL;
+
+    file = fopen(USB_OSD_CONFIG_FILE, "wb");
+    if (file == NULL) {
+        pr_err("fopen %s failed, when save file\n", USB_OSD_CONFIG_FILE);
+        return;
+    }
+
+    json_string = cJSON_Print(ctx->root);
+    if (json_string != NULL)
+        fwrite(json_string, strlen(json_string), 1, file);
+    else
+        pr_err("failed to print cjson when save osd config\n");
+
+    fclose(file);
+}
+
 static void menu_event_cb(lv_event_t * e)
 {
     lv_event_code_t code = (lv_event_code_t)lv_event_get_code(e);
@@ -205,7 +230,7 @@ static void menu_event_cb(lv_event_t * e)
         long_press_end = 1;
     }
 
-    if(code == LV_EVENT_CLICKED) {
+    if (code == LV_EVENT_CLICKED) {
         if (lv_settings_menu_is_enabled()) {
 
             /* Filter out a LV_EVENT_CLICKED event */
@@ -216,6 +241,8 @@ static void menu_event_cb(lv_event_t * e)
             }
 
             lv_settings_menu_enable(false);
+
+            lv_save_config_file();
         }
 
         /* switch to video screen to display controls such as video progress bars */
@@ -307,14 +334,15 @@ static void menu_hide_callback(lv_timer_t *tmr)
 
 static void slider_event_cb(lv_event_t * e)
 {
+    struct osd_settings_context *ctx = &g_settings_ctx;
     lv_obj_t * slider = lv_event_get_target(e);
     lv_obj_t * slider_label = lv_event_get_user_data(e);
     struct aicfb_disp_prop disp_prop;
     char buf[8];
-    u32 value;
+    u32 origin, value;
 
-    value = (u32)lv_slider_get_value(slider);
-    lv_snprintf(buf, sizeof(buf), "%d", value);
+    origin = (u32)lv_slider_get_value(slider);
+    lv_snprintf(buf, sizeof(buf), "%d", origin);
     lv_label_set_text(slider_label, buf);
 
     if (mpp_fb_ioctl(g_fb, AICFB_GET_DISP_PROP, &disp_prop)) {
@@ -323,16 +351,50 @@ static void slider_event_cb(lv_event_t * e)
     }
 
     /* limit value in [25, 75] */
-    value = (value >> 1) + 25;
+    value = (origin >> 1) + 25;
 
-    if (slider_label == brightness_label)
+    if (slider_label == brightness_label) {
         disp_prop.bright = value;
-    if (slider_label == contrast_label)
+        cJSON_SetIntValue(ctx->brightness.cjson, origin);
+    }
+
+    if (slider_label == contrast_label) {
         disp_prop.contrast = value;
-    if (slider_label == saturation_label)
+        cJSON_SetIntValue(ctx->contrast.cjson, origin);
+    }
+
+    if (slider_label == saturation_label) {
         disp_prop.saturation = value;
-    if (slider_label == hue_label)
+        cJSON_SetIntValue(ctx->saturation.cjson, origin);
+    }
+
+    if (slider_label == hue_label) {
         disp_prop.hue = value;
+        cJSON_SetIntValue(ctx->hue.cjson, origin);
+    }
+
+    if (mpp_fb_ioctl(g_fb, AICFB_SET_DISP_PROP, &disp_prop)) {
+        printf("mpp fb ioctl set disp prop failed\n");
+        return;
+    }
+}
+static void lv_config_disp_property(struct osd_settings_context *ctx)
+{
+    struct aicfb_disp_prop disp_prop;
+    u32 value;
+
+    /* limit value in [25, 75] */
+    value = (ctx->brightness.value >> 1) + 25;
+    disp_prop.bright = value;
+
+    value = (ctx->contrast.value >> 1) + 25;
+    disp_prop.contrast = value;
+
+    value = (ctx->saturation.value >> 1) + 25;
+    disp_prop.saturation = value;
+
+    value = (ctx->hue.value >> 1) + 25;
+    disp_prop.hue = value;
 
     if (mpp_fb_ioctl(g_fb, AICFB_SET_DISP_PROP, &disp_prop)) {
         printf("mpp fb ioctl set disp prop failed\n");
@@ -340,23 +402,59 @@ static void slider_event_cb(lv_event_t * e)
     }
 }
 
+#if defined(KERNEL_RTTHREAD) && defined(AIC_PWM_BACKLIGHT_CHANNEL)
+static lv_obj_t * backlight_label = NULL;
+static lv_obj_t * backlight_slider = NULL;
+
+static void backlight_pwm_config(u32 channel, u32 level)
+{
+    struct rt_device_pwm *pwm_dev;
+
+    pwm_dev = (struct rt_device_pwm *)rt_device_find("pwm");
+    /* pwm frequency: 1KHz = 1000000ns */
+    rt_pwm_set(pwm_dev, channel, 1000000, 10000 * level);
+}
+
+static void backlight_slider_event_cb(lv_event_t * e)
+{
+    lv_obj_t * slider = lv_event_get_target(e);
+    lv_obj_t * slider_label = lv_event_get_user_data(e);
+    struct osd_settings_context *ctx = &g_settings_ctx;
+
+    char buf[8];
+    u32 value;
+
+    value = (u32)lv_slider_get_value(slider);
+    lv_snprintf(buf, sizeof(buf), "%d", value);
+    lv_label_set_text(slider_label, buf);
+    cJSON_SetIntValue(ctx->pwm.cjson, value);
+
+    backlight_pwm_config(AIC_PWM_BACKLIGHT_CHANNEL, value);
+}
+#endif
+
 static void recovery_btn_event_handler(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
+    struct osd_settings_context *ctx = &g_settings_ctx;
 
     if(code == LV_EVENT_CLICKED) {
 
         lv_slider_set_value(brightness_slider, 50, LV_ANIM_OFF);
         lv_label_set_text(brightness_label, "50");
+        cJSON_SetIntValue(ctx->brightness.cjson, 50);
 
         lv_slider_set_value(contrast_slider, 50, LV_ANIM_OFF);
         lv_label_set_text(contrast_label, "50");
+        cJSON_SetIntValue(ctx->contrast.cjson, 50);
 
         lv_slider_set_value(saturation_slider, 50, LV_ANIM_OFF);
         lv_label_set_text(saturation_label, "50");
+        cJSON_SetIntValue(ctx->saturation.cjson, 50);
 
         lv_slider_set_value(hue_slider, 50, LV_ANIM_OFF);
         lv_label_set_text(hue_label, "50");
+        cJSON_SetIntValue(ctx->hue.cjson, 50);
 
         struct aicfb_disp_prop disp_prop = { 50, 50, 50, 50 };
         mpp_fb_ioctl(g_fb, AICFB_SET_DISP_PROP, &disp_prop);
@@ -365,11 +463,13 @@ static void recovery_btn_event_handler(lv_event_t * e)
 
 static void screen_lock_mode_dropdown_event_handler(lv_event_t * e)
 {
+    struct osd_settings_context *ctx = &g_settings_ctx;
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * obj = lv_event_get_target(e);
 
     if(code == LV_EVENT_VALUE_CHANGED) {
         g_screen_lock_mode = lv_dropdown_get_selected(obj);
+        cJSON_SetIntValue(ctx->lock_mode.cjson, g_screen_lock_mode);
 
         if (g_screen_lock_mode == DISPLAY_LOGO)
             lv_obj_clear_flag(screen_blank_time_obj, LV_OBJ_FLAG_HIDDEN);
@@ -380,6 +480,7 @@ static void screen_lock_mode_dropdown_event_handler(lv_event_t * e)
 
 static void screen_lock_delay_dropdown_event_handler(lv_event_t * e)
 {
+    struct osd_settings_context *ctx = &g_settings_ctx;
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * obj = lv_event_get_target(e);
 
@@ -412,11 +513,14 @@ static void screen_lock_delay_dropdown_event_handler(lv_event_t * e)
             rt_kprintf("Unknown screen lock index: %#x\n", index);
             break;
         }
+
+        cJSON_SetIntValue(ctx->lock_time.cjson, g_screen_lock_time_ms);
     }
 }
 
 static void screen_blank_delay_dropdown_event_handler(lv_event_t * e)
 {
+    struct osd_settings_context *ctx = &g_settings_ctx;
     lv_event_code_t code = lv_event_get_code(e);
     lv_obj_t * obj = lv_event_get_target(e);
 
@@ -443,6 +547,8 @@ static void screen_blank_delay_dropdown_event_handler(lv_event_t * e)
             rt_kprintf("Unknown screen blank after lock index: %#x\n", index);
             break;
         }
+
+        cJSON_SetIntValue(ctx->blank_time.cjson, g_screen_blank_time_ms);
     }
 }
 
@@ -495,7 +601,7 @@ static lv_obj_t * create_slider(lv_obj_t * parent,
                                 lv_obj_t ** label)
 {
     lv_obj_t * obj = create_text(parent, icon, txt, LV_MENU_ITEM_BUILDER_VARIANT_2);
-
+    char srt[8];
 
     lv_obj_t * slider = lv_slider_create(obj);
     lv_obj_set_flex_grow(slider, LV_FLEX_FLOW_COLUMN);
@@ -509,7 +615,9 @@ static lv_obj_t * create_slider(lv_obj_t * parent,
     if (label) {
         lv_obj_t * label_obj = lv_menu_cont_create(parent);
         *label = lv_label_create(label_obj);
-        lv_label_set_text(*label, "50");
+
+        lv_snprintf(srt, sizeof(srt), "%d", val);
+        lv_label_set_text(*label, srt);
 
         lv_obj_set_flex_flow(label_obj, LV_FLEX_FLOW_COLUMN);
         lv_obj_set_flex_align(label_obj, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -531,6 +639,8 @@ static lv_obj_t * create_switch(lv_obj_t * parent,
 
 static lv_obj_t * creat_screen_lock_mode_dropdown(lv_obj_t * parent)
 {
+    struct osd_settings_context *ctx = &g_settings_ctx;
+
     /*Create a normal drop down list*/
     lv_obj_t * dd = lv_dropdown_create(parent);
     lv_dropdown_set_options(dd, "LOGO \n"
@@ -540,7 +650,7 @@ static lv_obj_t * creat_screen_lock_mode_dropdown(lv_obj_t * parent)
 #endif
                             "Blank screen");
 
-    lv_dropdown_set_selected(dd, USB_OSD_SCREEN_LOCK_MODE);
+    lv_dropdown_set_selected(dd, ctx->lock_mode.value);
 
     lv_obj_add_event_cb(dd, screen_lock_mode_dropdown_event_handler, LV_EVENT_ALL, NULL);
     return dd;
@@ -548,6 +658,12 @@ static lv_obj_t * creat_screen_lock_mode_dropdown(lv_obj_t * parent)
 
 static lv_obj_t * creat_screen_lock_delay_dropdown(lv_obj_t * parent)
 {
+    unsigned int lock_delay[] = {     15 * 1000,     30 * 1000,  1 * 60 * 1000,
+                                  2 * 60 * 1000, 5 * 60 * 1000, 10 * 60 * 1000,
+                                  0 };
+    struct osd_settings_context *ctx = &g_settings_ctx;
+    int i;
+
     /*Create a normal drop down list*/
     lv_obj_t * dd = lv_dropdown_create(parent);
     lv_dropdown_set_options(dd, "15 seconds\n"
@@ -558,12 +674,22 @@ static lv_obj_t * creat_screen_lock_delay_dropdown(lv_obj_t * parent)
                             "10 minutes\n"
                             "Never");
 
+    for (i = 0; i < ARRAY_SIZE(lock_delay); i++)
+        if (ctx->lock_time.value == lock_delay[i])
+            break;
+
+    lv_dropdown_set_selected(dd, i);
     lv_obj_add_event_cb(dd, screen_lock_delay_dropdown_event_handler, LV_EVENT_ALL, NULL);
     return dd;
 }
 
 static lv_obj_t * creat_screen_blank_delay_dropdown(lv_obj_t * parent)
 {
+    unsigned int blank_delay[] = {  5 * 60 * 1000, 10 * 60 * 1000, 15 * 60 * 1000,
+                                  30 * 60 * 1000, 0 };
+    struct osd_settings_context *ctx = &g_settings_ctx;
+    int i;
+
     /*Create a normal drop down list*/
     lv_obj_t * dd = lv_dropdown_create(parent);
     lv_dropdown_set_options(dd, "5 minutes \n"
@@ -572,6 +698,11 @@ static lv_obj_t * creat_screen_blank_delay_dropdown(lv_obj_t * parent)
                             "30 minutes\n"
                             "Never");
 
+    for (i = 0; i < ARRAY_SIZE(blank_delay); i++)
+        if (ctx->blank_time.value == blank_delay[i])
+            break;
+
+    lv_dropdown_set_selected(dd, i);
     lv_obj_add_event_cb(dd, screen_blank_delay_dropdown_event_handler, LV_EVENT_ALL, NULL);
     return dd;
 }
@@ -597,8 +728,17 @@ static void lv_bg_dark_set(lv_obj_t * parent)
 
 static void lv_logo_image_create(lv_obj_t * parent)
 {
+#ifdef LV_USB_OSD_LOGO_IMAGE
     char logo_image_src[64];
-    snprintf(logo_image_src, sizeof(logo_image_src), LVGL_PATH(%s), USB_OSD_UI_LOGO);
+    snprintf(logo_image_src, sizeof(logo_image_src), LVGL_PATH(%s), USB_OSD_UI_LOGO_IMAGE);
+#else
+    struct aicfb_screeninfo info;
+    char logo_image_src[256];
+
+    mpp_fb_ioctl(g_fb, AICFB_GET_SCREENINFO, &info);
+    snprintf(logo_image_src, 255, "L:/%dx%d_%d_%08x.fake",\
+                 info.width, info.height, 0, 0x00000000);
+#endif
 
     g_logo_image = lv_img_create(parent);
     lv_img_set_src(g_logo_image, logo_image_src);
@@ -653,6 +793,7 @@ static void lv_menu_set_style(lv_obj_t * menu)
 
 lv_obj_t * lv_settings_screen_creat(void)
 {
+    struct osd_settings_context *ctx = &g_settings_ctx;
     lv_obj_t * settings_screen = lv_obj_create(NULL);
     lv_obj_clear_flag(settings_screen, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(settings_screen, menu_event_cb, LV_EVENT_ALL, NULL);
@@ -660,6 +801,7 @@ lv_obj_t * lv_settings_screen_creat(void)
     lv_mpp_fb_open();
     lv_bg_dark_set(settings_screen);
     lv_logo_image_create(settings_screen);
+    lv_parse_config_file(USB_OSD_CONFIG_FILE, ctx);
 
     g_image = lv_img_create(settings_screen);
     lv_img_set_src(g_image, LVGL_PATH(pictures/image0.jpg));
@@ -684,13 +826,16 @@ lv_obj_t * lv_settings_screen_creat(void)
     lv_obj_t * cont;
     lv_obj_t * section;
 
-    /* input sub page */
-    lv_obj_t * sub_input_page = lv_menu_page_create(menu, NULL);
-    lv_obj_set_style_pad_hor(sub_input_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
-    lv_menu_separator_create(sub_input_page);
-    section = lv_menu_section_create(sub_input_page);
+    /* device sub page */
+    lv_obj_t * sub_device_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_device_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_device_page);
+    section = lv_menu_section_create(sub_device_page);
+    cont = create_text(section, NULL, "Chip ID: D215BBV", LV_MENU_ITEM_BUILDER_VARIANT_1);
     cont = create_text(section, NULL, "Connection Type: USB", LV_MENU_ITEM_BUILDER_VARIANT_1);
     cont = create_text(section, NULL, "Resolution: 1024 * 600", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    cont = create_text(section, NULL,
+                       "Copyright (C) 2024 ArtinChip Technology Co., Ltd.", LV_MENU_ITEM_BUILDER_VARIANT_1);
 
     /* sound sub page */
     lv_obj_t * sub_sound_page = lv_menu_page_create(menu, NULL);
@@ -700,11 +845,11 @@ lv_obj_t * lv_settings_screen_creat(void)
     create_switch(section, LV_SYMBOL_AUDIO, "Sound", false);
     create_slider(section, LV_SYMBOL_SETTINGS, "Media", 0, 100, 50, NULL);
 
-    /* display sub page */
-    lv_obj_t * sub_display_page = lv_menu_page_create(menu, NULL);
-    lv_obj_set_style_pad_hor(sub_display_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
-    lv_menu_separator_create(sub_display_page);
-    section = lv_menu_section_create(sub_display_page);
+    /* image sub page */
+    lv_obj_t * sub_image_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_image_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_image_page);
+    section = lv_menu_section_create(sub_image_page);
 
     /* display sub page recovery button */
     lv_obj_t * recovery_btn = lv_btn_create(section);
@@ -721,18 +866,26 @@ lv_obj_t * lv_settings_screen_creat(void)
     lv_label_set_text(label, "recovery");
     lv_obj_center(label);
 
+    unsigned int default_value;
+
     /* display sub page slider */
-    brightness_slider = create_slider(section, LV_SYMBOL_SETTINGS, "Brightness", 0, 100, 50, &brightness_label);
+    default_value = ctx->brightness.value;
+    brightness_slider = create_slider(section, LV_SYMBOL_SETTINGS, "Brightness", 0, 100, default_value, &brightness_label);
     lv_obj_add_event_cb(brightness_slider, slider_event_cb, LV_EVENT_VALUE_CHANGED, brightness_label);
 
-    contrast_slider =create_slider(section, LV_SYMBOL_SETTINGS, "Contrast", 0, 100, 50, &contrast_label);
+    default_value = ctx->contrast.value;
+    contrast_slider =create_slider(section, LV_SYMBOL_SETTINGS, "Contrast", 0, 100, default_value, &contrast_label);
     lv_obj_add_event_cb(contrast_slider, slider_event_cb, LV_EVENT_VALUE_CHANGED, contrast_label);
 
-    saturation_slider =create_slider(section, LV_SYMBOL_SETTINGS, "Saturation", 0, 100, 50, &saturation_label);
+    default_value = ctx->saturation.value;
+    saturation_slider =create_slider(section, LV_SYMBOL_SETTINGS, "Saturation", 0, 100, default_value, &saturation_label);
     lv_obj_add_event_cb(saturation_slider, slider_event_cb, LV_EVENT_VALUE_CHANGED, saturation_label);
 
-    hue_slider =create_slider(section, LV_SYMBOL_SETTINGS, "Hue", 0, 100, 50, &hue_label);
+    default_value = ctx->hue.value;
+    hue_slider =create_slider(section, LV_SYMBOL_SETTINGS, "Hue", 0, 100, default_value, &hue_label);
     lv_obj_add_event_cb(hue_slider, slider_event_cb, LV_EVENT_VALUE_CHANGED, hue_label);
+
+    lv_config_disp_property(ctx);
 
     /* lock sub page */
     lv_obj_t * sub_lock_page = lv_menu_page_create(menu, NULL);
@@ -742,44 +895,48 @@ lv_obj_t * lv_settings_screen_creat(void)
 
     cont = create_text(section, NULL, "Screen Lock Delay", LV_MENU_ITEM_BUILDER_VARIANT_1);
     creat_screen_lock_delay_dropdown(cont);
-    /* sceen lock time default by menuconfig */
-    g_screen_lock_time_ms = USB_OSD_SCREEN_LOCK_TIME_MS;
+    g_screen_lock_time_ms = ctx->lock_time.value;
 
     cont = create_text(section, NULL, "Screen Lock Mode", LV_MENU_ITEM_BUILDER_VARIANT_1);
     creat_screen_lock_mode_dropdown(cont);
-    /* sceen lock mode default by menuconfig */
-    g_screen_lock_mode = USB_OSD_SCREEN_LOCK_MODE;
-    old_mode = USB_OSD_SCREEN_LOCK_MODE;
+    g_screen_lock_mode = ctx->lock_mode.value;
+    old_mode = ctx->lock_mode.value;
 
     cont = create_text(section, NULL, "Screen Blank After Lock", LV_MENU_ITEM_BUILDER_VARIANT_1);
     creat_screen_blank_delay_dropdown(cont);
     screen_blank_time_obj = cont;
-    /* sceen blank time after lock default by menuconfig */
-    g_screen_blank_time_ms = USB_OSD_SCREEN_BLANK_TIME_MS;
+    g_screen_blank_time_ms = ctx->blank_time.value;
 
-    /* about sub page */
-    lv_obj_t * sub_about_page = lv_menu_page_create(menu, NULL);
-    lv_obj_set_style_pad_hor(sub_about_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
-    lv_menu_separator_create(sub_about_page);
-    section = lv_menu_section_create(sub_about_page);
-    cont = create_text(section, NULL,
-                       "Copyright (C) 2024 ArtinChip Technology Co., Ltd.", LV_MENU_ITEM_BUILDER_VARIANT_1);
-    cont = create_text(section, NULL, "Chip ID: D215BBV", LV_MENU_ITEM_BUILDER_VARIANT_1);
+#if defined(KERNEL_RTTHREAD) && defined(AIC_PWM_BACKLIGHT_CHANNEL)
+    /* backlight sub page */
+    lv_obj_t * sub_backlight_page = lv_menu_page_create(menu, NULL);
+    lv_obj_set_style_pad_hor(sub_backlight_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
+    lv_menu_separator_create(sub_backlight_page);
+    section = lv_menu_section_create(sub_backlight_page);
+
+    /* backlight sub page slider */
+    default_value = ctx->pwm.value;
+    backlight_slider = create_slider(section, LV_SYMBOL_SETTINGS, "PWM-Backlight", 10, 100, default_value, &backlight_label);
+    lv_obj_add_event_cb(backlight_slider, backlight_slider_event_cb, LV_EVENT_VALUE_CHANGED, backlight_label);
+    backlight_pwm_config(AIC_PWM_BACKLIGHT_CHANNEL, default_value);
+#endif
 
     /* Create a root page */
     root_page = lv_menu_page_create(menu, "OSD");
     lv_obj_set_style_pad_hor(root_page, lv_obj_get_style_pad_left(lv_menu_get_main_header(menu), 0), 0);
     section = lv_menu_section_create(root_page);
-    cont = create_text(section, LV_SYMBOL_SETTINGS, "Input", LV_MENU_ITEM_BUILDER_VARIANT_1);
-    lv_menu_set_load_page_event(menu, cont, sub_input_page);
-    cont = create_text(section, LV_SYMBOL_SETTINGS, "Display", LV_MENU_ITEM_BUILDER_VARIANT_1);
-    lv_menu_set_load_page_event(menu, cont, sub_display_page);
+    cont = create_text(section, LV_SYMBOL_SETTINGS, "Device", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_device_page);
+    cont = create_text(section, LV_SYMBOL_SETTINGS, "Image", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_image_page);
     cont = create_text(section, LV_SYMBOL_POWER, "Lockscreen", LV_MENU_ITEM_BUILDER_VARIANT_1);
     lv_menu_set_load_page_event(menu, cont, sub_lock_page);
     cont = create_text(section, LV_SYMBOL_AUDIO, "Sound", LV_MENU_ITEM_BUILDER_VARIANT_1);
     lv_menu_set_load_page_event(menu, cont, sub_sound_page);
-    cont = create_text(section, LV_SYMBOL_LIST, "About", LV_MENU_ITEM_BUILDER_VARIANT_1);
-    lv_menu_set_load_page_event(menu, cont, sub_about_page);
+#if defined(KERNEL_RTTHREAD) && defined(AIC_PWM_BACKLIGHT_CHANNEL)
+    cont = create_text(section, LV_SYMBOL_SETTINGS, "Backlight", LV_MENU_ITEM_BUILDER_VARIANT_1);
+    lv_menu_set_load_page_event(menu, cont, sub_backlight_page);
+#endif
 
     lv_menu_set_sidebar_page(menu, root_page);
 

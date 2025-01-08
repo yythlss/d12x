@@ -10,6 +10,7 @@ menu "Syscfg Parameter"
         menuconfig AIC_SYSCFG_SIP_FLASH_ENABLE
             bool "SiP Flash Enable"
 	    default n
+		depends on AIC_SYSCFG_DRV_V11 || AIC_SYSCFG_DRV_V12
 
 	if AIC_SYSCFG_SIP_FLASH_ENABLE
 		config AIC_SIP_FLASH_ACCESS_QSPI_ID
@@ -21,6 +22,7 @@ menu "Syscfg Parameter"
 	menuconfig AIC_SYSCFG_LDO1X_ENABLE
 		bool "SYSCFG LDO1X enable"
 		default n
+		depends on AIC_SYSCFG_DRV_V11 || AIC_SYSCFG_DRV_V12 || AIC_SYSCFG_DRV_V10
 		if AIC_SYSCFG_LDO1X_ENABLE
 			config AIC_SYSCFG_LDO1X_VOL_VAL
 				depends on AIC_SYSCFG_DRV_V11

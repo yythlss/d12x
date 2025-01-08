@@ -138,7 +138,7 @@ static struct aic_qspi_bus qspi_bus_arr[] = {
 #endif
     },
 #endif
-#if defined(AIC_USING_SE_SPI)
+#if defined(AIC_USING_SE_SPI) && defined(AIC_SE_SPI_DEVICE_SPINOR)
     {
         .name = "sespi",
         .idx = 5,

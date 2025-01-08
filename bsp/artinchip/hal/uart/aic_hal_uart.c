@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024, Artinchip Technology Co., Ltd
+ * Copyright (c) 2021-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -87,8 +87,11 @@ typedef struct
     __IM uint32_t RFL;                  /* Offset: 0x084 (R/ )  UART rx fifo level register */
     __IOM uint32_t HSK;                 /* Offset: 0x088 (R/W)  UART dma hsk register */
     uint32_t RESERVED3[5];
-    __IOM uint32_t RXCTL;               /* Offset: 0x0A0 */
-    __IOM uint32_t HALT;                /* Offset: 0x0A4 */
+    __IOM uint32_t RXCTL;               /* Offset: 0x0A0 (R/W)  UART rx control register */
+    __IOM uint32_t HALT;                /* Offset: 0x0A4 (R/W)  UART tx halt register */
+    uint32_t RESERVED4[2];
+    __IOM uint32_t DBG_DLL;             /* Offset: 0x0B0 (R/W)  UART Clock frequency division low section debug register */
+    __IOM uint32_t DBG_DLH;             /* Offset: 0x0B4 (R/W)  UART Clock frequency division high section debug register */
 } aic_usart_reg_t;
 
 typedef struct
@@ -111,6 +114,34 @@ static const usart_capabilities_t usart_capabilities =
     .single_wire = 0,           /* supports USART Single-wire mode */
     .event_tx_complete = 1,     /* Transmit completed event */
     .event_rx_timeout = 0,      /* Signal receive character timeout event */
+};
+
+static const uint32_t uart_standard_baudrate[] = {
+    300,
+    600,
+    1200,
+    2400,
+    4800,
+    9600,
+    14400,
+    19200,
+    38400,
+    57600,
+    115200,
+    230400,
+    380400,
+    460800,
+    921600,
+    1000000,
+    1152000,
+    1500000,
+#if defined(AIC_CHIP_D12X)
+    1750000,
+    2000000,
+    2450000,
+#endif
+    2500000,
+    3000000,
 };
 
 extern int32_t drv_usart_target_init(int32_t idx, uint32_t *base, uint32_t *irq, void **handler);
@@ -411,6 +442,50 @@ int32_t hal_usart_clr_int_flag(usart_handle_t handle,uint32_t flag)
     addr->IER &= ~flag;
 
     return 0;
+}
+
+static uint32_t hal_usart_get_closest_baudrate(uint32_t baud)
+{
+    uint8_t i;
+    uint32_t closest_baud = 0;
+    uint32_t min_delta = U32_MAX;
+
+    for (i = 0; i < ARRAY_SIZE(uart_standard_baudrate); i++) {
+        uint32_t diff = abs(baud - uart_standard_baudrate[i]);
+        if (diff < min_delta) {
+            min_delta = diff;
+            closest_baud = uart_standard_baudrate[i];
+        }
+    }
+
+    return closest_baud;
+}
+
+uint32_t hal_usart_get_cur_baudrate(usart_handle_t handle)
+{
+    USART_NULL_PARAM_CHK(handle);
+    aic_usart_priv_t *usart_priv = handle;
+    aic_usart_reg_t *addr = (aic_usart_reg_t *)(usart_priv->base);
+    uint32_t dll, dlh, cmu_div, uart_div , baud;
+    unsigned int parent_id;
+    unsigned long parent_clk, moudle_clk;
+
+    /* CMU Divisor */
+    parent_id = hal_clk_get_parent(CLK_UART0 + usart_priv->idx);
+    parent_clk = hal_clk_get_freq(parent_id);
+    moudle_clk = hal_clk_get_freq(CLK_UART0 + usart_priv->idx);
+    cmu_div = parent_clk / moudle_clk;
+
+    /* UART Divisor */
+    dll = addr->DBG_DLL;
+    dlh = addr->DBG_DLH;
+    uart_div = (dlh << 8) | dll;
+
+    /* Baudrate = SCLK /（CMU_divisor * 16 * UART_divisor)*/
+    baud = parent_clk / (cmu_div * 16 * uart_div);
+    baud = hal_usart_get_closest_baudrate(baud);
+
+    return baud;
 }
 
 /**

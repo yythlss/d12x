@@ -121,7 +121,6 @@ aic_set_upgrade_status_err:
 int aic_get_os_to_startup(char *target_os)
 {
     char *next = NULL;
-    char *status = NULL;
     int ret = 0;
 
     if (fw_env_open()) {
@@ -183,25 +182,6 @@ int aic_get_os_to_startup(char *target_os)
 
     if (ret) {
         pr_err("dataAB write fail\n");
-        goto err_write_next_os;
-    }
-
-    status = fw_getenv("upgrade_available");
-#ifdef AIC_ENV_DEBUG
-    printf("upgrade_available = %s\n", status);
-#endif
-    if (strncmp(status, "1", 2) == 0) {
-        ret = fw_env_write("upgrade_available", "0");
-        if (ret) {
-            pr_err("Env write fail\n");
-            goto err_write_next_os;
-        }
-        fw_env_flush();
-    } else if (strncmp(status, "0", 2) == 0) {
-        ret = 0;
-    } else {
-        pr_err("Invalid upgrade_available\n");
-        ret = -1;
         goto err_write_next_os;
     }
 

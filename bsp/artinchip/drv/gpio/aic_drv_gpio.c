@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -235,7 +235,7 @@ int drv_pin_init(void)
 }
 INIT_BOARD_EXPORT(drv_pin_init);
 
-#elif defined(KERNEL_BAREMETAL)
+#elif defined(KERNEL_BAREMETAL) || defined(KERNEL_FREERTOS)
 
 #ifdef AIC_GPIO_IRQ_DRV_EN
 #define MAX_GPIO_IRQ_GROUP 8

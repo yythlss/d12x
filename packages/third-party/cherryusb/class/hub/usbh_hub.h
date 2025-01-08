@@ -24,6 +24,7 @@ int usbh_hub_clear_feature(struct usbh_hub *hub, uint8_t port, uint8_t feature);
 void usbh_hub_thread_wakeup(struct usbh_hub *hub);
 #ifdef KERNEL_BAREMETAL
 void usbh_hub_poll(void);
+int usbh_hub_connect_check(void);
 #endif
 int usbh_hub_initialize(struct usbh_bus *bus);
 int usbh_hub_deinitialize(struct usbh_bus *bus);

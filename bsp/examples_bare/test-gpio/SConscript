@@ -5,7 +5,7 @@ from building import *
 cwd = GetCurrentDir()
 CPPPATH = []
 src = []
-if GetDepend('KERNEL_BAREMETAL') and GetDepend('AIC_GPIO_DRV_TEST'):
+if (GetDepend('KERNEL_BAREMETAL') or GetDepend('KERNEL_FREERTOS')) and GetDepend('AIC_GPIO_DRV_TEST'):
     src += Glob('test_gpio.c')
 
 group = DefineGroup('test-gpio', src, depend = [''], CPPPATH = CPPPATH)

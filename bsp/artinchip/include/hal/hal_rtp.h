@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -18,6 +18,9 @@
 #define AIC_RTP_VAL_RANGE           (AIC_RTP_MAX_VAL + 1)
 #define AIC_RTP_INVALID_VAL         (AIC_RTP_MAX_VAL + 1)
 #define AIC_RTP_INVALID_MIN_VAL     50
+#define AIC_RTP_TIMEOUT             1000 /* 1000 ms */
+#define RTP_ADC_ACC_BIT             12
+#define RTP_ADC_ACC_RANGE           (1 << RTP_ADC_ACC_BIT)
 
 #define AIC_RTP_EVT_BUF_SIZE        64
 
@@ -55,6 +58,11 @@ struct aic_rtp_ebuf {
     struct aic_rtp_event event[AIC_RTP_EVT_BUF_SIZE];
 };
 
+struct aic_rtp_adc_info {
+    u8 ch;
+    u16 data;
+};
+
 typedef s32 (*rtp_callback_t)(void);
 
 struct aic_rtp_dev {
@@ -77,6 +85,8 @@ struct aic_rtp_dev {
     aicos_sem_t sem;
     struct aic_rtp_ebuf ebuf;
     u16 point_num;
+    aicos_sem_t complete;
+    struct aic_rtp_adc_info adc_info;
 };
 
 typedef struct {
@@ -105,5 +115,6 @@ s32 hal_rtp_clk_init(void);
 s32 hal_rtp_register_callback(rtp_callback_t callback);
 s32 hal_rtp_ebuf_sync(struct aic_rtp_ebuf *ebuf);
 u32 hal_rtp_pdeb_valid_check(struct aic_rtp_dev *rtp);
+u16 hal_rtp_adc_soft_trigger(struct aic_rtp_dev *rtp, int ch);
 
 #endif

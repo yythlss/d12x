@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -12,17 +12,27 @@
 #include <aic_hal.h>
 #include <aic_log.h>
 
-#define EFUSE_REG_CTL       (SID_BASE + 0x0000)
-#define EFUSE_REG_ADDR      (SID_BASE + 0x0004)
-#define EFUSE_REG_WDATA     (SID_BASE + 0x0008)
-#define EFUSE_REG_RDATA     (SID_BASE + 0x000C)
-#define EFUSE_REG_TIMING    (SID_BASE + 0x0010)
-#define EFUSE_REG_PWRCFG    (SID_BASE + 0x0014)
-#define EFUSE_REG_WFRID     (SID_BASE + 0x0018)
-#define EFUSE_REG_PKGID     (SID_BASE + 0x001C)
-#define EFUSE_REG_JTAG      (SID_BASE + 0x0080)
-#define EFUSE_REG_VER       (SID_BASE + 0x00FC)
-#define EFUSE_REG_SRAM      (SID_BASE + 0x200)
+#define EFUSE_REG_CTL           (SID_BASE + 0x0000)
+#define EFUSE_REG_ADDR          (SID_BASE + 0x0004)
+#define EFUSE_REG_WDATA         (SID_BASE + 0x0008)
+#define EFUSE_REG_RDATA         (SID_BASE + 0x000C)
+#define EFUSE_REG_TIMING        (SID_BASE + 0x0010)
+#define EFUSE_REG_PWRCFG        (SID_BASE + 0x0014)
+#define EFUSE_REG_WFRID         (SID_BASE + 0x0018)
+#define EFUSE_REG_PKGID         (SID_BASE + 0x001C)
+#define EFUSE_REG_JTAG          (SID_BASE + 0x0080)
+#define EFUSE_REG_AUTH_KEY(n)   (SID_BASE + 0x00C0 + (n) * 0x04)
+#define EFUSE_REG_AUTH_CTL      (SID_BASE + 0x00EC)
+#define EFUSE_REG_VER           (SID_BASE + 0x00FC)
+#define EFUSE_REG_SRAM          (SID_BASE + 0x0200)
+
+#define AUTH_CTL_MASK               (0xFFFFFFFF)
+#define AUTH_CTL_SZONE_STATE        (0x1 << 29)
+#define AUTH_CTL_SJTAG_STATE        (0x1 << 28)
+#define AUTH_CTL_SEL_SJTAG          (0x0 << 8)
+#define AUTH_CTL_SEL_SZONE          (0x1 << 8)
+#define AUTH_CTL_CLEAR              (0x1 << 4)
+#define AUTH_CTL_START              (0x1 << 0)
 
 #define EFUSE_CTL_BROM_PRIV_LOCK (0x1 << 28)
 
@@ -143,6 +153,66 @@ int hal_efuse_write(u32 wid, u32 wval)
         while(readl(EFUSE_REG_CTL) & (1 << 0)) {
             continue;
         }
+    }
+
+    return 0;
+}
+
+int hal_write_auth_key(u32 *key, u32 kwlen)
+{
+    u32 i;
+
+    if (kwlen > 8) {
+        hal_log_err("Error, key word length is too long.\n");
+        return -EINVAL;
+    }
+
+    for (i = 0; i < kwlen; i ++) {
+        writel(key[i], EFUSE_REG_AUTH_KEY(i));
+    }
+
+    return 0;
+}
+
+int hal_sjtag_auth(u32 *key, u32 kwlen)
+{
+    u32 ret, val;
+
+    ret = hal_write_auth_key(key, kwlen);
+    if (ret) {
+        hal_log_err("Error, set auth key failed.\n");
+        return ret;
+    }
+
+    writel(AUTH_CTL_START | AUTH_CTL_SEL_SJTAG, EFUSE_REG_AUTH_CTL);
+
+    val = readl(EFUSE_REG_AUTH_CTL);
+    if (val & AUTH_CTL_SJTAG_STATE) {
+        printf("Secure jtag authenticate success.\n");
+    } else {
+        printf("Secure jtag authenticate failed.\n");
+    }
+
+    return 0;
+}
+
+int hal_szone_auth(u32 *key, u32 kwlen)
+{
+    u32 ret, val;
+
+    ret = hal_write_auth_key(key, kwlen);
+    if (ret) {
+        hal_log_err("Error, set auth key failed.\n");
+        return ret;
+    }
+
+    writel(AUTH_CTL_START | AUTH_CTL_SEL_SZONE, EFUSE_REG_AUTH_CTL);
+
+    val = readl(EFUSE_REG_AUTH_CTL);
+    if (val & AUTH_CTL_SZONE_STATE) {
+        printf("Secure zone authenticate success.\n");
+    } else {
+        printf("Secure zone authenticate failed.\n");
     }
 
     return 0;

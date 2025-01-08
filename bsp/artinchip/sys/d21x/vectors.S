@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -104,6 +104,15 @@ Default_IRQHandler:
     FSTORE  ft11, 19 * FREGBYTES(sp)
 #endif
 
+#if defined(_ENABLE_BACK_TRACE_STACK_) && defined(_NO_OMIT_FRAME_POINT_)
+    addi    sp,sp,-16
+    STORE   s0,(sp)
+    csrr    a0, mepc
+    STORE   a0, 8(sp)
+    addi    s0, sp, 16
+#endif
+
+
 #if defined(KERNEL_RTTHREAD)
     la      t0, rt_interrupt_enter
     jalr    t0
@@ -173,6 +182,11 @@ Default_IRQHandler:
     sw      a0, (t0)
 .no_ext_irq_exit:
 
+#if defined(_ENABLE_BACK_TRACE_STACK_) && defined(_NO_OMIT_FRAME_POINT_)
+    lw    s0, (sp)
+    addi  sp, sp, 16
+#endif
+
 #ifdef ARCH_RISCV_FPU
     FLOAD   ft0,  0 * FREGBYTES(sp)
     FLOAD   ft1,  1 * FREGBYTES(sp)
@@ -234,8 +248,12 @@ Default_IRQHandler:
     .global trap
     .type   trap, %function
 trap:
+#ifndef AIC_BACKTRACE_DEBUG
     csrw    mscratch, sp
     la      t0, g_trap_sp
+#else
+    mv       t0, sp
+#endif
     addi    t0, t0, -(264)
     STORE   x1, 0(t0)
     STORE   x2, 8(t0)
@@ -278,6 +296,73 @@ trap:
 
     la      a5, trap_c
     jalr    a5
+
+#if defined(_ENABLE_BACK_TRACE_STACK_) && defined(KERNEL_RTTHREAD)
+    mv      a0, sp
+    addi    a0, a0, 264
+    csrr    a1, mscratch
+    csrr    a2, mepc
+    la      a5, print_stack
+    jalr    a5
+#define CALL_STACK_MAX_DEPTH 32
+    la      a0, rt_current_thread
+    beqz    a0, .
+#ifdef _NO_OMIT_FRAME_POINT_
+    mv      t0, sp
+    la      t1, CALL_STACK_MAX_DEPTH
+    slli    t1, t1, 3
+    sub     t0, t0, t1
+    csrr    a1, mepc
+    STORE   a1, (t0)
+    mv      a1, s0
+    li      t1, 1
+1:
+    // check addr
+    li      t2, 0x40000000
+    la      t3, AIC_DRAM_TOTAL_SIZE
+    add     t3, t2, t3
+    blt     a1, t2, 3f
+    bge     a1, t3, 3f
+
+    addi    a2, a1, -(8)
+    blt     a2, t2, 3f
+    bge     a2, t3, 3f
+
+    addi    a2, a1, -(16)
+    blt     a2, t2, 3f
+    bge     a2, t3, 3f
+2:
+    // get ra
+    LOAD    a2, -8(a1)
+    slli    t2, t1, 3
+    add     t2, t2, t0
+    STORE   a2, (t2)
+    // get next fp
+    LOAD    a1, -16(a1)
+    //inc call depth
+    addi    t1, t1, 1
+    // check end
+    li  a2, 0xdeadbeef
+    beq a1, a2, 3f
+    la  a2, CALL_STACK_MAX_DEPTH
+    blt t1, a2, 1b
+3:
+    mv      a0, t1
+    mv      a1, t0
+    mv      sp, t0
+    la      a5, print_back_trace
+    jalr    a5
+#else
+    mv      a0, sp
+    addi    a0, a0, 264
+    csrr    a1, mscratch
+    csrr    a2, mepc
+    la      a5, backtrace_call_stack
+    jalr    a5
+#endif
+#endif
+
+    j      .
 
     .align  6
     .weak   Default_Handler

@@ -1,10 +1,10 @@
 /*
-* Copyright (C) 2020-2022 Artinchip Technology Co. Ltd
-*
-*  author: author: <qi.xu@artinchip.com>
-*  Desc: jpeg register configuration
-*
-*/
+ * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ *
+ *  SPDX-License-Identifier: Apache-2.0
+ *  author: <qi.xu@artinchip.com>
+ *  Desc: jpeg register configuration
+ */
 
 #define LOG_TAG "jpeg_hal"
 #include <string.h>
@@ -467,7 +467,17 @@ static void config_jpeg_picture_info_register(struct mjpeg_dec_ctx *s)
 	frame_size.pic_ysize = s->rm_v_real_size[0];
 
 	frame_format.cbcr_interleaved = s->uv_interleave;
+
+#ifdef AIC_VE_DRV_V10
 	frame_format.stride = s->curr_frame->mpp_frame.buf.stride[0];
+#else
+	if(MPP_ROTATION_GET(s->decoder.rotmir_flag) == MPP_ROTATION_270 ||
+		MPP_ROTATION_GET(s->decoder.rotmir_flag) == MPP_ROTATION_90)
+		frame_format.stride = s->curr_frame->mpp_frame.buf.size.height;
+	else
+		frame_format.stride = s->curr_frame->mpp_frame.buf.stride[0];
+#endif
+
 	if (s->pix_fmt == MPP_FMT_YUV420P || s->pix_fmt == MPP_FMT_NV12 || s->pix_fmt == MPP_FMT_NV21) {
 		frame_format.color_mode = 0;
 	} else if(s->pix_fmt == MPP_FMT_YUV444P) {

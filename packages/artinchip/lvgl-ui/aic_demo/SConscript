@@ -35,6 +35,17 @@ else:
         if os.path.isfile(os.path.join(path, 'SConscript')):
             group = group + SConscript(os.path.join(d, 'SConscript'))
 
-group = group + DefineGroup('LVGL-port', src, depend = ['AIC_LVGL_DEMO'], CPPPATH = inc)
+if GetDepend(['AIC_LVGL_UI_BUILDER']):
+    ins_src='ui_builder/assets/'
+    if GetDepend(['LVGL_STORAGE_PATH']):
+        ins_dst = GetDepend('LVGL_STORAGE_PATH').strip('"/')
+    else:
+        ins_dst='rodata/lvgl_data'
+
+    install=[(ins_src, ins_dst)]
+    group = group + DefineGroup('LVGL-port', src, depend = ['AIC_LVGL_DEMO'], CPPPATH = inc,
+            INSTALL = install)
+else:
+    group = group + DefineGroup('LVGL-port', src, depend = ['AIC_LVGL_DEMO'], CPPPATH = inc)
 
 Return('group')

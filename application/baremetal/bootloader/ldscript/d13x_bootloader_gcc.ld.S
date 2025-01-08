@@ -129,6 +129,12 @@ SECTIONS
   KEEP (*(.dtors))
   __dtor_end__ = .;
 
+  /* usb host class */
+  . = ALIGN(0x8) ;
+  __usbh_class_info_start__ = .;
+  KEEP(*(.usbh_class_info))
+  __usbh_class_info_end__ = .;
+
   . = ALIGN(0x8) ;
   __erodata = .;
   __rodata_end__ = .;

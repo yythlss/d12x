@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -25,7 +25,6 @@ u32 rising_time_point = 0;
 u32 falling_time_point = 0;
 volatile u32 rising_flg = 0;
 volatile u32 falling_flg = 0;
-u32 g, p;
 
 static void cmd_gpio_usage(void)
 {
@@ -42,7 +41,11 @@ static void cmd_gpio_usage(void)
 static void cmd_gpio_irq_callback(void *args)
 {
     u32 value;
+    u32 pin = (u32)args;
+    u32 g, p;
 
+    g = GPIO_GROUP(pin);
+    p = GPIO_GROUP_PIN(pin);
     hal_gpio_get_value(g, p, &value);
     if (value) {
         /* obtain the rising level time*/
@@ -78,7 +81,7 @@ static u32 test_gpio_pin_check(char *arg_pin, int set_mode_flag)
 static int cmd_gpio_get_pin_cfg_status(int argc, char **argv)
 {
     int ret;
-    u32 pin;
+    u32 pin, g, p;
     pin = test_gpio_pin_check(argv[1], GPIO_NO_SET_MODE_FLAG);
     g = GPIO_GROUP(pin);
     p = GPIO_GROUP_PIN(pin);
@@ -145,7 +148,7 @@ static int cmd_gpio_get_pin_cfg_status(int argc, char **argv)
 static int cmd_gpio_input_pin_cfg(int argc, char **argv)
 {
     int ret;
-    u32 pin;
+    u32 pin, g, p;
     unsigned int gpio_irq;
     pin = test_gpio_pin_check(argv[1], GPIO_SET_MODE_FLAG);
     g = GPIO_GROUP(pin);
@@ -156,7 +159,7 @@ static int cmd_gpio_input_pin_cfg(int argc, char **argv)
     hal_gpio_set_irq_mode(g, p, PIN_IRQ_MODE_EDGE_BOTH);
 
     gpio_irq = AIC_GPIO_TO_IRQ(g * GPIO_GROUP_SIZE + p);
-    drv_irq_register(gpio_irq, cmd_gpio_irq_callback, NULL);
+    drv_irq_register(gpio_irq, cmd_gpio_irq_callback, (void *)pin);
     hal_gpio_enable_irq(g, p);
 
     cmd_gpio_get_pin_cfg_status(argc, argv);
@@ -173,7 +176,7 @@ static int cmd_gpio_input_pin_cfg(int argc, char **argv)
 static int cmd_gpio_output_pin_cfg(int argc, char **argv)
 {
     int ret;
-    u32 pin;
+    u32 pin, g, p;
     pin = test_gpio_pin_check(argv[1], GPIO_SET_MODE_FLAG);
     g = GPIO_GROUP(pin);
     p = GPIO_GROUP_PIN(pin);

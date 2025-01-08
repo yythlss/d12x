@@ -524,6 +524,10 @@ config AIC_GPAI_CH_NUM
     int
     default 8 if AIC_GPAI_DRV_V10
 
+config AIC_GPAI_CH_NUM_MASK
+    hex
+    default 0x7 if AIC_GPAI_DRV_V10
+
 #--------------------------------------------
 # PWM driver global option
 #--------------------------------------------
@@ -544,6 +548,27 @@ config AIC_PWM_DRV_VER
 config AIC_PWM_CH_NUM
     int
     default 4 if AIC_PWM_DRV_V10
+
+#--------------------------------------------
+# QEP driver global option
+#--------------------------------------------
+
+config AIC_QEP_DRV
+    bool
+    default n
+    select RT_USING_PULSE_ENCODER if DRIVER_DRV_EN
+
+config AIC_QEP_DRV_V11
+    bool
+    default y if AIC_QEP_DRV
+
+config AIC_QEP_DRV_VER
+    string
+    default "11" if AIC_QEP_DRV_V11
+
+config AIC_QEP_CH_NUM
+    int
+    default 10 if AIC_QEP_DRV_V11
 
 #--------------------------------------------
 # EPWM driver global option

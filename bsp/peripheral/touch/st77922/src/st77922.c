@@ -10,12 +10,13 @@
 
 #include <rtthread.h>
 #include <rtdevice.h>
-#include "st77922.h"
 #include <string.h>
-#include <rtdbg.h>
+#include "st77922.h"
+#include "touch_common.h"
 
 #define DBG_TAG     AIC_TOUCH_PANEL_NAME
 #define DBG_LVL     DBG_INFO
+#include <rtdbg.h>
 
 static struct rt_i2c_client st77922_client;
 
@@ -232,6 +233,12 @@ static rt_size_t st77922_read_point(struct rt_touch_device *touch,
 
             input_x = ((read_buf[off_set + 4] & 0x3f) << 8) | read_buf[off_set + 5];
             input_y = ((read_buf[off_set + 6] & 0x3f) << 8) | read_buf[off_set + 7];
+
+            aic_touch_flip(&input_x, &input_y);
+            aic_touch_rotate(&input_x, &input_y);
+            aic_touch_scale(&input_x, &input_y);
+            if (!aic_touch_crop(&input_x, &input_y))
+                continue;
 
             st77922_touch_down(buf, read_id, input_x, input_y);
         }

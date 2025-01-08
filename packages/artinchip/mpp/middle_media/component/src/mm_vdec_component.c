@@ -63,7 +63,7 @@ typedef struct mm_vdec_data {
     u32 decoder_ok_num;
     MM_BOOL wait_for_ready_pkt;
     MM_BOOL wait_for_empty_frame;
-
+    MM_BOOL pkt_end_flag;
 } mm_vdec_data;
 
 static void *mm_vdec_component_thread(void *p_thread_data);
@@ -111,6 +111,9 @@ static s32 mm_vdec_send_command(mm_handle h_component, MM_COMMAND_TYPE cmd,
             pthread_mutex_unlock(&p_vdec_data->in_pkt_lock);
         }
     } else {
+        if (MM_COMMAND_EOS == (s32)cmd) {
+            p_vdec_data->pkt_end_flag = MM_TRUE;
+        }
         aic_msg_put(&p_vdec_data->s_msg, &s_msg);
     }
 
@@ -367,7 +370,6 @@ static s32 mm_vdec_set_config(mm_handle h_component, MM_INDEX_TYPE index,
             p_vdec_data->flags = 0;
 
             // 3 clear decoder buff
-            printf("mpp_decoder_reset\n");
             mpp_decoder_reset(p_vdec_data->p_decoder);
 
             break;
@@ -382,6 +384,15 @@ static s32 mm_vdec_set_config(mm_handle h_component, MM_INDEX_TYPE index,
             memcpy(&p_vdec_data->crop, p_config, sizeof(struct mpp_dec_crop_info));
             p_vdec_data->ve_fill_fb_crop_change = 1;
             pthread_mutex_unlock(&p_vdec_data->process_dec_lock);
+            break;
+
+        case MM_INDEX_CONFIG_COMMON_ROTATE:
+            if (p_config)
+                mpp_decoder_control(p_vdec_data->p_decoder,
+                                    MPP_DEC_INIT_CMD_SET_ROT_FLIP_FLAG,
+                                    &((mm_config_rotation *)p_config)->rotation);
+            else
+                loge("config rotate config is null\n");
             break;
 
         default:
@@ -931,14 +942,18 @@ static void *mm_vdec_component_thread(void *p_thread_data)
 #ifndef AIC_MPP_PLAYER_VE_USE_FILL_FB
             mm_send_command(p_bind_video_render->p_bind_comp, MM_COMMAND_WKUP, 0, NULL);
 #endif
-            mm_send_command(p_bind_demuxer->p_bind_comp, MM_COMMAND_WKUP, 0,
-                            NULL);
+            mm_send_command(p_bind_demuxer->p_bind_comp, MM_COMMAND_WKUP, 0, NULL);
             p_vdec_data->decoder_ok_num++;
         } else if (dec_ret == DEC_NO_READY_PACKET) {
             mm_send_command(p_bind_demuxer->p_bind_comp, MM_COMMAND_WKUP, 0, NULL);
             pthread_mutex_lock(&p_vdec_data->in_pkt_lock);
             p_vdec_data->wait_for_ready_pkt = MM_TRUE;
             pthread_mutex_unlock(&p_vdec_data->in_pkt_lock);
+
+            if (p_vdec_data->pkt_end_flag) {
+                mm_send_command(p_bind_video_render->p_bind_comp,
+                                MM_COMMAND_EOS, 0, NULL);
+            }
         } else if (dec_ret == DEC_NO_EMPTY_FRAME) {
             pthread_mutex_lock(&p_vdec_data->out_frame_lock);
             p_vdec_data->wait_for_empty_frame = MM_TRUE;
@@ -971,8 +986,5 @@ static void *mm_vdec_component_thread(void *p_thread_data)
         }
     }
 _EXIT:
-    printf("[%s:%d]decoder_ok_num:%u\n", __FUNCTION__, __LINE__,
-           p_vdec_data->decoder_ok_num);
-    printf("[%s:%d]mm_vdec_component_thread exit\n", __FUNCTION__, __LINE__);
     return (void *)MM_ERROR_NONE;
 }

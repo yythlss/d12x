@@ -237,7 +237,8 @@ int hal_epwm_set(u32 ch, u32 duty_ns, u32 period_ns, u32 output)
 
     prd = arg->tb_clk_rate / arg->freq;
 
-    printf("output:Freq %f Hz, prd value %d, Time-base %d Hz\n", arg->freq, prd, arg->tb_clk_rate);
+    hal_log_debug("output:Freq %d.%03d Hz, prd value %d, Time-base %d Hz\n",
+        (int)arg->freq, (int)((arg->freq - (int)arg->freq) * 1000), prd, arg->tb_clk_rate);
 
     if (arg->mode == EPWM_MODE_UP_DOWN_COUNT)
         prd >>= 1;

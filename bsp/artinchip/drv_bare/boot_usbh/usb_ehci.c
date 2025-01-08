@@ -209,7 +209,7 @@ void usb_hc_low_level_init(int id)
     u32 val, clk_usbh, clk_usb_phy; //, reset_usbphy, reset_usbh;
 
     if (id == 0)
-        syscfg_usb_phy0_sw_host(1); /* Switch to HOST mode */
+        hal_syscfg_usb_phy0_sw_host(1); /* Switch to HOST mode */
 
     /* Enable clock */
     clk_usbh = CLK_USBH0 + id;

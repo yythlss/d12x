@@ -411,7 +411,13 @@ static s32 nand_fwc_spl_program(struct fwc_info *fwc, struct aicupg_nand_spl *sp
     pr_debug("Write page table to blk %d pa 0x%x., off 0x%x\n", blkidx, pa,
              (u32)offset);
 
+#ifdef AIC_USING_SPIENC
+    spienc_set_bypass(AIC_SPIENC_BYPASS_ENABLE);
+#endif
     ret = mtd_write(spl->mtd, offset, page_data, PAGE_TABLE_USE_SIZE);
+#ifdef AIC_USING_SPIENC
+    spienc_set_bypass(AIC_SPIENC_BYPASS_DISABLE);
+#endif
     if (ret) {
         pr_err("Write SPL page %d failed.\n", 0);
         ret = -1;
@@ -498,7 +504,13 @@ static s32 verify_page_table(struct aicupg_nand_spl *spl, u32 blkidx,
     s32 ret;
 
     offset = spl->mtd->erasesize * blkidx;
+#ifdef AIC_USING_SPIENC
+    spienc_set_bypass(AIC_SPIENC_BYPASS_ENABLE);
+#endif
     ret = mtd_read(spl->mtd, offset, page_data, PAGE_TABLE_USE_SIZE);
+#ifdef AIC_USING_SPIENC
+    spienc_set_bypass(AIC_SPIENC_BYPASS_DISABLE);
+#endif
     if (ret) {
         pr_err("Read page_data failed.\n");
         return -1;

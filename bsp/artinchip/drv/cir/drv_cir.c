@@ -157,9 +157,9 @@ void drv_cir_callback(aic_cir_ctrl_t *p_cir_ctrl, cir_event_t event, void *arg)
 #ifdef RT_USING_DEVICE_OPS
 static const struct rt_device_ops aic_cir_ops =
 {
-    drv_cir_init,
     NULL,
-    NULL,
+    drv_cir_open,
+    drv_cir_close,
     drv_cir_read,
     drv_cir_write,
     drv_cir_control,

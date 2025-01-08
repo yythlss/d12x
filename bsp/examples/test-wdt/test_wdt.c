@@ -11,6 +11,7 @@
 #include <hal_wdt.h>
 #include <getopt.h>
 
+#define AIC_WDT_DEV_NAME           "wdt"
 
 irqreturn_t aic_wdt_irq(int irq, void *arg)
 {
@@ -23,7 +24,7 @@ void wdt_feed_thread_entry(void *parameter)
 {
     rt_device_t wdt_dev = RT_NULL;
     do {
-        wdt_dev = rt_device_find("wdt");
+        wdt_dev = rt_device_find(AIC_WDT_DEV_NAME);
         rt_device_control(wdt_dev, RT_DEVICE_CTRL_WDT_KEEPALIVE, NULL);
         rt_thread_mdelay(200);
     } while (wdt_dev);
@@ -32,7 +33,7 @@ void wdt_feed_thread_entry(void *parameter)
 static void usage(char * program)
 {
     printf("\n");
-    printf("Usage: %s [-s timeout] [-p pretimeout] [-c clear threshold] [-g] [-k] [-u]\n",\
+    printf("Usage: %s [-s timeout] [-p pretimeout] [-c clear threshold] [-g] [-k] [-h]\n",\
         program);
     printf("\t -s, --set-timeout\tSet a timeout, in second\n");
     printf("\t -p, --set-pretimeout\tSet a pretimeout, in second\n");
@@ -43,23 +44,36 @@ static void usage(char * program)
     printf("\t -r, --change reset object \t change reset cpu or system\n");
     #endif
     printf("\t -w, --write reg enable/disable\tEnable(1)/Disable(0) write protect reg function\n");
-    printf("\t -u, --usage \n");
+    printf("\t -h, --help \n");
     printf("\n");
 }
 
-void test_wdt(int argc, char **argv)
+int test_wdt(int argc, char **argv)
 {
-    int opt;
+    int opt, ret = 0;
     __unused int status;
     int wreg_switch,timeout = 0;
     rt_device_t wdt_dev = RT_NULL;
     rt_thread_t wdt_thread = RT_NULL;
 
-    wdt_dev =  rt_device_find("wdt");
-    rt_device_init(wdt_dev);
+    if (argc < 2) {
+        usage(argv[0]);
+        return -1;
+    }
+
+    wdt_dev =  rt_device_find(AIC_WDT_DEV_NAME);
+    if (!wdt_dev) {
+        rt_kprintf("Failed to open %s device\n", AIC_WDT_DEV_NAME);
+        return -1;
+    }
+    ret = rt_device_init(wdt_dev);
+    if (ret < 0) {
+        rt_kprintf("Failed to init %s device\n", AIC_WDT_DEV_NAME);
+        return -1;
+    }
 
     optind = 0;
-    while ((opt = getopt(argc, argv, "s:p:c:w:gkru")) != -1) {
+    while ((opt = getopt(argc, argv, "s:p:c:w:gkrh")) != -1) {
         switch (opt) {
             case 'c':
                 timeout = strtoul(optarg, NULL, 10);
@@ -110,10 +124,12 @@ void test_wdt(int argc, char **argv)
                 else if (wreg_switch == 0)
                     rt_kprintf("disable write protect reg function\n");
                 break;
-            case 'u':
+            case 'h':
             default:
                 usage(argv[0]);
         }
     }
+
+    return 0;
 }
 MSH_CMD_EXPORT_ALIAS(test_wdt, test_wdt, Reboot the system);

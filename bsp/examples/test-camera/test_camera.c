@@ -15,8 +15,8 @@
 
 struct camera_cmd {
     char *name;
-    int (*handle1)(rt_device_t dev, u32 arg);
-    int (*handle2)(rt_device_t dev, bool arg);
+    int (*handle_int)(rt_device_t dev, u32 arg);
+    int (*handle_bool)(rt_device_t dev, bool arg);
 };
 
 static struct camera_cmd g_camera_cmds[] = {
@@ -136,10 +136,10 @@ static rt_err_t cmd_test_camera(int argc, char **argv)
     }
 
     printf("Try to set %s %d\n", cmd->name, val);
-    if (cmd->handle1)
-        ret = cmd->handle1(dev, val);
-    else if (cmd->handle2)
-        ret = cmd->handle2(dev, (bool)val);
+    if (cmd->handle_int)
+        ret = cmd->handle_int(dev, val);
+    else if (cmd->handle_bool)
+        ret = cmd->handle_bool(dev, (bool)val);
 
     if (ret)
         pr_err("Failed to set %s %ld, return %d\n", cmd->name, val, ret);

@@ -61,11 +61,11 @@ extern "C" {
 
 /* assert for developer. */
 #ifdef SFUD_DEBUG_MODE
-#define SFUD_ASSERT(EXPR)                                                      \
-if (!(EXPR))                                                                   \
-{                                                                              \
-    SFUD_DEBUG("(%s) has assert failed at %s.", #EXPR, __FUNCTION__);          \
-    while (1);                                                                 \
+#define SFUD_ASSERT(EXPR)                                                       \
+if (!(EXPR))                                                                    \
+{                                                                               \
+    SFUD_DEBUG("(%s) has assert failed at %s.", #EXPR, __FUNCTION__);           \
+    return 0;                                                                   \
 }
 #else
 #define SFUD_ASSERT(EXPR)
@@ -80,10 +80,17 @@ extern void sfud_log_info(const char *format, ...);
  * @param retry retry counts
  * @param result SFUD_ERR_TIMEOUT: retry timeout
  */
-#define SFUD_RETRY_PROCESS(delay, retry, result)                               \
-    void (*__delay_temp)(void) = (void (*)(void))delay;                        \
-    if (retry == 0) {result = SFUD_ERR_TIMEOUT;break;}                         \
-    else {if (__delay_temp) {__delay_temp();} retry --;}
+#define SFUD_RETRY_PROCESS(delay, retry, result)                                \
+    void (*__delay_temp)(void) = (void (*)(void))delay;                         \
+    if (retry == 0) {                                                           \
+        result = SFUD_ERR_TIMEOUT;                                              \
+        break;                                                                  \
+    } else {                                                                    \
+        if (__delay_temp) {                                                     \
+            __delay_temp();                                                     \
+        }                                                                       \
+        retry --;                                                               \
+    }
 
 /* software version number */
 #define SFUD_SW_VERSION                             "1.1.0"
@@ -186,6 +193,18 @@ extern void sfud_log_info(const char *format, ...);
 #define SFUD_CMD_EXIT_4B_ADDRESS_MODE                  0xE9
 #endif
 
+#ifndef SFUD_CMD_READ_SECURITY_REGISTER
+#define SFUD_CMD_READ_SECURITY_REGISTER                0x48
+#endif
+
+#ifndef SFUD_CMD_SECURITY_REGISTER_PROGRAM
+#define SFUD_CMD_SECURITY_REGISTER_PROGRAM             0x42
+#endif
+
+#ifndef SFUD_CMD_ERASE_SECURITY_REGISTER
+#define SFUD_CMD_ERASE_SECURITY_REGISTER               0x44
+#endif
+
 #ifndef SFUD_WRITE_MAX_PAGE_SIZE
 #define SFUD_WRITE_MAX_PAGE_SIZE                        256
 #endif
@@ -202,6 +221,13 @@ extern void sfud_log_info(const char *format, ...);
 #ifndef SFUD_WRITE_PROTECTION_MASK
 #define SFUD_WRITE_PROTECTION_MASK                      0xFC
 #endif
+
+/* time limit in wait_busy                           100us   ms     s    margin */
+#define SFUD_CHIP_ERASE_TIMEOUT                        (10 * 1000 * 40 * 10)
+#define SFUD_SECTOR_ERASE_TIMEOUT                      (10 * 400       * 10)
+#define SFUD_PAGE_PROGRAM_TIMEOUT                      (10 * 5         * 10)
+#define SFUD_WRITE_STATUS_TIMEOUT                      (10 * 30        * 10)
+#define SFUD_CHECK_BUSY_TIMEOUT                        (10 * 10        * 10)
 
 /**
  * status register bits

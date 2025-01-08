@@ -381,14 +381,14 @@ SECTIONS
   __data_end__ = .;
   . = ALIGN(0x4) ;
 
- } > REGION_DATA AT > REGION_RODATA
+ } > REGION_DATA AT > REGION_DATA
  .eh_frame : ONLY_IF_RW {
   KEEP (*(.eh_frame))
- } > REGION_DATA AT > REGION_RODATA
+ } > REGION_DATA AT > REGION_DATA
  .gcc_except_table : ONLY_IF_RW {
   *(.gcc_except_table .gcc_except_table.*)
   __data_end__ = .;
- } > REGION_DATA AT > REGION_RODATA
+ } > REGION_DATA AT > REGION_DATA
 
  .bss : {
   . = ALIGN(0x4) ;

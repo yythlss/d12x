@@ -1,7 +1,7 @@
 /*
- * Copyright 2020 The Apache Software Foundation
- * Copyright 2022 sakumisu
- * 
+ * Copyright 2020-2024 The Apache Software Foundation
+ * Copyright 2022-2024 sakumisu
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 #ifndef USB_HC_EHCI_H

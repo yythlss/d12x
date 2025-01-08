@@ -5,7 +5,9 @@
  *
  * Authors: xuan.wen <xuan.wen@artinchip.com>
  */
-
+#define DBG_ENABLE
+#define DBG_SECTION_NAME "absystem"
+#define DBG_COLOR
 #include <rtconfig.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -35,6 +37,43 @@ void aic_set_upgrade_status(char *file_name)
     } else {
         printf("file name %s not found!.\n", file_name);
     }
+}
+
+int aic_ota_status_update(void)
+{
+    char *status = NULL;
+    int ret = 0;
+
+    if (fw_env_open()) {
+        pr_err("Open env failed\n");
+        return -1;
+    }
+
+    status = fw_getenv("upgrade_available");
+#ifdef AIC_ENV_DEBUG
+    printf("upgrade_available = %s\n", status);
+#endif
+    if (strncmp(status, "1", 2) == 0) {
+
+        ret = fw_env_write("upgrade_available", "0");
+        if (ret) {
+            pr_err("Env write fail\n");
+            goto aic_get_upgrade_status_err;
+        }
+
+        fw_env_flush();
+    } else if (strncmp(status, "0", 2) == 0) {
+        ret = 0;
+        goto aic_get_upgrade_status_err;
+    } else {
+        pr_err("Invalid upgrade_available\n");
+        ret = -1;
+        goto aic_get_upgrade_status_err;
+    }
+
+aic_get_upgrade_status_err:
+    fw_env_close();
+    return ret;
 }
 
 int aic_upgrade_end(void)
@@ -166,7 +205,7 @@ int aic_get_data_to_mount(char *target_data)
 
     now = fw_getenv("dataAB_now");
 #ifdef AIC_ENV_DEBUG
-    printf("osAB_now = %s\n", now);
+    printf("dataAB_now = %s\n", now);
 #endif
     if (strncmp(now, "A", 2) == 0) {
         data = fw_getenv("data_partname");
@@ -199,6 +238,7 @@ int aic_absystem_mount_fs(unsigned int prio)
     enum boot_device boot_dev = aic_get_boot_device();
 
     if (boot_dev != BD_SDMC0) {
+        aic_ota_status_update();
 
         if (prio == 0) {
             aic_get_rodata_to_mount(target);

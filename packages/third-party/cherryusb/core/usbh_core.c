@@ -619,7 +619,9 @@ int usbh_enumerate(struct usbh_hubport *hport)
         }
         hport->config.intf[i].class_driver = class_driver;
         USB_LOG_INFO("Loading %s class driver\r\n", class_driver->driver_name);
+        usb_osal_mutex_take(hport->mutex);
         ret = CLASS_CONNECT(hport, i);
+        usb_osal_mutex_give(hport->mutex);
     }
 
 errout:
@@ -691,8 +693,7 @@ int usbh_initialize(struct usbh_bus *bus)
     usbh_class_info_table_begin = (struct usbh_class_info *)__section_begin("usbh_class_info");
     usbh_class_info_table_end = (struct usbh_class_info *)__section_end("usbh_class_info");
 #endif
-    usbh_hub_initialize(bus);
-    return 0;
+    return usbh_hub_initialize(bus);
 }
 
 int usbh_deinitialize(struct usbh_bus *bus)
@@ -856,26 +857,26 @@ int usbh_init(void)
 {
 #if defined(AIC_USING_USB0_HOST) || defined(AIC_USING_USB0_OTG) || defined(AIC_USING_USB1_HOST)
     int bus_id = 0;
+    int ret = 0;
 #endif
 
 #if defined(AIC_USING_USB0_HOST) || defined(AIC_USING_USB0_OTG)
-    int ret = 0;
     usb_ehci0_hs_bus = usbh_alloc_bus(bus_id, USB_HOST0_BASE);
-    #ifdef AIC_USING_USB0_OTG
+    #if defined(AIC_USING_USB0_OTG) && !defined(AIC_BOOTLOADER)
     ret = usb_otg_register_host(0, usb_ehci0_hs_bus);
     #endif
     if (!ret)
-        usbh_initialize(usb_ehci0_hs_bus);
+        ret = usbh_initialize(usb_ehci0_hs_bus);
     bus_id++;
 #endif
 
 #ifdef AIC_USING_USB1_HOST
     usb_ehci1_hs_bus = usbh_alloc_bus(bus_id, USB_HOST1_BASE);
-    usbh_initialize(usb_ehci1_hs_bus);
+    ret = usbh_initialize(usb_ehci1_hs_bus);
     bus_id++;
 #endif
 
-    return 0;
+    return ret;
 }
 
 #if defined(KERNEL_RTTHREAD)

@@ -1,7 +1,7 @@
 /*
  * Definitions for the ArtInChip media process platform interface
  *
- * Copyright (C) 2021-2022 ArtInChip Technology Co., Ltd.
+ * Copyright (C) 2021-2024 ArtInChip Technology Co., Ltd.
  * Authors:  Ning Fang <ning.fang@artinchip.com>
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -140,6 +140,8 @@ enum mpp_mbus_type {
     MEDIA_BUS_CCP2,
     MEDIA_BUS_CSI2_DPHY,
     MEDIA_BUS_CSI2_CPHY,
+    MEDIA_BUS_RAW8_MONO,
+    MEDIA_BUS_RAW8_RGB,
     MEDIA_BUS_INVALID,
 };
 
@@ -153,6 +155,7 @@ enum mpp_mbus_fmt {
     MEDIA_BUS_FMT_RGB565_2X8_BE = 0x1007,
     MEDIA_BUS_FMT_RGB565_2X8_LE = 0x1008,
     /* YUV (including grey) */
+    MEDIA_BUS_FMT_Y8_1X8        = 0x2001,
     MEDIA_BUS_FMT_UYVY8_2X8     = 0x2006,
     MEDIA_BUS_FMT_VYUY8_2X8     = 0x2007,
     MEDIA_BUS_FMT_YUYV8_2X8     = 0x2008,

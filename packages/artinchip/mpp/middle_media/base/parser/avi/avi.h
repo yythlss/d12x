@@ -1,9 +1,11 @@
 /*
-* Copyright (C) 2020-2024 Artinchip Technology Co. Ltd
-*
-*  author: <che.jiang@artinchip.com>
-*  Desc: avi.h
-*/
+ * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Author: <che.jiang@artinchip.com>
+ * Desc: avi parser
+ */
 
 #ifndef __AVI_H__
 #define __AVI_H__
@@ -28,7 +30,6 @@
 #define AVIIF_INDEX   0x00000010
 #define AVIIF_NO_TIME 0x00000100
 
-#define AV_INPUT_BUFFER_PADDING_SIZE 64
 
 struct avi_index_entry {
     int64_t pos;

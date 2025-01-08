@@ -28,34 +28,9 @@
     "             data addr: hex string, e.g. 0x40000000\n" \
     "             data len : hex string, e.g. 0x800\n" \
     "qspidev sendhex <lines> <cmd> <addr> <dummy_cnt> <data hex string>: Send data.\n" \
-    "             lines: 111, 112, 114, 122, 144 (lines for cmd,addr,data)\n" \
-    "             cmd  : hex string, e.g. 01\n" \
-    "             addr : hex string, e.g. 000001\n" \
-    "                    If address is not present, use \"-\" intead\n" \
-    "             dummy_cycles: hex string, e.g. 02, dummy clock cycles\n" \
-    "                    If dummy cycles is not present, use \"-\" intead\n" \
-    "             data hex string: hex string, e.g. 41 42 43 44 45\n" \
     "qspidev sendlen <lines> <data len>: Send data.\n" \
-    "             lines: 111, 112, 114, 122, 144 (lines for cmd,addr,data)\n" \
-    "             data len : hex string, e.g. 0x800\n" \
-    "             !!!attention : use in spi controller which connet nothing\n" \
     "qspidev recv <lines> <cmd> <addr> <dummy_cnt> <data addr> <data len>: Send cmd and recieve data\n" \
-    "             lines: 111, 112, 114, 122, 144 (lines for cmd,addr,data)\n" \
-    "             cmd  : hex string, e.g. 01\n" \
-    "             addr : hex string, e.g. 000001\n" \
-    "                    If address is not present, use \"-\" intead\n" \
-    "             dummy_cycles: hex string, e.g. 02, dummy clock cycles\n" \
-    "                    If dummy cycles is not present, use \"-\" intead\n" \
-    "             data addr: hex string, e.g. 0x40000000\n" \
-    "             data len : hex string, e.g. 0x800\n" \
     "qspidev recvhex <lines> <cmd> <addr> <dummy_cnt> <data length>: Send cmd and recieve data, then print\n" \
-    "             lines: 111, 112, 114, 122, 144 (lines for cmd,addr,data)\n" \
-    "             cmd  : hex string, e.g. 01\n" \
-    "             addr : hex string, e.g. 000001\n" \
-    "                    If address is not present, use \"-\" intead\n" \
-    "             dummy_cycles: hex string, e.g. 02, dummy clock cycles\n" \
-    "                    If dummy cycles is not present, use \"-\" intead\n" \
-    "             data len : hex string, e.g. 0x800\n" \
     "example:\n" \
     "qspidev attach qspi1 qtestdev\n" \
     "qspidev init qtestdev 3 50000000\n" \
@@ -518,12 +493,38 @@ static void test_qspi_recv(int argc, char **argv)
     rt_spi_release_bus((struct rt_spi_device *)g_qspi);
 }
 
-extern void test_qspi_slaverw(struct rt_qspi_device *qspi, int argc, char **argv);
-extern void test_qspi_send2slave(struct rt_qspi_device *qspi, int argc, char **argv);
+static void test_qspi_malloc(int argc, char **argv)
+{
+    unsigned long size = 0, align_len;
+
+    if (argc < 2) {
+        printf("Argument is not correct, please see help for more information.\n");
+        return;
+    }
+
+    size = strtoul(argv[1], NULL, 0);
+    align_len = roundup(size, CACHE_LINE_SIZE);
+    printf("0x%08lx\n", (unsigned long)aicos_malloc_align(0, align_len, CACHE_LINE_SIZE));
+    printf("size %lu\n", align_len);
+}
+
+static void test_qspi_free(int argc, char **argv)
+{
+    unsigned long addr = 0;
+
+    if (argc < 2) {
+        printf("Argument is not correct, please see help for more information.\n");
+        return;
+    }
+
+    addr = strtoul(argv[1], NULL, 0);
+    aicos_free_align(0, (void *)addr);
+    printf("free 0x%lx\n", addr);
+    return;
+}
+
 static void cmd_test_qspi(int argc, char **argv)
 {
-    unsigned long size = 0, addr = 0, align_len;
-
     if (argc < 2)
         goto help;
 
@@ -536,15 +537,10 @@ static void cmd_test_qspi(int argc, char **argv)
         test_qspi_init(argc - 1, &argv[1]);
         return;
     } else if (!rt_strcmp(argv[1], "alloc")) {
-        size = strtoul(argv[2], NULL, 0);
-        align_len = roundup(size, CACHE_LINE_SIZE);
-        printf("0x%08lx\n", (unsigned long)aicos_malloc_align(0, align_len, CACHE_LINE_SIZE));
-        printf("size %lu\n", align_len);
+        test_qspi_malloc(argc - 1, &argv[1]);
         return;
     } else if (!rt_strcmp(argv[1], "free")) {
-        addr = strtoul(argv[2], NULL, 0);
-        aicos_free_align(0, (void *)addr);
-        printf("free 0x%lx\n", addr);
+        test_qspi_free(argc - 1, &argv[1]);
         return;
     } else if (!rt_strcmp(argv[1], "sendhex")) {
         test_qspi_sendhex(argc - 1, &argv[1]);
@@ -561,25 +557,8 @@ static void cmd_test_qspi(int argc, char **argv)
     } else if (!rt_strcmp(argv[1], "recv")) {
         test_qspi_recv(argc - 1, &argv[1]);
         return;
-    } else if (!rt_strcmp(argv[1], "slaverw")) {
-#ifdef AIC_CHIP_D13X
-        if (!g_qspi) {
-            printf("QSPI device is not init yet.\n");
-            return;
-        }
-        test_qspi_slaverw(g_qspi, argc - 1, &argv[1]);
-        return;
-#endif
-    } else if (!rt_strcmp(argv[1], "send2slave")) {
-#ifdef AIC_CHIP_D13X
-        if (!g_qspi) {
-            printf("QSPI device is not init yet.\n");
-            return;
-        }
-        test_qspi_send2slave(g_qspi, argc - 1, &argv[1]);
-        return;
-#endif
     }
+
 help:
     qspi_usage();
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -71,7 +71,7 @@ struct aic_pwm_arg {
     enum aic_pwm_mode mode;
     u32 clk_rate;
     u32 tb_clk_rate;
-    u32 freq;
+    float freq;
     struct aic_pwm_action action0;
     struct aic_pwm_action action1;
     u32 period;

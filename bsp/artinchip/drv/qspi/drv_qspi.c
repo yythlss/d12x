@@ -442,8 +442,6 @@ static rt_err_t qspi_configure(struct rt_spi_device *device,
         if (bus_hz > HAL_QSPI_MAX_FREQ_HZ)
             bus_hz = HAL_QSPI_MAX_FREQ_HZ;
         cfg.clk_in_hz = qspi->clk_in_hz;
-        if (cfg.clk_in_hz > HAL_QSPI_MAX_FREQ_HZ)
-            cfg.clk_in_hz = HAL_QSPI_MAX_FREQ_HZ;
         if (qspi->clk_in_hz % bus_hz)
             cfg.clk_in_hz = bus_hz;
         if (cfg.clk_in_hz < HAL_QSPI_INPUT_MIN_FREQ_HZ)

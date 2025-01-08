@@ -31,11 +31,24 @@
     "  spinor read 0x40000000 0 256\n"        \
     "  spinor statuswrite 0x05 0x60 non-volatile\n" \
 
+#if defined(SFUD_USING_SECURITY_REGISTER)
+#define SECURITY_REGISTER_HELP                \
+    "security register:\n"                    \
+    "  spinor se read reg\n"                 \
+    "  spinor se erase reg\n"                \
+    "  spinor se write reg addr size\n"      \
+    "  spinor se lock reg\n"
+#else
+#define SECURITY_REGISTER_HELP      "\n"
+#endif
+
+
 extern sfud_flash *sfud_probe(u32 spi_bus);
 
 static void spinor_help(void)
 {
     puts(SPINOR_HELP);
+    puts(SECURITY_REGISTER_HELP);
 }
 
 sfud_flash *g_spinor_flash;
@@ -270,6 +283,162 @@ static int do_spinor_reg_read(int argc, char *argv[])
     return err;
 }
 
+#ifdef SFUD_USING_SECURITY_REGISTER
+static int do_spinor_secureg_read(int argc, char *argv[])
+{
+    sfud_err err;
+    sfud_flash *flash;
+    u8 reg, *data;
+
+    reg = (u8)strtol(argv[1], NULL, 0);
+
+    if (reg <= 0 || reg > 3) {
+        printf("Error: reg out of bound\n");
+        return -1;
+    }
+
+    flash = g_spinor_flash;
+    if (flash == NULL) {
+        printf("spinor init first.\n");
+        return 0;
+    }
+    data = malloc(256);
+    if (data == NULL) {
+        printf("Malloc memory failed.\n");
+        return -1;
+    }
+    err = sfud_read_secur(flash, reg, data);
+    if (err)
+        printf("Read Security Register %d failure.\n", reg);
+    else
+        hexdump((void *)data, 256, 1);
+
+    free(data);
+    return err;
+}
+
+static int do_spinor_secureg_erase(int argc, char *argv[])
+{
+    sfud_err err;
+    sfud_flash *flash;
+    u8 reg;
+
+    reg = (u8)strtol(argv[1], NULL, 0);
+
+    if (reg <= 0 || reg > 3) {
+        printf("Error: reg out of bound\n");
+        return -1;
+    }
+
+    flash = g_spinor_flash;
+    if (flash == NULL) {
+        printf("spinor init first.\n");
+        return 0;
+    }
+
+    err = sfud_erase_secur(flash, reg);
+    if (err)
+        printf("Erase security register %u failed!\n", reg);
+    return err;
+}
+
+static int do_spinor_secureg_write(int argc, char *argv[])
+{
+    sfud_err err;
+    sfud_flash *flash;
+    u8 *data;
+    unsigned long addr, size;
+    u8 reg;
+
+    flash = g_spinor_flash;
+    if (flash == NULL) {
+        printf("spinor init first.\n");
+        return 0;
+    }
+
+    reg = strtol(argv[1], NULL, 0);
+    addr = strtol(argv[2], NULL, 0);
+    size = strtol(argv[3], NULL, 0);
+
+    if (reg <= 0 || reg > 3) {
+        printf("Error: reg out of bound\n");
+        return -1;
+    }
+
+    data = (u8 *)addr;
+    if (data == NULL) {
+        printf("Source address is not correct.\n");
+        return -1;
+    }
+
+    err = sfud_write_secur(flash, reg, size, data);
+    return err;
+}
+
+static int do_spinor_secureg_lock(int argc, char *argv[])
+{
+    sfud_err err;
+    sfud_flash *flash;
+    u8 reg, val;
+
+    reg = (u8)strtol(argv[1], NULL, 0);
+
+    if (reg <= 0 || reg > 3) {
+        printf("Error: reg out of bound\n");
+        return -1;
+    }
+
+    flash = g_spinor_flash;
+    if (flash == NULL) {
+        printf("spinor init first.\n");
+        return 0;
+    }
+    /* read status register2 */
+    err = sfud_read_reg(flash, 0x35, &val);
+    if (err)
+        printf("Read status register2 failure.\n");
+    printf("Reg 0x%x, Value: 0x%x\n", reg, val);
+
+    if (val & (0x1 << (2 + reg))) {
+        printf("Security Register%x has been locked.\n", reg);
+        return err;
+    }
+
+    val |= (0x1 << (2 + reg));
+    err = sfud_write_status_ext(flash, false, 0x35, val);
+    err = sfud_read_reg(flash, 0x35, &val);
+    if (err)
+        printf("Read status register2 failure.\n");
+    printf("Reg 0x%x, Value: 0x%x\n", reg, val);
+
+    if (val & (0x1 << (2 + reg))) {
+        printf("Security Register%x locked done.\n", reg);
+        return err;
+    }
+
+    return err;
+}
+
+static int do_spinor_se(int argc, char *argv[])
+{
+    if (argc < 3) {
+        spinor_help();
+        return 0;
+    }
+
+    else if (!strncmp(argv[1], "read", 4))
+        return do_spinor_secureg_read(argc - 1, &argv[1]);
+    else if (!strncmp(argv[1], "erase", 5))
+        return do_spinor_secureg_erase(argc - 1, &argv[1]);
+    else if (!strncmp(argv[1], "write", 5))
+        return do_spinor_secureg_write(argc - 1, &argv[1]);
+    else if (!strncmp(argv[1], "lock", 4))
+        return do_spinor_secureg_lock(argc - 1, &argv[1]);
+
+    return 0;
+}
+#endif
+
 /*
  * spinor init 0
  * spinor dump offset size
@@ -301,6 +470,10 @@ static int do_spinor(int argc, char *argv[])
         return do_spinor_status_write(argc - 1, &argv[1]);
     else if (!strncmp(argv[1], "regread", 7))
         return do_spinor_reg_read(argc - 1, &argv[1]);
+#ifdef SFUD_USING_SECURITY_REGISTER
+    else if (!strncmp(argv[1], "se", 2))
+        return do_spinor_se(argc - 1, &argv[1]);
+#endif
 
     spinor_help();
     return 0;

@@ -638,7 +638,7 @@ void rt_memheap_free(void *ptr)
         {
             rt_set_errno(result);
 
-            return ;
+            return;
         }
     }
 
@@ -887,6 +887,19 @@ int memheapcheck(int argc, char *argv[])
         /* find the specified object */
         if (name != RT_NULL && rt_strncmp(name, heap->parent.name, RT_NAME_MAX) != 0)
             continue;
+
+        if (heap->locked == RT_FALSE)
+        {
+            rt_err_t result;
+
+            /* lock memheap */
+            result = rt_sem_take(&(heap->lock), RT_WAITING_FOREVER);
+            if (result != RT_EOK)
+            {
+                rt_set_errno(result);
+                return -1;
+            }
+        }
         /* check memheap */
         for (item = heap->block_list; item->next != heap->block_list; item = item->next)
         {
@@ -919,6 +932,11 @@ int memheapcheck(int argc, char *argv[])
                 break;
             }
         }
+        if (heap->locked == RT_FALSE)
+        {
+            /* release lock */
+            rt_sem_release(&(heap->lock));
+        }
     }
     rt_hw_interrupt_enable(level);
     if (has_bad)
@@ -929,7 +947,6 @@ int memheapcheck(int argc, char *argv[])
     }
     return 0;
 }
-MSH_CMD_EXPORT(memheapcheck, check memory for memheap);
 
 int memheaptrace(int argc, char *argv[])
 {
@@ -959,6 +976,19 @@ int memheaptrace(int argc, char *argv[])
         rt_kprintf("max_used: 0x%08x\n", mh->max_used_size);
         rt_kprintf("size    : 0x%08x\n", mh->pool_size);
         rt_kprintf("\n--memory used information --\n");
+
+        if (mh->locked == RT_FALSE)
+        {
+            rt_err_t result;
+
+            /* lock memheap */
+            result = rt_sem_take(&(mh->lock), RT_WAITING_FOREVER);
+            if (result != RT_EOK)
+            {
+                rt_set_errno(result);
+                return -1;
+            }
+        }
         /* memheap item */
         for (header_ptr = mh->block_list;
              header_ptr->next != mh->block_list;
@@ -989,12 +1019,18 @@ int memheaptrace(int argc, char *argv[])
                 header_ptr->owner_thread_name[2],
                 header_ptr->owner_thread_name[3]);
         }
+        if (mh->locked == RT_FALSE)
+        {
+            /* release lock */
+            rt_sem_release(&(mh->lock));
+        }
     }
     return 0;
 }
 
 #ifdef RT_USING_FINSH
 #include <finsh.h>
+MSH_CMD_EXPORT(memheapcheck, check memory for memheap);
 MSH_CMD_EXPORT(memheaptrace, dump memory trace for memheap);
 #endif /* RT_USING_FINSH */
 #endif /* RT_USING_MEMTRACE */

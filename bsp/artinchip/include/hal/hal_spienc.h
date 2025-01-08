@@ -14,6 +14,9 @@
 #define AIC_SPIENC_USER_TWEAK 0
 #define AIC_SPIENC_HW_TWEAK   1
 
+#define AIC_SPIENC_BYPASS_ENABLE  1
+#define AIC_SPIENC_BYPASS_DISABLE 0
+
 #define IOC_TYPE_SPIE 'E'
 #define AIC_SPIENC_IOCTL_CRYPT_CFG \
     _IOW(IOC_TYPE_SPIE, 0x10, struct spienc_crypt_cfg)

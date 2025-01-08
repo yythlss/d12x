@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2022-2024, ArtInChip Technology Co., Ltd
+
 import os
 import platform
 
@@ -28,14 +32,25 @@ else:
 if os.getenv('RTT_EXEC_PATH'):
     EXEC_PATH = os.getenv('RTT_EXEC_PATH')
 
+B_AFLAGS = ''
+B_CFLAGS = ''
+LFLAGS = ''
 # BUILD = 'debug'
 BUILD = 'release'
+# BACKTRACE = True
+BACKTRACE = False
+
 if BUILD == 'debug':
     CFLAGS_DBG = ' -O0 -gdwarf-2'
     AFLAGS_DBG = ' -gdwarf-2'
+    if BACKTRACE:
+        B_AFLAGS += ' -D_ENABLE_BACK_TRACE_STACK_ -D_NO_OMIT_FRAME_POINT_ '
+        CFLAGS_DBG += ' -fno-omit-frame-pointer '
 else:
     CFLAGS_DBG = ' -O2 -g2'
     AFLAGS_DBG = ''
+    if BACKTRACE:
+        B_AFLAGS += ' -D_ENABLE_BACK_TRACE_STACK_ '
 
 prj_out_dir = ''
 if os.environ.get('PRJ_OUT_DIR'):
@@ -73,8 +88,8 @@ if PLATFORM == 'gcc':
     if CPUNAME == 'e906' or CPUNAME == 'e907':
         DEVICE = ' -march=rv32imac_xtheade -mabi=ilp32'
 
-    B_CFLAGS  = ' -c -g -ffunction-sections -fdata-sections -Wall -mcmodel=medlow'
-    B_AFLAGS  = ' -c' + ' -x assembler-with-cpp' + ' -D__ASSEMBLY__'
+    B_CFLAGS  += ' -c -g -ffunction-sections -fdata-sections -Wall -mcmodel=medlow -mno-dup-loop-header'
+    B_AFLAGS  += ' -c' + ' -x assembler-with-cpp' + ' -D__ASSEMBLY__'
     CFLAGS  = DEVICE + B_CFLAGS + CFLAGS_DBG
     AFLAGS  = DEVICE + B_AFLAGS + AFLAGS_DBG
     CXXFLAGS = CFLAGS

@@ -26,6 +26,7 @@ static const struct {
     u32 fmt;
     enum dvp_input_yuv_seq dvp;
 } aic_dvp_in_fmt[] = {
+    {MEDIA_BUS_FMT_Y8_1X8,    0},
     {MEDIA_BUS_FMT_YUYV8_2X8, DVP_YUV_DATA_SEQ_YUYV},
     {MEDIA_BUS_FMT_YVYU8_2X8, DVP_YUV_DATA_SEQ_YVYU},
     {MEDIA_BUS_FMT_UYVY8_2X8, DVP_YUV_DATA_SEQ_UYVY},
@@ -38,7 +39,7 @@ static const struct {
 } aic_dvp_out_fmt[] = {
     {MPP_FMT_NV16, DVP_OUT_YUV422_COMBINED_NV16},
     {MPP_FMT_NV12, DVP_OUT_YUV420_COMBINED_NV12},
-    // TODO: Add RAW_PASSTHROUGH
+    {MPP_FMT_YUV400, DVP_OUT_RAW_PASSTHROUGH}
 };
 
 static int aic_dvp_out_fmt_valid(u32 pixelformat)
@@ -78,8 +79,10 @@ int aic_dvp_set_in_fmt(struct mpp_video_fmt *fmt)
 
     if (fmt->bus_type == MEDIA_BUS_BT656)
         cfg->input = DVP_IN_BT656;
-    else
+    else if (fmt->bus_type == MEDIA_BUS_PARALLEL)
         cfg->input = DVP_IN_YUV422;
+    else
+        cfg->input = DVP_IN_RAW;
 
 #ifdef AIC_USING_CAMERA_OV5640
     /* Should inverse the HSYNC signal of OV5640 */
@@ -114,6 +117,10 @@ static void _aic_dvp_try_fmt(struct dvp_out_fmt *pix)
         pix->plane_fmt[i].sizeimage = ALIGN_UP(pix->plane_fmt[i].bytesperline * pix->height, 8);
         if ((ret == DVP_OUT_YUV420_COMBINED_NV12) && (i > 0))
             pix->plane_fmt[i].sizeimage >>= 1;
+        if ((g_dvp.cfg.input == DVP_IN_RAW) && (i > 0)) {
+            pix->plane_fmt[i].bytesperline = 0;
+            pix->plane_fmt[i].sizeimage = 0;
+        }
     }
 }
 
@@ -241,7 +248,9 @@ static int aic_dvp_frame_done(struct aic_dvp *dvp, int err)
     struct vb_buffer *cur_buf = NULL;
 
     if (list_empty(&dvp->active_list)) {
+#ifndef AIC_DVP_IGNORE_LOSS
         pr_err("No buf available!\n");
+#endif
         return 0;
     }
 
@@ -277,7 +286,9 @@ static int aic_dvp_update_addr(struct aic_dvp *dvp)
         return 0;
 
     if (list_empty(&dvp->active_list)) {
+#ifndef AIC_DVP_IGNORE_LOSS
         pr_warn("No buf available!\n");
+#endif
         return -1;
     }
 
@@ -296,7 +307,9 @@ static int aic_dvp_update_addr(struct aic_dvp *dvp)
 
     if (cur_buf == list_last_entry(&dvp->active_list, struct vb_buffer,
                                    active_entry)) {
+#ifndef AIC_DVP_IGNORE_LOSS
         pr_warn("It's the last buf!\n");
+#endif
         return 0;
     }
 

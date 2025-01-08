@@ -34,6 +34,17 @@ endif
 endif
 
 #--------------------------------------------
+# External RTC Driver Option
+#--------------------------------------------
+
+menuconfig AIC_USING_EXTERNAL_RTC
+    bool "External RTC Driver Option"
+
+if AIC_USING_EXTERNAL_RTC
+    source "bsp/peripheral/rtc/Kconfig"
+endif
+
+#--------------------------------------------
 # Audio Codec driver option
 #--------------------------------------------
 

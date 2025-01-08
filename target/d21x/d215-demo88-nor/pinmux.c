@@ -9,8 +9,6 @@
 #include <aic_core.h>
 #include <aic_hal.h>
 #include "board.h"
-#include <libfdt.h>
-#include <of.h>
 #include <aic_utils.h>
 
 struct aic_pinmux aic_pinmux_config[] = {
@@ -238,7 +236,6 @@ struct aic_pinmux aic_pinmux_config[] = {
     {7, PIN_PULL_DIS, 3, "PC.5"},
 #endif
 #ifdef AIC_USING_PWM3
-    {5, PIN_PULL_DIS, 3, "PE.18"},
     {5, PIN_PULL_DIS, 3, "PE.19"},
 #endif
 #ifdef AIC_USING_CAP0

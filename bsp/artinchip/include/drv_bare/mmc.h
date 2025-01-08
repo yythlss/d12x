@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -342,6 +342,7 @@ struct aic_sdmc *find_mmc_dev_by_index(int id);
 struct aic_partition *mmc_new_partition(char *s, u64 start);
 void mmc_free_partition(struct aic_partition *part);
 struct aic_partition *mmc_create_gpt_part(void);
+struct aic_partition *mmc_create_gpt_part2(int mmc_id);
 void sdcard_hotplug_init(void);
 void sdcard_hotplug_act(void);
 int mmc_block_init(struct aic_sdmc *host);

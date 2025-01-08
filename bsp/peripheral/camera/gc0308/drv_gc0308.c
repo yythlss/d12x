@@ -417,10 +417,8 @@ static rt_err_t gc03_close(rt_device_t dev)
     return RT_EOK;
 }
 
-static int gc03_get_fmt(rt_device_t dev, struct mpp_video_fmt *cfg)
+static int gc03_get_fmt(struct gc03_dev *sensor, struct mpp_video_fmt *cfg)
 {
-    struct gc03_dev *sensor = (struct gc03_dev *)dev;
-
     cfg->code   = sensor->fmt.code;
     cfg->width  = sensor->fmt.width;
     cfg->height = sensor->fmt.height;
@@ -429,25 +427,80 @@ static int gc03_get_fmt(rt_device_t dev, struct mpp_video_fmt *cfg)
     return RT_EOK;
 }
 
-static int gc03_start(rt_device_t dev)
+static int gc03_start(struct gc03_dev *sensor)
 {
     return 0;
 }
 
-static int gc03_stop(rt_device_t dev)
+static int gc03_stop(struct gc03_dev *sensor)
 {
     return 0;
+}
+
+/* Edge Enhancement */
+static int gc03_set_ee(struct gc03_dev *sensor, u32 percent)
+{
+    u8 cur = 0, val = PERCENT_TO_INT(0, 0xFF, percent);
+
+    if (gc03_read_reg(sensor->i2c, 0x77, &cur)) {
+        LOG_E("Failed to get current EE\n");
+        return -1;
+    }
+
+    LOG_I("Set Edge Enhancement 0x%02x -> 0x%02x\n", cur, val);
+    if (cur == val)
+        return 0;
+
+    return gc03_write_reg(sensor->i2c, 0x77, val);
+}
+
+static int gc03_enable_flip(struct gc03_dev *sensor, bool enable,
+                            u8 mask, u8 shift, char *name)
+{
+    u8 cur = 0;
+
+    if (gc03_read_reg(sensor->i2c, 0x14, &cur)) {
+        LOG_E("Failed to get current flip\n");
+        return -1;
+    }
+
+    LOG_I("Set %s flip %d -> %d\n", name, (cur & mask) >> shift, enable);
+    if ((cur & mask) >> shift == (u8)enable)
+        return 0;
+
+    if (enable)
+        return gc03_write_reg(sensor->i2c, 0x14, cur | mask);
+    else
+        return gc03_write_reg(sensor->i2c, 0x14, cur & ~mask);
+}
+
+static int gc03_enable_h_flip(struct gc03_dev *sensor, bool enable)
+{
+    return gc03_enable_flip(sensor, enable, 1, 0, "H");
+}
+
+static int gc03_enable_v_flip(struct gc03_dev *sensor, bool enable)
+{
+    return gc03_enable_flip(sensor, enable, 2, 1, "V");
 }
 
 static rt_err_t gc03_control(rt_device_t dev, int cmd, void *args)
 {
+    struct gc03_dev *sensor = (struct gc03_dev *)dev;
+
     switch (cmd) {
     case CAMERA_CMD_START:
-        return gc03_start(dev);
+        return gc03_start(sensor);
     case CAMERA_CMD_STOP:
-        return gc03_stop(dev);
+        return gc03_stop(sensor);
     case CAMERA_CMD_GET_FMT:
-        return gc03_get_fmt(dev, (struct mpp_video_fmt *)args);
+        return gc03_get_fmt(sensor, (struct mpp_video_fmt *)args);
+    case CAMERA_CMD_SET_SHARPNESS:
+        return gc03_set_ee(sensor, *(u32 *)args);
+    case CAMERA_CMD_SET_H_FLIP:
+        return gc03_enable_h_flip(sensor, *(bool *)args);
+    case CAMERA_CMD_SET_V_FLIP:
+        return gc03_enable_v_flip(sensor, *(bool *)args);
     default:
         LOG_I("Unsupported cmd: 0x%x", cmd);
         return -RT_EINVAL;

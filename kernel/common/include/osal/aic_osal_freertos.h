@@ -24,7 +24,7 @@
 //--------------------------------------------------------------------+
 
 extern unsigned int g_aicos_irq_nested_cnt;
-static inline int aicos_in_irq(void)
+static inline bool aicos_in_irq(void)
 {
     return g_aicos_irq_nested_cnt;
 }
@@ -268,34 +268,57 @@ static inline int aicos_queue_empty(aicos_queue_t queue)
 //--------------------------------------------------------------------+
 // Wait Queue API
 //--------------------------------------------------------------------+
+typedef struct
+{
+  unsigned int set;
+  aicos_event_t event;
+}osal_wqueue_def_t;
+
+typedef osal_wqueue_def_t* osal_wqueue_t;
 
 static inline aicos_wqueue_t aicos_wqueue_create(void)
 {
-    aicos_event_t event = aicos_event_create();
+    osal_wqueue_t wqueue;
 
-    return (aicos_wqueue_t)event;
+    wqueue = aic_tlsf_malloc(MEM_CMA, sizeof(osal_wqueue_t));
+    if (NULL == wqueue)
+        return NULL;
+
+    wqueue->event = aicos_event_create();
+    wqueue->set = 0;
+
+    return (aicos_wqueue_t)wqueue;
 }
 
 static inline void aicos_wqueue_delete(aicos_wqueue_t wqueue)
 {
-    aicos_event_t event = (aicos_event_t)wqueue;
+    osal_wqueue_t wq = (osal_wqueue_t)wqueue;
+    aicos_event_t event = (aicos_event_t)wq->event;
 
     aicos_event_delete(event);
+    aic_tlsf_free(MEM_CMA, wq);
 }
 
 static inline void aicos_wqueue_wakeup(aicos_wqueue_t wqueue)
 {
-    aicos_event_t event = (aicos_event_t)wqueue;
-    uint32_t recved;
+    osal_wqueue_t wq = (osal_wqueue_t)wqueue;
+    aicos_event_t event = (aicos_event_t)wq->event;
 
-    aicos_event_recv(event, 0x1, &recved, 100);
+    if (wq->set != 1)
+        return;
+
+    wq->set = 0;
+    aicos_event_send(event, 0x1);
 }
 
 static inline int aicos_wqueue_wait(aicos_wqueue_t wqueue, uint32_t msec)
 {
-    aicos_event_t event = (aicos_event_t)wqueue;
+    osal_wqueue_t wq = (osal_wqueue_t)wqueue;
+    aicos_event_t event = (aicos_event_t)wq->event;
+    uint32_t recved;
 
-    return aicos_event_send(event, 0x1);
+    wq->set = 1;
+    return aicos_event_recv(event, 0x1, &recved, 100);
 }
 
 //--------------------------------------------------------------------+

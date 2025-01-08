@@ -36,24 +36,15 @@ static void use_touch_monkey_test(void)
 #endif
 #endif
 
+#ifdef AIC_LVGL_DEMO
 void aic_ui_init()
 {
-#if defined(AIC_LVGL_QC_TEST_DEMO)
-    extern int qc_test_init();
-    qc_test_init();
-#elif defined(AIC_LVGL_MUSIC_DEMO)
-    lv_demo_music();
-#elif defined(AIC_LVGL_DEMO_BENCHMARK)
-    lv_demo_benchmark();
-#elif defined(AIC_LVGL_DEMO_WIDGETS)
-    lv_demo_widgets();
-#else
     extern void ui_init(void);
     ui_init();
-#endif
 
 #ifdef AIC_USE_TOUCH_MONKEY_TEST
     use_touch_monkey_test();
 #endif
     return;
 }
+#endif

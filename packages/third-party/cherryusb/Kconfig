@@ -191,6 +191,18 @@ if LPKG_USING_CHERRYUSB
             endchoice
         endif
 
+        menuconfig LPKG_CHERRYUSB_DEVICE_CLASS_AIC
+            bool
+            prompt "Enable usb aic device"
+            default n
+
+        if LPKG_CHERRYUSB_DEVICE_CLASS_AIC
+            config LPKG_CHERRYUSB_DEVICE_AICUPG_FOR_USB
+                bool
+                prompt "Use aicupg for usb"
+                default n
+        endif
+
         menuconfig LPKG_CHERRYUSB_DEVICE_CDC
             bool
             prompt "Enable usb cdc acm device"
@@ -213,28 +225,35 @@ if LPKG_USING_CHERRYUSB
             default n
 
         if LPKG_CHERRYUSB_DEVICE_HID
-            choice
-                prompt "Use hid template"
-                default LPKG_CHERRYUSB_DEVICE_HID_MOUSE_TEMPLATE
-                config LPKG_CHERRYUSB_DEVICE_HID_MOUSE_TEMPLATE
-                    bool "mouse"
-                config LPKG_CHERRYUSB_DEVICE_HID_KEYBOARD_TEMPLATE
-                    bool "keyboard"
-                config LPKG_CHERRYUSB_DEVICE_HID_IO_TEMPLATE
-                    bool "custom input/output device"
-                config LPKG_CHERRYUSB_DEVICE_HID_TOUCH_TEMPLATE
-                    bool "touch"
-                config LPKG_CHERRYUSB_DEVICE_HID_REPORT_ID_TEMPLATE
-                    bool "multiple report id keyboard"
-            endchoice
+            config LPKG_CHERRYUSB_DEVICE_AICUPG_FOR_HID
+                bool
+                prompt "Use aicupg for hid"
+                default n
+            config LPKG_CHERRYUSB_DEVICE_HID_MOUSE_TEMPLATE
+                bool "mouse"
+                default n
+            config LPKG_CHERRYUSB_DEVICE_HID_KEYBOARD_TEMPLATE
+                bool "keyboard"
+                default n
+            config LPKG_CHERRYUSB_DEVICE_HID_IO_TEMPLATE
+                bool "custom input/output device"
+                default n
+                select LPKG_MPP
+                select AIC_VE_TEST
+            config LPKG_CHERRYUSB_DEVICE_HID_TOUCH_TEMPLATE
+                bool "touch"
+                default n
+            config LPKG_CHERRYUSB_DEVICE_HID_REPORT_ID_TEMPLATE
+                bool "multiple report id keyboard"
+                default n
             config HID_TOUCHSCREEN_MODE
-                    depends on LPKG_CHERRYUSB_DEVICE_HID_TOUCH_TEMPLATE
-                    bool "HID_TOUCHSCREEN_MODE"
-                    default y
+                depends on LPKG_CHERRYUSB_DEVICE_HID_TOUCH_TEMPLATE
+                bool "HID_TOUCHSCREEN_MODE"
+                default y
             config HID_TOUCHPAD_MODE
-                    depends on LPKG_CHERRYUSB_DEVICE_HID_TOUCH_TEMPLATE
-                    bool "HID_TOUCHPAD_MODE"
-                    default n
+                depends on LPKG_CHERRYUSB_DEVICE_HID_TOUCH_TEMPLATE
+                bool "HID_TOUCHPAD_MODE"
+                default n
             menu "Hid Touch Parameter"
                 depends on LPKG_CHERRYUSB_DEVICE_HID_TOUCH_TEMPLATE
                 config HID_TOUCH_INT_MODE
@@ -551,6 +570,17 @@ if LPKG_USING_CHERRYUSB
             endif
         endif
 
+        menuconfig LPKG_CHERRYUSB_DEVICE_VENDER
+            bool
+            prompt "Enable usb vender device"
+            default n
+        if LPKG_CHERRYUSB_DEVICE_VENDER
+            config LPKG_CHERRYUSB_DEVICE_VENDER_TEMPLATE
+                bool
+                prompt "Use vender template"
+                default n
+        endif
+
         menuconfig LPKG_CHERRYUSB_DEVICE_COMPOSITE
             bool
             prompt "Enable composite device"
@@ -579,6 +609,9 @@ if LPKG_USING_CHERRYUSB
                 config LPKG_USING_COMP_TOUCH
                     bool "USBDEV_TOUCH_COMPOSITE"
                     default n
+                config LPKG_USING_COMP_VENDER
+                    bool "USBDEV_VENDER_COMPOSITE"
+                    default n
             endmenu
         endif
     endif
@@ -589,14 +622,22 @@ if LPKG_USING_CHERRYUSB
         depends on AIC_USB_HOST_EHCI_DRV
 
     if LPKG_CHERRYUSB_HOST
-        choice
+        menuconfig LPKG_CHERRYUSB_HOST_SELECT
+            bool
             prompt "Select usb host ip"
-            default LPKG_CHERRYUSB_HOST_EHCI
+            default y
+
+        if LPKG_CHERRYUSB_HOST_SELECT
             config LPKG_CHERRYUSB_HOST_EHCI
-                bool "EHCI"
-            #config LPKG_CHERRYUSB_HOST_XHCI
-            #    bool "XHCI"
-        endchoice
+                bool
+                prompt "Use EHCI"
+                default y
+
+            config LPKG_CHERRYUSB_HOST_OHCI
+                bool
+                prompt "Use OHCI"
+                default y
+        endif
 
         if LPKG_CHERRYUSB_HOST_MUSB
             choice
@@ -634,10 +675,17 @@ if LPKG_USING_CHERRYUSB
             prompt "Enable usb cdc acm driver"
             default n
 
-        config LPKG_CHERRYUSB_HOST_HID
+        menuconfig LPKG_CHERRYUSB_HOST_HID
             bool
             prompt "Enable usb hid driver"
             default n
+
+        if LPKG_CHERRYUSB_HOST_HID
+            config LPKG_CHERRYUSB_HOST_HID_TEMPLATE
+                bool
+                prompt "Use hid template"
+                default n
+        endif
 
         menuconfig LPKG_CHERRYUSB_HOST_MSC
             bool
@@ -648,6 +696,11 @@ if LPKG_USING_CHERRYUSB
             config LPKG_CHERRYUSB_HOST_MSC_TEMPLATE
                 bool
                 prompt "Use msc template"
+                default n
+
+            config LPKG_CHERRYUSB_HOST_AICUPG_FOR_UDISK
+                bool
+                prompt "Use aicupg for udisk"
                 default n
         endif
 

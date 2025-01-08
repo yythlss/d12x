@@ -5,6 +5,9 @@
  *
  * Authors: zrq <ruiqi.zheng@artinchip.com>
  */
+#define DBG_ENABLE
+#define DBG_SECTION_NAME "ota.burn"
+#define DBG_COLOR
 #include <rtconfig.h>
 #include <stdio.h>
 #include <stdint.h>

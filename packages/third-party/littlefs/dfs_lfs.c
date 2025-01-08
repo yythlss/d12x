@@ -30,7 +30,7 @@
 #endif
 
 #ifndef LFS_CACHE_SIZE
-    #define LFS_CACHE_SIZE LFS_PROG_SIZE
+    #define LFS_CACHE_SIZE LFS_READ_SIZE
 #endif
 
 #ifndef LFS_BLOCK_CYCLES

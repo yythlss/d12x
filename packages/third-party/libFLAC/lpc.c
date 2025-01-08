@@ -36,6 +36,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "FLAC/assert.h"
 #include "FLAC/format.h"
@@ -290,7 +291,7 @@ int FLAC__lpc_quantize_coefficients(const FLAC__real lp_coeff[], uint32_t order,
 		double error = 0.0;
 		FLAC__int32 q;
 #ifndef NDEBUG
-		flac_fprintf(stderr,"FLAC__lpc_quantize_coefficients: negative shift=%d order=%u cmax=%f\n", *shift, order, cmax);
+		flac_fprintf(stderr,"FLAC__lpc_quantize_coefficients: negative shift=%d order=%"PRIu32" cmax=%f\n", *shift, order, cmax);
 #endif
 		for(i = 0; i < order; i++) {
 			error += lp_coeff[i] / (1 << nshift);

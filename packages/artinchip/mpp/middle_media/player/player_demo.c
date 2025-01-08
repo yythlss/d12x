@@ -30,6 +30,7 @@
 #include "aic_message.h"
 #include "aic_player.h"
 #include "player_dec_share_test.h"
+#include "player_audio_render_share_test.h"
 
 #include <rthw.h>
 #include <rtthread.h>
@@ -42,6 +43,7 @@
 
 #define PLAYER_DEMO_FILE_MAX_NUM 128
 #define PLAYER_DEMO_FILE_PATH_MAX_LEN 256
+#define SUPPORT_FILE_SUFFIX_TYPE_NUM 8
 
 struct file_list {
     char *file_path[PLAYER_DEMO_FILE_MAX_NUM];
@@ -61,6 +63,8 @@ struct video_player_ctx {
     struct av_media_info media_info;
 };
 
+char *file_suffix[SUPPORT_FILE_SUFFIX_TYPE_NUM] = {".h264", ".264", ".mp4", ".mp3",
+                                                   ".avi", ".mkv", ".ts", ".flv"};
 struct video_player_ctx  *g_video_player_ctx = NULL;
 
 static void print_help(const char* prog)
@@ -89,6 +93,7 @@ static void print_help(const char* prog)
         "('b'): back seek -8s \n"
         "('z'): seek to begin pos \n"
         "('m':  enter/eixt mute \n"
+        "('w':  play audio warning tone \n"
         "('e'): eixt app \n");
 }
 
@@ -96,16 +101,16 @@ static int read_file(char* path, struct file_list *files)
 {
     int file_path_len;
     file_path_len = strlen(path);
-    printf("file_path_len:%d\n",file_path_len);
+    logd("file_path_len:%d\n",file_path_len);
     if (file_path_len > PLAYER_DEMO_FILE_PATH_MAX_LEN-1) {
-        printf("file_path_len too long \n");
+        loge("file_path_len too long \n");
         return -1;
     }
     files->file_path[0] = (char *)aicos_malloc(MEM_DEFAULT,file_path_len+1);
     files->file_path[0][file_path_len] = '\0';
     strcpy(files->file_path[0], path);
     files->file_num = 1;
-    printf("file path: %s\n", files->file_path[0]);
+    logd("file path: %s\n", files->file_path[0]);
     return 0;
 }
 
@@ -114,6 +119,7 @@ static int read_dir(char* path, struct file_list *files)
     char* ptr = NULL;
     int file_path_len = 0;
     struct dirent* dir_file;
+    int i = 0;
     DIR* dir = opendir(path);
     if (dir == NULL) {
         loge("read dir failed");
@@ -127,8 +133,12 @@ static int read_dir(char* path, struct file_list *files)
         ptr = strrchr(dir_file->d_name, '.');
         if (ptr == NULL)
             continue;
-
-        if (strcmp(ptr, ".h264") && strcmp(ptr, ".264") && strcmp(ptr, ".mp4") && strcmp(ptr, ".mp3") && strcmp(ptr, ".avi"))
+        for (i = 0; i < SUPPORT_FILE_SUFFIX_TYPE_NUM; i++) {
+            if (strcmp(ptr, file_suffix[i]) == 0) {
+                break;
+            }
+        }
+        if (i == SUPPORT_FILE_SUFFIX_TYPE_NUM)
             continue;
 
         logd("name: %s", dir_file->d_name);
@@ -137,7 +147,7 @@ static int read_dir(char* path, struct file_list *files)
         file_path_len += strlen(path);
         file_path_len += 1; // '/'
         file_path_len += strlen(dir_file->d_name);
-        printf("file_path_len:%d\n",file_path_len);
+        logd("file_path_len:%d\n",file_path_len);
         if (file_path_len > PLAYER_DEMO_FILE_PATH_MAX_LEN-1) {
             loge("%s too long \n",dir_file->d_name);
             continue;
@@ -273,7 +283,10 @@ static int cal_disp_size(struct aic_video_stream *media, struct mpp_rect *disp)
 #endif
 
     screen_ratio = (float)screen.width / (float)screen.height;
-    media_ratio  = (float)media->width / (float)media->height;
+    if (media->width > 0  && media->height > 0)
+        media_ratio  = (float)media->width / (float)media->height;
+    else
+        media_ratio  = screen_ratio;
 
     if (media_ratio < screen_ratio) {
         disp->y = 0;
@@ -288,7 +301,7 @@ static int cal_disp_size(struct aic_video_stream *media, struct mpp_rect *disp)
     }
 
 out:
-    printf("Media size %d x %d, Display offset (%d, %d) size %d x %d\n",
+    logd("Media size %d x %d, Display offset (%d, %d) size %d x %d\n",
            media->width, media->height,
            disp->x, disp->y, disp->width, disp->height);
     mpp_fb_close(fb);
@@ -307,7 +320,7 @@ static int start_play(struct video_player_ctx *player_ctx)
         loge("aic_player_start error!!!!\n");
         return -1;
     }
-    printf("[%s:%d]aic_player_start ok\n",__FUNCTION__,__LINE__);
+    logd("[%s:%d]aic_player_start ok\n",__FUNCTION__,__LINE__);
 
     ret =  aic_player_get_media_info(ctx->player,&media_info);
     if (ret != 0) {
@@ -317,9 +330,9 @@ static int start_play(struct video_player_ctx *player_ctx)
     ctx->media_info = media_info;
     logd("aic_player_get_media_info duration:"FMT_x64",file_size:"FMT_x64"\n",media_info.duration,media_info.file_size);
 
-    printf("has_audio:%d,has_video:%d,"
-        "width:%d,height:%d,\n"
-        "bits_per_sample:%d,nb_channel:%d,sample_rate:%d\n"
+    logd("has_audio:%d, has_video:%d,"
+        "width:%d, height:%d,\n"
+        "bits_per_sample:%d, nb_channel:%d, sample_rate:%d\n"
         ,media_info.has_audio
         ,media_info.has_video
         ,media_info.video_stream.width
@@ -372,7 +385,7 @@ static int start_play(struct video_player_ctx *player_ctx)
         loge("aic_player_play error!!!!\n");
         return -1;
     }
-    printf("[%s:%d]aic_player_play ok\n",__FUNCTION__,__LINE__);
+    logd("[%s:%d]aic_player_play ok\n",__FUNCTION__,__LINE__);
     return 0;
 }
 
@@ -486,7 +499,6 @@ static int parse_options(struct video_player_ctx *player_ctx,int cnt,char**optio
             break;
         case 'a':
             ctx->alpha_value = atoi(optarg);
-            printf("alpha_value:%d\n",ctx->alpha_value);
             break;
         case 'r':
             ctx->rotation = (atoi(optarg) % 360) / 90;
@@ -530,17 +542,49 @@ static int process_command(struct video_player_ctx *player_ctx,char cmd)
         ret = aic_player_seek(ctx->player,0);
     } else if (cmd == 'r') {
         ret = do_rotation(ctx);
+    } else if (cmd == 'w') {
+#ifdef AIC_MPP_PLAYER_AUDIO_RENDER_SHARE_TEST
+        ret = player_audio_render_share_play();
+#endif
     }
     return ret;
 }
 
 static int power_on_flag = 0;
 
+static int player_demo_prepare_stop(struct video_player_ctx *ctx, int force_stop,
+                                    int loop_time, int file_num)
+{
+    int enable = 0;
+    /*force stop need set render delay disable*/
+    if (force_stop && (ctx->loop_time > 1 || ctx->files.file_num > 1)) {
+        enable = 0;
+        aic_player_control(ctx->player, AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME, &enable);
+        return 0;
+    }
+
+    /*check the final play file then set render delay disable*/
+    if ((ctx->loop_time > 1) && (ctx->files.file_num > 1)) {
+        if ((loop_time == ctx->loop_time - 1) && (file_num == ctx->files.file_num -1)) {
+            enable = 0;
+            aic_player_control(ctx->player, AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME, &enable);
+        }
+    } else if ((ctx->loop_time > 1) && (loop_time == ctx->loop_time - 1)) {
+        enable = 0;
+        aic_player_control(ctx->player, AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME, &enable);
+    } else if ((ctx->files.file_num > 1) && (file_num == ctx->files.file_num - 1)) {
+        enable = 0;
+        aic_player_control(ctx->player, AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME, &enable);
+    }
+    return 0;
+}
+
 static int player_demo_test(int argc, char **argv)
 {
     int ret = 0;
     int i = 0;
     int j = 0;
+    int enable = 0;
     char ch;
     rt_device_t render_dev = RT_NULL;
     struct aicfb_alpha_config alpha_bak = {0};
@@ -606,7 +650,7 @@ static int player_demo_test(int argc, char **argv)
     memset(&thread_trace_infos,0x00,sizeof(struct thread_trace_info));
     for (i = 0; i < 6 ;i++) {
         snprintf(thread_trace_infos[i].thread_name,sizeof(thread_trace_infos[i].thread_name),"%s%02d","pth",i);
-        printf("%s\n",thread_trace_infos[i].thread_name);
+        logd("%s\n",thread_trace_infos[i].thread_name);
     }
     rt_scheduler_sethook(hook_of_scheduler);
 #endif
@@ -626,18 +670,26 @@ static int player_demo_test(int argc, char **argv)
 #endif
     aic_player_set_event_callback(ctx->player,ctx,event_handle);
 
+
+    if (ctx->loop_time > 1 || ctx->files.file_num > 1) {
+        enable = 1;
+        aic_player_control(ctx->player, AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME, &enable);
+    }
+
     for(i = 0;i < ctx->loop_time; i++) {
         for(j = 0; j < ctx->files.file_num; j++) {
             logd("loop:%d,index:%d,path:%s\n",i,j,ctx->files.file_path[j]);
             ctx->player_end = 0;
             if (aic_player_set_uri(ctx->player,ctx->files.file_path[j])) {
                 loge("aic_player_prepare error!!!!\n");
+                player_demo_prepare_stop(ctx, 0, i, j);
                 aic_player_stop(ctx->player);
                 ret = -1;
                 continue;
             }
 
             if (aic_player_prepare_sync(ctx->player)) {
+                player_demo_prepare_stop(ctx, 0, i, j);
                 loge("aic_player_prepare error!!!!\n");
                 aic_player_stop(ctx->player);
                 ret = -1;
@@ -646,6 +698,7 @@ static int player_demo_test(int argc, char **argv)
 
             if (start_play(ctx) != 0) {
                 loge("start_play error!!!!\n");
+                player_demo_prepare_stop(ctx, 0, i, j);
                 aic_player_stop(ctx->player);
                 ret = -1;
                 continue;
@@ -655,6 +708,7 @@ static int player_demo_test(int argc, char **argv)
             {
                 if (ctx->player_stop == 1) {
                     logd("Stop player!\n");
+                    player_demo_prepare_stop(ctx, 0, i, j);
                     aic_player_stop(ctx->player);
                     goto _EXIT_;
                 }
@@ -664,6 +718,7 @@ static int player_demo_test(int argc, char **argv)
                         aic_player_seek(ctx->player,0);
                         ctx->player_end = 0;
                     } else {
+                        player_demo_prepare_stop(ctx, 0, i, j);
                         aic_player_stop(ctx->player);
                         ctx->player_end = 0;
                         break;
@@ -676,9 +731,11 @@ static int player_demo_test(int argc, char **argv)
                         aic_player_stop(ctx->player);
                         break;
                     } else if (ch == 'd') {// down
+                        player_demo_prepare_stop(ctx, 0, i, j);
                         aic_player_stop(ctx->player);
                         break;
                     } else if (ch == 'e') {// end
+                        player_demo_prepare_stop(ctx, 1, i, j);
                         aic_player_stop(ctx->player);
                         goto _EXIT_;
                     }

@@ -240,10 +240,15 @@ static void usb_otg_start_host(unsigned char on)
         if ((d->host[i] == NULL)/* || (on == d->host_on[i])*/)
             continue;
 
-        if (on)
+        if (on) {
+#ifdef LPKG_CHERRYUSB_HOST
             usbh_initialize(d->host[i]);
-        else
+#endif
+        } else {
+#ifdef LPKG_CHERRYUSB_HOST
             usbh_deinitialize(d->host[i]);
+#endif
+        }
 
         d->host_on[i] = on;
     }
@@ -256,10 +261,15 @@ static void usb_otg_start_device(unsigned char on)
     /*if (d->device_on == on)
         return;*/
 
-    if (on)
+    if (on) {
+#ifdef LPKG_CHERRYUSB_DEVICE
         usbd_initialize();
-    else
+#endif
+    } else {
+#ifdef LPKG_CHERRYUSB_DEVICE
         usbd_deinitialize();
+#endif
+    }
 
     d->device_on = on;
 }

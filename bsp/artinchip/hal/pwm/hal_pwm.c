@@ -7,6 +7,7 @@
  */
 
 #include <string.h>
+#include <math.h>
 
 #include "aic_core.h"
 #include "aic_hal_clk.h"
@@ -45,36 +46,38 @@
 #define PWM_ETFRC(n)    (PWM_PWMx + (((n) & 0x7) << 8) + 0x054)
 #define PWM_VERSION     0xFFC
 
-#define PWM_DEFAULT_TB_CLK_RATE 24000000
-#define PWM_DEFAULT_DB_RED  20
-#define PWM_DEFAULT_DB_FED  20
+#define PWM_DEFAULT_TB_CLK_RATE  24000000
+#define PWM_DEFAULT_DB_RED       20
+#define PWM_DEFAULT_DB_FED       20
 
-#define PWM_ACTION_CFG_NUM  6
+#define PWM_ACTION_CFG_NUM       6
 
-#define PWM_CTL_EN              BIT(0)
-#define PWM_MCTL_PWM0_EN        BIT(0)
-#define PWM_MCTL_PWM_EN(n)      (PWM_MCTL_PWM0_EN << (n))
-#define PWM_CKCTL_PWM0_ON       BIT(0)
-#define PWM_CKCTL_PWM_ON(n)     (PWM_CKCTL_PWM0_ON << (n))
-#define PWM_INTCTL_PWM0_ON      BIT(0)
-#define PWM_INTCTL_PWM_ON(n)    (PWM_INTCTL_PWM0_ON << (n))
-#define PWM_TBCTL_CLKDIV_MAX    0xFFF
-#define PWM_TBCTL_CLKDIV_SHIFT  16
-#define PWM_TBCTL_CTR_MODE_MASK GENMASK(1, 0)
-#define PWM_TBPRD_MAX           0xFFFF
-#define PWM_AQCTL_DEF_LEVEL     BIT(16)
-#define PWM_AQCTL_CBD_SHIFT     10
-#define PWM_AQCTL_CBU_SHIFT     8
-#define PWM_AQCTL_CAD_SHIFT     6
-#define PWM_AQCTL_CAU_SHIFT     4
-#define PWM_AQCTL_PRD_SHIFT     2
-#define PWM_AQCTL_MASK          0x3
-#define PWM_ETSEL_INTEN_SHIFT   3
-#define PWM_ETSEL_INTSEL_SHIFT  0
-#define PWM_SHADOW_SEL_ZRQ_PRD  0xa
+#define PWM_CTL_EN               BIT(0)
+#define PWM_MCTL_PWM0_EN         BIT(0)
+#define PWM_MCTL_PWM_EN(n)       (PWM_MCTL_PWM0_EN << (n))
+#define PWM_CKCTL_PWM0_ON        BIT(0)
+#define PWM_CKCTL_PWM_ON(n)      (PWM_CKCTL_PWM0_ON << (n))
+#define PWM_INTCTL_PWM0_ON       BIT(0)
+#define PWM_INTCTL_PWM_ON(n)     (PWM_INTCTL_PWM0_ON << (n))
+#define PWM_TBCTL_CLKDIV_MAX     0xFFF
+#define PWM_TBCTL_CLKDIV_SHIFT   16
+#define PWM_TBCTL_CLKDIV_MASK    GENMASK(27, 16)
+#define PWM_TBCTL_CTR_MODE_SHITF 0
+#define PWM_TBCTL_CTR_MODE_MASK  GENMASK(1, 0)
+#define PWM_TBPRD_MAX            0xFFFF
+#define PWM_AQCTL_DEF_LEVEL      BIT(16)
+#define PWM_AQCTL_CBD_SHIFT      10
+#define PWM_AQCTL_CBU_SHIFT      8
+#define PWM_AQCTL_CAD_SHIFT      6
+#define PWM_AQCTL_CAU_SHIFT      4
+#define PWM_AQCTL_PRD_SHIFT      2
+#define PWM_AQCTL_MASK           0x3
+#define PWM_ETSEL_INTEN_SHIFT    3
+#define PWM_ETSEL_INTSEL_SHIFT   0
+#define PWM_SHADOW_SEL_ZRQ_PRD   0xa
 
 #ifndef NSEC_PER_SEC
-#define NSEC_PER_SEC            1000000000
+#define NSEC_PER_SEC             1000000000
 #endif
 
 #ifndef AIC_PWM_CH_NUM
@@ -91,6 +94,11 @@ static inline void pwm_writel(u32 val, int reg)
 static inline u32 pwm_readl(int reg)
 {
     return readl(PWM_BASE + reg);
+}
+
+static inline void pwm_writel_bits(u32 val, u32 mask, u32 shift, int reg)
+{
+    writel_bits(val, mask, shift, PWM_BASE + reg);
 }
 
 static void aic_pwm_ch_info(char *buf, u32 ch, u32 en, struct aic_pwm_arg *arg)
@@ -110,6 +118,48 @@ static void aic_pwm_ch_info(char *buf, u32 ch, u32 en, struct aic_pwm_arg *arg)
         act[arg->action1.PRD], act[arg->action1.ZRO]);
 }
 
+static int hal_pwm_ch_check(u32 ch)
+{
+    if (ch >= AIC_PWM_CH_NUM) {
+        hal_log_err("ch%d is out of range, max num:%d\n", ch, AIC_PWM_CH_NUM -1);
+        return -EINVAL;
+    }
+    return 0;
+}
+
+int hal_pwm_set_tb(u32 ch, int freq)
+{
+    struct aic_pwm_arg *arg = NULL;
+    u32 div = 0;
+
+    if (hal_pwm_ch_check(ch) < 0)
+        return -EINVAL;
+
+    arg = &g_pwm_args[ch];
+
+    if (!arg->available) {
+        hal_log_err("ch%d is unavailable\n", ch);
+        return -EINVAL;
+    }
+
+    if ((freq > arg->clk_rate) || (freq < (arg->clk_rate / (PWM_TBCTL_CLKDIV_MAX + 1)))) {
+        hal_log_err("ch%d:time-base:%dHz is out of range[%d, %d]Hz\n", ch, freq,
+            (arg->clk_rate / (PWM_TBCTL_CLKDIV_MAX + 1)), arg->clk_rate);
+        return -EINVAL;
+    }
+
+    arg->tb_clk_rate = freq;
+
+    if (arg->clk_rate == arg->tb_clk_rate)
+        div = 0;
+    else
+        div = arg->clk_rate / arg->tb_clk_rate - 1;
+
+    pwm_writel_bits(div, PWM_TBCTL_CLKDIV_MASK, PWM_TBCTL_CLKDIV_SHIFT, PWM_TBCTL(ch));
+
+    return 0;
+}
+
 void hal_pwm_status_show(void)
 {
     int ver = pwm_readl(PWM_VERSION);
@@ -127,26 +177,6 @@ void hal_pwm_status_show(void)
         aic_pwm_ch_info(info[i], i, enable, &g_pwm_args[i]);
         printf("%s", info[i]);
     }
-}
-
-int hal_pwm_set_tb(u32 ch, int freq)
-{
-    struct aic_pwm_arg *arg = &g_pwm_args[ch];
-
-    if (!arg->available) {
-        hal_log_err("ch%d is unavailable\n", ch);
-        return -EINVAL;
-    }
-
-    if ((freq > arg->clk_rate) || (freq < (arg->clk_rate / (PWM_TBCTL_CLKDIV_MAX + 1)))) {
-        hal_log_err("ch%d:time-base:%dHz is out of range[%d, %d]Hz\n", ch, freq,
-            (arg->clk_rate / (PWM_TBCTL_CLKDIV_MAX + 1)), arg->clk_rate);
-        return -EINVAL;
-    }
-
-    arg->tb_clk_rate = freq;
-
-    return 0;
 }
 
 static void pwm_reg_enable(int offset, int bit, int enable)
@@ -180,7 +210,12 @@ void hal_pwm_int_config(u32 ch, enum aic_pwm_irq_event irq_mode, u8 enable)
 void hal_pwm_ch_init(u32 ch, enum aic_pwm_mode mode, u32 default_level,
                      struct aic_pwm_action *a0, struct aic_pwm_action *a1)
 {
-    struct aic_pwm_arg *arg = &g_pwm_args[ch];
+    struct aic_pwm_arg *arg = NULL;
+
+    if (hal_pwm_ch_check(ch) < 0)
+        return;
+
+    arg = &g_pwm_args[ch];
 
     arg->mode = mode;
     arg->available = 1;
@@ -192,9 +227,48 @@ void hal_pwm_ch_init(u32 ch, enum aic_pwm_mode mode, u32 default_level,
     pwm_writel(PWM_SHADOW_SEL_ZRQ_PRD, PWM_CMPCTL(ch));
 }
 
-void hal_pwm_ch_deinit(u32 ch)
+static int hal_pwm_calculate_div(u32 ch, float tar_freq)
 {
     struct aic_pwm_arg *arg = &g_pwm_args[ch];
+    int div = -1, i = 0;
+    float min_error = 5e6;
+
+    for (i = 0; i < PWM_TBCTL_CLKDIV_MAX; ++i) {
+        int count_value = arg->clk_rate / ((i + 1) * tar_freq);
+        if (count_value < PWM_TBPRD_MAX) {
+            float current_freq = arg->clk_rate / ((i + 1) * count_value);
+            float error = fabs(current_freq - tar_freq);
+
+            if (error < min_error) {
+                min_error = error;
+                div = i;
+            }
+         }
+    }
+
+    hal_log_debug("div:%d\n", div);
+
+    if (div < 0) {
+        hal_log_err("calculate div error,should adjust the PWM_CLK_RATE.\n");
+        return -1;
+    }
+
+    pwm_writel_bits(div, PWM_TBCTL_CLKDIV_MASK, PWM_TBCTL_CLKDIV_SHIFT, PWM_TBCTL(ch));
+
+    arg->tb_clk_rate = arg->clk_rate / (div + 1);
+
+    return 0;
+}
+
+
+void hal_pwm_ch_deinit(u32 ch)
+{
+    struct aic_pwm_arg *arg = NULL;
+
+    if (hal_pwm_ch_check(ch) < 0)
+        return;
+
+    arg = &g_pwm_args[ch];
 
     arg->available = 0;
     pwm_reg_enable(PWM_CKCTL, PWM_CKCTL_PWM_ON(ch), 0);
@@ -202,7 +276,12 @@ void hal_pwm_ch_deinit(u32 ch)
 
 int hal_pwm_set_prd(u32 ch, u32 cnt)
 {
-    struct aic_pwm_arg *arg = &g_pwm_args[ch];
+    struct aic_pwm_arg *arg = NULL;
+
+    if (hal_pwm_ch_check(ch) < 0)
+        return -EINVAL;
+
+    arg = &g_pwm_args[ch];
 
     if (!arg->available) {
         hal_log_err("ch%d is unavailable\n", ch);
@@ -223,22 +302,30 @@ int hal_pwm_set_prd(u32 ch, u32 cnt)
 
 int hal_pwm_set(u32 ch, u32 duty_ns, u32 period_ns, u32 output)
 {
-    struct aic_pwm_arg *arg = &g_pwm_args[ch];
+    struct aic_pwm_arg *arg = NULL;
     u32 prd = 0;
     u64 duty = 0;
 
-    if ((period_ns < 1) || (period_ns > NSEC_PER_SEC)) {
-        hal_log_err("ch%d invalid period %d\n", ch, period_ns);
-        return -ERANGE;
-    }
+    if (hal_pwm_ch_check(ch) < 0)
+        return -EINVAL;
+
+    arg = &g_pwm_args[ch];
 
     if (!arg->available) {
         hal_log_err("ch%d is unavailable\n", ch);
         return -EINVAL;
     }
 
-    arg->freq = NSEC_PER_SEC / period_ns;
+    arg->freq = (float)NSEC_PER_SEC / period_ns;
+
+    if (hal_pwm_calculate_div(ch, arg->freq) < 0)
+        return -ERANGE;
+
     prd = arg->tb_clk_rate / arg->freq;
+
+    hal_log_debug("output:Freq %d.%03d Hz, prd value %d, Time-base %d Hz\n",
+        (int)arg->freq, (int)((arg->freq - (int)arg->freq) * 1000), prd, arg->tb_clk_rate);
+
     if (arg->mode == PWM_MODE_UP_DOWN_COUNT)
         prd >>= 1;
     else
@@ -280,7 +367,12 @@ int hal_pwm_set(u32 ch, u32 duty_ns, u32 period_ns, u32 output)
 
 int hal_pwm_get(u32 ch, u32 *duty_ns, u32 *period_ns)
 {
-    struct aic_pwm_arg *arg = &g_pwm_args[ch];
+    struct aic_pwm_arg *arg = NULL;
+
+    if (hal_pwm_ch_check(ch) < 0)
+        return -EINVAL;
+
+    arg = &g_pwm_args[ch];
 
     if (!arg->available) {
         hal_log_err("ch%d is unavailable\n", ch);
@@ -294,7 +386,12 @@ int hal_pwm_get(u32 ch, u32 *duty_ns, u32 *period_ns)
 
 int hal_pwm_set_polarity(u32 ch, enum pwm_polarity polarity)
 {
-    struct aic_pwm_arg *arg = &g_pwm_args[ch];
+    struct aic_pwm_arg *arg = NULL;
+
+    if (hal_pwm_ch_check(ch) < 0)
+        return -EINVAL;
+
+    arg = &g_pwm_args[ch];
 
     if (!arg->available) {
         hal_log_err("ch%d is unavailable\n", ch);
@@ -327,8 +424,12 @@ static void pwm_action_set(u32 ch, struct aic_pwm_action *act, char *name)
 
 int hal_pwm_enable(u32 ch)
 {
-    u32 div = 0;
-    struct aic_pwm_arg *arg = &g_pwm_args[ch];
+    struct aic_pwm_arg *arg = NULL;
+
+    if (hal_pwm_ch_check(ch) < 0)
+        return -EINVAL;
+
+    arg = &g_pwm_args[ch];
 
     if (!arg->available) {
         hal_log_err("ch%d is unavailable\n", ch);
@@ -336,12 +437,8 @@ int hal_pwm_enable(u32 ch)
     }
 
     hal_log_debug("ch%d enable\n", ch);
-    div = arg->clk_rate / arg->tb_clk_rate - 1;
-    if (div > PWM_TBCTL_CLKDIV_MAX) {
-        hal_log_err("ch%d clkdiv %d is too big\n", ch, div);
-        return -ERANGE;
-    }
-    pwm_writel((div << PWM_TBCTL_CLKDIV_SHIFT) | arg->mode, PWM_TBCTL(ch));
+
+    pwm_writel_bits(arg->mode, PWM_TBCTL_CTR_MODE_MASK, PWM_TBCTL_CTR_MODE_SHITF, PWM_TBCTL(ch));
 
     pwm_action_set(ch, &arg->action0, "action0");
     pwm_action_set(ch, &arg->action1, "action1");
@@ -353,7 +450,12 @@ int hal_pwm_enable(u32 ch)
 
 int hal_pwm_disable(u32 ch)
 {
-    struct aic_pwm_arg *arg = &g_pwm_args[ch];
+    struct aic_pwm_arg *arg = NULL;
+
+    if (hal_pwm_ch_check(ch) < 0)
+        return -EINVAL;
+
+    arg = &g_pwm_args[ch];
 
     if (!arg->available) {
         hal_log_err("ch%d is unavailable\n", ch);

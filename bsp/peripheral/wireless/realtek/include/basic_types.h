@@ -1,20 +1,6 @@
 /******************************************************************************
  *
  * Copyright(c) 2007 - 2011 Realtek Corporation. All rights reserved.
- *                                        
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of version 2 of the GNU General Public License as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
  *
  ******************************************************************************/
 #ifndef __BASIC_TYPES_H__
@@ -29,16 +15,16 @@
 #undef _FAIL
 #define _FAIL		0
 
-#ifndef FALSE		
+#ifndef FALSE
     #define FALSE   0
 #endif
 
 #ifndef TRUE
     #define TRUE    (!FALSE)
 #endif
-		
-#define _TRUE        TRUE	
-#define _FALSE	     FALSE	
+
+#define _TRUE        TRUE
+#define _FALSE	     FALSE
 
 #ifndef NULL
 #define NULL 0
@@ -87,7 +73,7 @@ typedef unsigned char           bool;
 #define UCHAR                   uint8_t
 #define USHORT                  uint16_t
 #define UINT                    uint32_t
-#define ULONG                   uint32_t	
+#define ULONG                   uint32_t
 
 //typedef struct { volatile int counter; } atomic_t;
 
@@ -116,7 +102,7 @@ typedef     void (*proc_t)(void*);
 typedef     unsigned int __kernel_size_t;
 typedef     int __kernel_ssize_t;
 
-typedef 	__kernel_size_t	SIZE_T;	
+typedef 	__kernel_size_t	SIZE_T;
 typedef	    __kernel_ssize_t	SSIZE_T;
 #define     FIELD_OFFSET(s,field)	((SSIZE_T)&((s*)(0))->field)
 
@@ -183,7 +169,7 @@ typedef	    __kernel_ssize_t	SSIZE_T;
 #ifndef _LONG_CALL_
 #define _LONG_CALL_
 #endif
-#define _LONG_CALL_ROM_  
+#define _LONG_CALL_ROM_
 #define _WEAK          __weak
 #else
 #define SECTION(_name) __attribute__ ((__section__(_name)))
@@ -216,7 +202,7 @@ typedef	    __kernel_ssize_t	SSIZE_T;
  			(((u32)(x) & (u32)0x0000ff00) <<  8) |            \
  			(((u32)(x) & (u32)0x00ff0000) >>  8) |            \
  			(((u32)(x) & (u32)0xff000000) >> 24)))
- 
+
 #define WAP16(x) ((u16)(                         \
  			(((u16)(x) & (u16)0x00ff) <<  8) |            \
  			(((u16)(x) & (u16)0xff00) >>  8)))
@@ -248,7 +234,7 @@ typedef	    __kernel_ssize_t	SSIZE_T;
 //
 #define WriteEF1Byte(_ptr, _val)	(*((u8 *)(_ptr)))=EF1Byte(_val)
 #define WriteEF2Byte(_ptr, _val)	(*((u16 *)(_ptr)))=EF2Byte(_val)
-#define WriteEF4Byte(_ptr, _val)	(*((u32 *)(_ptr)))=EF4Byte(_val)									
+#define WriteEF4Byte(_ptr, _val)	(*((u32 *)(_ptr)))=EF4Byte(_val)
 
 //
 //	Example:
@@ -265,7 +251,7 @@ typedef	    __kernel_ssize_t	SSIZE_T;
 //		BIT_OFFSET_LEN_MASK_32(16, 2) => 0x00030000
 //
 #define BIT_OFFSET_LEN_MASK_32(__BitOffset, __BitLen) \
-	(BIT_LEN_MASK_32(__BitLen) << (__BitOffset)) 
+	(BIT_LEN_MASK_32(__BitLen) << (__BitOffset))
 
 //
 //	Description:
@@ -289,7 +275,7 @@ typedef	    __kernel_ssize_t	SSIZE_T;
 
 //
 //	Description:
-//		Mask subfield (continuous bits in little-endian) of 4-byte value in litten byte oredering  
+//		Mask subfield (continuous bits in little-endian) of 4-byte value in litten byte oredering
 //		and return the result in 4-byte value in host byte ordering.
 //
 #define LE_BITS_CLEARED_TO_4BYTE(__pStart, __BitOffset, __BitLen) \
@@ -301,7 +287,7 @@ typedef	    __kernel_ssize_t	SSIZE_T;
 
 //
 //	Description:
-//		Set subfield of little-endian 4-byte value to specified value.	
+//		Set subfield of little-endian 4-byte value to specified value.
 //
 #define SET_BITS_TO_LE_4BYTE(__pStart, __BitOffset, __BitLen, __Value) \
 	*((u32 *)(__pStart)) = \
@@ -311,23 +297,23 @@ typedef	    __kernel_ssize_t	SSIZE_T;
 			( (((u32)__Value) & BIT_LEN_MASK_32(__BitLen)) << (__BitOffset) ) \
 		);
 
-		
+
 #define BIT_LEN_MASK_16(__BitLen) \
 		(0xFFFF >> (16 - (__BitLen)))
-		
+
 #define BIT_OFFSET_LEN_MASK_16(__BitOffset, __BitLen) \
 	(BIT_LEN_MASK_16(__BitLen) << (__BitOffset))
-	
+
 #define LE_P2BYTE_TO_HOST_2BYTE(__pStart) \
 	(EF2Byte(*((u16 *)(__pStart))))
-	
+
 #define LE_BITS_TO_2BYTE(__pStart, __BitOffset, __BitLen) \
 	( \
 		( LE_P2BYTE_TO_HOST_2BYTE(__pStart) >> (__BitOffset) ) \
 		& \
 		BIT_LEN_MASK_16(__BitLen) \
 	)
-	
+
 #define LE_BITS_CLEARED_TO_2BYTE(__pStart, __BitOffset, __BitLen) \
 	( \
 		LE_P2BYTE_TO_HOST_2BYTE(__pStart) \
@@ -342,7 +328,7 @@ typedef	    __kernel_ssize_t	SSIZE_T;
 			| \
 			( (((u16)__Value) & BIT_LEN_MASK_16(__BitLen)) << (__BitOffset) ) \
 		);
-			
+
 #define BIT_LEN_MASK_8(__BitLen) \
 		(0xFF >> (8 - (__BitLen)))
 
@@ -412,14 +398,14 @@ typedef unsigned char	BOOLEAN,*PBOOLEAN,boolean;
 #if defined ( __ICCARM__ )
 #define __inline__                      inline
 #define __inline                        inline
-#define __inline_definition			//In dialect C99, inline means that a function's definition is provided 
-								//only for inlining, and that there is another definition 
-								//(without inline) somewhere else in the program. 
-								//That means that this program is incomplete, because if 
-								//add isn't inlined (for example, when compiling without optimization), 
+#define __inline_definition			//In dialect C99, inline means that a function's definition is provided
+								//only for inlining, and that there is another definition
+								//(without inline) somewhere else in the program.
+								//That means that this program is incomplete, because if
+								//add isn't inlined (for example, when compiling without optimization),
 								//then main will have an unresolved reference to that other definition.
 
-								// Do not inline function is the function body is defined .c file and this 
+								// Do not inline function is the function body is defined .c file and this
 								// function will be called somewhere else, otherwise there is compile error
 #elif defined ( __CC_ARM   )
 #define __inline__			__inline	//__linine__ is not supported in keil compilor, use __inline instead
@@ -438,14 +424,14 @@ typedef unsigned char	BOOLEAN,*PBOOLEAN,boolean;
 #if defined (__ICCARM__)
 
 #define RTW_PACK_STRUCT_BEGIN _Pragma( STRINGIFY(pack(1)))
-#define RTW_PACK_STRUCT_STRUCT 
+#define RTW_PACK_STRUCT_STRUCT
 #define RTW_PACK_STRUCT_END _Pragma( STRINGIFY(pack()))
 //#define RTW_PACK_STRUCT_USE_INCLUDES
 
 #elif defined (__CC_ARM)
 
 #define RTW_PACK_STRUCT_BEGIN __packed
-#define RTW_PACK_STRUCT_STRUCT 
+#define RTW_PACK_STRUCT_STRUCT
 #define RTW_PACK_STRUCT_END
 
 #elif defined (__GNUC__)

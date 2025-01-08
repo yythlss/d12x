@@ -7,10 +7,6 @@
  */
 
 #include <string.h>
-#include <usbdescriptors.h>
-#include <usbdevice.h>
-#include <usb_drv.h>
-#include <usbupg.h>
 #include <aic_core.h>
 #include <aicupg.h>
 #include "upg_internal.h"
@@ -447,7 +443,7 @@ void media_data_write_end(struct fwc_info *fwc)
             break;
 #endif
         default:
-            pr_err("device type is not support!...\n");
+            pr_err("device type %d is not support!...\n", type);
             break;
     }
 }

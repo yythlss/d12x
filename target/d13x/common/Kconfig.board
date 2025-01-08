@@ -262,6 +262,24 @@ source "bsp/artinchip/drv/cap/Kconfig"
 
 endmenu
 
+#---------------------------
+# QEP device global option
+#---------------------------
+
+menu "Using QEP"
+
+config AIC_USING_QEP2
+    bool "Using QEP2"
+    default n
+    select AIC_QEP_DRV
+
+config AIC_USING_QEP3
+    bool "Using QEP3"
+    default n
+    select AIC_QEP_DRV
+
+endmenu
+
 
 #---------------------------
 # CAN device global option
@@ -307,6 +325,7 @@ config AIC_USING_USB0
 if AIC_USING_USB0
     choice
         prompt "Select Usb0 mode"
+        default AIC_USING_USB0_OTG if AICUPG_UDISK_ENABLE || AICUPG_USB_ENABLE
         default AIC_USING_USB0_DEVICE
         config AIC_USING_USB0_HOST
             bool "Host"
@@ -331,7 +350,7 @@ config AIC_USING_GMAC0
     default n
     select AIC_GMAC_DRV
 
-source "packages/third-party/lwip/contrib/ports/drv/aic/Kconfig.dev"
+source "bsp/artinchip/hal/mac/Kconfig.dev"
 
 #================================================
 # Storage Class
@@ -614,7 +633,7 @@ config AIC_USING_GPAI7
     default n
     select AIC_GPAI_DRV
 
-source "bsp/artinchip/drv/gpai/Kconfig.dev"
+source "bsp/artinchip/hal/gpai/Kconfig.dev"
 endmenu
 
 #================================================
@@ -692,7 +711,7 @@ source "bsp/artinchip/drv/audio/Kconfig"
 
 if KERNEL_BAREMETAL
 
-    config AIC_USING_TOUCH
+    config AIC_USING_BARE_TOUCH
         bool "Using Touch"
         default n
         select AIC_TOUCH_DRV
@@ -895,6 +914,7 @@ endmenu
 # 4. Sections memory location
 
 menu "ELF Sections memory location"
+    depends on !AIC_BOOTLOADER
     choice
         prompt "Section .text"
         default AIC_SEC_TEXT_XIP if AIC_XIP

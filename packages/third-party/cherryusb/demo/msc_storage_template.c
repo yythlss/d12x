@@ -126,10 +126,13 @@ struct usbd_storage_p {
     uint8_t is_configured;
 };
 
+char msc_storage_path[] = MSC_STORAGE_PATH;
+rt_thread_t usbd_msc_tid;
 struct usbd_interface msc_intf0;
 struct usbd_storage_p usbd_storage;
 static void usbd_msc_suspend(void);
 static void usbd_msc_configured(void);
+int usbd_msc_detection(void);
 
 #ifdef LPKG_CHERRYUSB_DEVICE_COMPOSITE
 void usbd_comp_msc_event_handler(uint8_t event)
@@ -393,42 +396,64 @@ int msc_storage_deinit()
     return 0;
 }
 
-int msc_storage_forbidden(void)
+int msc_storage_forbid(void)
 {
     struct usbd_storage_p *usbd_storage = get_usbd_storage();
+
+    if (usbd_storage->is_forbidden == true)
+        return -1;
+
+    usbd_msc_thread_deinit();
+    usbd_msc_set_popup();
+    usbd_storage->is_forbidden = true;
+    usbd_msc_check_storage();
+    if (usbd_msc_tid != NULL)
+        rt_thread_delete(usbd_msc_tid);
+    usbd_msc_suspend();
+
+    return 0;
+}
+
+int msc_usbd_forbid(void)
+{
+    struct usbd_storage_p *usbd_storage = get_usbd_storage();
+
+    if (usbd_storage->is_forbidden == true)
+        return -1;
 
     usbd_storage->is_forbidden = true;
     usbd_msc_check_storage();
     usbd_msc_thread_deinit();
+    if (usbd_msc_tid != NULL)
+        rt_thread_delete(usbd_msc_tid);
     usbd_msc_suspend();
-#ifdef LPKG_CHERRYUSB_DEVICE_COMPOSITE
+
+    #ifdef LPKG_CHERRYUSB_DEVICE_COMPOSITE
+    usbd_storage->is_inited = false;
     usbd_comp_func_release(msc_storage_descriptor, NULL);
-#endif
+    #else
+    msc_storage_deinit();
+    #endif
 
     return 0;
 }
 
-static void cmd_msc_usage(void)
+int msc_storage_allow(void)
 {
-    printf("Usage: msc_init [mountpoint]\n");
-    printf("Example: msc_init /rodata\n");
+    struct usbd_storage_p *usbd_storage = get_usbd_storage();
+    usbd_storage->is_forbidden = false;
+    usbd_msc_detection();
+
+    return 0;
 }
 
+#if defined(AIC_CONSOLE_BARE_DRV)
+#include <console.h>
 static int cmd_msc_storage_init(int argc, char *argv[])
 {
-    if (argc < 2) {
-        cmd_msc_usage();
-        return -1;
-    }
-
     msc_storage_init(argv[1]);
     return 0;
 }
-
-#if defined(RT_USING_FINSH)
-MSH_CMD_EXPORT_ALIAS(cmd_msc_storage_init, msc_init, Mount usb massstorage);
-#elif defined(AIC_CONSOLE_BARE_DRV)
-#include <console.h>
 CONSOLE_CMD(msc_init, cmd_msc_storage_init, "Mount usb massstorage");
 #endif
 
@@ -450,16 +475,15 @@ bool usbd_msc_check_storage(void)
     return usbd_storage->storage_exist;
 }
 
-rt_thread_t usbd_msc_tid;
 static void usbd_msc_detection_thread(void *parameter)
 {
 retry:
-    if (msc_storage_init(MSC_STORAGE_PATH) < 0) {
+    if (msc_storage_init(msc_storage_path) < 0) {
         rt_thread_mdelay(400);
         goto retry;
     }
 
-    if ((_fs_is_exist(MSC_STORAGE_PATH) < 0)) {
+    if ((_fs_is_exist(msc_storage_path) < 0)) {
         rt_thread_mdelay(400);
         goto retry;
     }
@@ -468,10 +492,10 @@ retry:
     *  please initialize the USB function here and use it in conjunction
     *  with the msc_storage_deinit function below.
     */
-    // msc_storage_init(MSC_STORAGE_PATH);
+    // msc_storage_init(msc_storage_path);
 
-    if (usbd_storage_init(MSC_STORAGE_PATH) < 0) {
-        USB_LOG_ERR("Failed to detect %s !\n", MSC_STORAGE_PATH);
+    if (usbd_storage_init(msc_storage_path) < 0) {
+        USB_LOG_ERR("Failed to detect %s !\n", msc_storage_path);
         goto retry;
     }
 
@@ -508,4 +532,67 @@ int usbd_msc_detection(void)
 #if !defined(LPKG_CHERRYUSB_DYNAMIC_REGISTRATION_MODE)
 INIT_APP_EXPORT(usbd_msc_detection);
 #endif
+
+#include <getopt.h>
+static void cmd_msc_usage(char *program)
+{
+    printf("Usage: %s [options]\n", program);
+    printf("\t -a, \t allowed \n");
+    printf("\t -f [usb] or [media],   \t forbidden usb or media\n");
+    printf("\t -n [media name],       \t media name\n");
+
+    printf("\t -h ,\tusage\n");
+}
+
+static char sopts[] = "af:n:ih";
+static struct option lopts[] = {
+    {"-a allowed msc ",    no_argument, NULL, 'a'},
+    {"-f forbidden usb or media",  required_argument, NULL, 'f'},
+    {"-n media name",       required_argument, NULL, 'n'},
+    {"-i show msc info",    required_argument, NULL, 'n'},
+    {0, 0, 0, 0}
+    };
+
+static int cmd_test_msc_mount(int argc, char **argv)
+{
+    int opt;
+    struct usbd_storage_p *usbd_storage = get_usbd_storage();
+
+    optind = 0;
+    while ((opt = getopt_long(argc, argv, sopts, lopts, NULL)) != -1) {
+        switch (opt) {
+        case 'a':
+            msc_storage_allow();
+            break;
+        case 'f':
+            if (!strncmp("media", optarg, strlen(optarg))) {
+                if (msc_storage_forbid() < 0)
+                    USB_LOG_ERR("MSC function has be forbidden.\n");
+            }
+
+            if (!strncmp("usb", optarg, strlen(optarg))) {
+                if (msc_usbd_forbid() < 0)
+                    USB_LOG_ERR("MSC function has be forbidden.\n");
+            }
+            break;
+        case 'n':
+            if (usbd_storage->is_forbidden == false) {
+                USB_LOG_WRN("Please forbidden msc function.\n"
+                            "such as: test_msc -f [usb] or [media]\n");
+            }
+            strcpy(msc_storage_path, optarg);
+        case 'i':
+            USB_LOG_INFO("MSC STORAGE PATH: %s\n", msc_storage_path);
+            break;
+        case'h':
+        default:
+            cmd_msc_usage(argv[0]);
+            break;
+        }
+    }
+
+    return 0;
+}
+MSH_CMD_EXPORT_ALIAS(cmd_test_msc_mount, test_msc, Test USB MSC);
+
 #endif

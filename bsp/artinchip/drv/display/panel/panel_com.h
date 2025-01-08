@@ -45,6 +45,9 @@ extern struct aic_panel dbi_st7789;
  */
 extern struct aic_panel dbi_ili9341;
 extern struct aic_panel dbi_st77903;
+extern struct aic_panel dbi_st7789t3;
+extern struct aic_panel dbi_st7789v;
+extern struct aic_panel dbi_ili9327;
 
 /*
  * RGB Panel SPI Init

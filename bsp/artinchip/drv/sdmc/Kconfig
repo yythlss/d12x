@@ -27,6 +27,11 @@ endchoice
         bool "Using DDR mode"
         default n
 
+    config AIC_SDMC0_IS_SDIO
+        bool "SDMC0 connect to a SDIO device"
+        select AIC_SDMC_IRQ_MODE
+        default n
+
     config AIC_SDMC0_DRV_PHASE
         int "SDMC0 driver phase"
         range 0 3
@@ -58,9 +63,14 @@ choice
         bool "sdmc 4-bit mode"
 endchoice
 
-    config AIC_SD_USING_HOTPLUG
+    config AIC_SDMC1_USING_HOTPLUG
         bool "Using SDcard hotplug detection"
         default n
+
+    config AIC_SDMC1_HOTPLUG_PIN
+        string "sdcard hotplug gpio"
+        default "PC.6"
+        depends on AIC_SDMC1_USING_HOTPLUG
 
     config AIC_SDMC1_IS_SDIO
         bool "SDMC1 connect to a SDIO device"

@@ -9,7 +9,7 @@
 
 #include <string.h>
 #include "aic_audio_decoder.h"
-#include "aic_audio_render.h"
+#include "aic_audio_render_manager.h"
 #include "aic_parser.h"
 #include "mini_audio_player.h"
 
@@ -47,6 +47,7 @@ enum PLAYER_FILE_TYPE {
     PLAYER_FILE_MP3 = 0,
     PLAYER_FILE_WAV = 1,
     PLAYER_FILE_FLAC = 2,
+    PLAYER_FILE_WMA = 3,
 };
 
 #define MINI_AUDIO_PLAYER_WAVE_BUFF_SIZE (4*1024)
@@ -178,7 +179,7 @@ int mini_audio_player_set_volume(struct mini_audio_player *player,int vol)
     }
     player->volume = volume;
     if (player->render) {
-        aic_audio_render_set_volume(player->render,player->volume);
+        aic_audio_render_control(player->render, AUDIO_RENDER_CMD_SET_VOL, &player->volume);
     }
     return 0;
 }
@@ -197,9 +198,12 @@ int mini_audio_player_get_state(struct mini_audio_player *player)
 
 static int mini_audio_player_open(struct mini_audio_player *player)
 {
+    int ret = 0;
     char* ptr = NULL;
     struct aic_parser_av_media_info media_info;
     struct aic_audio_render_attr attr;
+    struct aic_audio_decode_params decode_params;
+    struct audio_render_create_params create_params;
 
     if (player == NULL) {
         MINI_AUDIO_PLAYER_ERROR("para error\n");
@@ -220,6 +224,8 @@ static int mini_audio_player_open(struct mini_audio_player *player)
         }
     } else if (!strncmp(ptr+1, "flac", 4)) {
         player->type = PLAYER_FILE_FLAC;
+    } else if (!strncmp(ptr+1, "wma", 3)) {
+        player->type = PLAYER_FILE_WMA;
     } else {
         MINI_AUDIO_PLAYER_ERROR("unsupport file type\n");
         goto _exit;
@@ -244,11 +250,16 @@ static int mini_audio_player_open(struct mini_audio_player *player)
     player->audio_info.nb_channel = media_info.audio_stream.nb_channel;
     player->audio_info.bits_per_sample = media_info.audio_stream.bits_per_sample;
 
-    if (player->type == PLAYER_FILE_MP3 || player->type == PLAYER_FILE_FLAC) {
+
+    if (player->type == PLAYER_FILE_MP3 ||
+        player->type == PLAYER_FILE_FLAC ||
+        player->type == PLAYER_FILE_WMA) {
         if (player->type == PLAYER_FILE_MP3)
             player->decoder = aic_audio_decoder_create(MPP_CODEC_AUDIO_DECODER_MP3);
         else if (player->type == PLAYER_FILE_FLAC)
             player->decoder = aic_audio_decoder_create(MPP_CODEC_AUDIO_DECODER_FLAC);
+        else if (player->type == PLAYER_FILE_WMA)
+            player->decoder = aic_audio_decoder_create(MPP_CODEC_AUDIO_DECODER_WMA);
 
         if (player->decoder == NULL) {
             MINI_AUDIO_PLAYER_ERROR("aic_audio_decoder_create fail\n");
@@ -257,31 +268,51 @@ static int mini_audio_player_open(struct mini_audio_player *player)
         player->dec_cfg.packet_buffer_size = 4*1024;
         player->dec_cfg.packet_count = 2;
         player->dec_cfg.frame_count = 2;
-        aic_audio_decoder_init(player->decoder, &player->dec_cfg);
+        ret = aic_audio_decoder_init(player->decoder, &player->dec_cfg);
+        if (ret) {
+            MINI_AUDIO_PLAYER_ERROR("aic_audio_decoder_init fail %d\n", ret);
+            goto _exit;
+        }
+
+        decode_params.sample_rate = media_info.audio_stream.sample_rate;
+        decode_params.bit_rate = media_info.audio_stream.bit_rate;
+        decode_params.bits_per_sample = media_info.audio_stream.bits_per_sample;
+        decode_params.channels = media_info.audio_stream.nb_channel;
+        decode_params.block_align = media_info.audio_stream.block_align;
+        decode_params.extradata = media_info.audio_stream.extra_data;
+        decode_params.extradata_size = media_info.audio_stream.extra_data_size;
+        ret = aic_audio_decoder_control(player->decoder, MPP_DEC_INIT_CMD_SET_PARAMS,
+                                        &decode_params);
+        if (ret) {
+            MINI_AUDIO_PLAYER_ERROR("aic_audio_decoder_control set params fail %d\n", ret);
+            goto _exit;
+        }
     }
 
-    aic_audio_render_create(&player->render);
+    create_params.dev_id = 0;
+    create_params.scene_type = AUDIO_RENDER_SCENE_DEFAULT;
+    aic_audio_render_create(&player->render, &create_params);
     if (player->render == NULL) {
         MINI_AUDIO_PLAYER_ERROR("aic_audio_render_create fail\n");
         goto _exit;
     }
-    if (aic_audio_render_init(player->render,0)) {
+    if (aic_audio_render_init(player->render)) {
         MINI_AUDIO_PLAYER_ERROR("aic_audio_render_init fail\n");
         goto _exit;
     }
 
     // set volume
     if (player->volume != 0) {
-        aic_audio_render_set_volume(player->render,player->volume);
+        aic_audio_render_control(player->render, AUDIO_RENDER_CMD_SET_VOL, &player->volume);
     } else {
-        player->volume = aic_audio_render_get_volume(player->render);
+        aic_audio_render_control(player->render, AUDIO_RENDER_CMD_GET_VOL, &player->volume);
     }
 
     // set attr
     attr.bits_per_sample = player->audio_info.bits_per_sample;
     attr.channels = player->audio_info.nb_channel;
     attr.sample_rate = player->audio_info.sample_rate;
-    if (aic_audio_render_set_attr(player->render,&attr)) {
+    if (aic_audio_render_control(player->render, AUDIO_RENDER_CMD_SET_ATTR, &attr)) {
         MINI_AUDIO_PLAYER_ERROR("aic_audio_render_set_attr fail\n");
         goto _exit;
     }
@@ -430,8 +461,10 @@ static void mini_audio_player_entry(void *parameter)
                         }
                     }
                     decoder_ret = aic_audio_decoder_decode(player->decoder);
-                    if (decoder_ret == DEC_NO_RENDER_FRAME) {
-                        need_peek = 0;
+                    if (decoder_ret == DEC_NO_EMPTY_PACKET) {
+                        /*Decoder in multi-thread conditions, the decoder internal
+                         *packet buf may be fulled and returned no empty packet,
+                         *so should sleep a minute */
                         usleep(5000);
                     }
                     decoder_ret = aic_audio_decoder_get_frame(player->decoder,&audio_frame);
@@ -519,7 +552,8 @@ struct mini_audio_player* mini_audio_player_create(void)
         goto _exit;
     }
 
-    player->tid = aicos_thread_create("mini_audio_player",32*1024,20,mini_audio_player_entry,player);
+    player->tid = aicos_thread_create("mini_audio_player", 32 * 1024, 18,
+                                      mini_audio_player_entry, player);
     if (player->tid == NULL) {
         MINI_AUDIO_PLAYER_ERROR("aicos_thread_create error\n");
         goto _exit;

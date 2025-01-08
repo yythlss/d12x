@@ -17,8 +17,8 @@ static rt_thread_t   	uart_decode_task_id;
 
 
 /**************************bt uart******************************
-ï¿½ï¿½ï¿½Âºï¿½ï¿½ï¿½ï¿½ï¿½ÏµÍ³ï¿½ï¿½Î¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Òªï¿½Ã»ï¿½ï¿½ï¿½Êµï¿½ï¿½,
-uartÍ¨Ñ¶Ä¬ï¿½Ï²ï¿½ï¿½ï¿½ï¿½ï¿½115200ï¿½ï¿½8Î»ï¿½ï¿½ï¿½ï¿½Î»ï¿½ï¿½1Î»Í£Ö¹Î»ï¿½ï¿½ï¿½ï¿½Ð£ï¿½ï¿½Î»
+ÒÔÏÂº¯ÊýÊÇÏµÍ³²ã²Î¿¼º¯Êý£¬ÐèÒªÓÃ»§¶ËÊµÏÖ,
+uartÍ¨Ñ¶Ä¬ÈÏ²¨ÌØÂÊ115200£¬8Î»Êý¾ÝÎ»£¬1Î»Í£Ö¹Î»£¬ÎÞÐ£ÑéÎ»
 **************************bt uart******************************/
 //__u32  	COM_UART_BAUD = 115200;
 //bt uart operate
@@ -48,7 +48,7 @@ __s32 rtt_com_uart_init(void)
     }
 
 	bt_msleep(10);
-	__msg("UART open success");
+	__wrn("UART open success");
 
 	return EPDK_OK;
 }
@@ -148,14 +148,13 @@ __s32 rtt_com_uart_flush(void)
 
 #endif
 
-#if (runmode == 1)//ï¿½ß³ï¿½ï¿½ï¿½ï¿½ï¿½
+#if (runmode == 1)//Ïß³ÌÔËÐÐ
 
 void sys_bt_decode_task(void*parg)
 {
     while(1)
     {
         sys_bt_decode_cmd(parg);
-
     }
 
 }
@@ -164,7 +163,6 @@ void sys_bt_receive_task(void*parg)
     while(1)
     {
         sys_bt_receive_cmd(parg);
-
     }
 
 }
@@ -173,16 +171,16 @@ __s32 rtt_bt_task_start(void)//task
 	printf("uart_task_start\n");
     uart_decode_task_id = rt_thread_create("bt_decode_task",
                                    sys_bt_decode_task, RT_NULL,
-                                   2048,
-                                   21, 10);
+                                   4096,
+                                   6, 10);
 
     if (uart_decode_task_id != RT_NULL)
         rt_thread_startup(uart_decode_task_id);
 
     uart_recive_task_id = rt_thread_create("bt_receive_task",
                                    sys_bt_receive_task, RT_NULL,
-                                   2048,
-                                   22, 10);
+                                   4096,
+                                   7, 10);
 
     if (uart_recive_task_id != RT_NULL)
         rt_thread_startup(uart_recive_task_id);
@@ -206,7 +204,7 @@ __s32 rtt_bt_task_stop(void)
 	return EPDK_OK;
 }
 
-#elif(runmode == 0)//ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
+#elif(runmode == 0)//¶¨Ê±Æ÷ÔËÐÐ
 
 __s32 rtt_bt_task_start(void) timer
 {

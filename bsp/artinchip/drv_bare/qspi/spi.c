@@ -104,6 +104,26 @@ static struct aic_qspi_bus qspi_bus_arr[] = {
 #endif
     },
 #endif
+#if defined(AIC_USING_SE_SPI) && defined(AIC_SE_SPI_DEVICE_SPINOR)
+    {
+        .name = "sespi",
+        .idx = 5,
+        .clk_id = CLK_SE_SPI,
+        .clk_in_hz = AIC_DEV_SE_SPI_MAX_SRC_FREQ_HZ,
+        .bus_hz = AIC_SE_SPI_DEVICE_SPINOR_FREQ,
+        .dma_port_id = DMA_ID_SE_SPI,
+        .irq_num = SE_SPI_IRQn,
+        .dl_width = AIC_SE_SPI_BUS_WIDTH,
+#if defined(AIC_QSPI_MULTIPLE_CS_NUM)
+        .cs_num = AIC_SE_SPI_CS_NUM,
+#endif
+        .rxd_dylmode = AIC_DEV_SE_SPI_DELAY_MODE,
+#if defined(AIC_QSPI_DRV_V20)
+        .txd_dylmode = AIC_DEV_SE_SPI_TXD_DELAY_MODE,
+        .txc_dylmode = AIC_DEV_SE_SPI_TX_CLK_DELAY_MODE,
+#endif
+    },
+#endif
 };
 
 int spi_write_read(struct aic_qspi_bus *qspi,

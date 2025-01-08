@@ -1,13 +1,12 @@
 
 config AIC_DISPLAY_DRV
-    bool "Display Support"
-    default y
-    depends on AIC_DE_DRV
+    bool
+    default y if AIC_DE_DRV
 
 config AIC_DISP_PQ_TOOL
     bool "Ai PQ Tool Support"
     default n
-    depends on AIC_DE_DRV
+    depends on AIC_DISPLAY_DRV
     select AIC_FB_DRV_DEBUG
 
 config AIC_DISP_DE_DRV
@@ -219,6 +218,10 @@ if AIC_PWM_BACKLIGHT
         int "default brightness level"
         default 80
         range 0 100
+
+    config AIC_PWM_BACKLIGHT_BYPASS
+        bool
+        default n
 endif
 endif
 
@@ -229,6 +232,7 @@ config AIC_PANEL_SPI_EMULATION
 config AIC_SCREEN_CROP
     bool "Enable screen crop"
     default n
+    depends on AIC_DISPLAY_DRV
     help
         Some LCD screen need to be cropped, the effective area displayed is less
         than the timing signal.

@@ -11,11 +11,9 @@
 #include <stdint.h>
 
 /****************** Quant Table   *************************/
-/* These are the sample quantization tables given in JPEG spec section K.1.
- * The spec says that the values given produce "good" quality, and
- * when divided by 2, "very good" quality.
+/* JPEG spec section K.1.
  */
-const unsigned char std_luminance_quant_tbl[64] = {
+const unsigned char std_luma_quant_table[64] = {
 	16,  11,  10,  16,  24,  40,  51,  61,
 	12,  12,  14,  19,  26,  58,  60,  55,
 	14,  13,  16,  24,  40,  57,  69,  56,
@@ -25,7 +23,7 @@ const unsigned char std_luminance_quant_tbl[64] = {
 	49,  64,  78,  87, 103, 121, 120, 101,
 	72,  92,  95,  98, 112, 100, 103,  99
 };
-const unsigned char std_chrominance_quant_tbl[64] = {
+const unsigned char std_chroma_quant_table[64] = {
 	17,  18,  24,  47,  99,  99,  99,  99,
 	18,  21,  26,  66,  99,  99,  99,  99,
 	24,  26,  56,  99,  99,  99,  99,  99,
@@ -36,7 +34,7 @@ const unsigned char std_chrominance_quant_tbl[64] = {
 	99,  99,  99,  99,  99,  99,  99,  99
 };
 
-uint8_t zigzag_direct[64] = {
+uint8_t zigzag_dir[64] = {
 	0,  1,  8, 16,  9,  2,  3, 10,
 	17, 24, 32, 25, 18, 11,  4,  5,
 	12, 19, 26, 33, 40, 48, 41, 34,
@@ -48,19 +46,17 @@ uint8_t zigzag_direct[64] = {
 };
 
 /****************** Huffman Table   *************************/
-/* Set up the standard Huffman tables (cf. JPEG standard section K.3) */
-/* IMPORTANT: these are only valid for 8-bit data precision! */
-const uint8_t avpriv_mjpeg_bits_dc_luminance[17] =
-{ /* 0-base */ 0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0 };
-const uint8_t avpriv_mjpeg_val_dc[12] =
-{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
+/* standard Huffman tables ( JPEG standard section K.3) */
+const uint8_t bits_dc_luma[17] = { 0, 0, 1, 5, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0 };
+const uint8_t val_dc[12] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 };
 
-const uint8_t avpriv_mjpeg_bits_dc_chrominance[17] =
-{ /* 0-base */ 0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0 };
+const uint8_t bits_dc_chroma[17] =
+{ 0, 0, 3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0 };
 
-const uint8_t avpriv_mjpeg_bits_ac_luminance[17] =
-{ /* 0-base */ 0, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d };
-const uint8_t avpriv_mjpeg_val_ac_luminance[] =
+const uint8_t bits_ac_luminance[17] =
+{ 0, 0, 2, 1, 3, 3, 2, 4, 3, 5, 5, 4, 4, 0, 0, 1, 0x7d };
+
+const uint8_t val_ac_luminance[] =
 {	0x01, 0x02, 0x03, 0x00, 0x04, 0x11, 0x05, 0x12,
 	0x21, 0x31, 0x41, 0x06, 0x13, 0x51, 0x61, 0x07,
 	0x22, 0x71, 0x14, 0x32, 0x81, 0x91, 0xa1, 0x08,
@@ -84,10 +80,10 @@ const uint8_t avpriv_mjpeg_val_ac_luminance[] =
 	0xf9, 0xfa
 };
 
-const uint8_t avpriv_mjpeg_bits_ac_chrominance[17] =
-{ /* 0-base */ 0, 0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 0x77 };
+const uint8_t bits_ac_chroma[17] =
+{ 0, 0, 2, 1, 2, 4, 4, 3, 4, 7, 5, 4, 4, 0, 1, 2, 0x77 };
 
-const uint8_t avpriv_mjpeg_val_ac_chrominance[] =
+const uint8_t val_ac_chroma[] =
 {	0x00, 0x01, 0x02, 0x03, 0x11, 0x04, 0x05, 0x21,
 	0x31, 0x06, 0x12, 0x41, 0x51, 0x07, 0x61, 0x71,
 	0x13, 0x22, 0x32, 0x81, 0x08, 0x14, 0x42, 0x91,
@@ -111,31 +107,25 @@ const uint8_t avpriv_mjpeg_val_ac_chrominance[] =
 	0xf9, 0xfa
 };
 
-/* isn't this function nicer than the one in the libjpeg ? */
-void mjpeg_build_huffman_codes(uint8_t *huff_size, uint16_t *huff_code,
-                                  const uint8_t *bits_table,
-                                  const uint8_t *val_table)
+void mjpeg_build_huffman_codes(uint8_t *huffman_size,
+                                uint16_t *huffman_code,
+                                const uint8_t *bits_tbl,
+                                const uint8_t *val_tbl)
 {
-	int i, j, k,nb, code, sym;
+	int i, j, k;
+    int number, code, symbol;
 
-	/* Some badly encoded files [1] map 2 different codes to symbol 0.
-	Only the first one is valid, so we zero-initialize this here and
-	make sure we only set it once (the first time) in the loop below.
-
-	[1]: Embedded JPEGs in "X7 RAW" and "X7 CinemaDNG" samples here:
-		https://www.dji.com/gr/zenmuse-x7/info#downloads
-	*/
-
-	huff_size[0] = 0;
+	huffman_size[0] = 0;
 	k = 0;
 	code = 0;
-	for(i=1;i<=16;i++) {
-		nb = bits_table[i];
-		for(j=0;j<nb;j++) {
-			sym = val_table[k++];
-			if (sym != 0 || huff_size[sym] == 0) { /* see comment above */
-				huff_size[sym] = i;
-				huff_code[sym] = code;
+
+	for (i=1; i<=16; i++) {
+		number = bits_tbl[i];
+		for (j=0; j<number; j++) {
+			symbol = val_tbl[k++];
+			if (symbol != 0 || huffman_size[symbol] == 0) {
+				huffman_size[symbol] = i;
+				huffman_code[symbol] = code;
 			}
 
 			code++;

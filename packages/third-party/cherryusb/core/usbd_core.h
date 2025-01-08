@@ -85,6 +85,10 @@ void usbd_add_interface(struct usbd_interface *intf);
 void usbd_add_endpoint(struct usbd_endpoint *ep);
 
 bool usb_device_is_configured(void);
+bool usb_device_is_connected(void);
+
+bool usbd_connect_check(uint32_t timeout);
+
 int usbd_initialize(void);
 int usbd_deinitialize(void);
 

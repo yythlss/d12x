@@ -19,7 +19,7 @@ int xincun_ecc_get_status(struct aic_spinand *flash, u8 status)
         case STATUS_ECC_UNCOR_ERROR:
             return -SPINAND_ERR_ECC;
         case STATUS_ECC_MASK:
-            return 4;
+            return 8;
         default:
             break;
     }
@@ -27,13 +27,25 @@ int xincun_ecc_get_status(struct aic_spinand *flash, u8 status)
     return -SPINAND_ERR;
 }
 
+static int xcsp1a_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    if (section > 3)
+      return -SPINAND_ERR;
+
+    region->offset = (16 * section) + 0;
+    region->length = 16;
+
+    return 0;
+}
+
 const struct aic_spinand_info xincun_spinand_table[] = {
     /*devid page_size oob_size block_per_lun pages_per_eraseblock planes_per_lun
     is_die_select*/
     /*XCSP1AAPK-IT device*/
-    { DEVID(0x01), PAGESIZE(2048), OOBSIZE(128), BPL(1024), PPB(64),
-      PLANENUM(1), DIE(0), "xincun 128MB: 2048+128@64@1024", cmd_cfg_table,
-      xincun_ecc_get_status },
+    { DEVID(0x01), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64),
+      PLANENUM(1), DIE(0), "xincun 128MB: 2048+64@64@1024", cmd_cfg_table,
+      xincun_ecc_get_status, xcsp1a_ooblayout_user },
 };
 
 const struct aic_spinand_info *

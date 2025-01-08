@@ -50,6 +50,7 @@ extern "C" {
 #define  RT_TOUCH_CTRL_GET_STATUS        (RT_DEVICE_CTRL_BASE(Touch) + 10)  /* Get Touch Power Status */
 #ifdef AIC_RTP_DRV
 #define  RT_TOUCH_CTRL_PDEB_VALID_CHECK  (RT_DEVICE_CTRL_BASE(Touch) + 11)  /* Determine if the pdeb value is valid*/
+#define  RT_TOUCH_CTRL_GET_ADC           (RT_DEVICE_CTRL_BASE(Touch) + 12)  /* Get ADC value*/
 #endif
 
 /* Touch event */

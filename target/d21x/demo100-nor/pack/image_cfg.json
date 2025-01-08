@@ -2,10 +2,10 @@
     "spi-nor": { // Media type
         "size": "16m", // Size of NOR
         "partitions": {
-            "spl":         { "size": "256k" },
-            "os":          { "size": "2m" },
-            "rodata":      { "size": "12m" },
-            "data":        { "size": "1m" },
+            "spl":        { "size": "512k" },
+            "os":         { "size": "2m" },
+            "rodata":     { "size": "12m" },
+            "data":       { "size": "1m" },
         }
     },
     "image": {

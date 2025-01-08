@@ -14,8 +14,7 @@ import subprocess
 
 
 def run_cmd(cmdstr):
-
-    # print(cmdstr)
+    print(cmdstr)
     cmd = cmdstr.split(' ')
     ret = subprocess.run(cmd, stdout=subprocess.PIPE)
     if ret.returncode != 0:
@@ -52,6 +51,39 @@ def mkimage_get_mtdpart_size(outfile):
     return size
 
 
+def main(args):
+    inputdir = args.inputdir
+    # First priority is pack folder in the same directory with output file
+    inputdir_1st = os.path.join(os.path.dirname(args.outfile), inputdir)
+    if os.path.exists(inputdir_1st):
+        inputdir = inputdir_1st
+    if os.path.exists(inputdir) is False:
+        print('Error: inputdir {} is not exist, use a empty one.'.format(inputdir))
+        inputdir = os.path.dirname(args.outfile) + '/empty'
+        os.makedirs(inputdir, exist_ok=True)
+    print(inputdir)
+    if args.imgsize is not None:
+        imgsize = int(args.imgsize)
+    else:
+        imgsize = mkimage_get_mtdpart_size(args.outfile)
+
+    if imgsize == 0:
+        imgsize = mkimage_get_resource_size(inputdir, int(args.blocksize))
+        # Add some free space
+        imgsize += (4 * int(args.blocksize))
+    cmdstr = args.tooldir
+    if platform.system() == 'Linux':
+        cmdstr += 'mklittlefs '
+    elif platform.system() == 'Windows':
+        cmdstr += 'mklittlefs.exe '
+    cmdstr += '-c {} '.format(inputdir)
+    cmdstr += '-b {} '.format(args.blocksize)
+    cmdstr += '-p {} '.format(args.pagesize)
+    cmdstr += '-s {} '.format(imgsize)
+    cmdstr += '{}'.format(args.outfile)
+    run_cmd(cmdstr)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--inputdir", type=str,
@@ -67,24 +99,4 @@ if __name__ == "__main__":
     parser.add_argument("-g", "--imgsize", type=str,
                         help="image size")
     args = parser.parse_args()
-
-    if args.imgsize is not None:
-        imgsize = int(args.imgsize)
-    else:
-        imgsize = mkimage_get_mtdpart_size(args.outfile)
-
-    if imgsize == 0:
-        imgsize = mkimage_get_resource_size(args.inputdir, int(args.blocksize))
-        # Add some free space
-        imgsize += (4 * int(args.blocksize))
-    cmdstr = args.tooldir
-    if platform.system() == 'Linux':
-        cmdstr += 'mklittlefs '
-    elif platform.system() == 'Windows':
-        cmdstr += 'mklittlefs.exe '
-    cmdstr += '-c {} '.format(args.inputdir)
-    cmdstr += '-b {} '.format(args.blocksize)
-    cmdstr += '-p {} '.format(args.pagesize)
-    cmdstr += '-s {} '.format(imgsize)
-    cmdstr += '{}'.format(args.outfile)
-    run_cmd(cmdstr)
+    main(args)

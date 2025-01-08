@@ -159,7 +159,7 @@
 #endif
 
 #ifndef CONFIG_USBHOST_MSC_TIMEOUT
-#define CONFIG_USBHOST_MSC_TIMEOUT 5000
+#define CONFIG_USBHOST_MSC_TIMEOUT 500
 #endif
 
 /* ================ USB Device Port Configuration ================*/
@@ -196,5 +196,8 @@
 #define CONFIG_USB_EHCI_CONFIGFLAG
 #define CONFIG_USB_EHCI_PORT_POWER
 // #define CONFIG_USB_EHCI_PRINT_HW_PARAM
+
+/* ================ OHCI Configuration ================ */
+#define CONFIG_USB_OHCI_HCOR_OFFSET (0x400)
 
 #endif

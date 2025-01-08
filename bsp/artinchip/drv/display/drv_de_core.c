@@ -150,11 +150,35 @@ static inline void de_check_ui_alpha(struct aic_de_comp *comp)
     alpha->value    = 0x0;
 }
 
+static void aic_de_calc_config(const struct display_timing *timing)
+{
+    struct aic_de_comp *comp = aic_de_request_drvdata();
+
+    u32 vtotal = timing->vactive + timing->vfront_porch +
+                 timing->vback_porch + timing->vsync_len;
+    u32 htotal = timing->hactive + timing->hfront_porch +
+                 timing->hback_porch + timing->hsync_len;
+    u32 pixelclock = timing->pixelclock;
+
+    u32 fps = pixelclock / htotal / vtotal;
+    u32 frame_us = 1000000 / fps;
+    u32 line_us = frame_us / vtotal;
+    u32 line = 1;
+
+    while (line_us < LAYER_CONFIG_TIME_US) {
+        line_us = line_us << 1;
+        line++;
+    }
+
+    comp->accum_line = vtotal - line - 1;
+}
+
 static int aic_de_set_mode(struct aic_panel *panel)
 {
     struct aic_de_comp *comp = aic_de_request_drvdata();
 
     comp->timing = panel->timings;
+    aic_de_calc_config(panel->timings);
 
 #if defined AIC_DISPLAY_DITHER && !defined AIC_DISABLE_DITHER
     if (comp->timing->hactive > DE_DITHER_WIDTH_MAX) {
@@ -438,11 +462,26 @@ static int update_one_layer_config(struct aic_de_comp *comp,
 static int aic_de_update_layer_config(struct aicfb_layer_data *layer_data)
 {
     struct aic_de_comp *comp = aic_de_request_drvdata();
+    u32 output_line = 0;
+    u32 lock = 1;
+    size_t flag;
     int ret;
+
+    flag = aicos_enter_critical_section();
+
+    output_line = reg_read(comp->regs + TIMING_DEBUG);
+    if (output_line >= comp->accum_line || output_line <= 2) {
+        aicos_leave_critical_section(flag);
+        aic_delay_ms(1);
+        lock = 0;
+    }
 
     de_config_update_enable(comp->regs, 0);
     ret = update_one_layer_config(comp, layer_data);
     de_config_update_enable(comp->regs, 1);
+
+    if (lock)
+        aicos_leave_critical_section(flag);
 
     aic_de_release_drvdata();
     return ret;

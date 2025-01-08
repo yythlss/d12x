@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, sakumisu
+ * Copyright (c) 2022-2024, sakumisu
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -204,5 +204,6 @@
         9, 8, 7, 6, 5, 4, 3, 2, 1, 0
 
 #define USB_MEM_ALIGNX __attribute__((aligned(CONFIG_USB_ALIGN_SIZE)))
+#define USB_ALIGN_UP(size, align) (((size) + (align)-1) & ~((align)-1))
 
 #endif /* USB_UTIL_H */

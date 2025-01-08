@@ -7,6 +7,7 @@ CPPPATH = []
 src = []
 if GetDepend('KERNEL_BAREMETAL') and GetDepend('AIC_SPINAND_DRV_TEST'):
     src += Glob('spinand.c')
+    src += Glob('spinand_benchmark.c')
 
 group = DefineGroup('test-spinand', src, depend = [''], CPPPATH = CPPPATH)
 

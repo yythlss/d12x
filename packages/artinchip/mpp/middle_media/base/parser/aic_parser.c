@@ -16,10 +16,21 @@
 #ifdef AIC_MPP_AVI_DEMUX
 #include "aic_avi_parser.h"
 #endif
+#ifdef AIC_MPP_MKV_DEMUX
+#include "aic_mkv_parser.h"
+#endif
+#ifdef AIC_MPP_TS_DEMUX
+#include "aic_ts_parser.h"
+#endif
+#ifdef AIC_MPP_FLV_DEMUX
+#include "aic_flv_parser.h"
+#endif
 #ifdef AIC_MPP_FLAC_DEMUX
 #include "aic_flac_parser.h"
 #endif
-
+#ifdef AIC_MPP_WMA_DEMUX
+#include "aic_asf_parser.h"
+#endif
 struct aic_parser_create_tbl {
 	char  file_type[7];
 	unsigned char len;
@@ -35,8 +46,20 @@ struct aic_parser_create_tbl create_tbl[] = {
 #ifdef AIC_MPP_AVI_DEMUX
 	{"avi", 3, aic_avi_parser_create},
 #endif
+#ifdef AIC_MPP_MKV_DEMUX
+	{"mkv", 3, aic_mkv_parser_create},
+#endif
+#ifdef AIC_MPP_TS_DEMUX
+	{"ts", 2, aic_ts_parser_create},
+#endif
+#ifdef AIC_MPP_FLV_DEMUX
+	{"flv", 3, aic_flv_parser_create},
+#endif
 #ifdef AIC_MPP_FLAC_DEMUX
 	{"flac", 4, aic_flac_parser_create},
+#endif
+#ifdef AIC_MPP_WMA_DEMUX
+	{"wma", 3, aic_asf_parser_create},
 #endif
 };
 s32 aic_parser_create(unsigned char *uri, struct aic_parser **parser)
@@ -53,8 +76,6 @@ s32 aic_parser_create(unsigned char *uri, struct aic_parser **parser)
 	if (ptr == NULL) {
 		return -1;
 	}
-
-	printf("parser for (%s)\n", uri);
 
 	size = sizeof(create_tbl)/sizeof(struct aic_parser_create_tbl);
 

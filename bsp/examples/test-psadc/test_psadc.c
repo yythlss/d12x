@@ -79,7 +79,7 @@ int psadc_get_adc(float def_voltage, int sample_num)
     }
 
 #ifdef AIC_SYSCFG_DRV
-    ref_voltage = syscfg_read_ldo_cfg();
+    ref_voltage = hal_syscfg_read_ldo_cfg();
 #endif
     if (!ref_voltage) {
         rt_kprintf("Failed to obtain reference voltage through eFuse\n");

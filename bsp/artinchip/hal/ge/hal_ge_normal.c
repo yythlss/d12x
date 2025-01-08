@@ -173,6 +173,16 @@ static inline bool is_rgb(enum mpp_pixel_format format)
     return false;
 }
 
+#ifdef AIC_GE_DRV_V11
+static inline bool is_rgb_or_yuv400(enum mpp_pixel_format format)
+{
+    if (is_rgb(format) || format == MPP_FMT_YUV400)
+        return true;
+
+    return false;
+}
+#endif
+
 static inline bool need_blend(struct ge_ctrl *ctrl)
 {
     if (ctrl->alpha_en || ctrl->ck_en)
@@ -1009,10 +1019,10 @@ static int ge_fillrect(struct aic_ge_data *data,
         return -1;
 #ifdef AIC_GE_DRV_V11
     /* check rgb type */
-    if (!is_rgb(fill->dst_buf.format)) {
-        hal_log_err("fill rectangle not support yuv format\n");
+    if (!is_rgb_or_yuv400(fill->dst_buf.format)) {
+        hal_log_err("fill rectangle not support yuv format, except yuv400\n");
             return -1;
-        }
+    }
 #endif
 
     set_alpha_rules_and_premul(data, &fill->ctrl,
@@ -1123,9 +1133,9 @@ static int ge_bitblt(struct aic_ge_data *data, struct ge_bitblt *blt)
     }
 #ifdef AIC_GE_DRV_V11
     /* check rgb type */
-    if (!is_rgb(blt->src_buf.format) ||
+    if (!is_rgb_or_yuv400(blt->src_buf.format) ||
         !is_rgb(blt->dst_buf.format)) {
-        hal_log_err("bitblt not support yuv format\n");
+        hal_log_err("bitblt not support yuv format, except src format yuv400\n");
         return -1;
     }
 #endif

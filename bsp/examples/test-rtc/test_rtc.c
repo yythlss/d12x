@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -9,14 +9,33 @@
 #include <drivers/rtc.h>
 #include "aic_core.h"
 
+/*
+ * RTC set time test, if want to get time use "date" common
+ * The specific code is in kernel/rt-thread/components/drivers/rtc/rtc.c
+ */
 static rt_err_t cmd_test_rtc(int argc, char **argv)
 {
     rt_err_t ret = RT_EOK;
     time_t now;
     struct tm *local_time;
+    int year, month, day, hour, min, sec;
+
+    if (argc != 7) {
+        rt_kprintf("Usage: test_rtc YYYY MM DD HH MM SS]\n");
+        rt_kprintf("sample:\n");
+        rt_kprintf("       test_rtc 2024 12 25 20 30 00\n");
+        return -RT_ERROR;
+    } else {
+        year = atoi(argv[1]);
+        month = atoi(argv[2]);
+        day = atoi(argv[3]);
+        hour = atoi(argv[4]);
+        min = atoi(argv[5]);
+        sec = atoi(argv[6]);
+    }
 
     // set date with local timezone
-    ret = set_date(2023, 11, 8);
+    ret = set_date(year, month, day);
     if (ret != RT_EOK)
     {
         rt_kprintf("set RTC date failed");
@@ -26,7 +45,7 @@ static rt_err_t cmd_test_rtc(int argc, char **argv)
     rt_thread_mdelay(1);
 
     // set time with local timezone
-    ret = set_time(20, 22, 33);
+    ret = set_time(hour, min, sec);
     if (ret != RT_EOK)
     {
         rt_kprintf("set RTC time failed");

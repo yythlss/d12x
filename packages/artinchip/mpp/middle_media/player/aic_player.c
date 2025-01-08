@@ -68,6 +68,7 @@ struct aic_player {
     s32 rotation_angle;
     s8 mute;
     s8 seeking;
+    s8 video_render_keep_last_frame;
 #ifdef AIC_MPP_PLAYER_VE_USE_FILL_FB
     void *vdec_allocator;
     s8 init_vdec_crop;
@@ -112,31 +113,31 @@ static s32 component_event_handler (
             if (player->media_info.has_video) {
                 if (player->video_render_handle == h_component) {
                     player->video_audio_end_mask &= ~AIC_VIDEO;
-                    printf("[%s:%d]rececive video_render_end,video_audio_end_mask:%d!!!\n",
+                    logi("[%s:%d]rececive video_render_end,video_audio_end_mask:%d!!!\n",
                            __FUNCTION__, __LINE__, player->video_audio_end_mask);
                     if (player->video_audio_end_mask == 0) {
                         player->event_handle(player->app_data,AIC_PLAYER_EVENT_PLAY_END, 0, 0);
                         player->state = AIC_PLAYER_STATE_PLAYBACK_COMPLETED;
-                        printf("[%s:%d]play end!!!\n",__FUNCTION__,__LINE__);
+                        logi("[%s:%d]play end!!!\n",__FUNCTION__,__LINE__);
                     }
                 }
             }
             if (player->media_info.has_audio) {
                 if (player->audio_render_handle == h_component) {
                     player->video_audio_end_mask &= ~AIC_AUDIO;
-                    printf("[%s:%d]rececive audio_render_handle,video_audio_end_mask:%d!!!\n",
+                    logi("[%s:%d]rececive audio_render_handle,video_audio_end_mask:%d!!!\n",
                            __FUNCTION__, __LINE__, player->video_audio_end_mask);
                     if (player->video_audio_end_mask == 0) {
                         player->event_handle(player->app_data, AIC_PLAYER_EVENT_PLAY_END, 0, 0);
                         player->state = AIC_PLAYER_STATE_PLAYBACK_COMPLETED;
-                        printf("[%s:%d]play end!!!\n", __FUNCTION__, __LINE__);
+                        logi("[%s:%d]play end!!!\n", __FUNCTION__, __LINE__);
                     }
                 }
             }
 
             break;
         case MM_EVENT_PORT_FORMAT_DETECTED:
-            printf("[%s:%d]MM_EVENT_PORT_FORMAT_DETECTED\n", __FUNCTION__, __LINE__);
+            logi("[%s:%d]MM_EVENT_PORT_FORMAT_DETECTED\n", __FUNCTION__, __LINE__);
             memcpy(&player->media_info, p_event_data, sizeof(struct aic_parser_av_media_info));
             player->format_detected = AIC_PLAYER_PREPARE_FORMAT_DETECTED;
             //player->event_handle(player->app_data,AIC_PLAYER_EVENT_DEMUXER_FORMAT_DETECTED,0,0);
@@ -148,7 +149,7 @@ static s32 component_event_handler (
             } else if (data1 == MM_ERROR_MB_ERRORS_IN_FRAME || data1 == MM_ERROR_INSUFFICIENT_RESOURCES) {
                 player->event_handle(player->app_data, AIC_PLAYER_EVENT_PLAY_END, 0, 0);
                 player->state = AIC_PLAYER_STATE_PLAYBACK_COMPLETED;
-                printf("[%s:%d]play end!!!\n", __FUNCTION__, __LINE__);
+                logi("[%s:%d]play end!!!\n", __FUNCTION__, __LINE__);
             }
             break;
         case MM_EVENT_VIDEO_RENDER_PTS:
@@ -167,7 +168,7 @@ static s32 component_event_handler (
         case MM_EVENT_AUDIO_RENDER_FIRST_FRAME:
             if (player->media_info.has_video) {
                 if (player->video_render_handle == h_component) {
-                    printf("[%s:%d]first video frame come!!!\n",__FUNCTION__,__LINE__);
+                    logi("[%s:%d]first video frame come!!!\n",__FUNCTION__,__LINE__);
                     player->video_audio_seek_mask &= ~AIC_VIDEO;
                     if (player->video_audio_seek_mask == 0) {
                         player->seeking = 0;
@@ -176,7 +177,7 @@ static s32 component_event_handler (
             }
             if (player->media_info.has_audio) {
                 if (player->audio_render_handle == h_component) {
-                    printf("[%s:%d]first audio  frame come!!!\n",__FUNCTION__,__LINE__);
+                    logi("[%s:%d]first audio  frame come!!!\n",__FUNCTION__,__LINE__);
                     player->video_audio_seek_mask &= ~AIC_AUDIO;
                     if (player->video_audio_seek_mask == 0) {
                         player->seeking = 0;
@@ -540,8 +541,11 @@ s32 aic_player_start_audio(struct aic_player *player)
         if (MM_ERROR_NONE != mm_set_config(player->audio_render_handle,
                                            MM_INDEX_VENDOR_AUDIO_RENDER_INIT,
                                            NULL)) {
-            loge("mm_set_config error!!!!.\n");
-            return MM_ERROR_INSUFFICIENT_RESOURCES;
+            logd("audio render init error!!!!.\n");
+            mm_free_handle(player->audio_render_handle);
+            player->audio_render_handle = NULL;
+            player->media_info.has_audio = 0;
+            return MM_ERROR_UNDEFINED;
         }
 
         if (player->volume != 0) {
@@ -635,9 +639,7 @@ s32 aic_player_start(struct aic_player *player)
 
     if (player->sync_flag == AIC_PLAYER_PREPARE_ASYNC) {
         if (player->threadId != 0) {
-            printf("[%s:%d]wait pthread_join\n",__FUNCTION__,__LINE__);
             pthread_join(player->threadId, NULL);
-            printf("[%s:%d]pthread_join ok\n",__FUNCTION__,__LINE__);
             player->threadId = 0;
         }
     }
@@ -1050,21 +1052,15 @@ void aic_player_stop_component(struct aic_player *player)
 s32 aic_player_stop(struct aic_player *player)
 {
     if (player->state == AIC_PLAYER_STATE_STOPPED) {
-        printf("player->state has been  in AIC_PLAYER_STATE_STOPPED \n");
         return 0;
     }
 
     if (player->sync_flag == AIC_PLAYER_PREPARE_ASYNC) {
         if (player->threadId != 0) {
-            printf("[%s:%d]pthread_cancel,player->thread_runing:%d\n",
-                   __FUNCTION__, __LINE__, player->thread_runing);
             if (player->thread_runing == 1) {
-                printf("[%s:%d]pthread_cancel\n", __FUNCTION__, __LINE__);
                 pthread_cancel(player->threadId);
             }
-            printf("[%s:%d]wait   pthread_join\n", __FUNCTION__, __LINE__);
             pthread_join(player->threadId, NULL);
-            printf("[%s:%d]pthread_join ok\n", __FUNCTION__, __LINE__);
             player->threadId = 0;
         }
     }
@@ -1076,6 +1072,14 @@ s32 aic_player_stop(struct aic_player *player)
     if (player->media_info.has_video) {
 #ifndef AIC_MPP_PLAYER_VE_USE_FILL_FB
         if (player->video_render_handle) {
+            mm_param_u32 params;
+            params.u32 = (u32)player->video_render_keep_last_frame;
+            if (MM_ERROR_NONE != mm_set_parameter(player->video_render_handle,
+                                                  MM_INDEX_VENDOR_VIDEO_RENDER_KEEP_LAST_FRAME,
+                                                  &params)) {
+                loge("set video render keep last frame failed.\n");
+            }
+
             mm_free_handle(player->video_render_handle);
             player->video_render_handle = NULL;
         }
@@ -1289,15 +1293,33 @@ s32 aic_player_set_rotation(struct aic_player *player, int rotation_angle)
             return -1;
     }
     player->rotation_angle = rotation_angle;
-    if (!player->media_info.has_video || !player->video_render_handle) {
+    if (!player->media_info.has_video) {
         return 0;
     }
+
     rotation.rotation = rotation_angle;
-    if (MM_ERROR_NONE != mm_set_config(player->video_render_handle,
-                                       MM_INDEX_CONFIG_COMMON_ROTATE, &rotation)) {
-        loge("no video!!!!\n");
-        return -1;
+    if (0 == strcmp(PRJ_CHIP, "d13x")) {
+        if(!player->vdecoder_handle) {
+            loge("no vdecoder_handle!!!!\n");
+            return -1;
+        }
+        if (MM_ERROR_NONE != mm_set_config(player->vdecoder_handle,
+                                            MM_INDEX_CONFIG_COMMON_ROTATE,
+                                            &rotation)) {
+            loge("set vdecoder rotate failed!!!!\n");
+            return -1;
+        }
     }
+    if(player->video_render_handle) {
+        if (MM_ERROR_NONE != mm_set_config(player->video_render_handle,
+                                            MM_INDEX_CONFIG_COMMON_ROTATE,
+                                            &rotation)) {
+            loge("set video render rotate failed!!!!\n");
+            return -1;
+        }
+    }
+
+
     return 0;
 }
 
@@ -1359,6 +1381,14 @@ s32 aic_player_control(struct aic_player *player, enum aic_player_command cmd, v
                                 MM_INDEX_CONFIG_VIDEO_DECODER_CROP_INFO, data);
             break;
 #endif
+        case AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME: {
+            if (!data) {
+                loge("video render set last frame data is null\n");
+                return -1;
+            }
+            player->video_render_keep_last_frame = *(s8 *)data;
+            break;
+        }
 
         default:
             return -1;

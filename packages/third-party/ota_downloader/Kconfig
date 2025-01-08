@@ -22,6 +22,7 @@ if LPKG_USING_HTTP_OTA_DOWNLOADER
 
     config LPKG_USING_YMODEM_OTA
         bool "Enable Ymodem OTA"
+        select LPKG_USING_OTA_DOWNLOADER
         select RT_USING_RYM
         default n
 

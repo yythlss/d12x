@@ -82,7 +82,11 @@
 #define LWIP_DNS                    0
 #endif
 
+#ifdef AIC_WLAN_AIC8800D40L
+#define LWIP_HAVE_LOOPIF            1
+#else
 #define LWIP_HAVE_LOOPIF            0
+#endif
 
 #define LWIP_PLATFORM_BYTESWAP      0
 
@@ -284,12 +288,20 @@
 //#define MEMP_USE_CUSTOM_POOLS       1
 //#define MEM_SIZE                    (1024*64)
 
+#define MEMP_MEM_INIT               0
+#define MEM_SIZE                    (128 * 1024)
+#define MEMP_SANITY_CHECK           0
+#define MEM_SANITY_CHECK            0
+
 #define MEMP_MEM_MALLOC             0
 
 /* MEMP_NUM_PBUF: the number of memp struct pbufs. If the application
    sends a lot of data out of ROM (or other static memory), this
    should be set high. */
 #define MEMP_NUM_PBUF               32 //16
+#ifdef AIC_WLAN_AIC8800D40L
+#define MEMP_NUM_NETBUF             32
+#endif
 
 /* the number of struct netconns */
 #ifdef RT_MEMP_NUM_NETCONN
@@ -425,6 +437,8 @@
 #define TCPIP_THREAD_NAME           "tcpip"
 #ifdef AIC_WLAN_ASR
 #define DEFAULT_TCP_RECVMBOX_SIZE   60
+#elif defined(AIC_WLAN_AIC8800D40L)
+#define DEFAULT_TCP_RECVMBOX_SIZE   32
 #else
 #define DEFAULT_TCP_RECVMBOX_SIZE   10
 #endif
@@ -493,7 +507,11 @@
 
 #define LWIP_UDPLITE                0
 #define UDP_TTL                     255
+#ifdef AIC_WLAN_AIC8800D40L
+#define DEFAULT_UDP_RECVMBOX_SIZE   32
+#else
 #define DEFAULT_UDP_RECVMBOX_SIZE   1
+#endif
 
 /* ---------- RAW options ---------- */
 #ifdef RT_LWIP_RAW
@@ -502,8 +520,13 @@
 #define LWIP_RAW                    0
 #endif
 
+#ifdef AIC_WLAN_AIC8800D40L
+#define DEFAULT_RAW_RECVMBOX_SIZE   32
+#define DEFAULT_ACCEPTMBOX_SIZE     32
+#else
 #define DEFAULT_RAW_RECVMBOX_SIZE   1
 #define DEFAULT_ACCEPTMBOX_SIZE     10
+#endif
 
 /* ---------- Statistics options ---------- */
 #ifdef RT_LWIP_STATS

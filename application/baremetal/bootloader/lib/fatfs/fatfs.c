@@ -17,7 +17,7 @@
 #include <fatfs.h>
 #include <aic_utils.h>
 #include <mmc.h>
-#include <usbhost.h>
+#include <disk_part.h>
 
 #define TAG "FATF"
 #define LBA_SIZE 512
@@ -37,7 +37,7 @@ s32 aic_fat_set_blk_dev(int id, int type)
         blk_dev.priv = host;
 #endif
     } else if (type == BLK_DEV_TYPE_MSC) {
-#ifdef AIC_BOOTLOADER_UDISK_SUPPORT
+#ifdef LPKG_CHERRYUSB_HOST_AICUPG_FOR_UDISK
         blk_dev.priv = NULL;
 #endif
     }
@@ -46,6 +46,8 @@ s32 aic_fat_set_blk_dev(int id, int type)
     return 0;
 }
 
+extern u32 usbh_msc_read(struct blk_desc *blk_dev, u32 start, u32 blkcnt, const
+        void *buffer);
 static u32 blkdev_bread(struct blkdev *dev, u32 start_blk, u32 blkcnt, u8 *buf)
 {
     if (dev->type == BLK_DEV_TYPE_MMC) {
@@ -53,8 +55,8 @@ static u32 blkdev_bread(struct blkdev *dev, u32 start_blk, u32 blkcnt, u8 *buf)
         return mmc_bread(dev->priv, start_blk, blkcnt, buf);
 #endif
     } else {
-#ifdef AIC_BOOTLOADER_UDISK_SUPPORT
-        return usbh_msc_read(start_blk, blkcnt, buf);
+#ifdef LPKG_CHERRYUSB_HOST_AICUPG_FOR_UDISK
+        return usbh_msc_read(NULL, start_blk, blkcnt, buf);
 #endif
     }
 

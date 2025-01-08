@@ -64,7 +64,7 @@ int hal_qspi_master_transfer_bit_mode(qspi_master_handle *h, struct qspi_bm_tran
 int hal_qspi_master_init(qspi_master_handle *h, struct qspi_master_config *cfg)
 {
     struct qspi_master_state *qspi;
-    u32 base, sclk;
+    u32 base, sclk, tmp_sclk, cur_clk;
     int ret;
 
     CHECK_PARAM(h, -EINVAL);
@@ -79,14 +79,20 @@ int hal_qspi_master_init(qspi_master_handle *h, struct qspi_master_config *cfg)
     }
 
     sclk = cfg->clk_in_hz;
-    if (sclk > HAL_QSPI_MAX_FREQ_HZ)
-        sclk = HAL_QSPI_MAX_FREQ_HZ;
-    else if (sclk < HAL_QSPI_MIN_FREQ_HZ)
-        sclk = HAL_QSPI_MIN_FREQ_HZ;
+    if (sclk > HAL_QSPI_INPUT_MAX_FREQ_HZ_V2)
+        sclk = HAL_QSPI_INPUT_MAX_FREQ_HZ_V2;
+    else if (sclk < HAL_QSPI_INPUT_MIN_FREQ_HZ_V2)
+        sclk = HAL_QSPI_INPUT_MIN_FREQ_HZ_V2;
     qspi->idx = cfg->idx;
 
-    show_freq("freq (input)", qspi->idx, sclk);
-    hal_clk_set_freq(cfg->clk_id, sclk);
+    tmp_sclk = sclk + HAL_QSPI_HZ_PER_MHZ;
+    do {
+        tmp_sclk -= HAL_QSPI_HZ_PER_MHZ;
+        hal_clk_set_freq(cfg->clk_id, tmp_sclk);
+        cur_clk = hal_clk_get_freq(cfg->clk_id);
+    } while (cur_clk > sclk);
+
+    show_freq("freq (input)", qspi->idx, cur_clk);
     ret = hal_clk_enable(cfg->clk_id);
     if (ret < 0) {
         hal_log_err("QSPI %d clk enable failed!\n", cfg->idx);
@@ -117,7 +123,7 @@ int hal_qspi_master_init(qspi_master_handle *h, struct qspi_master_config *cfg)
         qspi_hw_set_cs_owner(base, QSPI_CS_CTL_BY_SW);
     qspi_hw_drop_invalid_data(base, QSPI_DROP_INVALID_DATA);
     qspi_hw_reset_fifo(base);
-    qspi_hw_set_fifo_watermark(base, QSPI_TX_WATERMARK, QSPI_RX_WATERMARK);
+    qspi_hw_set_fifo_watermark(base, QSPI_HALF_FIFO_DEPTH, QSPI_HALF_FIFO_DEPTH);
 
     qspi->clk_id = cfg->clk_id;
     qspi->cb = NULL;
@@ -259,7 +265,7 @@ int hal_qspi_master_set_cs(qspi_master_handle *h, u32 cs_num, bool enable)
 
 int hal_qspi_master_set_bus_freq(qspi_master_handle *h, u32 bus_hz)
 {
-    u32 base, sclk, divider, div;
+    u32 base, sclk, divider, div, cal_clk = 0;
     struct qspi_master_state *qspi;
 
     CHECK_PARAM(h, -EINVAL);
@@ -271,28 +277,35 @@ int hal_qspi_master_set_bus_freq(qspi_master_handle *h, u32 bus_hz)
     /* The source clock is divided into two halves by spi controller. */
     sclk = sclk / 2;
 
-    if (bus_hz > HAL_QSPI_FPGA_MAX_FREQ_HZ)
-        bus_hz = HAL_QSPI_FPGA_MAX_FREQ_HZ;
+    if (bus_hz > HAL_QSPI_MAX_FREQ_HZ)
+        bus_hz = HAL_QSPI_MAX_FREQ_HZ;
     else if (bus_hz < HAL_QSPI_MIN_FREQ_HZ)
         bus_hz = HAL_QSPI_MIN_FREQ_HZ;
 
-    show_freq("freq ( bus )", qspi->idx, bus_hz);
-
     if (h->bit_mode) {
-        qspi_hw_bit_mode_set_clk(bus_hz, sclk, base);
+        div = qspi_hw_bit_mode_set_clk(bus_hz, sclk, base);
+        cal_clk = sclk / (2 * (div + 1));
+    } else {
+        divider = qspi_master_get_best_div_param(sclk, bus_hz, &div);
+
+        if (divider == 0 && div == 0) {
+            u32 rx_delay, tx_delay;
+            tx_delay = qspi_hw_get_tx_delay_mode(base);
+            rx_delay = qspi_hw_get_rx_delay_mode(base);
+            qspi_hw_set_delay_mode_normal(base);
+            qspi_hw_set_tx_delay_normal(base, tx_delay);
+            qspi_hw_set_rx_delay_normal(base, rx_delay);
+        }
+
+        if (divider == 1) {
+            cal_clk = sclk/(2 * (div + 1));
+        } else if (divider == 0) {
+            cal_clk = sclk >> div;
+        }
+        qspi_hw_set_clk_div(base, divider, div);
     }
 
-    divider = qspi_master_get_best_div_param(sclk, bus_hz, &div);
-
-    qspi_hw_set_clk_div(base, divider, div);
-    if (divider == 0 && div == 0) {
-        u32 rx_delay, tx_delay;
-        tx_delay = qspi_hw_get_tx_delay_mode(base);
-        rx_delay = qspi_hw_get_rx_delay_mode(base);
-        qspi_hw_set_delay_mode_normal(base);
-        qspi_hw_set_tx_delay_normal(base, tx_delay);
-        qspi_hw_set_rx_delay_normal(base, rx_delay);
-    }
+    show_freq("freq ( bus )", qspi->idx, cal_clk);
     qspi->bus_hz = bus_hz;
 
     return 0;
@@ -602,13 +615,19 @@ static int qspi_txrx_dma_sync(qspi_master_handle *h,
     dmacfg.src_addr = (unsigned long)QSPI_REG_RXD(base);
     dmacfg.dst_addr = (unsigned long)t->rx_data;
 
-    if (!(t->data_len % HAL_QSPI_DMA_4BYTES_LINE))
+    if (!(t->data_len % HAL_QSPI_DMA_4BYTES_LINE)) {
         dmacfg.src_addr_width = qspi->dma_cfg.dev_bus_width;
-    else
+        dmacfg.src_maxburst = qspi->dma_cfg.dev_max_burst;
+        qspi_hw_set_fifo_watermark(base, QSPI_HALF_FIFO_DEPTH, QSPI_HALF_FIFO_DEPTH);
+        qspi_hw_dma_word_enable(base, true);
+    } else {
         dmacfg.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-    dmacfg.src_maxburst = qspi->dma_cfg.mem_max_burst;
-    dmacfg.dst_addr_width = qspi->dma_cfg.dev_bus_width;
-    dmacfg.dst_maxburst = qspi->dma_cfg.dev_max_burst;
+        dmacfg.src_maxburst = HAL_QSPI_DMA_DEV_BURST_ONE;
+        qspi_hw_set_fifo_watermark(base, QSPI_HALF_FIFO_DEPTH, QSPI_ONE_BYTE_WATERMARK);
+        qspi_hw_dma_word_enable(base, false);
+    }
+    dmacfg.dst_addr_width = qspi->dma_cfg.mem_bus_width;
+    dmacfg.dst_maxburst = qspi->dma_cfg.mem_max_burst;
 
     ret = hal_dma_chan_config(qspi->dma_rx, &dmacfg);
     if (ret < 0) {
@@ -739,11 +758,17 @@ static int qspi_master_transfer_dma_sync(qspi_master_handle *h,
         dmacfg.src_addr = (unsigned long)QSPI_REG_RXD(base);
         dmacfg.dst_addr = (unsigned long)t->rx_data;
 
-        if (!(rxlen % HAL_QSPI_DMA_4BYTES_LINE))
+        if (!(rxlen % HAL_QSPI_DMA_4BYTES_LINE)) {
             dmacfg.src_addr_width = qspi->dma_cfg.dev_bus_width;
-        else
+            dmacfg.src_maxburst = qspi->dma_cfg.dev_max_burst;
+            qspi_hw_set_fifo_watermark(base, QSPI_HALF_FIFO_DEPTH, QSPI_HALF_FIFO_DEPTH);
+            qspi_hw_dma_word_enable(base, true);
+        } else {
             dmacfg.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
-        dmacfg.src_maxburst = qspi->dma_cfg.dev_max_burst;
+            dmacfg.src_maxburst = HAL_QSPI_DMA_DEV_BURST_ONE;
+            qspi_hw_set_fifo_watermark(base, QSPI_HALF_FIFO_DEPTH, QSPI_ONE_BYTE_WATERMARK);
+            qspi_hw_dma_word_enable(base, false);
+        }
         dmacfg.dst_addr_width = qspi->dma_cfg.mem_bus_width;
         dmacfg.dst_maxburst = qspi->dma_cfg.mem_max_burst;
 
@@ -752,10 +777,6 @@ static int qspi_master_transfer_dma_sync(qspi_master_handle *h,
             hal_log_err("RX dma chan config failure.\n");
             goto out;
         }
-        if (dmacfg.src_addr_width % HAL_QSPI_DMA_4BYTES_LINE)
-            qspi_hw_dma_word_enable(base, false);
-        else
-            qspi_hw_dma_word_enable(base, true);
         ret = hal_dma_prep_mode_device(dma_rx, PTR2U32(t->rx_data),
                                        PTR2U32(QSPI_REG_RXD(base)), rxlen,
                                        DMA_DEV_TO_MEM, TYPE_IO_FAST);

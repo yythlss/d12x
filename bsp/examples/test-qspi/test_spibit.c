@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2024S, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -17,10 +17,10 @@ static struct rt_spi_device *g_spi;
 #define USAGE                                                                   \
     "test_spibit help : Get this information.\n"                                \
     "test_spibit attach <bus name> <dev name> : Attach device to SPI bus.\n"    \
-    "test_spibit init <name> <bit_mode>: Initialize SPI for bit mode device.\n" \
+    "test_spibit init <name> <bit_mode> <freq>: Initialize SPI for bit mode device.\n" \
     "test_spibit send_recv <send_val> <send_len> <recv_len>: Write the addr first, then read the data\n" \
     "test_spibit attach qspi0 qtestdev\n"                                       \
-    "test_spibit init qtestdev 1\n"                                             \
+    "test_spibit init qtestdev 1 20000000\n"                                             \
     "test_spibit send_recv 0x0f 10 20\n"
 
 static void spibit_usage(void)
@@ -51,7 +51,7 @@ static int test_spibit_init(int argc, char **argv)
     char *name;
     int ret = 0;
 
-    if (argc != 3) {
+    if (argc < 3) {
         spibit_usage();
         return -1;
     }
@@ -75,7 +75,12 @@ static int test_spibit_init(int argc, char **argv)
     else
         spi_cfg.mode = 3;
 
-    spi_cfg.max_hz = 50000000;
+    if (argc > 3) {
+        spi_cfg.max_hz = atol(argv[3]);
+    } else {
+        /* default 50MHz */
+        spi_cfg.max_hz = 50000000;
+    }
 
     ret = rt_spi_configure(g_spi, &spi_cfg);
     if (ret < 0) {

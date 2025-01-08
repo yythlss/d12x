@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Copyright (C) 2022-2024, ArtInChip Technology Co., Ltd
+
 import os
 import platform
 from aic_build import get_config
@@ -30,14 +34,26 @@ else:
 if os.getenv('RTT_EXEC_PATH'):
     EXEC_PATH = os.getenv('RTT_EXEC_PATH')
 
+B_AFLAGS = ''
+B_CFLAGS = ''
+LFLAGS = ''
 # BUILD = 'debug'
 BUILD = 'release'
+# BACKTRACE = True
+BACKTRACE = False
+
 if BUILD == 'debug':
     CFLAGS_DBG = ' -O0 -gdwarf-2'
     AFLAGS_DBG = ' -gdwarf-2'
+    if BACKTRACE:
+        B_AFLAGS += ' -D_ENABLE_BACK_TRACE_STACK_ '
+        CFLAGS_DBG += ' -fno-omit-frame-pointer '
+        B_AFLAGS += ' -D_NO_OMIT_FRAME_POINT_ '
 else:
     CFLAGS_DBG = ' -O2 -g2'
     AFLAGS_DBG = ''
+    if BACKTRACE:
+        B_AFLAGS += ' -D_ENABLE_BACK_TRACE_STACK_ '
 
 prj_out_dir = ''
 if os.environ.get('PRJ_OUT_DIR'):
@@ -85,30 +101,34 @@ if PLATFORM == 'gcc':
     if CPUNAME == 'c906v':
         DEVICE = ' -march=rv64imafdcv_xtheadc -mabi=lp64dv -mcmodel=medany'
 
-    B_CFLAGS = ' -c -g -ffunction-sections -fdata-sections -Wall'
-    B_AFLAGS = ' -c' +' -x assembler-with-cpp' + ' -D__ASSEMBLY__'
-    CFLAGS  = DEVICE + B_CFLAGS + CFLAGS_DBG
-    AFLAGS  = DEVICE + B_AFLAGS + AFLAGS_DBG
+    B_CFLAGS += ' -c -g -ffunction-sections -fdata-sections -Wall -mno-dup-loop-header'
+    B_AFLAGS += ' -c' + ' -x assembler-with-cpp' + ' -D__ASSEMBLY__'
+    CFLAGS = DEVICE + B_CFLAGS + CFLAGS_DBG
+    AFLAGS = DEVICE + B_AFLAGS + AFLAGS_DBG
     CXXFLAGS = CFLAGS
-    LFLAGS  = DEVICE + ' -nostartfiles -Wl,--no-whole-archive -lm -lc -lgcc -Wl,-gc-sections -Wl,-zmax-page-size=1024 -Wl,-Map=' + prj_out_dir + SOC + '.map'
-    CPATH   = ''
-    LPATH   = ''
+    LFLAGS += DEVICE
+    LFLAGS += ' -nostartfiles -Wl,--no-whole-archive -lm -lc -lgcc -Wl,-gc-sections'
+    LFLAGS += ' -Wl,-zmax-page-size=1024'
+    LFLAGS += ' -Wl,-Map=' + prj_out_dir + SOC + '.map'
+    CPATH = ''
+    LPATH = ''
 
     # module setting
-    M_PREFIX  = 'riscv-none-embed-'
-    M_CC      = M_PREFIX + 'gcc'
-    M_CXX     = M_PREFIX + 'g++'
-    M_AS      = M_PREFIX + 'gcc'
-    M_AR      = M_PREFIX + 'ar'
-    M_LINK    = M_PREFIX + 'g++'
-    M_SIZE    = M_PREFIX + 'size'
+    M_PREFIX = 'riscv-none-embed-'
+    M_CC = M_PREFIX + 'gcc'
+    M_CXX = M_PREFIX + 'g++'
+    M_AS = M_PREFIX + 'gcc'
+    M_AR = M_PREFIX + 'ar'
+    M_LINK = M_PREFIX + 'g++'
+    M_SIZE = M_PREFIX + 'size'
     M_OBJDUMP = M_PREFIX + 'objdump'
-    M_OBJCPY  = M_PREFIX + 'objcopy'
-    M_STRIP   = M_PREFIX + 'strip'
-    M_CFLAGS  = M_DEVICE + B_CFLAGS + CFLAGS_DBG + ' -fPIC -shared'
-    M_AFLAGS  = M_DEVICE + B_AFLAGS + AFLAGS_DBG
+    M_OBJCPY = M_PREFIX + 'objcopy'
+    M_STRIP = M_PREFIX + 'strip'
+    M_CFLAGS = M_DEVICE + B_CFLAGS + CFLAGS_DBG + ' -fPIC -shared'
+    M_AFLAGS = M_DEVICE + B_AFLAGS + AFLAGS_DBG
     M_CXXFLAGS = M_CFLAGS
-    M_LFLAGS  = M_DEVICE + ' -Wl,--gc-sections,-z,max-page-size=0x4 -shared -fPIC -nostartfiles -nostdlib -static-libgcc'
+    M_LFLAGS = M_DEVICE + ' -Wl,--gc-sections,-z,max-page-size=0x4'
+    M_LFLAGS += ' -shared -fPIC -nostartfiles -nostdlib -static-libgcc'
     M_POST_ACTION = M_STRIP + ' -R .hash $TARGET\n' + M_SIZE + ' $TARGET \n'
     M_BIN_PATH = ''
 

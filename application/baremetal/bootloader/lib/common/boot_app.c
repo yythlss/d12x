@@ -43,6 +43,7 @@ void boot_app(void *app)
     boot_arg = (unsigned long)aic_get_boot_args();
     aicos_dcache_clean();
     aicos_icache_invalid();
+    aicos_local_irq_disable();
 
     ep(dev, boot_arg);
 }

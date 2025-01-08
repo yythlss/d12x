@@ -11,14 +11,13 @@
 
 #include <rtthread.h>
 #include <rtdevice.h>
-
 #include <string.h>
+#include "touch_common.h"
+#include "gt911.h"
 
 #define DBG_TAG "gt911"
 #define DBG_LVL DBG_INFO
 #include <rtdbg.h>
-#include "../../common/touch_common.h"
-#include "gt911.h"
 
 static struct rt_i2c_client gt911_client;
 

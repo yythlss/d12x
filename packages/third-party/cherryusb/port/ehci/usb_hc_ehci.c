@@ -1,9 +1,12 @@
 /*
- * Copyright (c) 2022, sakumisu
+ * Copyright (c) 2022-2024, sakumisu
  *
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "usb_ehci_priv.h"
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+#include "../ohci/usb_hc_ohci.h"
+#endif
 
 #define EHCI_TUNE_CERR    3 /* 0-3 qtd retries; 0 == don't stop */
 #define EHCI_TUNE_RL_HS   4 /* nak throttle; see 4.9 */
@@ -33,9 +36,9 @@ USB_NOCACHE_RAM_SECTION uint32_t g_framelist[CONFIG_USBHOST_MAX_BUS][CONFIG_USB_
 
 USB_MEM_ALIGNX static uint8_t g_usb_ehci_buf[CONFIG_USBHOST_MAX_BUS][CONFIG_USB_EHCI_FRAME_LIST_SIZE];
 
-void usb_ehci_dcache_clean(uintptr_t addr, uint32_t len);
-void usb_ehci_dcache_invalidate(uintptr_t addr, uint32_t len);
-void usb_ehci_dcache_clean_invalidate(uintptr_t addr, uint32_t len);
+void usb_dcache_clean(uintptr_t addr, uint32_t len);
+void usb_dcache_invalidate(uintptr_t addr, uint32_t len);
+void usb_dcache_clean_invalidate(uintptr_t addr, uint32_t len);
 
 static int usb_ehci_buf_alloc(struct ehci_qtd_hw *qtd, uint32_t len)
 {
@@ -85,7 +88,7 @@ static int usb_ehci_qtd_flush(struct ehci_qtd_hw *qtd)
     * accessed.
     */
 
-    usb_ehci_dcache_clean((uintptr_t)&qtd->hw, EHCI_QTD_HDR_ALIGN_SIZE);
+    usb_dcache_clean((uintptr_t)&qtd->hw, EHCI_QTD_HDR_ALIGN_SIZE);
 
     return 0;
 }
@@ -101,14 +104,14 @@ static int usb_ehci_qh_flush(struct ehci_qh_hw *qh)
         qtd = EHCI_ADDR2QTD(qtd->hw.next_qtd);
     }
 
-    usb_ehci_dcache_clean((uintptr_t)&qh->hw, EHCI_QH_HDR_ALIGN_SIZE);
+    usb_dcache_clean((uintptr_t)&qh->hw, EHCI_QH_HDR_ALIGN_SIZE);
 
     return 0;
 }
 #else
-#define usb_ehci_dcache_clean(addr, len)
-#define usb_ehci_dcache_invalidate(addr, len)
-#define usb_ehci_dcache_clean_invalidate(addr, len)
+#define usb_dcache_clean(addr, len)
+#define usb_dcache_invalidate(addr, len)
+#define usb_dcache_clean_invalidate(addr, len)
 #define usb_ehci_qtd_flush(qtd, bp, arg)
 #define usb_ehci_qh_flush(qh)
 #endif
@@ -201,24 +204,24 @@ static inline void ehci_qh_add_head(struct ehci_qh_hw *head, struct ehci_qh_hw *
     n->hw.hlp = head->hw.hlp;
     usb_ehci_qh_flush(n);
 
-    usb_ehci_dcache_invalidate((uintptr_t)&head->hw, EHCI_QH_HDR_ALIGN_SIZE);
+    usb_dcache_invalidate((uintptr_t)&head->hw, EHCI_QH_HDR_ALIGN_SIZE);
     head->hw.hlp = QH_HLP_QH(n);
-    usb_ehci_dcache_clean((uintptr_t)&head->hw, EHCI_QH_HDR_ALIGN_SIZE);
+    usb_dcache_clean((uintptr_t)&head->hw, EHCI_QH_HDR_ALIGN_SIZE);
 }
 
 static inline void ehci_qh_remove(struct ehci_qh_hw *head, struct ehci_qh_hw *n)
 {
     struct ehci_qh_hw *tmp = head;
 
-    usb_ehci_dcache_invalidate((uintptr_t)&tmp->hw, EHCI_QH_HDR_ALIGN_SIZE);
+    usb_dcache_invalidate((uintptr_t)&tmp->hw, EHCI_QH_HDR_ALIGN_SIZE);
     while (EHCI_ADDR2QH(tmp->hw.hlp) && EHCI_ADDR2QH(tmp->hw.hlp) != n) {
         tmp = EHCI_ADDR2QH(tmp->hw.hlp);
-        usb_ehci_dcache_invalidate((uintptr_t)&tmp->hw, EHCI_QH_HDR_ALIGN_SIZE);
+        usb_dcache_invalidate((uintptr_t)&tmp->hw, EHCI_QH_HDR_ALIGN_SIZE);
     }
 
     if (tmp) {
         tmp->hw.hlp = n->hw.hlp;
-        usb_ehci_dcache_clean((uintptr_t)&tmp->hw, EHCI_QH_HDR_ALIGN_SIZE);
+        usb_dcache_clean((uintptr_t)&tmp->hw, EHCI_QH_HDR_ALIGN_SIZE);
     }
 }
 
@@ -378,9 +381,9 @@ static void ehci_qtd_bpl_fill(struct ehci_qtd_hw *qtd, uint32_t bufaddr, size_t 
 
     /* out direction */
     if (qtd->dir_in == 0)
-        usb_ehci_dcache_clean((uintptr_t)bufaddr, rest);
+        usb_dcache_clean((uintptr_t)bufaddr, rest);
     else
-        usb_ehci_dcache_invalidate((uintptr_t)bufaddr, rest);
+        usb_dcache_invalidate((uintptr_t)bufaddr, rest);
 #endif
 
     qtd->hw.bpl[0] = bufaddr;
@@ -834,7 +837,7 @@ static void ehci_check_qh(struct usbh_bus *bus, struct ehci_qh_hw *qhead, struct
     struct ehci_qtd_hw *qtd;
     uint32_t token;
 
-    usb_ehci_dcache_invalidate((uintptr_t)&qh->hw, EHCI_QH_HDR_ALIGN_SIZE);
+    usb_dcache_invalidate((uintptr_t)&qh->hw, EHCI_QH_HDR_ALIGN_SIZE);
 
     qtd = EHCI_ADDR2QTD(qh->first_qtd);
 
@@ -843,7 +846,7 @@ static void ehci_check_qh(struct usbh_bus *bus, struct ehci_qh_hw *qhead, struct
     }
 
     while (qtd) {
-        usb_ehci_dcache_invalidate((uintptr_t)&qtd->hw,
+        usb_dcache_invalidate((uintptr_t)&qtd->hw,
                                        EHCI_QTD_HDR_ALIGN_SIZE);
 
         token = qtd->hw.token;
@@ -930,13 +933,13 @@ static int usbh_reset_port(struct usbh_bus *bus, const uint8_t port)
     usb_osal_msleep(55);
 
     EHCI_HCOR->portsc[port - 1] &= ~EHCI_PORTSC_RESET;
-    while ((EHCI_HCOR->portsc[port - 1] & EHCI_PORTSC_RESET) != 0) {
+    do {
         usb_osal_msleep(1);
         timeout++;
         if (timeout > 100) {
             return -USB_ERR_TIMEOUT;
         }
-    }
+    } while ((EHCI_HCOR->portsc[port - 1] & EHCI_PORTSC_RESET) != 0);
 
     return 0;
 }
@@ -985,7 +988,7 @@ int usb_hc_init(struct usbh_bus *bus)
     g_async_qh_head[bus->hcd.hcd_id].hw.overlay.token = QTD_TOKEN_STATUS_HALTED;
     g_async_qh_head[bus->hcd.hcd_id].first_qtd = QTD_LIST_END;
 
-    usb_ehci_dcache_clean((uintptr_t)&g_async_qh_head[bus->hcd.hcd_id].hw,
+    usb_dcache_clean((uintptr_t)&g_async_qh_head[bus->hcd.hcd_id].hw,
                           EHCI_QH_HDR_ALIGN_SIZE);
 
     memset(g_framelist[bus->hcd.hcd_id], 0, sizeof(uint32_t) * CONFIG_USB_EHCI_FRAME_LIST_SIZE);
@@ -999,7 +1002,7 @@ int usb_hc_init(struct usbh_bus *bus)
         g_periodic_qh_head[bus->hcd.hcd_id][i].hw.overlay.token = QTD_TOKEN_STATUS_HALTED;
         g_periodic_qh_head[bus->hcd.hcd_id][i].first_qtd = QTD_LIST_END;
 
-        usb_ehci_dcache_clean((uintptr_t)&g_periodic_qh_head[bus->hcd.hcd_id][i].hw,
+        usb_dcache_clean((uintptr_t)&g_periodic_qh_head[bus->hcd.hcd_id][i].hw,
                               EHCI_QH_HDR_ALIGN_SIZE);
 
         interval = 1 << i;
@@ -1023,10 +1026,29 @@ int usb_hc_init(struct usbh_bus *bus)
         }
     }
 
-    usb_ehci_dcache_clean((uintptr_t)g_framelist[bus->hcd.hcd_id], CONFIG_USB_EHCI_FRAME_LIST_SIZE * sizeof(uint32_t));
+    usb_dcache_clean((uintptr_t)g_framelist[bus->hcd.hcd_id], CONFIG_USB_EHCI_FRAME_LIST_SIZE * sizeof(uint32_t));
 
     usb_hc_low_level_init(bus);
 
+    USB_LOG_INFO("EHCI HCIVERSION:0x%04x\r\n", (unsigned int)EHCI_HCCR->hciversion);
+    USB_LOG_INFO("EHCI HCSPARAMS:0x%06x\r\n", (unsigned int)EHCI_HCCR->hcsparams);
+    USB_LOG_INFO("EHCI HCCPARAMS:0x%04x\r\n", (unsigned int)EHCI_HCCR->hccparams);
+
+    g_ehci_hcd[bus->hcd.hcd_id].ppc = (EHCI_HCCR->hcsparams & EHCI_HCSPARAMS_PPC) ? true : false;
+    g_ehci_hcd[bus->hcd.hcd_id].n_ports = (EHCI_HCCR->hcsparams & EHCI_HCSPARAMS_NPORTS_MASK) >> EHCI_HCSPARAMS_NPORTS_SHIFT;
+    g_ehci_hcd[bus->hcd.hcd_id].n_cc = (EHCI_HCCR->hcsparams & EHCI_HCSPARAMS_NCC_MASK) >> EHCI_HCSPARAMS_NCC_SHIFT;
+    g_ehci_hcd[bus->hcd.hcd_id].n_pcc = (EHCI_HCCR->hcsparams & EHCI_HCSPARAMS_NPCC_MASK) >> EHCI_HCSPARAMS_NPCC_SHIFT;
+    g_ehci_hcd[bus->hcd.hcd_id].has_tt = g_ehci_hcd[bus->hcd.hcd_id].n_cc ? false : true;
+    g_ehci_hcd[bus->hcd.hcd_id].hcor_offset = EHCI_HCCR->caplength;
+
+    USB_LOG_INFO("EHCI ppc:%u, n_ports:%u, n_cc:%u, n_pcc:%u\r\n",
+                 g_ehci_hcd[bus->hcd.hcd_id].ppc,
+                 g_ehci_hcd[bus->hcd.hcd_id].n_ports,
+                 g_ehci_hcd[bus->hcd.hcd_id].n_cc,
+                 g_ehci_hcd[bus->hcd.hcd_id].n_pcc);
+
+    EHCI_HCOR->usbcmd &= ~EHCI_USBCMD_RUN;
+    usb_osal_msleep(2);
     EHCI_HCOR->usbcmd |= EHCI_USBCMD_HCRESET;
     while (EHCI_HCOR->usbcmd & EHCI_USBCMD_HCRESET) {
         usb_osal_msleep(1);
@@ -1079,13 +1101,33 @@ int usb_hc_init(struct usbh_bus *bus)
             return -USB_ERR_TIMEOUT;
         }
     }
-#ifdef CONFIG_USB_EHCI_PORT_POWER
-    for (uint8_t port = 0; port < CONFIG_USBHOST_MAX_RHPORTS; port++) {
-        regval = EHCI_HCOR->portsc[port];
-        regval |= EHCI_PORTSC_PP;
-        EHCI_HCOR->portsc[port] = regval;
+
+    if (g_ehci_hcd[bus->hcd.hcd_id].ppc) {
+        for (uint8_t port = 0; port < g_ehci_hcd[bus->hcd.hcd_id].n_ports; port++) {
+            regval = EHCI_HCOR->portsc[port];
+            regval |= EHCI_PORTSC_PP;
+            regval &= ~(EHCI_PORTSC_CSC | EHCI_PORTSC_PEC | EHCI_PORTSC_OCC);
+            EHCI_HCOR->portsc[port] = regval;
+        }
     }
+
+    if (g_ehci_hcd[bus->hcd.hcd_id].has_tt) {
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+        USB_LOG_INFO("EHCI uses tt for ls/fs device, so cannot enable this macro\r\n");
+        return -USB_ERR_INVAL;
 #endif
+    }
+
+    if (g_ehci_hcd[bus->hcd.hcd_id].has_tt) {
+        USB_LOG_INFO("EHCI uses tt for ls/fs device\r\n");
+    } else {
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+        USB_LOG_INFO("EHCI uses companion controller for ls/fs device\r\n");
+        ohci_init(bus);
+#else
+        USB_LOG_WRN("Do not enable companion controller, you should use a hub to support ls/fs device\r\n");
+#endif
+    }
 
     /* Enable EHCI interrupts. */
     EHCI_HCOR->usbintr = EHCI_USBIE_INT | EHCI_USBIE_ERR | EHCI_USBIE_PCD | EHCI_USBIE_FATAL | EHCI_USBIE_IAA;
@@ -1107,32 +1149,37 @@ int usb_hc_deinit(struct usbh_bus *bus)
     regval &= ~EHCI_USBCMD_RUN;
     EHCI_HCOR->usbcmd = regval;
 
-    while ((EHCI_HCOR->usbsts & (EHCI_USBSTS_PSS | EHCI_USBSTS_ASS))) {
+    while ((EHCI_HCOR->usbsts & (EHCI_USBSTS_PSS | EHCI_USBSTS_ASS)) || ((EHCI_HCOR->usbsts & EHCI_USBSTS_HALTED) == 0)) {
         usb_osal_msleep(1);
         timeout++;
         if (timeout > 100) {
-            break;
+            return -USB_ERR_TIMEOUT;
         }
     }
 
-#ifdef CONFIG_USB_EHCI_PORT_POWER
-    for (uint8_t port = 0; port < CONFIG_USBHOST_MAX_RHPORTS; port++) {
-        regval = EHCI_HCOR->portsc[port];
-        regval &= ~EHCI_PORTSC_PP;
-        EHCI_HCOR->portsc[port] = regval;
+    if (g_ehci_hcd[bus->hcd.hcd_id].ppc) {
+        for (uint8_t port = 0; port < g_ehci_hcd[bus->hcd.hcd_id].n_ports; port++) {
+            regval = EHCI_HCOR->portsc[port];
+            regval &= ~EHCI_PORTSC_PP;
+            EHCI_HCOR->portsc[port] = regval;
+        }
     }
-#endif
 
 #ifdef CONFIG_USB_EHCI_CONFIGFLAG
     EHCI_HCOR->configflag = 0;
 #endif
 
     EHCI_HCOR->usbsts = EHCI_HCOR->usbsts;
+    EHCI_HCOR->usbcmd |= EHCI_USBCMD_HCRESET;
 
     for (uint8_t index = 0; index < CONFIG_USB_EHCI_QH_NUM; index++) {
         qh = &ehci_qh_pool[bus->hcd.hcd_id][index];
         usb_osal_sem_delete(qh->waitsem);
     }
+
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+    ohci_deinit(bus);
+#endif
 
     usb_hc_low_level_deinit(bus);
 
@@ -1141,6 +1188,12 @@ int usb_hc_deinit(struct usbh_bus *bus)
 
 uint16_t usbh_get_frame_number(struct usbh_bus *bus)
 {
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+    if (EHCI_HCOR->portsc[0] & EHCI_PORTSC_OWNER) {
+        return ohci_get_frame_number(bus);
+    }
+#endif
+
     return (((EHCI_HCOR->frindex & EHCI_FRINDEX_MASK) >> 3) & 0x3ff);
 }
 
@@ -1150,9 +1203,26 @@ int usbh_roothub_control(struct usbh_bus *bus, struct usb_setup_packet *setup, u
     uint8_t port;
     uint32_t temp, status;
 
-    nports = CONFIG_USBHOST_MAX_RHPORTS;
+    nports = g_ehci_hcd[bus->hcd.hcd_id].n_ports;
 
     port = setup->wIndex;
+
+    temp = EHCI_HCOR->portsc[port - 1];
+
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+    if (temp & EHCI_PORTSC_OWNER) {
+        return ohci_roothub_control(bus, setup, buf);
+    }
+
+    if ((temp & EHCI_PORTSC_LSTATUS_MASK) == EHCI_PORTSC_LSTATUS_KSTATE) {
+        EHCI_HCOR->portsc[port - 1] |= EHCI_PORTSC_OWNER;
+
+        while (!(EHCI_HCOR->portsc[port - 1] & EHCI_PORTSC_OWNER)) {
+        }
+        USB_LOG_INFO("Switch port %u to OHCI\r\n", port);
+        return ohci_roothub_control(bus, setup, buf);
+    }
+#endif
     if (setup->bmRequestType & USB_REQUEST_RECIPIENT_DEVICE) {
         switch (setup->bRequest) {
             case HUB_REQUEST_CLEAR_FEATURE:
@@ -1213,9 +1283,7 @@ int usbh_roothub_control(struct usbh_bus *bus, struct usb_setup_packet *setup, u
                     case HUB_PORT_FEATURE_C_SUSPEND:
                         break;
                     case HUB_PORT_FEATURE_POWER:
-#ifdef CONFIG_USB_EHCI_PORT_POWER
                         EHCI_HCOR->portsc[port - 1] &= ~EHCI_PORTSC_PP;
-#endif
                         break;
                     case HUB_PORT_FEATURE_C_CONNECTION:
                         EHCI_HCOR->portsc[port - 1] |= EHCI_PORTSC_CSC;
@@ -1253,12 +1321,21 @@ int usbh_roothub_control(struct usbh_bus *bus, struct usb_setup_packet *setup, u
                         }
                         break;
                     case HUB_PORT_FEATURE_POWER:
-#ifdef CONFIG_USB_EHCI_PORT_POWER
                         EHCI_HCOR->portsc[port - 1] |= EHCI_PORTSC_PP;
-#endif
                         break;
                     case HUB_PORT_FEATURE_RESET:
                         usbh_reset_port(bus, port);
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+                        if (!(EHCI_HCOR->portsc[port - 1] & EHCI_PORTSC_PE)) {
+                            EHCI_HCOR->portsc[port - 1] |= EHCI_PORTSC_OWNER;
+
+                            while (!(EHCI_HCOR->portsc[port - 1] & EHCI_PORTSC_OWNER)) {
+                            }
+
+                            USB_LOG_INFO("Switch port %u to OHCI\r\n", port);
+                            return -USB_ERR_NOTSUPP;
+                        }
+#endif
                         break;
 
                     default:
@@ -1303,7 +1380,7 @@ int usbh_roothub_control(struct usbh_bus *bus, struct usb_setup_packet *setup, u
                 if (temp & EHCI_PORTSC_RESET) {
                     status |= (1 << HUB_PORT_FEATURE_RESET);
                 }
-                if (temp & EHCI_PORTSC_PP) {
+                if (temp & EHCI_PORTSC_PP || !(EHCI_HCCR->hcsparams & EHCI_HCSPARAMS_PPC)) {
                     status |= (1 << HUB_PORT_FEATURE_POWER);
                 }
                 memcpy(buf, &status, 4);
@@ -1314,6 +1391,7 @@ int usbh_roothub_control(struct usbh_bus *bus, struct usb_setup_packet *setup, u
     }
     return 0;
 }
+
 
 int usbh_submit_urb(struct usbh_urb *urb)
 {
@@ -1337,6 +1415,12 @@ int usbh_submit_urb(struct usbh_urb *urb)
         hport = hub->parent;
         hub = hub->parent->parent;
     }
+
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+    if (EHCI_HCOR->portsc[hport->port - 1] & EHCI_PORTSC_OWNER) {
+        return ohci_submit_urb(urb);
+    }
+#endif
 
     if (!urb->hport->connected || !(EHCI_HCOR->portsc[hport->port - 1] & EHCI_PORTSC_CCS)) {
         return -USB_ERR_NOTCONN;
@@ -1412,12 +1496,19 @@ int usbh_kill_urb(struct usbh_urb *urb)
     struct ehci_qh_hw *qh;
     struct usbh_bus *bus;
     size_t flags;
+    bool remove_in_iaad = false;
 
     if (!urb || !urb->hcpriv || !urb->hport->bus) {
         return -USB_ERR_INVAL;
     }
 
     bus = urb->hport->bus;
+
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+    if (EHCI_HCOR->portsc[urb->hport->port - 1] & EHCI_PORTSC_OWNER) {
+        return ohci_kill_urb(urb);
+    }
+#endif
 
     flags = usb_osal_enter_critical_section();
 
@@ -1427,6 +1518,7 @@ int usbh_kill_urb(struct usbh_urb *urb)
         qh = EHCI_ADDR2QH(g_async_qh_head[bus->hcd.hcd_id].hw.hlp);
         while ((qh != &g_async_qh_head[bus->hcd.hcd_id]) && qh) {
             if (qh->urb == urb) {
+                remove_in_iaad = true;
                 ehci_kill_qh(bus, &g_async_qh_head[bus->hcd.hcd_id], qh);
             }
             qh = EHCI_ADDR2QH(qh->hw.hlp);
@@ -1464,6 +1556,20 @@ int usbh_kill_urb(struct usbh_urb *urb)
         usb_osal_sem_give(qh->waitsem);
     } else {
         ehci_qh_free(bus, qh);
+    }
+
+    if (remove_in_iaad) {
+        volatile uint32_t timeout = 0;
+        EHCI_HCOR->usbcmd |= EHCI_USBCMD_IAAD;
+        while (!(EHCI_HCOR->usbsts & EHCI_USBSTS_IAA)) {
+            usb_osal_msleep(1);
+            timeout++;
+            if (timeout > 100) {
+                usb_osal_leave_critical_section(flags);
+                return -USB_ERR_TIMEOUT;
+            }
+        }
+        EHCI_HCOR->usbsts = EHCI_USBSTS_IAA;
     }
 
     usb_osal_leave_critical_section(flags);
@@ -1525,7 +1631,7 @@ void USBH_IRQHandler(uint32_t irq_num, struct usbh_bus *bus)
     }
 
     if (usbsts & EHCI_USBSTS_PCD) {
-        for (int port = 0; port < CONFIG_USBHOST_MAX_RHPORTS; port++) {
+        for (int port = 0; port < g_ehci_hcd[bus->hcd.hcd_id].n_ports; port++) {
             uint32_t portsc = EHCI_HCOR->portsc[port];
 
             if (portsc & EHCI_PORTSC_CSC) {

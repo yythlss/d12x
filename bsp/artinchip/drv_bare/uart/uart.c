@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -371,4 +371,11 @@ int uart_getchar(int id)
 int uart_putchar(int id, int c)
 {
     return hal_usart_putchar(uart_dev[id], (uint8_t)c);
+}
+
+int uart_get_cur_baudrate(int id)
+{
+    int baud;
+    baud = hal_usart_get_cur_baudrate(uart_dev[id]);
+    return baud;
 }

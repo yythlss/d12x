@@ -23,7 +23,7 @@
 #include "mpp_mem.h"
 #include "aic_message.h"
 #include "mpp_decoder.h"
-#include "aic_audio_render.h"
+#include "aic_audio_render_manager.h"
 #include "aic_audio_decoder.h"
 
 #define AUDIO_RENDER_INPORT_SEND_ALL_FRAME_FLAG  0x02
@@ -111,7 +111,9 @@ static s32 mm_audio_render_send_command(mm_handle h_component,
         s_msg.data = p_cmd_data;
         s_msg.data_size = strlen((char *)p_cmd_data);
     }
-
+    if (MM_COMMAND_EOS == (s32)cmd) {
+        p_audio_render_data->frame_end_flag = MM_TRUE;
+    }
     aic_msg_put(&p_audio_render_data->s_msg, &s_msg);
     return error;
 }
@@ -127,9 +129,8 @@ static s32 mm_audio_render_get_parameter(mm_handle h_component,
 
     switch (index) {
         case MM_INDEX_VENDOR_AUDIO_RENDER_VOLUME: {
-            s32 vol = p_audio_render_data->render->get_volume(
-                p_audio_render_data->render);
-            ((mm_param_audio_volume *)p_param)->volume = vol;
+            aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_GET_VOL,
+                &((mm_param_audio_volume *)p_param)->volume);
             break;
         }
         default:
@@ -212,17 +213,25 @@ static s32 mm_audio_render_set_config(mm_handle h_component,
                 MM_TIME_CLOCK_STATE_WAITING_FOR_START_TIME;
             // 2 reset render
             //aic_audio_render_reset(p_audio_render_data->render);
-            aic_audio_render_clear_cache(p_audio_render_data->render);
+            aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_CLEAR_CACHE, NULL);
             break;
 
         case MM_INDEX_CONFIG_TIME_CLOCK_STATE: {
             mm_time_config_clock_state *p_state =
                 (mm_time_config_clock_state *)p_config;
             p_audio_render_data->clock_state = p_state->state;
-            printf("[%s:%d]p_audio_render_data->clock_state:%d\n", __FUNCTION__,
+            logi("[%s:%d]p_audio_render_data->clock_state:%d\n", __FUNCTION__,
                    __LINE__, p_audio_render_data->clock_state);
             break;
         }
+
+        case MM_INDEX_VENDOR_AUDIO_RENDER_INIT:
+#if !defined(AIC_USING_I2S0) && !defined(AIC_USING_I2S1) && !defined(AIC_USING_AUDIO)
+            loge("Not config audio device\n");
+            error = MM_ERROR_UNDEFINED;
+#endif
+            break;
+
         default:
             break;
     }
@@ -521,7 +530,10 @@ mm_audio_render_state_change_to_idle(mm_audio_render_data *p_audio_render_data)
     if (p_audio_render_data->state == MM_STATE_LOADED) {
         //create Audio_handle
         if (!p_audio_render_data->render) {
-            ret = aic_audio_render_create(&p_audio_render_data->render);
+            struct audio_render_create_params create_params;
+            create_params.dev_id = 0;
+            create_params.scene_type = AUDIO_RENDER_SCENE_DEFAULT;
+            ret = aic_audio_render_create(&p_audio_render_data->render, &create_params);
         }
 
         if (ret != 0) {
@@ -534,7 +546,7 @@ mm_audio_render_state_change_to_idle(mm_audio_render_data *p_audio_render_data)
             return;
         }
     } else if (p_audio_render_data->state == MM_STATE_PAUSE) {
-        aic_audio_render_pause(p_audio_render_data->render);
+        aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_PAUSE, NULL);
     } else if (p_audio_render_data->state == MM_STATE_EXECUTING) {
     } else {
         mm_audio_render_event_notify(p_audio_render_data, MM_EVENT_ERROR,
@@ -560,8 +572,7 @@ static void mm_audio_render_state_change_to_excuting(
         return;
     } else if (p_audio_render_data->state == MM_STATE_IDLE) {
     } else if (p_audio_render_data->state == MM_STATE_PAUSE) {
-        aic_audio_render_pause(p_audio_render_data->render);
-
+        aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_PAUSE, NULL);
     } else {
         mm_audio_render_event_notify(p_audio_render_data, MM_EVENT_ERROR,
                                      MM_ERROR_INCORRECT_STATE_TRANSITION,
@@ -581,7 +592,7 @@ mm_audio_render_state_change_to_pause(mm_audio_render_data *p_audio_render_data)
     if (p_audio_render_data->state == MM_STATE_LOADED) {
     } else if (p_audio_render_data->state == MM_STATE_IDLE) {
     } else if (p_audio_render_data->state == MM_STATE_EXECUTING) {
-        aic_audio_render_pause(p_audio_render_data->render);
+        aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_PAUSE, NULL);
     } else {
         mm_audio_render_event_notify(p_audio_render_data, MM_EVENT_ERROR,
                                      MM_ERROR_INCORRECT_STATE_TRANSITION,
@@ -608,8 +619,8 @@ static int mm_process_audio_sync(mm_audio_render_data *p_audio_render_data,
 
     mm_bind_info *p_bind_clock =
         &p_audio_render_data->in_port_bind[AUDIO_RENDER_PORT_IN_CLOCK_INDEX];
-    audio_cache_duration = p_audio_render_data->render->get_cached_time(
-        p_audio_render_data->render);
+    aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_GET_CACHE_TIME,
+                             &audio_cache_duration);
     real_audio_time = p_frame_info->pts - audio_cache_duration;
     if (p_bind_clock->flag) {
         mm_get_config(p_bind_clock->p_bind_comp,
@@ -685,7 +696,11 @@ static void mm_audio_render_wait_frame_timeout(mm_audio_render_data *p_audio_ren
 {
     struct timespec before = { 0 }, after = { 0 };
     clock_gettime(CLOCK_REALTIME, &before);
-
+    if (p_audio_render_data->frame_end_flag) {
+        logi("[%s:%d]:receive audio frame end flag\n", __FUNCTION__, __LINE__);
+        p_audio_render_data->flags |= AUDIO_RENDER_INPORT_SEND_ALL_FRAME_FLAG;
+        return;
+    }
     /*if no empty frame then goto sleep, wait wkup by vdec*/
     aic_msg_wait_new_msg(&p_audio_render_data->s_msg,
                          AUDIO_RENDER_WAIT_FRAME_INTERVAL);
@@ -695,7 +710,7 @@ static void mm_audio_render_wait_frame_timeout(mm_audio_render_data *p_audio_ren
 
     /*if the get frame diff time overange max wait time, then indicate fame end*/
     if (diff > AUDIO_RENDER_WAIT_FRAME_MAX_TIME) {
-        printf("[%s:%d]:%ld\n", __FUNCTION__, __LINE__, diff);
+        logi("[%s:%d]:%ld\n", __FUNCTION__, __LINE__, diff);
         p_audio_render_data->flags |= AUDIO_RENDER_INPORT_SEND_ALL_FRAME_FLAG;
     }
 }
@@ -794,37 +809,34 @@ static void mm_audio_render_set_attr(mm_audio_render_data *p_audio_render_data)
     s32 ret = 0;
     struct aic_audio_render_attr ao_attr;
     if (!p_audio_render_data->audio_render_init_flag) {
-        p_audio_render_data->render->init(p_audio_render_data->render,
-                                            p_audio_render_data->dev_id);
+        aic_audio_render_init(p_audio_render_data->render);
     }
 
     if (p_audio_render_data->volume_change) {
-        if (p_audio_render_data->render->set_volume(
-                p_audio_render_data->render,
-                p_audio_render_data->volume) == 0) {
+        if (aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_SET_VOL,
+                                     &p_audio_render_data->volume) == 0) {
             p_audio_render_data->volume_change = 0;
         } else {
             loge("set_volume error\n");
         }
     } else {
-        p_audio_render_data->volume =
-            p_audio_render_data->render->get_volume(
-                p_audio_render_data->render);
+        aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_GET_VOL,
+                                 &p_audio_render_data->volume);
         logd("volume :%d\n", p_audio_render_data->volume);
     }
 
     /*initial state and attr not changed need do set new attr, avoid cost too much time*/
-    ret = p_audio_render_data->render->get_attr(p_audio_render_data->render, &ao_attr);
+    ret = aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_GET_ATTR, &ao_attr);
     ao_attr.bits_per_sample = p_audio_render_data->frame.bits_per_sample;
     if (ret || !p_audio_render_data->audio_render_init_flag) {
         ao_attr.channels = p_audio_render_data->frame.channels;
         ao_attr.sample_rate = p_audio_render_data->frame.sample_rate;
-        p_audio_render_data->render->set_attr(p_audio_render_data->render, &ao_attr);
+        aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_SET_ATTR, &ao_attr);
     } else if (ao_attr.channels != p_audio_render_data->frame.channels ||
                ao_attr.sample_rate != p_audio_render_data->frame.sample_rate) {
         ao_attr.channels = p_audio_render_data->frame.channels;
         ao_attr.sample_rate = p_audio_render_data->frame.sample_rate;
-        p_audio_render_data->render->set_attr(p_audio_render_data->render, &ao_attr);
+        aic_audio_render_control(p_audio_render_data->render, AUDIO_RENDER_CMD_SET_ATTR, &ao_attr);
     }
     /*need to define a member of struct*/
     ao_attr.smples_per_frame = 32 * 1024;
@@ -841,7 +853,7 @@ static void mm_audio_render_set_attr(mm_audio_render_data *p_audio_render_data)
 
 void mm_audio_render_frame_count_print(mm_audio_render_data *p_audio_render_data)
 {
-    printf("[%s:%d]receive_frame_num:%u,"
+    logi("[%s:%d]receive_frame_num:%u,"
            "show_frame_ok_num:%u,"
            "show_frame_fail_num:%u,"
            "giveback_frame_ok_num:%u,"
@@ -938,16 +950,15 @@ static void *mm_audio_render_component_thread(void *p_thread_data)
                                          10 * 1000);
                     goto _AIC_MSG_GET_;
                 }
-                printf("[%s:%d]video start time arrive\n", __FUNCTION__,
+                logi("[%s:%d]video start time arrive\n", __FUNCTION__,
                        __LINE__);
             }
 
             ret = 0;
             if (p_audio_render_data->frame.size > 0) { // frame size maybe 0.
-                ret = p_audio_render_data->render->rend(
-                    p_audio_render_data->render,
-                    p_audio_render_data->frame.data,
-                    p_audio_render_data->frame.size);
+                ret = aic_audio_render_rend(p_audio_render_data->render,
+                                            p_audio_render_data->frame.data,
+                                            p_audio_render_data->frame.size);
             }
             if (ret == 0) {
                 p_audio_render_data->show_frame_ok_num++;
@@ -974,9 +985,9 @@ static void *mm_audio_render_component_thread(void *p_thread_data)
             }
         } else { // not first frame
             if (p_audio_render_data->volume_change) {
-                if (p_audio_render_data->render->set_volume(
-                        p_audio_render_data->render,
-                        p_audio_render_data->volume) == 0) {
+                if (aic_audio_render_control(p_audio_render_data->render,
+                                             AUDIO_RENDER_CMD_SET_VOL,
+                                             &p_audio_render_data->volume) == 0) {
                     p_audio_render_data->volume_change = 0;
                 } else {
                     loge("set_volume error\n");
@@ -987,10 +998,9 @@ static void *mm_audio_render_component_thread(void *p_thread_data)
             ret = 0;
             // last frame size maybe 0.
             if (p_audio_render_data->frame.size > 0) {
-                ret = p_audio_render_data->render->rend(
-                    p_audio_render_data->render,
-                    p_audio_render_data->frame.data,
-                    p_audio_render_data->frame.size);
+                ret = aic_audio_render_rend(p_audio_render_data->render,
+                                            p_audio_render_data->frame.data,
+                                            p_audio_render_data->frame.size);
             }
             if (ret == 0) {
                 p_audio_render_data->show_frame_ok_num++;
@@ -1003,7 +1013,7 @@ static void *mm_audio_render_component_thread(void *p_thread_data)
                 if (p_audio_render_data->frame.flag & FRAME_FLAG_EOS) {
                     p_audio_render_data->flags |=
                         AUDIO_RENDER_INPORT_SEND_ALL_FRAME_FLAG;
-                    printf("[%s:%d]receive frame_end_flag\n", __FUNCTION__, __LINE__);
+                    logi("[%s:%d]receive frame_end_flag\n", __FUNCTION__, __LINE__);
                 }
 
                 mm_audio_render_calc_frame_num(p_audio_render_data);
@@ -1029,7 +1039,5 @@ _EXIT:
         p_audio_render_data->render = NULL;
     }
     mm_audio_render_frame_count_print(p_audio_render_data);
-    printf("[%s:%d]mm_audio_render_component_thread exit\n",__FUNCTION__,
-           __LINE__);
     return (void *)MM_ERROR_NONE;
 }

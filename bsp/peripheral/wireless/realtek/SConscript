@@ -16,7 +16,6 @@ CPPPATH.append(cwd + '/include/')
 CPPPATH.append(cwd + '/api/')
 CPPPATH.append(cwd + '/os/customer_rtos/')
 CPPPATH.append(cwd + '/os/os_dep/include/')
-CPPPATH.append(cwd + '/os/wlan_lwip/')
 CPPPATH.append(cwd + '/platform/include/')
 CPPPATH.append(cwd + '/platform/rtwlan_bsp/')
 
@@ -36,7 +35,16 @@ if GetDepend('REALTEK_FULL_FNC_MODE'):
 
 src += Glob('os/customer_rtos/customer_rtt_service.c')
 src += Glob('os/os_dep/*.c')
-src += Glob('os/wlan_lwip/*.c')
+
+# Third-party packages LwIP using wlan_lwip/*
+if GetDepend('LPKG_USING_LWIP'):
+    src += Glob('os/wlan_lwip/*.c')
+    CPPPATH.append(cwd + '/os/wlan_lwip/')
+
+# RT-thread LwIP using adapt_to_rtt/*
+if GetDepend('RT_USING_LWIP'):
+    src += Glob('os/adapt_to_rtt/*.c')
+    CPPPATH.append(cwd + '/os/adapt_to_rtt/')
 
 src += Glob('platform/rtwlan_bsp/*.c')
 if GetDepend('REALTEK_WLAN_INTF_SDIO'):

@@ -26,7 +26,9 @@ void lv_wait_sdcard_mounted(void)
 
 void lv_user_gui_init(void)
 {
+#ifdef AIC_LVGL_DEMO
     aic_ui_init();
+#endif
 }
 
 #ifdef KERNEL_RTTHREAD

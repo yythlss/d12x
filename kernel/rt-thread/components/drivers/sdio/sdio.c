@@ -27,6 +27,9 @@
 #define RT_SDIO_THREAD_PRIORITY  0x40
 #endif
 
+#define RT_SDIO_IRQ_THREAD_WAKEUP    (1 << 0)
+#define RT_SDIO_IRQ_THREAD_EXIT      (1 << 1)
+
 static rt_list_t sdio_cards = RT_LIST_OBJECT_INIT(sdio_cards);
 static rt_list_t sdio_drivers = RT_LIST_OBJECT_INIT(sdio_drivers);
 
@@ -266,7 +269,7 @@ rt_int32_t sdio_io_rw_extended_block(struct rt_sdio_function *func,
         while (left_size > func->cur_blk_size)
         {
             blks = left_size / func->cur_blk_size;
-#ifndef AIC_WLAN_ASR
+#if !(defined(AIC_WLAN_ASR) || defined(AIC_WLAN_AIC8800D40L))
             if (blks > max_blks)
                 blks = max_blks;
 #endif
@@ -1009,7 +1012,9 @@ err:
 
 static void sdio_irq_thread(void *param)
 {
+    rt_err_t rt_ret;
     rt_int32_t i, ret;
+    rt_uint32_t evt;
     rt_uint8_t pending;
     struct rt_mmcsd_card *card;
     struct rt_mmcsd_host *host = (struct rt_mmcsd_host *)param;
@@ -1019,7 +1024,15 @@ static void sdio_irq_thread(void *param)
 
     while (1)
     {
-        if (rt_sem_take(host->sdio_irq_sem, RT_WAITING_FOREVER) == RT_EOK)
+        rt_ret = rt_event_recv(host->sdio_irq_event,
+                               RT_SDIO_IRQ_THREAD_WAKEUP | RT_SDIO_IRQ_THREAD_EXIT,
+                               RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
+                               RT_WAITING_FOREVER,
+                               &evt);
+        if (rt_ret != RT_EOK)
+            continue;
+
+        if (evt & RT_SDIO_IRQ_THREAD_WAKEUP)
         {
             mmcsd_host_lock(host);
             pending = sdio_io_readb(host->card->sdio_function[0],
@@ -1059,7 +1072,13 @@ static void sdio_irq_thread(void *param)
                 host->ops->enable_sdio_irq(host, 1);
             continue;
         }
+
+        if (evt & RT_SDIO_IRQ_THREAD_EXIT)
+            break;
     }
+
+    if (host->sdio_irq_delete_sem)
+        rt_sem_release(host->sdio_irq_delete_sem);
 }
 
 static rt_int32_t sdio_irq_thread_create(struct rt_mmcsd_card *card)
@@ -1070,8 +1089,10 @@ static rt_int32_t sdio_irq_thread_create(struct rt_mmcsd_card *card)
     if (!host->sdio_irq_num)
     {
         host->sdio_irq_num++;
-        host->sdio_irq_sem = rt_sem_create("sdio_irq", 0, RT_IPC_FLAG_FIFO);
-        RT_ASSERT(host->sdio_irq_sem != RT_NULL);
+        host->sdio_irq_event = rt_event_create("sdio_irq", 0);
+        RT_ASSERT(host->sdio_irq_event != RT_NULL);
+        host->sdio_irq_delete_sem = rt_sem_create("sdio_irq_delete", 0, RT_IPC_FLAG_FIFO);
+        RT_ASSERT(host->sdio_irq_delete_sem != RT_NULL);
 
         host->sdio_irq_thread = rt_thread_create("sdio_irq", sdio_irq_thread, host,
                              RT_SDIO_STACK_SIZE, RT_SDIO_THREAD_PRIORITY, 20);
@@ -1095,10 +1116,11 @@ static rt_int32_t sdio_irq_thread_delete(struct rt_mmcsd_card *card)
     {
         if (host->flags & MMCSD_SUP_SDIO_IRQ)
             host->ops->enable_sdio_irq(host, 0);
-        rt_sem_delete(host->sdio_irq_sem);
-        host->sdio_irq_sem = RT_NULL;
-        rt_thread_delete(host->sdio_irq_thread);
-        host->sdio_irq_thread = RT_NULL;
+        rt_event_send(host->sdio_irq_event, RT_SDIO_IRQ_THREAD_EXIT);
+        rt_sem_take(host->sdio_irq_delete_sem, RT_WAITING_FOREVER);
+
+        rt_sem_delete(host->sdio_irq_delete_sem);
+        rt_event_delete(host->sdio_irq_event);
     }
 
     return 0;
@@ -1192,8 +1214,8 @@ void sdio_irq_wakeup(struct rt_mmcsd_host *host)
 {
     if (host->flags & MMCSD_SUP_SDIO_IRQ)
         host->ops->enable_sdio_irq(host, 0);
-    if (host->sdio_irq_sem)
-        rt_sem_release(host->sdio_irq_sem);
+    if (host->sdio_irq_event)
+        rt_event_send(host->sdio_irq_event, RT_SDIO_IRQ_THREAD_WAKEUP);
 }
 
 rt_int32_t sdio_enable_func(struct rt_sdio_function *func)

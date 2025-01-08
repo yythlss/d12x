@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -27,6 +27,8 @@ uint32_t ringbuf_len(ringbuf_t *fifo);
 uint32_t ringbuf_avail(ringbuf_t *fifo);
 bool ringbuf_is_empty(ringbuf_t *fifo);
 bool ringbuf_is_full(ringbuf_t *fifo);
+
+void ringbuf_init(ringbuf_t *fifo, uint8_t *buf, uint32_t size);
 
 /*write to ringbuffer*/
 uint32_t ringbuf_in(ringbuf_t *fifo, const void *in, uint32_t len);

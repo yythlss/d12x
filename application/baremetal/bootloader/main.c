@@ -25,10 +25,6 @@
 #include <aic_clk_id.h>
 #include <upg_uart.h>
 #include <hal_syscfg.h>
-#include <xspi_psram.h>
-#include <usb_drv.h>
-#include <usbhost.h>
-#include <usbdevice.h>
 #include <boot_rom.h>
 #include <ram_param.h>
 #include <hal_axicfg.h>
@@ -136,6 +132,8 @@ int main(void)
     log_buf_init();
 #endif
 
+    aicos_local_irq_enable();
+
     bd = aic_get_boot_device();
     board_init(bd);
 
@@ -181,10 +179,13 @@ int main(void)
      *  2. If bootloader failure to boot application, it will stay in console
      *     loop, user/developer can run built-in commands to do some jobs.
      */
-    console_loop();
-
+    int ret = 0;
     while (1) {
-        /* Should not run to here. */
-    };
+        ret = console_loop();
+        if (ret == CONSOLE_QUIT) {
+            /* Can do some process here */
+        }
+    }
+
     return 0;
 }

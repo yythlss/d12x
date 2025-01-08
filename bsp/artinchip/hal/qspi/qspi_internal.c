@@ -75,10 +75,10 @@ u32 qspi_master_get_best_div_param(u32 sclk, u32 bus_hz, u32 *div)
         cdr2 = 0;
     if (cdr2 > 0xFF)
         cdr2 = 0xFF;
-    cdr2_clk = sclk / (2 * cdr2 + 1);
+    cdr2_clk = sclk / (2 * (cdr2 + 1));
 
     cdr1_clk = sclk >> cdr1;
-    cdr2_clk = sclk / (2 * cdr2 + 1);
+    cdr2_clk = sclk / (2 * (cdr2 + 1));
 
     /* cdr1 param vs cdr2 param, use the best */
     if (cdr1_clk == bus_hz) {

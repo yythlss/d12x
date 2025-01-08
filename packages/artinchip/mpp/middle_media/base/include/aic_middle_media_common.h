@@ -22,10 +22,12 @@ extern "C" {
 #define TIME_BASE 1000000LL
 #define MPP_MAX(a, b) ((a)>(b)? (a) : (b))
 #define MPP_MIN(a, b) ((a)<(b)? (a) : (b))
+#define MPP_ARRAY_ELEMS(a) (sizeof(a) / sizeof((a)[0]))
+#define MPP_SWAP(type, a, b) do {type tmp = b; b = a; a = tmp;}while(0)
 
 enum aic_stream_type {
 	MPP_MEDIA_TYPE_UNKNOWN = -1,
-	MPP_MEDIA_TYPE_VIDEO,
+	MPP_MEDIA_TYPE_VIDEO = 1,
 	MPP_MEDIA_TYPE_AUDIO,
 	MPP_MEDIA_TYPE_OTHER
 };
@@ -60,6 +62,7 @@ struct aic_av_audio_stream {
 	s32 extra_data_size;
 	u8 *extra_data;
 	s32 bit_rate;
+	s32 block_align;
 };
 
 struct aic_av_media_info {

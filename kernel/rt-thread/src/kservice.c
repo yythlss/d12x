@@ -652,12 +652,17 @@ RTM_EXPORT(rt_show_banner);
 extern struct boot_args boot_arg;
 void rt_show_version(void)
 {
-    char ver[] = PRJ_CHIP;
+    char soc[] = PRJ_CHIP;
 
-    ver[0] = toupper(ver[0]);
+    soc[0] = toupper(soc[0]);
+    if (isalpha((int)soc[1]))
+        soc[1] = toupper(soc[1]);
+    if (isalpha((int)soc[2]))
+        soc[2] = toupper(soc[2]);
+
     rt_kprintf("Welcome to ArtInChip Luban-Lite %d.%d.%d [%s Inside]\n",
-               LL_VERSION, LL_SUBVERSION, LL_REVISION, ver);
-    if ((boot_arg.image_version[0] - '0') < 10)
+               LL_VERSION, LL_SUBVERSION, LL_REVISION, soc);
+    if (isdigit((int)boot_arg.image_version[0]))
         rt_kprintf("Image version: %s\n", boot_arg.image_version);
     rt_kprintf("Built on %s %s\n", __DATE__, __TIME__);
 }

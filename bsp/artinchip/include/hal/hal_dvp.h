@@ -76,6 +76,7 @@
 #define DVP_IN_HOR_SIZE_XY_CODE_SHIFT       (0)
 #define DVP_IN_HOR_SIZE_XY_CODE_F           BIT(6)
 
+#define DVP_OUT_HOR_NUM_RAW(w)          (((w) - 1) << 16)
 #define DVP_OUT_HOR_NUM(w)              (((w) * 2 - 1) << 16)
 #define DVP_OUT_VER_NUM(h)              (((h) - 1) << 16)
 

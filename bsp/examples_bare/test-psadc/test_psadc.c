@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Artinchip Technology Co., Ltd
+ * Copyright (c) 2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -138,7 +138,7 @@ static int test_psadc_get_adc()
     }
 
 #ifdef AIC_SYSCFG_DRV
-    ref_voltage = syscfg_read_ldo_cfg();
+    ref_voltage = hal_syscfg_read_ldo_cfg();
 #endif
     if (!ref_voltage) {
         printf("Failed to obtain reference voltage through eFuse\n");

@@ -21,6 +21,7 @@
 struct ffmpeg_context_s {
     struct aic_player *aic_player;
     struct av_media_info media_info;
+    bool has_keep_last_frame;
     int play_end;
     int play_async;
     int play_detected;
@@ -155,6 +156,13 @@ lv_res_t lv_ffmpeg_player_set_src(lv_obj_t * obj, const char *path)
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN); /* audio did't not disp */
         lv_timer_resume(player->timer);
         return LV_RES_OK;
+    }
+
+    /* here are the video related settings */
+    if (player->keep_last_frame && !ffmpeg_ctx->has_keep_last_frame) {
+        int enable = 1;
+        aic_player_control(ffmpeg_ctx->aic_player, AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME, &enable);
+        ffmpeg_ctx->has_keep_last_frame = true;
     }
 
     lv_ffmpeg_player_get_disp_area(obj, &pos, &width, &height, &rotation);
@@ -309,6 +317,9 @@ void lv_ffmpeg_player_set_cmd_ex(lv_obj_t * obj, lv_ffmpeg_player_cmd_t cmd, voi
                 LV_LOG_ERROR("aic_player_get_play_time failed");
                 break;
             }
+            break;
+        case LV_FFMPEG_PLAYED_CMD_KEEP_LAST_FRAME_EX:
+            player->keep_last_frame = true;
             break;
 #ifdef PLAYER_ASYNC
         /* async src is not currently supported */
@@ -501,6 +512,10 @@ static void lv_ffmpeg_player_destructor(const lv_obj_class_t * class_p,
         struct ffmpeg_context_s *ffmpeg_ctx;
         ffmpeg_ctx = player->ffmpeg_ctx;
         if (ffmpeg_ctx->aic_player) {
+            if (ffmpeg_ctx->has_keep_last_frame) {
+                int enable = 0;
+                aic_player_control(ffmpeg_ctx->aic_player, AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME, &enable);
+            }
             aic_player_stop(ffmpeg_ctx->aic_player);
             aic_player_destroy(ffmpeg_ctx->aic_player);
             ffmpeg_ctx->aic_player = NULL;

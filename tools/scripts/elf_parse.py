@@ -149,6 +149,12 @@ def insert_seg_node(depth, seg_index):
     node_str += indent + "\tos = \"artinchip\";\n"
     node_str += indent + "\tload = <{}>;\n".format(seg_info[seg_index]["load"])
     node_str += indent + "\tentry = <{}>;\n".format(seg_info[seg_index]["entry"])
+    node_str += indent + "\thash-1 {\n"
+    node_str += indent + "\t\talgo = \"crc32\";\n"
+    node_str += indent + "\t};\n"
+    node_str += indent + "\thash-2 {\n"
+    node_str += indent + "\t\talgo = \"md5\";\n"
+    node_str += indent + "\t};\n"
     node_str += indent + "};\n"
     return node_str
 

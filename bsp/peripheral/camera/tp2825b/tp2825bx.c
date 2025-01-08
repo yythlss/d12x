@@ -31,8 +31,9 @@
 #define DEFAULT_BUS_TYPE    MEDIA_BUS_BT656
 #define DEFAULT_WIDTH       PAL_WIDTH
 #define DEFAULT_HEIGHT      PAL_HEIGHT
+#define DEFAULT_USE_CVBS    1   /* 0, HDA; 1, CVBS */
 #define DEFAULT_FRAMERATE   25
-#define DEFAULT_VIN_CH      0
+#define DEFAULT_VIN_CH      0   /* 0 or 1 channel */
 
 #define DEBUG               0 // debug information on/off
 #define TEST_MODE           0
@@ -1760,6 +1761,12 @@ static void TP28xx_reset_default(int chip, unsigned char ch)
 ////////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////
+
+static int tp2825_is_interlaced(void)
+{
+    return tp28xx_byte_read(0, 0x01) & 0x2 ? 0 : 1;
+}
+
 static void tp2802_comm_init(int chip)
 {
     if (TP2825B == id[chip]) {
@@ -1770,7 +1777,10 @@ static void tp2802_comm_init(int chip)
 
         TP2825B_reset_default(chip, VIDEO_PAGE);
 
-        tp2802_set_video_mode(chip, mode, VIDEO_PAGE, STD_TVI);
+        if (DEFAULT_USE_CVBS)
+            tp2802_set_video_mode(chip, mode, VIDEO_PAGE, STD_TVI);
+        else
+            tp2802_set_video_mode(chip, mode, VIDEO_PAGE, STD_HDA);
 
 #if (WDT)
         tp28xx_byte_write(chip, 0x26, 0x04);
@@ -2543,8 +2553,12 @@ static rt_err_t tp2825_init(rt_device_t dev)
     fmt->flags = MEDIA_SIGNAL_FIELD_ACTIVE_LOW |
                  MEDIA_SIGNAL_VSYNC_ACTIVE_HIGH |
                  MEDIA_SIGNAL_HSYNC_ACTIVE_LOW |
-                 MEDIA_SIGNAL_PCLK_SAMPLE_FALLING |
-                 MEDIA_SIGNAL_INTERLACED_MODE;
+                 MEDIA_SIGNAL_PCLK_SAMPLE_FALLING;
+
+    if (tp2825_is_interlaced()) {
+        LOG_I("The input signal is interlace mode\n");
+        fmt->flags |= MEDIA_SIGNAL_INTERLACED_MODE;
+    }
 
     LOG_I("Init %s device\n", DRV_NAME);
     return SUCCESS;

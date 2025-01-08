@@ -705,20 +705,23 @@ static inline u32 qspi_hw_bit_mode_set_cs_num(u32 chipselect, u32 base)
     return 0;
 }
 
-static inline void qspi_hw_bit_mode_set_clk(u32 spiclk, u32 mclk, u32 base)
+static inline u32 qspi_hw_bit_mode_set_clk(u32 spiclk, u32 mclk, u32 base)
 {
-    u32 div;
+    u32 div = 1, cal_clk = 0;
 
     /*
 	 * mclk: module source clock
 	 * spiclk: expected spi working clock
 	 */
+    do {
+        cal_clk = mclk / (2 * div);
+        div++;
+    } while (cal_clk > spiclk);
 
-    if (spiclk == 0)
-        spiclk = 1;
-    div = mclk / (2 * spiclk) - 1;
-
+    div--;
+    div &= 0xff;
     writel(div, QSPI_REG_BMCLK(base));
+    return div;
 }
 
 static inline void qspi_hw_bit_mode_set_cs_level(u32 base, bool level)

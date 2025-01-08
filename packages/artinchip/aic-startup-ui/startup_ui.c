@@ -28,7 +28,20 @@
 #include "rtconfig.h"
 #include "stddef.h"
 
+#define SCREEN_MAX_WIDTH  1024
+#define SCREEN_MAX_HEIGHT 600
+
+#define IMAGE_MAX_WIDTH   500
+#define IMAGE_MAX_HEIGHT  160
+
+#define WIDTH_SCALE(x)     ((x) * IMAGE_MAX_WIDTH / SCREEN_MAX_WIDTH)
+#define HEIGHT_SCALE(y)    ((y) * IMAGE_MAX_HEIGHT / SCREEN_MAX_HEIGHT)
+
 #define PATH_MAX 1024
+#define MALLOC_FAILED   -1
+#define FB_OPEN_FAILED  -2
+#define MPP_OPS_FAILED  -3
+#define GET_SCREEN_ERR  -4
 
 #ifdef LPKG_CHERRYUSB_DEVICE_DISPLAY_TEMPLATE
 #define AIC_STARTUP_UI_SHOW_LVGL_LOGO
@@ -48,104 +61,12 @@
 #define IMAGE_PATH_ROOT "/data/image"
 #endif
 
-#ifdef AIC_STARTUP_UI_POS_X
-#define IMAGE_SCREEN_POS_X AIC_STARTUP_UI_POS_X
-#else
-#define IMAGE_SCREEN_POS_X 0
-#endif
-
-#ifdef AIC_STARTUP_UI_POS_Y
-#define IMAGE_SCREEN_POS_Y AIC_STARTUP_UI_POS_Y
-#else
-#define IMAGE_SCREEN_POS_Y 0
+#if defined (AIC_CHIP_D13X) || defined (AIC_CHIP_D12X)
+#define FORMAT_RGB
 #endif
 
 static struct startup_ui_fb startup_screen_info = {0};
 static char image_path[PATH_MAX];
-
-#if defined (AIC_CHIP_D13X) || defined (AIC_CHIP_D12X)
-#define USE_VE_FILL_FB
-#endif
-
-#ifdef USE_VE_FILL_FB
-struct ext_frame_allocator {
-    struct frame_allocator allocator;
-    dma_addr_t             buf;
-    struct mpp_rect        rect;
-};
-
-static int start_frame_buf_alloc(struct frame_allocator *p, struct mpp_frame* frame,
-                           int stride, int height, enum mpp_pixel_format format)
-{
-    struct ext_frame_allocator *ext = (struct ext_frame_allocator *)p;
-    struct startup_ui_fb *info = &startup_screen_info;
-    u32 offset_x, offset_y = ext->rect.y;
-    u32 offset = 0;
-
-    if (format > MPP_FMT_BGRA_4444) {
-        loge("The decode format 0x%x is not RGB!\n", format);
-        return 0;
-    }
-
-    frame->buf.format = info->startup_fb_data.format;
-    frame->buf.size.width = info->startup_fb_data.width;
-    frame->buf.size.height = info->startup_fb_data.height;
-    frame->buf.stride[0] = info->startup_fb_data.stride;
-    frame->buf.buf_type = MPP_PHY_ADDR;
-
-    if (offset_y + height > info->startup_fb_data.height)
-        offset_y = info->startup_fb_data.height - height;
-
-    if (ext->rect.x * (info->startup_fb_data.bits_per_pixel / 8) + stride > info->startup_fb_data.stride)
-        offset_x = info->startup_fb_data.stride - stride;
-    else
-        offset_x = (ext->rect.x - 1) * (info->startup_fb_data.bits_per_pixel / 8);
-
-    offset = info->startup_fb_data.stride * (offset_y - 1) + offset_x;
-    if (offset % 8) {
-        logi("The offset of (%d, %d) is not 8-byte aligned\n",
-             ext->rect.x, ext->rect.y);
-        offset = offset - offset % 8;
-    }
-
-    frame->buf.phy_addr[0] = (unsigned long)(ext->buf + offset);
-    return 0;
-}
-
-static int start_frame_buf_free(struct frame_allocator *p, struct mpp_frame *frame)
-{
-    // Use the UI layer framebuffer directly, do not need to free
-    return 0;
-}
-
-static int start_allocator_close(struct frame_allocator *p)
-{
-    struct ext_frame_allocator *ext = (struct ext_frame_allocator*)p;
-    mpp_free(ext);
-    return 0;
-}
-
-static struct alloc_ops def_ops = {
-    .alloc_frame_buffer = start_frame_buf_alloc,
-    .free_frame_buffer = start_frame_buf_free,
-    .close_allocator = start_allocator_close,
-};
-
-static struct frame_allocator *allocator_open(u8 *buf, u32 x, u32 y)
-{
-    struct ext_frame_allocator *ext = (struct ext_frame_allocator*)mpp_alloc(sizeof(struct ext_frame_allocator));
-    if (ext == NULL) {
-        return NULL;
-    }
-
-    memset(ext, 0, sizeof(struct ext_frame_allocator));
-    ext->allocator.ops = &def_ops;
-    ext->buf = (dma_addr_t)buf;
-    ext->rect.x = min(x, startup_screen_info.startup_fb_data.width);
-    ext->rect.y = min(y, startup_screen_info.startup_fb_data.height);
-    return &ext->allocator;
-}
-#endif
 
 static int ge_bitblt(struct ge_bitblt *blt)
 {
@@ -181,9 +102,7 @@ static int ge_bitblt(struct ge_bitblt *blt)
 
 #ifdef AIC_PAN_DISPLAY
 static u32 fb_copy_index = 0;
-#ifndef USE_VE_FILL_FB
 static u32 startup_fb_buf_index = 0;
-#endif
 #endif
 
 static struct aicfb_screeninfo *get_screen_info(void)
@@ -208,7 +127,6 @@ static struct aicfb_screeninfo *get_screen_info(void)
     return &startup_screen_info.startup_fb_data;
 }
 
-#ifndef USE_VE_FILL_FB
 static void render_frame(struct mpp_fb* fb, struct mpp_frame* frame,
                          u32 offset_x, u32 offset_y, u32 width, u32 height,
                          u32 layer_id, bool is_first_img)
@@ -262,8 +180,9 @@ static void render_frame(struct mpp_fb* fb, struct mpp_frame* frame,
 
     blt.dst_buf.crop.x = offset_x;
     blt.dst_buf.crop.y = offset_y;
-    blt.dst_buf.crop.width = blt.src_buf.crop.width;
-    blt.dst_buf.crop.height = blt.src_buf.crop.height;
+
+    blt.dst_buf.crop.width = blt.src_buf.crop.width * info->width/SCREEN_MAX_WIDTH;
+    blt.dst_buf.crop.height = blt.src_buf.crop.height * info->height/SCREEN_MAX_HEIGHT;
 
     logi("phy_addr: %x, stride: %d", blt.src_buf.phy_addr[0], blt.src_buf.stride[0]);
     logi("width: %d, height: %d, format: %d", blt.src_buf.size.width, blt.src_buf.size.height, blt.src_buf.format);
@@ -277,20 +196,19 @@ static void render_frame(struct mpp_fb* fb, struct mpp_frame* frame,
     }
 #endif
 }
-#endif
 
 #ifdef AIC_PAN_DISPLAY
 static void framebuffer_copy(int buffer_index)
 {
     struct ge_bitblt blt;
-    struct aicfb_screeninfo *info = NULL;;
+    struct aicfb_screeninfo *info = NULL;
 
     info = get_screen_info();
     if (info == NULL)
         return;
 
-    u32 fb0_buf_addr0 = (u32)(unsigned long)info->framebuffer;;
-    u32 fb0_buf_addr1 = fb0_buf_addr0 + info->smem_len;;
+    u32 fb0_buf_addr0 = (u32)(unsigned long)info->framebuffer;
+    u32 fb0_buf_addr1 = fb0_buf_addr0 + info->smem_len;
 
     memset(&blt, 0, sizeof(struct ge_bitblt));
 
@@ -331,11 +249,6 @@ static int decode_pic_from_path(const char *path, u32 offset_x, u32 offset_y,
     struct mpp_fb *fb = mpp_fb_open();
     int ret = 0;
 
-#ifdef USE_VE_FILL_FB
-    struct frame_allocator *allocator = NULL;
-    struct aicfb_screeninfo *info = get_screen_info();
-#endif
-
     FILE *fp = fopen(path, "rb");
     if (!fp) {
         loge("Failed to open file '%s'\n", path);
@@ -367,8 +280,8 @@ static int decode_pic_from_path(const char *path, u32 offset_x, u32 offset_y,
     config.extra_frame_num = 0;
     config.packet_count = 1;
 
-#ifdef USE_VE_FILL_FB
-    config.pix_fmt = info->format;
+#ifdef FORMAT_RGB
+    config.pix_fmt = MPP_FMT_RGB_888;
 #else
     config.pix_fmt = MPP_FMT_NV12;
 #endif
@@ -391,11 +304,6 @@ static int decode_pic_from_path(const char *path, u32 offset_x, u32 offset_y,
     if (!dec)
         goto out;
 
-
-#ifdef USE_VE_FILL_FB
-    allocator = allocator_open(info->framebuffer, offset_x, offset_y);
-    mpp_decoder_control(dec, MPP_DEC_INIT_CMD_SET_EXT_FRAME_ALLOCATOR, (void*)allocator);
-#endif
 
     mpp_decoder_init(dec, &config);
 
@@ -420,9 +328,8 @@ static int decode_pic_from_path(const char *path, u32 offset_x, u32 offset_y,
     memset(&frame, 0, sizeof(struct mpp_frame));
     mpp_decoder_get_frame(dec, &frame);
 
-#ifndef USE_VE_FILL_FB
     render_frame(fb, &frame, offset_x, offset_y, width, height, layer_id, is_first_img);
-#endif
+
     mpp_decoder_put_frame(dec, &frame);
 
 out:
@@ -451,7 +358,7 @@ static int count_images(const char *directoryPath)
 
     dir = opendir(directoryPath);
     if (!dir) {
-        printf("Error opening directory");
+        LOG_E("Error opening directory");
         return 0;
     }
 
@@ -478,19 +385,31 @@ static void construct_imagepath(char *outputBuffer, int image_number)
 int startup_ui_show(void)
 {
     int i, ret = 0;
+    int screen_pos_x = 0;
+    int screen_pos_y = 0;
     int image_count = count_images(IMAGE_CATALOG);
+    int width_scale = 0;
+    int height_scale = 0;
     struct startup_ui_fb *startup_ui = malloc(sizeof(struct startup_ui_fb));
+
+    if (!startup_ui) {
+        LOG_E("malloc failed\n");
+        return MALLOC_FAILED;
+    }
+
     startup_ui->startup_fb = mpp_fb_open();
 
     if (!startup_ui->startup_fb) {
-        printf("fb open failed\n");
+        LOG_E("fb open failed\n");
         free(startup_ui);
+        return FB_OPEN_FAILED;
     }
 
     ret = mpp_fb_ioctl(startup_ui->startup_fb, AICFB_GET_SCREENINFO , &startup_ui->startup_fb_data);
     if (ret) {
-        printf("mpp_fb_ioctl ops failed\n");
+        LOG_E("mpp_fb_ioctl ops failed\n");
         free(startup_ui);
+        return MPP_OPS_FAILED;
     }
 
     fb_clean(startup_ui->startup_fb_data.framebuffer, 0, startup_ui->startup_fb_data.height * startup_ui->startup_fb_data.stride);
@@ -500,15 +419,27 @@ int startup_ui_show(void)
     startup_ui->startup_fb_data.height * startup_ui->startup_fb_data.stride);
 #endif
 
+    if ((!startup_ui->startup_fb_data.width) || (!startup_ui->startup_fb_data.height)) {
+        LOG_E("Get scrren error\n");
+        free(startup_ui);
+        return GET_SCREEN_ERR;
+    }
+
+    width_scale = WIDTH_SCALE(startup_ui->startup_fb_data.width);
+    height_scale = HEIGHT_SCALE(startup_ui->startup_fb_data.height);
+
+    screen_pos_x = (startup_ui->startup_fb_data.width - width_scale) / 2;
+    screen_pos_y = (startup_ui->startup_fb_data.height - height_scale) / 2;
+
     for(i = 0; i < image_count; i++) {
         construct_imagepath(image_path, i);
 
         if(i == 0) {
-            decode_pic_from_path(image_path, IMAGE_SCREEN_POS_X, IMAGE_SCREEN_POS_Y, 0, 0, AICFB_LAYER_TYPE_UI, true);
+            decode_pic_from_path(image_path, screen_pos_x, screen_pos_y, 0, 0, AICFB_LAYER_TYPE_UI, true);
             mpp_fb_ioctl(startup_ui->startup_fb, AICFB_POWERON, 0);
         } else {
             aic_mdelay(80);
-            decode_pic_from_path(image_path, IMAGE_SCREEN_POS_X, IMAGE_SCREEN_POS_Y, 0, 0, AICFB_LAYER_TYPE_UI, false);
+            decode_pic_from_path(image_path, screen_pos_x, screen_pos_y, 0, 0, AICFB_LAYER_TYPE_UI, false);
         }
     }
 #ifdef AIC_PAN_DISPLAY

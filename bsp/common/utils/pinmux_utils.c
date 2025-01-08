@@ -39,8 +39,19 @@ int list_pinmux(int argc, char *argv[])
                 func = 0;
 
                 hal_gpio_get_func(group, pin, &func);
-                if (func)
+
+#ifdef AIC_SE_GPIO_DRV
+                if (func) {
+                    if (group == SE_GPIO_GROUP_ID)
+                        printf("SE.%u: function: %u\n", pin, func);
+                    else
+                        printf("P%c%u: function: %u\n", group + 'A', pin, func);
+                }
+#else
+                if (func) {
                     printf("P%c%u: function: %u\n", group + 'A', pin, func);
+                }
+#endif
 
                 pin_name++;
             }

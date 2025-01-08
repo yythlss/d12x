@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -81,19 +81,29 @@ err:
     return NULL;
 }
 
+static char *get_part_start(char *parts)
+{
+    char *p;
+
+    p = parts + strlen(parts);
+
+    /* Skip = : */
+    while (p != parts) {
+        if (*p != ':' && *p != '=') {
+            p--;
+        } else {
+            p++;
+            break;
+        }
+    }
+    return p;
+}
+
 struct aic_partition *aic_part_mtd_parse(char *parts)
 {
     char *p;
 
-    p = parts;
-
-    while ((*p != '\0') && (*p != ':'))
-        p++;
-    if (*p != ':') {
-        printf("%s: parts is invalid: %s\n", __FUNCTION__, parts);
-        return NULL;
-    }
-    p++;
+    p = get_part_start(parts);
 
     return aic_part_parse(p, 0);
 }
@@ -102,8 +112,7 @@ struct aic_partition *aic_part_gpt_parse(char *parts)
 {
     char *p;
 
-    p = parts;
-
+    p = get_part_start(parts);
     return aic_part_parse(p, 0x4400);
 }
 

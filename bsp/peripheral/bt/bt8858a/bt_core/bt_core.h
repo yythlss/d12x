@@ -97,7 +97,7 @@ __s32 bt_phone_recall(void);
 __s32  bt_is_connected(void);
 
 //重新连接BT
-__s32 bt_reconnect_set(void);
+__s32 bt_connect_set(void);
 
 //断开连接BT
 __s32 bt_disconnect_set(void);
@@ -157,12 +157,12 @@ extern __s32 bt_spp_rx_data(char *CmdStr,unsigned char len);
 //判断SPP RFCOMM是否连接成功
 extern __s32 bt_spp_rfcomm_is_connected(void);
 
-extern __s32 bt_spp_rfcomm_reconnect(void);
+extern __s32 bt_spp_rfcomm_connect(void);
 
 extern __s32 bt_spp_rfcomm_disconnect(void);
 
 //RFCOMM连接成功后，AT#SG加上第三方手机互联库发过来的形成数据串，转为AT##再通过RFCOMM发送给手机
-extern __s32 bt_spp_tx_data_rfcomm(char *CmdStr,unsigned char len); 
+extern __s32 bt_spp_tx_data_rfcomm(char *CmdStr,unsigned char len);
 
 //RFCOMM连接成功后，手机上层发过来的RFCOMM数据串，后面可发送第三方手机互联库
 extern __s32 bt_spp_rx_data_rfcomm(char *CmdStr,unsigned char len);
@@ -170,19 +170,51 @@ extern __s32 bt_spp_rx_data_rfcomm(char *CmdStr,unsigned char len);
 
 /*********************BLE COMM******************************/
 
-//extern __s32 bt_ble_tx_data(char *CmdStr,unsigned char len); 
+//extern __s32 bt_ble_tx_data(char *CmdStr,unsigned char len);
 
 //extern __s32 bt_ble_rx_data(char *CmdStr,unsigned char len);
 
 //extern __s32 bt_ble_rfcomm_is_connected(void);
 
-//extern __s32 bt_ble_rfcomm_reconnect(void);
+//extern __s32 bt_ble_rfcomm_connect(void);
 
 //extern __s32 bt_ble_rfcomm_disconnect(void);
 
-extern __s32 bt_ble_tx_data_rfcomm(char *CmdStr,unsigned char len); 
+//extern __s32 bt_ble_tx_data_rfcomm(char *CmdStr,unsigned char len);
 
 //extern __s32 bt_ble_rx_data_rfcomm(char *CmdStr,unsigned char len);
+
+/*********************HID COMM******************************/
+
+//"AT#@"打头的指令透传通道
+//发送数据
+ __s32 bt_hid_tx_data(char *CmdStr,unsigned char len);
+
+//接收bt数据
+ __s32 bt_hid_rx_data(char *CmdStr,unsigned char len);
+
+//HID是否连接
+__s32 bt_hid_is_connected(void);
+
+//连接HID
+__s32 bt_hid_connect(void);
+
+//断开HID
+__s32 bt_hid_disconnect(void);
+
+//设置手机光标指针的坐标位置给蓝牙
+__s32 bt_hid_set_cursor_pos(s16 x_pos,s16 y_pos);
+
+//发送触摸滑动点坐标相对变化值(需要减去上一次坐标值)给bt
+//action 0:指针移动；1:鼠标左键按下；2:鼠标左键抬起；3:鼠标中键按下；4:鼠标中键抬起；
+//5:鼠标右键按下；6:鼠标右键抬起；
+__s32 bt_hid_set_cursor_xy(u8 action,s16 x_diff,s16 y_diff);
+
+//重置手机光标指针的坐标位置给蓝牙，这个时候的光标位置就是bt_hid_set_cursor_pos函数设置的坐标
+__s32 bt_hid_reset_cursor_pos(void);
+
+//测试点击触摸滑动效果给bt
+__s32 bt_hid_mouse_test(void);
 
 
 /*********************FMRX COMM******************************/

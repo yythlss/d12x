@@ -215,6 +215,7 @@ int check_spienc_nonce(void)
     return 0;
 }
 
+#if defined(D13X_BURN_SPIENC_KEY_ENABLE)
 int burn_spienc_rotpk(void)
 {
     u32 offset = 0xFFFF;
@@ -251,6 +252,7 @@ int check_spienc_rotpk(void)
 
     return 0;
 }
+#endif
 
 int burn_spienc_key_read_write_disable_bits(void)
 {
@@ -399,11 +401,13 @@ int cmd_efuse_do_spienc(int argc, char **argv)
         return -1;
     }
 
+#if defined(D13X_BURN_SPIENC_KEY_ENABLE)
     ret = burn_spienc_rotpk();
     if (ret) {
         printf("Error\n");
         return -1;
     }
+#endif
 
     ret = burn_spienc_key_read_write_disable_bits();
     if (ret) {
@@ -441,11 +445,13 @@ int cmd_efuse_do_spienc(int argc, char **argv)
         return -1;
     }
 
+#if defined(D13X_BURN_SPIENC_KEY_ENABLE)
     ret = check_spienc_rotpk();
     if (ret) {
         printf("Error\n");
         return -1;
     }
+#endif
 
     ret = check_spienc_key_read_write_disable_bits();
     if (ret) {

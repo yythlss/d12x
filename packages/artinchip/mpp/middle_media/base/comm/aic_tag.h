@@ -1,9 +1,11 @@
 /*
-* Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
-*
-*  author: <che.jiang@artinchip.com>
-*  Desc: aic tag, internal header for aic based (de)muxers
-*/
+ * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Author: <che.jiang@artinchip.com>
+ * Desc: aic tag, internal header for aic based (de)muxers
+ */
 
 
 #ifndef AIC_TAGS_H
@@ -63,6 +65,9 @@ enum CodecID {
 
 	CODEC_ID_MP3, ///< preferred ID for decoding MPEG audio layer 1, 2 or 3
 	CODEC_ID_AAC,
+	CODEC_ID_FLAC,
+	CODEC_ID_WMAV1,
+	CODEC_ID_WMAV2,
 };
 
 struct codec_tag {

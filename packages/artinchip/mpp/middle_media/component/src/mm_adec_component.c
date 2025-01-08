@@ -63,6 +63,7 @@ typedef struct mm_adec_data {
     MM_BOOL stream_end_flag;
     MM_BOOL decode_end_flag;
     MM_BOOL frame_end_flag;
+    MM_BOOL pkt_end_flag;
     MM_BOOL flags;
 } mm_adec_data;
 
@@ -100,6 +101,9 @@ static s32 mm_adec_send_command(mm_handle h_component, MM_COMMAND_TYPE cmd,
             pthread_mutex_unlock(&p_adec_data->in_pkt_lock);
         }
     } else {
+        if (MM_COMMAND_EOS == (s32)cmd) {
+            p_adec_data->pkt_end_flag = MM_TRUE;
+        }
         aic_msg_put(&p_adec_data->s_msg, &s_msg);
     }
 
@@ -152,7 +156,7 @@ static s32 mm_adec_audio_format_trans(enum aic_audio_codec_type *p_desType,
     }
     if (*p_srcType == MM_AUDIO_CODING_MP3) {
         *p_desType = MPP_CODEC_AUDIO_DECODER_MP3;
-#ifdef AAC_DECODER
+#ifdef LPKG_USING_FAAD2
     } else if (*p_srcType == MM_AUDIO_CODING_AAC) {
         *p_desType = MPP_CODEC_AUDIO_DECODER_AAC;
 #endif
@@ -413,7 +417,11 @@ static int adc_thread_attr_init(pthread_attr_t *attr)
         return EINVAL;
     }
     pthread_attr_init(attr);
+#ifdef LPKG_USING_FAAD2
+    attr->stacksize = 64 * 1024;
+#else
     attr->stacksize = 32 * 1024;
+#endif
     attr->schedparam.sched_priority = MM_COMPONENT_ADEC_THREAD_PRIORITY;
     return 0;
 }
@@ -759,6 +767,10 @@ static void *mm_adec_component_thread(void *p_thread_data)
             pthread_mutex_lock(&p_adec_data->in_pkt_lock);
             p_adec_data->wait_for_ready_pkt = MM_TRUE;
             pthread_mutex_unlock(&p_adec_data->in_pkt_lock);
+            if (p_adec_data->pkt_end_flag) {
+                mm_send_command(p_bind_audio_render->p_bind_comp,
+                                MM_COMMAND_EOS, 0, NULL);
+            }
         } else if (dec_ret == DEC_NO_EMPTY_FRAME) {
             pthread_mutex_lock(&p_adec_data->out_frame_lock);
             p_adec_data->wait_for_empty_frame = MM_TRUE;
@@ -785,10 +797,5 @@ static void *mm_adec_component_thread(void *p_thread_data)
         }
     }
 _EXIT:
-    printf("[%s:%d]decoder_ok_num:%u\n", __FUNCTION__,
-           __LINE__, p_adec_data->decoder_ok_num);
-
-    printf("[%s:%d]mm_adec_component_thread exit\n",__FUNCTION__,
-           __LINE__);
     return (void *)MM_ERROR_NONE;
 }

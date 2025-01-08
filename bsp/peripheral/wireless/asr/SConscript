@@ -41,7 +41,8 @@ src += Glob('certificate_test/sdio_loopback/*.c')
 
 LOCAL_CCFLAGS = ' -w'
 
-lib_name = 'libasrwpa_gcc.a'
+wifi_name = 'asr5505s'
+lib_name = 'wlan_' + wifi_name + '_'+ rtconfig.CPUNAME
 LIBS = [lib_name]
 LIBPATH = [cwd + "/wlan_lib/"]
 

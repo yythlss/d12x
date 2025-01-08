@@ -9,7 +9,7 @@
             "os":         { "size": "2m" },
             "os_r":       { "size": "2m" },
             "rodata":     { "size": "14m" },
-            "rodata_r":   { "size": "6m" },
+            "rodata_r":   { "size": "14m" },
             "data": {
                 "size": "40m",
                 "nftl": { // Volume in NFTL device

@@ -23,6 +23,7 @@ struct rt_adc_ops
     rt_err_t (*config_dma)(struct rt_adc_device *device, void *dma_info);
     rt_err_t (*get_dma_data)(struct rt_adc_device *device,
                              rt_uint32_t channel);
+    rt_err_t (*stop_dma)(struct rt_adc_device *device, rt_uint32_t channel);
     rt_err_t (*get_mode)(struct rt_adc_device *device, void *chan_info);
     rt_uint32_t (*get_obtaining_data_mode)(struct rt_adc_device *device,
                                            rt_uint32_t channel);
@@ -63,11 +64,12 @@ typedef enum
     RT_ADC_CMD_IRQ_CALLBACK = RT_DEVICE_CTRL_BASE(ADC) + 9,
     RT_ADC_CMD_GET_CH_INFO = RT_DEVICE_CTRL_BASE(ADC) + 10,
     RT_ADC_CMD_GET_MODE = RT_DEVICE_CTRL_BASE(ADC) + 11,
+    RT_ADC_CMD_STOP_DMA = RT_DEVICE_CTRL_BASE(ADC) + 12,
 #endif
 #ifdef AIC_PSADC_DRV
-    RT_ADC_CMD_GET_VALUES_POLL = RT_DEVICE_CTRL_BASE(ADC) + 12,
     RT_ADC_CMD_GET_VALUES = RT_DEVICE_CTRL_BASE(ADC) + 13,
     RT_ADC_CMD_GET_CHAN_COUNT = RT_DEVICE_CTRL_BASE(ADC) + 14,
+    RT_ADC_CMD_GET_VALUES_POLL = RT_DEVICE_CTRL_BASE(ADC) + 15,
 #endif
 } rt_adc_cmd_t;
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -31,7 +31,7 @@ extern struct usb_device usbupg_device;
 void usbd_connection_check_start(void)
 {
 #ifndef AIC_SYSCFG_DRV_V12
-    syscfg_usb_phy0_sw_host(0);
+    hal_syscfg_usb_phy0_sw_host(0);
 #endif
     aic_udc_init(&usbupg_device);
 }

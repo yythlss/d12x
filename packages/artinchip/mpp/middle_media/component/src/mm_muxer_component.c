@@ -588,8 +588,6 @@ static void mm_muxer_state_change_to_idle(mm_muxer_data *p_muxer_data)
                     p_muxer_data->muxer_write_pkt_fail_num++;
                 }
             }
-            printf("num:%d,cur_file_write_frame_num:%d\n", num,
-                   p_muxer_data->cur_file_write_frame_num);
 
             aic_muxer_write_trailer(p_muxer_data->p_muxer);
             aic_muxer_destroy(p_muxer_data->p_muxer);
@@ -944,6 +942,5 @@ static void *mm_muxer_component_thread(void *p_thread_data)
 
 _EXIT:
     mm_muxer_component_count_print(p_muxer_data);
-    printf("mm_muxer_component_thread exit\n");
     return (void *)MM_ERROR_NONE;
 }

@@ -27,6 +27,30 @@ backup_list=
 display_list=
 display_list_total=
 
+# $1 - the command name
+function _unalias()
+{
+	CMD=$1
+	alias | grep $CMD"=" -w > /dev/null
+	if [ $? -eq 0 ]; then
+		unalias $CMD
+	fi
+}
+
+function _clear_env()
+{
+	unset ckernel
+	_unalias ck
+	unset cuboot
+	_unalias cu
+	unset mm
+	unset genindex
+	_unalias gi
+	unset goexplorer
+	_unalias ge
+	unset um
+}
+
 function _hline()
 {
 	local cmd="$1"
@@ -568,6 +592,27 @@ function rebuildall()
 	build_check_all clean
 }
 
+function _all_config_update()
+{
+	cd_root
+	configs=`ls ${SDK_PRJ_TOP_DIR}/target/configs/ -1 | grep defconfig`
+	for config in $configs
+	do
+		scons --apply-def=${config}
+		python3 ${SDK_PRJ_TOP_DIR}/tools/scripts/config_update.py
+		if [ $? -eq 0 ]; then
+			echo "Update ${config} successfully."
+			echo
+		else
+			echo "Update ${config} failed!!!!!!!!!"
+			return
+		fi
+	done
+		echo "Update all config successfully."
+	cd_back
+}
+alias updateconfig=_all_config_update
+
 function godir()
 {
 	local keyword="$*"
@@ -1008,6 +1053,7 @@ function _sdk_update()
 }
 alias update=_sdk_update
 
+_clear_env
 _mark_topdir
 
 uname -a | grep MINGW  > /dev/null

@@ -1,9 +1,11 @@
 /*
-* Copyright (C) 2020-2023 ArtInChip Technology Co. Ltd
-*
-*  author: <jun.ma@artinchip.com>
-*  Desc: aic_audio_decoder interface
-*/
+ * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *  Author: <jun.ma@artinchip.com>
+ *  Desc: audio decoder render test demo
+ */
 
 #include <string.h>
 #include <malloc.h>
@@ -19,7 +21,7 @@
 
 #include "aic_audio_decoder.h"
 #include "mpp_log.h"
-#include "aic_audio_render.h"
+#include "aic_audio_render_manager.h"
 #include "pcm2wav.h"
 
 static int g_bs_eof_flag = 0;
@@ -39,11 +41,13 @@ static int g_decoder_end = 0;
 
 static void* decode_thread(void *p)
 {
-	struct aic_audio_decoder* audio_decoder = (struct aic_audio_decoder* )p;
+	struct aic_audio_decoder *audio_decoder = (struct aic_audio_decoder *)p;
 	logi("decode_thread start!!!!!\n");
 	aic_audio_decoder_decode(audio_decoder);
 	g_decoder_end = 1;
 	logi("decode_thread exit!!!!!\n");
+
+	return NULL;
 }
 
 int main(int argc ,char *argv[])
@@ -57,12 +61,11 @@ int main(int argc ,char *argv[])
 	struct aic_audio_decode_config audio_decoder_config;
 	struct aic_audio_frame audio_frame;
 	pthread_t decode_thread_id;
-	pthread_t get_frame_thread_id;
 	struct aic_audio_render *render;
 	int first_frame_show =1;
 	struct aic_audio_render_attr  audio_render_attr;
 	int save_fd;
-
+	struct audio_render_create_params create_params;
 	struct timeval pre,cur;
 
 	struct timeval before_rend,after_rend;
@@ -72,7 +75,7 @@ int main(int argc ,char *argv[])
 	memset(&pre,0x00,sizeof(struct timeval));
 	memset(&cur,0x00,sizeof(struct timeval));
 
-	if(argc < 2){
+	if (argc < 2) {
 		logd("param error\n");
 		return -1;
 	}
@@ -85,13 +88,14 @@ int main(int argc ,char *argv[])
 	file_size = lseek(file_fd, 0, SEEK_END);
 	lseek(file_fd, 0, SEEK_SET);
 	audio_decoder = aic_audio_decoder_create(MPP_CODEC_AUDIO_DECODER_MP3);
-	if(audio_decoder == NULL){
+	if (audio_decoder == NULL) {
 		loge("aic_audio_decoder_create error!!!\n");
 		ret =-1;
 		goto _EXIT1;
 	}
-
-	if(aic_audio_render_create(&render) != 0){
+	create_params.dev_id = 0;
+	create_params.scene_type = AUDIO_RENDER_SCENE_DEFAULT;
+	if (aic_audio_render_create(&render, &create_params) != 0) {
 		loge("aic_audio_decoder_create error!!!\n");
 		ret = -1;
 		goto _EXIT2;
@@ -101,7 +105,7 @@ int main(int argc ,char *argv[])
 	audio_decoder_config.packet_count = 8;
 	audio_decoder_config.frame_count = 16;
 
-	if(aic_audio_decoder_init(audio_decoder, &audio_decoder_config) != 0){
+	if (aic_audio_decoder_init(audio_decoder, &audio_decoder_config) != 0) {
 		loge("aic_audio_decoder_init error!!!\n");
 		ret =-1;
 		goto _EXIT3;
@@ -122,45 +126,45 @@ int main(int argc ,char *argv[])
 
 	memset(&pkt,0x00,sizeof(struct mpp_packet));
 
-	while(1){
-		if(!g_bs_eof_flag){
+	while(1) {
+		if (!g_bs_eof_flag) {
 			pkt.size = PKT_SIZE;
 			// if get packet fail,do not wait
 			ret = aic_audio_decoder_get_packet(audio_decoder,&pkt,pkt.size);
-			if(ret == 0){//ger packet success
+			if (ret == 0) {//ger packet success
 				ret = read(file_fd, pkt.data, pkt.size);
-				if(ret > 0){
+				if (ret > 0) {
 					pkt.size = ret;
 					read_len += ret;
-					if(read_len >= file_size){
+					if (read_len >= file_size) {
 						g_bs_eof_flag = 1;
 						pkt.flag |= PACKET_FLAG_EOS;
 						logi("end of stream\n");
 					}
 					logd("read size:%d,read_len:%d,file_size:%d\n",pkt.size,read_len,file_size);
-				}else if(ret == 0){
+				} else if(ret == 0) {
 					g_bs_eof_flag = 1;
 					pkt.flag |= PACKET_FLAG_EOS;
 					logi("end of stream\n");
-				}else{
+				} else {
 					logd("read error!!!\n");
 					// need to do
 					break;
 				}
 				aic_audio_decoder_put_packet(audio_decoder,&pkt);
-			}else{
+			} else {
 				// nothing to do ,do not need to wait
 			}
 		}
 
 		ret = aic_audio_decoder_get_frame(audio_decoder,&audio_frame);
-		if(ret == DEC_OK){
+		if (ret == DEC_OK) {
 			logd("bits_per_sample:%d,"\
 				"channels:%d,"\
 				"data:%p,"\
 				"flag:0x%x,"\
 				"id:%d,"\
-				"pts:%d,"\
+				"pts:%lld,"\
 				"sample_rate:%d,"\
 				"size:%d,\n"\
 				,audio_frame.bits_per_sample
@@ -171,27 +175,27 @@ int main(int argc ,char *argv[])
 				,audio_frame.pts
 				,audio_frame.sample_rate
 				,audio_frame.size);
-			if(first_frame_show){
+			if (first_frame_show) {
+				ret = aic_audio_render_init(render);
+				logi("render->init:%d\n",ret);
 				audio_render_attr.bits_per_sample = audio_frame.bits_per_sample;
 				audio_render_attr.channels = audio_frame.channels;
 				audio_render_attr.sample_rate = audio_frame.sample_rate;
 				audio_render_attr.smples_per_frame = 1024;
-				ret = render->set_attr(render,&audio_render_attr);
+				ret = aic_audio_render_control(render, AUDIO_RENDER_CMD_SET_ATTR, &audio_render_attr);
 				logi("render->set_attr:%d\n",ret);
-				ret = render->init(render,0);
-				logi("render->init:%d\n",ret);
 				first_frame_show = 0;
 			}
 
 			gettimeofday(&cur, NULL);
-			if(pre.tv_sec != 0 || pre.tv_usec != 0){
+			if (pre.tv_sec != 0 || pre.tv_usec != 0) {
 				intelval = ((cur.tv_sec - pre.tv_sec)*1000000) + (cur.tv_usec - pre.tv_usec);
 				logd("get frame intelval time :%ld\n",intelval);
 			}
 			pre = cur;
 
 			gettimeofday(&before_rend, NULL);
-			ret = render->rend(render,audio_frame.data,audio_frame.size);
+			ret = aic_audio_render_rend(render, audio_frame.data, audio_frame.size);
 			gettimeofday(&after_rend, NULL);
 			logd("rend intelval time :%ld\n",((after_rend.tv_sec - before_rend.tv_sec)*1000000) + (after_rend.tv_usec - before_rend.tv_usec));
 
@@ -199,23 +203,23 @@ int main(int argc ,char *argv[])
 			write(save_fd,audio_frame.data,audio_frame.size);
 #endif
 			aic_audio_decoder_put_frame(audio_decoder,&audio_frame);
-		}else if(ret == DEC_NO_RENDER_FRAME){
-			if(g_bs_eof_flag && g_decoder_end){
+		} else if(ret == DEC_NO_RENDER_FRAME) {
+			if (g_bs_eof_flag && g_decoder_end) {
 				logw("decoder end break;\n");
 				break;
 			}
 			//usleep(1000);
 			//logw("mpp_dec_get_frame error, ret: %x", ret);
 			continue;
-		}else if(ret == DEC_NO_EMPTY_FRAME){
+		} else if (ret == DEC_NO_EMPTY_FRAME) {
 			//usleep(1000);
 			logw("mpp_dec_get_frame error, ret: %d", ret);
 			continue;
-		}else if(ret == DEC_ERR_FM_NOT_CREATE){
+		} else if (ret == DEC_ERR_FM_NOT_CREATE) {
 			//usleep(1000);
 			logw("mpp_dec_get_frame error, ret: %d", ret);
 			continue;
-		}else{
+		} else {
 			logw("mpp_dec_get_frame error, ret: %d", ret);
 			break;
 		}

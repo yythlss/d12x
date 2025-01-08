@@ -27,9 +27,6 @@ extern "C" {
 #ifdef AIC_SPINAND_DRV
 #include "spinand_port.h"
 #endif
-#ifdef AIC_BOOT_USB_DRV
-#include "usb_drv.h"
-#endif
 #include "wdt.h"
 #include "gpai.h"
 

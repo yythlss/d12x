@@ -217,7 +217,7 @@ static void sub_tapview_event(lv_event_t * e)
 void base_ui_init()
 {
     img_bg = lv_img_create(lv_scr_act());
-    lv_img_set_src(img_bg, LVGL_PATH(global_bg.png));
+    lv_img_set_src(img_bg, LVGL_IMAGE_PATH(global_bg.png));
     lv_obj_set_pos(img_bg, 0, 0);
 
     main_title = lv_label_create(img_bg);
@@ -283,11 +283,11 @@ void base_ui_init()
     lv_obj_set_pos(main_tab1, 0, 0);
 
     lv_obj_t *img_ck = lv_img_create(main_tab0);
-    lv_img_set_src(img_ck, LVGL_PATH(meter_clk.png));
+    lv_img_set_src(img_ck, LVGL_IMAGE_PATH(meter_clk.png));
     lv_obj_set_pos(img_ck, 50, 152);
 
     lv_obj_t *img_point = lv_img_create(main_tab0);
-    lv_img_set_src(img_point, LVGL_PATH(meter_point.png));
+    lv_img_set_src(img_point, LVGL_IMAGE_PATH(meter_point.png));
     lv_obj_set_pos(img_point, 192, 200);
     lv_img_set_pivot(img_point, 12, 108);
     lv_img_set_angle(img_point, rot_angle * 10);
@@ -303,7 +303,7 @@ void base_ui_init()
     lv_obj_set_style_text_font(ui_speed, &ui_font_italic, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *img_info = lv_img_create(main_tab0);
-    lv_img_set_src(img_info, LVGL_PATH(meter_info.png));
+    lv_img_set_src(img_info, LVGL_IMAGE_PATH(meter_info.png));
     lv_obj_set_pos(img_info, 340, 125);
 
     fps_title = lv_label_create(main_tab0);
@@ -361,10 +361,10 @@ void base_ui_init()
     lv_obj_set_style_text_font(mem_info, &ui_font_italic, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     lv_obj_t *cook_top_img = lv_img_create(main_tab1);
-    lv_img_set_src(cook_top_img, LVGL_PATH(cook_top.png));
+    lv_img_set_src(cook_top_img, LVGL_IMAGE_PATH(cook_top.png));
     lv_obj_set_pos(cook_top_img, 280, 80);
     lv_obj_t *cook_buttom_img = lv_img_create(main_tab1);
-    lv_img_set_src(cook_buttom_img, LVGL_PATH(cook_buttom.png));
+    lv_img_set_src(cook_buttom_img, LVGL_IMAGE_PATH(cook_buttom.png));
     lv_obj_set_pos(cook_buttom_img, 0, 430);
 
 #if LVGL_VERSION_MAJOR == 8
@@ -381,27 +381,27 @@ void base_ui_init()
     lv_obj_t *sub_tab1 = lv_tabview_add_tab(tab_sub, "sub page 1");
 
     lv_obj_t *sub_image00 = lv_img_create(sub_tab0);
-    lv_img_set_src(sub_image00, LVGL_PATH(cook_0.jpg));
+    lv_img_set_src(sub_image00, LVGL_IMAGE_PATH(cook_0.jpg));
     lv_obj_set_pos(sub_image00, 36, 100);
 
     lv_obj_t *sub_image01 = lv_img_create(sub_tab0);
-    lv_img_set_src(sub_image01, LVGL_PATH(cook_1.jpg));
+    lv_img_set_src(sub_image01, LVGL_IMAGE_PATH(cook_1.jpg));
     lv_obj_set_pos(sub_image01, 366, 100);
 
     lv_obj_t *sub_image02 = lv_img_create(sub_tab0);
-    lv_img_set_src(sub_image02, LVGL_PATH(cook_2.jpg));
+    lv_img_set_src(sub_image02, LVGL_IMAGE_PATH(cook_2.jpg));
     lv_obj_set_pos(sub_image02, 696, 100);
 
     lv_obj_t *sub_image03 = lv_img_create(sub_tab1);
-    lv_img_set_src(sub_image03, LVGL_PATH(cook_3.jpg));
+    lv_img_set_src(sub_image03, LVGL_IMAGE_PATH(cook_3.jpg));
     lv_obj_set_pos(sub_image03, 36, 100);
 
     lv_obj_t *sub_image04 = lv_img_create(sub_tab1);
-    lv_img_set_src(sub_image04, LVGL_PATH(cook_4.jpg));
+    lv_img_set_src(sub_image04, LVGL_IMAGE_PATH(cook_4.jpg));
     lv_obj_set_pos(sub_image04, 366, 100);
 
     lv_obj_t *sub_image05 = lv_img_create(sub_tab1);
-    lv_img_set_src(sub_image05, LVGL_PATH(cook_5.jpg));
+    lv_img_set_src(sub_image05, LVGL_IMAGE_PATH(cook_5.jpg));
     lv_obj_set_pos(sub_image05, 696, 100);
     lv_obj_add_event_cb(tab_sub, sub_tapview_event, LV_EVENT_ALL, NULL);
 

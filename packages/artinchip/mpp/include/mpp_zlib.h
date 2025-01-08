@@ -1,8 +1,9 @@
 /*
-* Copyright (C) 2020-2023 ArtInChip Technology Co. Ltd
-*
-*  author: <jun.ma@artinchip.com>
-*  Desc: mpp zlip
+ * Copyright (c) 2020-2024, ArtInChip Technology Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Authors: <qi.xu@artinchip.com>
 */
 
 #ifndef __MPP_ZLIB_H__
@@ -35,6 +36,19 @@ extern "C" {
         unsigned int compressed_len,
         unsigned char *uncompressed_data,
         unsigned int uncompressed_len);
+
+/******************************************/
+enum COMPRESS_TYPE {
+    MPP_ZLIB,
+    MPP_GZIP
+};
+
+void* mpp_unzip_create(void);
+void mpp_unzip_destroy(void *ctx);
+int mpp_unzip_uncompressed(void *ctx, enum COMPRESS_TYPE type,
+        unsigned char *src, unsigned int src_len,
+        unsigned char *dst, unsigned int dst_len,
+        int first_part, int last_part);
 
 #ifdef __cplusplus
 }

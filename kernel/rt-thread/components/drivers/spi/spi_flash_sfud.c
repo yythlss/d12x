@@ -319,7 +319,7 @@ static void spi_unlock(const sfud_spi *spi) {
 
 static void retry_delay_100us(void) {
     /* 100 microsecond delay */
-    rt_thread_delay((RT_TICK_PER_SECOND * 1 + 9999) / 10000);
+    aicos_udelay(100);
 }
 
 sfud_err sfud_spi_port_init(sfud_flash *flash) {
@@ -337,9 +337,7 @@ sfud_err sfud_spi_port_init(sfud_flash *flash) {
     flash->spi.lock = spi_lock;
     flash->spi.unlock = spi_unlock;
     flash->spi.user_data = flash;
-    if (RT_TICK_PER_SECOND < 1000) {
-        LOG_W("[SFUD] Warning: The OS tick(%d) is less than 1000. So the flash write will take more time.", RT_TICK_PER_SECOND);
-    }
+
     /* 100 microsecond delay */
     flash->retry.delay = retry_delay_100us;
     /* 60 seconds timeout */

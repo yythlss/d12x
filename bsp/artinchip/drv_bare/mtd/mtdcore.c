@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2024, ArtInChip Technology Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Authors: jiji.chen <jiji.chen@artinchip.com>
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -139,5 +146,19 @@ int mtd_block_markbad(struct mtd_dev *mtd, u32 offset)
 {
     if (mtd && mtd->ops.block_markbad)
         return mtd->ops.block_markbad(mtd, offset);
+    return -1;
+}
+
+int mtd_map_oob_user_region(struct mtd_dev *mtd, u8 *oobbuf, u8 *buf, int start, int nbytes)
+{
+    if (mtd && mtd->ops.map_user)
+        return mtd->ops.map_user(mtd, oobbuf, buf, start, nbytes);
+    return -1;
+}
+
+int mtd_unmap_oob_user_region(struct mtd_dev *mtd, u8 *dst, u8* src, int start, int nbytes)
+{
+    if (mtd && mtd->ops.unmap_user)
+        return mtd->ops.unmap_user(mtd, dst, src, start, nbytes);
     return -1;
 }

@@ -33,6 +33,27 @@ enum AIC_COM_TYPE {
     AIC_DBI_COM  = 0x04,  /* mipi dbi component */
 };
 
+struct panel_dbi_commands {
+    const u8 *buf;
+    size_t len;
+};
+
+struct spi_cfg {
+    unsigned int qspi_mode;
+    unsigned int vbp_num;
+    unsigned int code1_cfg;
+    unsigned int code[3];
+};
+
+struct panel_dbi {
+    unsigned int type;
+    unsigned int format;
+    unsigned int first_line;
+    unsigned int other_line;
+    struct panel_dbi_commands commands;
+    struct spi_cfg *spi;
+};
+
 struct panel_rgb {
     unsigned int mode;
     unsigned int format;
@@ -190,7 +211,35 @@ static void aicpq_print_config(struct aicfb_pq_config *config, int connector_typ
                         dsi->ln_assign);
                 break;
             }
+            case AIC_DBI_COM:
+            {
+                struct panel_dbi *dbi = config->data;
+                unsigned int dbi_code = dbi->spi->code[0] << 16 |
+                                        dbi->spi->code[1] << 8  |
+                                        dbi->spi->code[2];
+
+                printf("dbi info:\n"
+                        "\ttype:%d\n"
+                        "\tformat:%d\n"
+                        "\tfirst_line:%x\n"
+                        "\tother_line:%x\n"
+                        "\tqspi_mode:%d\n"
+                        "\tvbp_num:%d\n"
+                        "\tcode1_cfg:%x\n"
+                        "\tdbi_code:%x\n",
+                        dbi->type,
+                        dbi->format,
+                        dbi->first_line,
+                        dbi->other_line,
+                        dbi->spi->qspi_mode,
+                        dbi->spi->vbp_num,
+                        dbi->spi->code1_cfg,
+                        dbi_code
+                        );
+                break;
+            }
             default:
+                printf("Unknown Connector type: %d !\n", connector_type);
                 break;
         }
 }
@@ -245,6 +294,7 @@ static int aipq_config_test(int argc, char **argv)
     struct panel_rgb rgb = { 0 };
     struct panel_lvds lvds = { 0 };
     struct panel_dsi dsi = { 0 };
+    struct panel_dbi dbi = { 0 };
     int connector_type = 1;
     int c, ret = 0;
 
@@ -412,11 +462,48 @@ static int aipq_config_test(int argc, char **argv)
                     config.data            = &dsi;
                     break;
                 }
+                case AIC_DBI_COM:
+                {
+
+                    dbi.spi = aicos_malloc(MEM_CMA, sizeof(struct spi_cfg));
+                    if(!dbi.spi) {
+                        pr_err("Malloc spi_cfg buf failed!\n");
+                        return -1;
+                    }
+
+                    char str[3] = {0};
+
+                    dbi.type            = char2int(con_info[1]);
+                    dbi.format          = char2int(con_info[2]);
+
+                    memcpy(str, con_info + 3, 2);
+                    dbi.first_line      = strtoll(str, NULL, 16);
+
+                    memcpy(str, con_info + 5, 2);
+                    dbi.other_line      = strtoll(str, NULL, 16);
+
+                    dbi.spi->qspi_mode  = char2int(con_info[7]);
+                    dbi.spi->vbp_num    = char2int(con_info[8]);
+
+                    memcpy(str, con_info + 9, 2);
+                    dbi.spi->code1_cfg  = strtoll(str, NULL, 16);
+
+                    memcpy(str, con_info + 11, 2);
+                    dbi.spi->code[0]    = strtoll(str, NULL, 16);
+                    memcpy(str, con_info + 13, 2);
+                    dbi.spi->code[1]    = strtoll(str, NULL, 16);
+                    memcpy(str, con_info + 15, 2);
+                    dbi.spi->code[2]    = strtoll(str, NULL, 16);
+
+                    config.data         = &dbi;
+                    break;
+                }
                 default:
                     break;
             }
 
             mpp_fb_ioctl(fb, AICFB_PQ_SET_CONFIG, &config);
+            aicos_free(MEM_CMA, dbi.spi);
             break;
         }
         case 'g':
@@ -438,12 +525,21 @@ static int aipq_config_test(int argc, char **argv)
                 case AIC_MIPI_COM:
                     config.data = &dsi;
                     break;
+                case AIC_DBI_COM:
+                    dbi.spi = aicos_malloc(MEM_CMA, sizeof(struct spi_cfg));
+                    if (!dbi.spi) {
+                        pr_err("Malloc spi_cfg buf failed!\n");
+                        return -1;
+                    }
+                    config.data = &dbi;
+                    break;
                 default:
                     break;
             }
 
             mpp_fb_ioctl(fb, AICFB_PQ_GET_CONFIG, &config);
             aicpq_print_config(&config, connector_type);
+            aicos_free(MEM_CMA, dbi.spi);
             break;
         }
         default:

@@ -10,11 +10,12 @@
 #include <rtthread.h>
 #include <rtdevice.h>
 #include "touch.h"
-#include <rtdbg.h>
 #include "cst3240.h"
+#include "touch_common.h"
 
 #define DBG_TAG "cst3240"
 #define DBG_LVL DBG_LOG
+#include <rtdbg.h>
 
 static struct rt_i2c_client cst3240_client;
 
@@ -175,6 +176,12 @@ static rt_size_t cst3240_readpoint(struct rt_touch_device *touch, void *buf, rt_
             pre_id[read_index] = read_id;
             input_x = ((rt_uint16_t)read_buf[off_set + 1] << 4) | ((read_buf[off_set + 3] >> 4) & 0x0f);
             input_y = ((rt_uint16_t)read_buf[off_set + 2] << 4) | (read_buf[off_set + 3] & 0x0f);
+
+            aic_touch_flip(&input_x, &input_y);
+            aic_touch_rotate(&input_x, &input_y);
+            aic_touch_scale(&input_x, &input_y);
+            if (!aic_touch_crop(&input_x, &input_y))
+                continue;
 
             cst3240_touch_down(buf, read_id, input_x, input_y);
         }

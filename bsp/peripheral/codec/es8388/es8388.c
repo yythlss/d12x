@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -133,7 +133,7 @@ int es8388_start(struct codec *codec, i2s_stream_t stream)
         reg_write(ES8388_DACCONTROL20, 0xB8);
         /* startup FSM and DLL */
         reg_write(ES8388_CHIPPOWER, 0xAA);
-        rt_thread_delay(500);
+        rt_thread_delay(10);
         reg_write(ES8388_DACCONTROL24, 0x1C);
         reg_write(ES8388_DACCONTROL25, 0x1C);
         reg_write(ES8388_DACCONTROL26, 0x1C);

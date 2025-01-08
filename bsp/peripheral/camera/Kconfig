@@ -32,6 +32,12 @@ choice
     config AIC_USING_CAMERA_SC030IOT
         bool "Using camera SC030IOT"
 
+    config AIC_USING_CAMERA_SC031GS
+        bool "Using camera SC031GS"
+
+    config AIC_USING_CAMERA_SC035HGS
+        bool "Using camera SC035HGS"
+
     config AIC_USING_CAMERA_TP2825
         bool "Using camera TP2825"
 endchoice

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -120,4 +120,14 @@ int efuse_program(u32 addr, const void *data, u32 size)
     }
 
     return (int)(size - rest);
+}
+
+int sjtag_auth(u32 *key, u32 kwlen)
+{
+    return hal_sjtag_auth(key, kwlen);
+}
+
+int szone_auth(u32 *key, u32 kwlen)
+{
+    return hal_szone_auth(key, kwlen);
 }

@@ -68,8 +68,6 @@ void aic_msg_destroy(struct aic_message_queue* msg_que)
 	}
 	pthread_mutex_unlock(&msg_que->mutex);
 
-	printf("[%s:%d] free cnt:%d,free cnt :%d\n",__FUNCTION__,__LINE__,cnt,msg_que->msg_node_cnt);
-
 	if (cnt != msg_que->msg_node_cnt) {
 		loge("why not eq,check code !!!,free cnt:%d,malloc cnt :%d\n",cnt,msg_que->msg_node_cnt);
 	}

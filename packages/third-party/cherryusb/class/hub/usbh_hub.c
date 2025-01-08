@@ -280,6 +280,7 @@ static int usbh_hub_set_depth(struct usbh_hub *hub, uint16_t depth)
 static void usbh_hubport_release(struct usbh_hubport *child)
 {
     if (child->connected) {
+        usb_osal_mutex_take(child->mutex);
         child->connected = false;
         usbh_free_devaddr(child);
         for (uint8_t i = 0; i < child->config.config_desc.bNumInterfaces; i++) {
@@ -287,6 +288,7 @@ static void usbh_hubport_release(struct usbh_hubport *child)
                 CLASS_DISCONNECT(child, i);
             }
         }
+        usb_osal_mutex_give(child->mutex);
         child->config.config_desc.bNumInterfaces = 0;
         usbh_kill_urb(&child->ep0_urb);
         if (child->parent->is_roothub)
@@ -688,6 +690,25 @@ void usbh_hub_poll(void)
         usbh_hub_events(hub);
 #endif
 }
+
+int usbh_hub_connect_check(void)
+{
+    struct usbh_hub *hub;
+    struct usbh_bus *bus = NULL;
+
+#if defined(AIC_USING_USB0_HOST) || defined(AIC_USING_USB0_OTG)
+    bus = usb_ehci0_hs_bus;
+    if (bus->hub_mq && !usb_osal_mq_recv(bus->hub_mq, (uintptr_t *)&hub, 1000))
+        return true;
+#endif
+
+#ifdef AIC_USING_USB1_HOST
+    bus = usb_ehci1_hs_bus;
+    if (bus->hub_mq && !usb_osal_mq_recv(bus->hub_mq, (uintptr_t *)&hub, 1000))
+        return true;
+#endif
+    return false;
+}
 #endif
 
 void usbh_hub_thread_wakeup(struct usbh_hub *hub)
@@ -714,7 +735,7 @@ int usbh_hub_initialize(struct usbh_bus *bus)
         return -1;
     }
 #else
-    usb_hc_init(bus);
+    return usb_hc_init(bus);
 #endif
     return 0;
 }

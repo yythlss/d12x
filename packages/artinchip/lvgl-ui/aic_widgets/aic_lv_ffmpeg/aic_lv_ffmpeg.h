@@ -49,6 +49,7 @@ typedef struct {
     lv_timer_t * timer;
     lv_img_dsc_t imgdsc;
     bool auto_restart;
+    bool keep_last_frame;
     struct ffmpeg_context_s * ffmpeg_ctx;
 } lv_ffmpeg_player_t;
 
@@ -64,6 +65,7 @@ typedef enum {
     LV_FFMPEG_PLAYER_CMD_GET_VOLUME_EX,     /* data type is s32 *, rang: 0 ~ 100 */
     LV_FFMPEG_PLAYER_CMD_SET_PLAY_TIME_EX,  /* data type is u64 *, unite: microsecond */
     LV_FFMPEG_PLAYER_CMD_GET_PLAY_TIME_EX,  /* data type is u64 *, unite: microsecond */
+    LV_FFMPEG_PLAYED_CMD_KEEP_LAST_FRAME_EX, /* data is NULL, caching last frame on multiple src switches avoids black screen */
     _LV_FFMPEG_PLAYER_CMD_LAST
 } lv_ffmpeg_player_cmd_t;
 

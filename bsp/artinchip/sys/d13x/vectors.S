@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -49,6 +49,14 @@ Default_IRQHandler:
     ipush
 #else
     .long   0x0040000b
+#endif
+
+#if defined(_ENABLE_BACK_TRACE_STACK_) && defined(_NO_OMIT_FRAME_POINT_)
+    addi    sp,sp,-8
+    STORE   s0,(sp)
+    csrr    a0, mepc
+    STORE   a0, 4(sp)
+    addi    s0, sp, 8
 #endif
 
 #ifdef ARCH_RISCV_FPU
@@ -138,6 +146,12 @@ Default_IRQHandler:
 
     addi    sp, sp, (20 * FREGBYTES)
 #endif
+
+#if defined(_ENABLE_BACK_TRACE_STACK_) && defined(_NO_OMIT_FRAME_POINT_)
+lw    s0, (sp)
+addi  sp, sp, 8
+#endif
+
 #ifdef __riscv_xthead
     ipop
 #else
@@ -159,8 +173,11 @@ trap:
     csrr    t0, mcause
     blt     t0, x0, .Lirq
     addi    sp, sp, 4
+#ifndef AIC_BACKTRACE_DEBUG
     la      t0, g_trap_sp
-
+#else
+    mv       t0, sp
+#endif
     addi    t0, t0, -132
 
     sw      x1,    0(t0)
@@ -207,6 +224,92 @@ trap:
     la      a5, trap_c
     jalr    a5
 
+#if defined(_ENABLE_BACK_TRACE_STACK_) && defined(KERNEL_RTTHREAD)
+    mv      a0, sp
+    addi    a0, a0, 132
+    csrr    a1, mscratch
+    csrr    a2, mepc
+    la      a5, print_stack
+    jalr    a5
+#define CALL_STACK_MAX_DEPTH 32
+    la      a0, rt_current_thread
+    beqz    a0, .
+#ifdef _NO_OMIT_FRAME_POINT_
+    mv      t0, sp
+    la      t1, CALL_STACK_MAX_DEPTH
+    slli    t1, t1, 2
+    sub     t0, t0, t1
+    csrr    a1, mepc
+    STORE   a1, (t0)
+    mv      a1, s0
+    li      t1, 1
+1:
+    // check sram addr
+    li      t2, 0x30000000
+    la      t3, AIC_SRAM_TOTAL_SIZE
+    add     t3, t2, t3
+
+    blt     a1, t2, 2f
+    bge     a1, t3, 2f
+
+    addi    a2, a1, -(4)
+    blt     a2, t2, 2f
+    bge     a2, t3, 2f
+
+    addi    a2, a1, -(8)
+    blt     a2, t2, 2f
+    bge     a2, t3, 2f
+
+    j       3f
+2:
+    // check psram addr
+    li      t2, 0x40000000
+    la      t3, AIC_PSRAM_SIZE
+    add     t3, t2, t3
+
+    blt     a1, t2, 4f
+    bge     a1, t3, 4f
+
+    addi    a2, a1, -(4)
+    blt     a2, t2, 4f
+    bge     a2, t3, 4f
+
+    addi    a2, a1, -(8)
+    blt     a2, t2, 4f
+    bge     a2, t3, 4f
+3:
+    // get ra
+    LOAD    a2, -4(a1)
+    slli    t2, t1, 2
+    add     t2, t2, t0
+    STORE   a2, (t2)
+    // get next fp
+    LOAD    a1, -8(a1)
+    //inc call depth
+    addi    t1, t1, 1
+    // check end
+    li  a2, 0xdeadbeef
+    beq a1, a2, 4f
+    la  a2, CALL_STACK_MAX_DEPTH
+    blt t1, a2, 1b
+4:
+    mv      a0, t1
+    mv      a1, t0
+    mv      sp, t0
+    la      a5, print_back_trace
+    jalr    a5
+#else
+    mv      a0, sp
+    addi    a0, a0, 132
+    csrr    a1, mscratch
+    csrr    a2, mepc
+    la      a5, backtrace_call_stack
+    jalr    a5
+#endif
+#endif
+
+
+    j       .
 
 .Lirq:
     lw      t0, 0x0(sp)

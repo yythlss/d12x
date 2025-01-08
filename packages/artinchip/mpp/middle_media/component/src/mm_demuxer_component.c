@@ -279,8 +279,6 @@ static s32 mm_demuxer_index_param_contenturi(mm_demuxer_data *p_demuxer_data,
     }
     ret = aic_parser_create(p_demuxer_data->p_contenturi->content_uri,
                             &p_demuxer_data->p_parser);
-    printf("[%s:%d]p_parser=%p,content_uri:%s\n", __FUNCTION__, __LINE__,
-           p_demuxer_data->p_parser, p_demuxer_data->p_contenturi->content_uri);
     if (NULL == p_demuxer_data->p_parser) { /*create parser fail*/
         mm_demuxer_event_notify(p_demuxer_data, MM_EVENT_ERROR,
                                 MM_ERROR_FORMAT_NOT_DETECTED,
@@ -293,7 +291,6 @@ static s32 mm_demuxer_index_param_contenturi(mm_demuxer_data *p_demuxer_data,
         Here,it will takes a lot of time,the larger the file,the longer it takes.
         so,if you want to optimize it,please optimize parser.
     *******************************************************************************/
-    time_start(aic_parser_init);
     ret = aic_parser_init(p_demuxer_data->p_parser);
     if (0 != ret) {
         mm_demuxer_event_notify(p_demuxer_data, MM_EVENT_ERROR,
@@ -303,7 +300,6 @@ static s32 mm_demuxer_index_param_contenturi(mm_demuxer_data *p_demuxer_data,
         p_demuxer_data->p_parser = NULL;
         return MM_ERROR_FORMAT_NOT_DETECTED;
     }
-    time_end(aic_parser_init);
     memset(&p_demuxer_data->s_media_info, 0x00,
            sizeof(struct aic_parser_av_media_info));
     ret = aic_parser_get_media_info(p_demuxer_data->p_parser,
@@ -355,8 +351,6 @@ static s32 mm_demuxer_index_param_contenturi(mm_demuxer_data *p_demuxer_data,
     if (b_audio_find || b_video_find) {
         mm_demuxer_event_notify(p_demuxer_data, MM_EVENT_PORT_FORMAT_DETECTED,
                                 0, 0, &p_demuxer_data->s_media_info);
-        printf("[%s:%d]MM_EVENT_PORT_FORMAT_DETECTED\n", __FUNCTION__,
-               __LINE__);
 
         if (b_audio_find &&
             p_demuxer_data->s_media_info.audio_stream.extra_data_size > 0 &&
@@ -403,20 +397,6 @@ static s32 mm_demuxer_index_param_contenturi(mm_demuxer_data *p_demuxer_data,
             p_demuxer_data->extra_video_pkt.type = MPP_MEDIA_TYPE_VIDEO;
             p_demuxer_data->extra_video_pkt_flag = MM_TRUE;
             p_demuxer_data->video_pkt_num++;
-#if 0
-            int i = 0;
-            printf(
-                "-----------------------------extra_data,size:%d------------------------------------\n",
-                p_demuxer_data->s_media_info.video_stream.extra_data_size);
-            for (i = 0;
-                 i < p_demuxer_data->s_media_info.video_stream.extra_data_size;
-                 i++) {
-                printf("%02x ",
-                       p_demuxer_data->s_media_info.video_stream.extra_data[i]);
-            }
-            printf(
-                "\n----------------------------------------------------------------------------\n");
-#endif
         }
     } else {
         mm_demuxer_event_notify(p_demuxer_data, MM_EVENT_ERROR,
@@ -463,7 +443,7 @@ static s32 mm_demuxer_set_parameter(mm_handle h_component, MM_INDEX_TYPE index,
             break;
         case MM_INDEX_PARAM_NUM_AVAILABLE_STREAM: //u32
             break;
-        case MM_INDEX_PARAM_ACTIVE_STREAM: //u32
+        case MM_INDEX_PARAM_ACTIVE_STREAM: // u32
             tmp1 = ((mm_param_u32 *)p_param)->port_index;
             tmp2 = ((mm_param_u32 *)p_param)->u32; // start from 0
             if (tmp1 == DEMUX_PORT_AUDIO_INDEX) {
@@ -482,6 +462,17 @@ static s32 mm_demuxer_set_parameter(mm_handle h_component, MM_INDEX_TYPE index,
                 *p_vid_stream_idx = tmp2;
             } else {
                 error = MM_ERROR_BAD_PARAMETER;
+            }
+            break;
+
+        case MM_INDEX_VENDOR_DEMUXER_SKIP_TRACK:
+            tmp1 = ((mm_param_skip_track *)p_param)->port_index;
+            if (tmp1 == DEMUX_PORT_AUDIO_INDEX) {
+                p_demuxer_data->skip_track |= DEMUX_SKIP_AUDIO_TRACK;
+                aic_parser_control(p_demuxer_data->p_parser, PARSER_AUDIO_SKIP_PACKET, NULL);
+            } else if (tmp1 == DEMUX_PORT_VIDEO_INDEX) {
+                p_demuxer_data->skip_track |= DEMUX_SKIP_VIDEO_TRACK;
+                aic_parser_control(p_demuxer_data->p_parser, PARSER_VIDEO_SKIP_PACKET, NULL);
             }
             break;
 
@@ -961,6 +952,59 @@ CMD_EXIT:
 }
 
 static int
+mm_demuxer_component_process_eos_pkt(mm_demuxer_data *p_demuxer_data)
+{
+    /*Get video decoder handle*/
+    mm_component *h_vdec_comp =
+        p_demuxer_data->out_port_bind[DEMUX_PORT_VIDEO_INDEX].p_bind_comp;
+    mm_component *h_adec_comp =
+        p_demuxer_data->out_port_bind[DEMUX_PORT_AUDIO_INDEX].p_bind_comp;
+
+    /*when the final video or audio packet can't get PACKET_EOS flag,
+     *then parser send a empty packet to demuxer , and demuxer need
+     *wakup dec comp and send end flag to dec comp
+     */
+    if (h_vdec_comp != NULL && (p_demuxer_data->skip_track == 0 ||
+                                p_demuxer_data->skip_track & DEMUX_SKIP_AUDIO_TRACK)) {
+        mm_send_command(h_vdec_comp, MM_COMMAND_EOS, 0, NULL);
+    }
+
+    if (h_adec_comp != NULL && (p_demuxer_data->skip_track == 0 ||
+                                p_demuxer_data->skip_track & DEMUX_SKIP_VIDEO_TRACK)) {
+        mm_send_command(h_adec_comp, MM_COMMAND_EOS, 0, NULL);
+    }
+
+    return MM_ERROR_NONE;
+}
+
+static int mm_demuxer_component_uri_is_exist(mm_demuxer_data *p_demuxer_data)
+{
+    bool is_exist = true;
+
+    if (!p_demuxer_data->p_contenturi || !p_demuxer_data->p_contenturi->content_uri)
+        is_exist = false;
+
+    if (is_exist == true) {
+        if(access((char *)p_demuxer_data->p_contenturi->content_uri, 0) == -1) {
+            loge("uri:%s is not exist, then notify player exit\n",
+                p_demuxer_data->p_contenturi->content_uri);
+            is_exist = false;
+        }
+    }
+
+    if (is_exist == false) {
+        /*send a end empty pkt to vdec and adec */
+        mm_demuxer_component_process_eos_pkt(p_demuxer_data);
+
+        /*notify player exit */
+        mm_demuxer_event_notify(p_demuxer_data, MM_EVENT_BUFFER_FLAG, 0, 0, NULL);
+        aic_msg_wait_new_msg(&p_demuxer_data->s_msg, 0);
+    }
+
+    return is_exist;
+}
+
+static int
 mm_demuxer_component_process_video_pkt(mm_demuxer_data *p_demuxer_data,
                                        struct aic_parser_packet *p_pkt)
 {
@@ -1184,7 +1228,7 @@ mm_demuxer_component_process_audio_pkt(mm_demuxer_data *p_demuxer_data,
 
 void mm_demuxer_pkt_count_print(mm_demuxer_data *p_demuxer_data)
 {
-    printf("[%s:%d]video_pkt_num:%u,get_video_pkt_ok_num:%u,"
+    logi("[%s:%d]video_pkt_num:%u,get_video_pkt_ok_num:%u,"
            "put_video_pkt_ok_num:%u,put_video_pkt_fail_num:%u,"
            "audio_pkt_num:%u,get_audio_pkt_ok_num:%u,"
            "put_audio_pkt_ok_num:%u,put_audio_pkt_fail_num:%u\n",
@@ -1238,9 +1282,14 @@ static void *mm_demuxer_component_thread(void *p_thread_data)
         }
         b_notify_frame_end = 0;
 
+        /* uri is not exist, then need to notify player exit*/
+        if (!mm_demuxer_component_uri_is_exist(p_demuxer_data))
+            continue;
+
         /* peek pkt info from parser*/
         if (p_demuxer_data->need_peek) {
             s_pkt.flag = 0;
+            s_pkt.size = 0;
             ret = aic_parser_peek(p_demuxer_data->p_parser, &s_pkt);
             if (!ret) {
                 logd("peek type %d ok\n", s_pkt.type);
@@ -1251,9 +1300,10 @@ static void *mm_demuxer_component_thread(void *p_thread_data)
                     p_demuxer_data->audio_pkt_num++;
                 }
             } else if (ret == PARSER_EOS) { //peek end
-                printf("[%s:%d]*************PARSER_EOS*******************\n",
-                       __FUNCTION__, __LINE__);
                 p_demuxer_data->eos = 1;
+                if (s_pkt.size == 0 && s_pkt.flag == PACKET_EOS) {
+                    mm_demuxer_component_process_eos_pkt(p_demuxer_data);
+                }
                 goto _AIC_MSG_GET_;
             } else { // now  nothing to do ,becase no other return val
                 loge("peek fail\n");
@@ -1285,7 +1335,6 @@ static void *mm_demuxer_component_thread(void *p_thread_data)
 
 _EXIT:
     mm_demuxer_pkt_count_print(p_demuxer_data);
-    printf("[%s:%d]mm_demuxer_component_thread exit\n",__FUNCTION__,
-           __LINE__);
+
     return (void *)MM_ERROR_NONE;
 }

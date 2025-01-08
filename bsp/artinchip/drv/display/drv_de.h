@@ -41,6 +41,7 @@ struct aic_de_comp {
 
     const struct display_timing *timing;
     aicos_wqueue_t vsync_queue;
+    unsigned int accum_line;
     u32 scaler_active;
 };
 

@@ -68,6 +68,12 @@ uint8_t usb_disp_free_framebuffer = 1;
 uint8_t usb_disp_free_framebuffer = 0;
 #endif
 
+#ifdef LPKG_CHERRYUSB_DEVICE_AUDIO
+uint8_t usb_large_transfer = 0;
+#else
+uint8_t usb_large_transfer = 1;
+#endif
+
 static void usage_fps(char * program)
 {
     printf("\n");
@@ -134,8 +140,8 @@ void usbd_disp_comp_setup(void *parameter)
 {
 #if defined(LPKG_USING_COMP_MSC) && \
     defined(LPKG_CHERRYUSB_DEVICE_MSC)
-    extern int msc_storage_forbidden(void);
-    msc_storage_forbidden();
+    extern int msc_usbd_forbid(void);
+    msc_usbd_forbid();
 #endif
 #if defined(LPKG_USING_COMP_TOUCH) && \
     defined(LPKG_CHERRYUSB_DEVICE_HID_TOUCH_TEMPLATE)

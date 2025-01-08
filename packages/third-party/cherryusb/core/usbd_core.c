@@ -55,6 +55,7 @@ struct usbd_core_priv {
 
     /** Currently selected configuration */
     USB_MEM_ALIGNX uint8_t configuration;
+    uint8_t connected;
     uint8_t speed;
 #ifdef CONFIG_USBDEV_TEST_MODE
     bool test_mode;
@@ -534,6 +535,7 @@ static bool usbd_std_device_req_handler(struct usb_setup_packet *setup, uint8_t 
                 ret = false;
             } else {
                 g_usbd_core.configuration = value;
+                g_usbd_core.connected = true;
                 usbd_class_event_notify_handler(USBD_EVENT_CONFIGURED, NULL);
                 usbd_event_handler(USBD_EVENT_CONFIGURED);
             }
@@ -958,11 +960,13 @@ static void usbd_class_event_notify_handler(uint8_t event, void *arg)
 
 void usbd_event_connect_handler(void)
 {
+    g_usbd_core.connected = true;
     usbd_event_handler(USBD_EVENT_CONNECTED);
 }
 
 void usbd_event_disconnect_handler(void)
 {
+    g_usbd_core.connected = false;
     usbd_event_handler(USBD_EVENT_DISCONNECTED);
 }
 
@@ -1001,8 +1005,7 @@ void usbd_event_reset_handler(void)
     usbd_event_handler(USBD_EVENT_RESET);
 }
 
-extern uint8_t ep0_ctrl_stage;
-extern uint8_t ep0_ctlwr_rd_flg;
+//extern uint8_t ep0_ctrl_stage;
 
 void usbd_event_ep0_setup_complete_handler(uint8_t *psetup)
 {
@@ -1028,7 +1031,6 @@ void usbd_event_ep0_setup_complete_handler(uint8_t *psetup)
     /* handle class request when all the data is received */
     if (setup->wLength && ((setup->bmRequestType & USB_REQUEST_DIR_MASK) == USB_REQUEST_DIR_OUT)) {
         USB_LOG_DBG("[2]: Control write transfer start reading %d bytes from ep0\r\n", setup->wLength);
-        ep0_ctlwr_rd_flg = 1;
         usbd_ep_start_read(USB_CONTROL_OUT_EP0, g_usbd_core.ep0_data_buf, setup->wLength);
         return;
     }
@@ -1052,6 +1054,9 @@ void usbd_event_ep0_setup_complete_handler(uint8_t *psetup)
         return;
     }
 
+    /* Send data or status to host */
+    usbd_ep_start_write(USB_CONTROL_IN_EP0, g_usbd_core.ep0_data_buf, g_usbd_core.ep0_data_buf_residue);
+
     /*
     * Set ZLP flag when host asks for a bigger length and the data size is
     * multiplier of USB_CTRL_EP_MPS, to indicate the transfer done after zlp
@@ -1061,17 +1066,6 @@ void usbd_event_ep0_setup_complete_handler(uint8_t *psetup)
         g_usbd_core.zlp_flag = true;
         USB_LOG_DBG("EP0 Set zlp\r\n");
     }
-
-    if ((setup->wLength == 0) && ((setup->bmRequestType & USB_REQUEST_DIR_MASK) == USB_REQUEST_DIR_OUT)) {
-        USB_LOG_DBG("[3]: Two-stage control transfer start in-status.\r\n");
-        ep0_ctrl_stage = 3;
-        usbd_ep_start_write(USB_CONTROL_IN_EP0, NULL, 0);
-    } else {
-        /* Send data or status to host */
-        USB_LOG_DBG("[2]: Control read transfer start writing %d bytes to ep0\r\n",
-                    (unsigned int)g_usbd_core.ep0_data_buf_residue);
-        usbd_ep_start_write(USB_CONTROL_IN_EP0, g_usbd_core.ep0_data_buf, g_usbd_core.ep0_data_buf_residue);
-    }
 }
 
 void usbd_event_ep0_in_complete_handler(uint8_t ep, uint32_t nbytes)
@@ -1080,6 +1074,8 @@ void usbd_event_ep0_in_complete_handler(uint8_t ep, uint32_t nbytes)
 
     g_usbd_core.ep0_data_buf += nbytes;
     g_usbd_core.ep0_data_buf_residue -= nbytes;
+
+    USB_LOG_DBG("usbd_event_ep0_in_complete_handler.\n");
 
     USB_LOG_DBG("EP0 send %d bytes, %d remained\r\n",
                 (unsigned int)nbytes, (unsigned int)g_usbd_core.ep0_data_buf_residue);
@@ -1102,7 +1098,7 @@ void usbd_event_ep0_in_complete_handler(uint8_t ep, uint32_t nbytes)
             if (setup->wLength && ((setup->bmRequestType & USB_REQUEST_DIR_MASK) == USB_REQUEST_DIR_IN)) {
                 /* if all data has sent completely, start reading out status */
                 USB_LOG_DBG("[3]: Control read transfer start out-status.\r\n");
-                ep0_ctrl_stage = 3;
+                //ep0_ctrl_stage++;
                 usbd_ep_start_read(USB_CONTROL_OUT_EP0, NULL, 0);
             }
         }
@@ -1112,6 +1108,8 @@ void usbd_event_ep0_in_complete_handler(uint8_t ep, uint32_t nbytes)
 void usbd_event_ep0_out_complete_handler(uint8_t ep, uint32_t nbytes)
 {
     struct usb_setup_packet *setup = &g_usbd_core.setup;
+
+    USB_LOG_DBG("usbd_event_ep0_out_complete_handler.\n");
 
     if (nbytes > 0) {
         g_usbd_core.ep0_data_buf += nbytes;
@@ -1131,7 +1129,7 @@ void usbd_event_ep0_out_complete_handler(uint8_t ep, uint32_t nbytes)
 
             /*Send status to host*/
             USB_LOG_DBG("[3]: Control write transfer start in-status.\r\n");
-            ep0_ctrl_stage = 3;
+            //ep0_ctrl_stage++;
             usbd_ep_start_write(USB_CONTROL_IN_EP0, NULL, 0);
         } else {
             /* Start reading the remain data */
@@ -1225,11 +1223,29 @@ bool usb_device_is_configured(void)
     return g_usbd_core.configuration;
 }
 
+bool usb_device_is_connected(void)
+{
+    return g_usbd_core.connected;
+}
+
+bool usbd_connect_check(uint32_t timeout)
+{
+    u64 start;
+
+    start = aic_get_time_ms();
+    while ((aic_get_time_ms() - start) < timeout)
+    {
+        if (usb_device_is_connected())
+            return true;
+    }
+    return false;
+}
+
 int usbd_initialize(void)
 {
     int ret = 0;
 
-    #ifdef AIC_USING_USB0_OTG
+    #if defined(AIC_USING_USB0_OTG) && !defined(AIC_BOOTLOADER)
     ret = usb_otg_register_device(NULL);
     #endif
     if (!ret)

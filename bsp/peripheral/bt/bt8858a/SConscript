@@ -4,7 +4,7 @@ Import('rtconfig')
 from building import *
 
 cwd = GetCurrentDir()
-src = Glob('*.c')
+src = Glob('bt_main.c')
 CPPPATH = []
 
 CPPPATH.append(cwd)
@@ -13,6 +13,7 @@ CPPPATH.append(cwd + '/bt_core')
 src += Glob('bt_os_rtt.c')
 src += Glob('bt_os.c')
 src += Glob('bt_core/*.c')
+src += Glob('hid_control.c')
 
 CPPDEFINES = ['RTT']
 myccflags = (' -w')

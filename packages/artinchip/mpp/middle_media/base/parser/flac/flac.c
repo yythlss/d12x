@@ -83,7 +83,7 @@ int flac_read_header(struct aic_flac_parser *s)
         return PARSER_NOMEM;
 
     st->codecpar.codec_type = MPP_MEDIA_TYPE_AUDIO;
-    st->codecpar.codec_id = MPP_CODEC_AUDIO_DECODER_FLAC;
+    st->codecpar.codec_id = CODEC_ID_FLAC;
     s->file_size = aic_stream_size(s->stream);
 
     /* the parameters will be extracted from the compressed bitstream */

@@ -103,7 +103,7 @@ static s32 get_nand_page_table(nand_read fn, void *dev, unsigned long pagesize,
         blkidx = table[i];
         pa = (blkidx << 6) + 0; /* First page in block */
         offset = pa * pagesize;
-        ret = fn(dev, offset, page_data, PAGE_DEFAULT_SIZE);
+        ret = fn(dev, offset, page_data, PAGE_DEFAULT_SIZE, 1);
         if (ret != 0) {
             pr_err("Read from block = %d, pa = 0x%x failed.\n", blkidx, pa);
             return (ret);
@@ -159,7 +159,7 @@ void *aic_get_boot_resource_from_nand(void *dev, unsigned long pagesize,
     cksum = pt->entry[1].checksum;
 
     offset = pa * pagesize;
-    fn(dev, offset, page, pagesize);
+    fn(dev, offset, page, pagesize, 0);
     sumval = calc_page_checksum(page, pagesize);
     sumval += cksum;
     if (sumval != 0xFFFFFFFF) {
@@ -196,7 +196,7 @@ void *aic_get_boot_resource_from_nand(void *dev, unsigned long pagesize,
                 pa = pt->entry[i % PAGE_TABLE_MAX_ENTRY].pageaddr[1];
             }
             offset = pa * pagesize;
-            ret = fn(dev, offset, p, pagesize);
+            ret = fn(dev, offset, p, pagesize, 0);
             if (ret) {
                 pr_err("Failed to read aic image head.");
                 free(res);

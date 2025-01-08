@@ -10,10 +10,32 @@
 #define LV_DEMO_USB_OSD_SETTINGS_H
 
 #include "lvgl.h"
+#include "cJSON.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct osd_property {
+    unsigned int value;
+    cJSON *cjson;
+};
+
+struct osd_settings_context {
+    cJSON *root;
+
+    struct osd_property lock_mode;
+    struct osd_property lock_time;
+    struct osd_property blank_time;
+
+    struct osd_property pwm;
+    struct osd_property brightness;
+    struct osd_property contrast;
+    struct osd_property saturation;
+    struct osd_property hue;
+};
+
+int lv_parse_config_file(char *config_file, struct osd_settings_context *settings_cxt);
 
 lv_obj_t * lv_settings_screen_creat(void);
 

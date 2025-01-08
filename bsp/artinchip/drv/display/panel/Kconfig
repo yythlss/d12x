@@ -79,6 +79,18 @@ if !AIC_DISP_PQ_TOOL
         depends on AIC_DISP_MIPI_DBI
         help
             MIPI-DBI Type C, SPI_4SDA_RGB666
+
+    config AIC_PANEL_DBI_ST7789V
+        bool "ArtInChip MIPI DBI ST7789V panel"
+        depends on AIC_DISP_MIPI_DBI
+        help
+            MIPI-DBI Type C, SPI_4LINE_RGB565
+
+    config AIC_PANEL_DBI_ILI9327
+        bool "ArtInChip MIPI DBI ILI9327 panel"
+        depends on AIC_DISP_MIPI_DBI
+        help
+            MIPI-DBI Type C, SPI_4LINE_RGB565
 #
 # RGB Panel SPI Init
 #

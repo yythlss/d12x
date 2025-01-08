@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -25,7 +25,7 @@ void usb_dc_low_level_init(void)
 {
     /* set usb0 phy switch: Host/Device */
 #if defined(AIC_USING_USB0_DEVICE) || defined(AIC_USING_USB0_OTG)
-    syscfg_usb_phy0_sw_host(0);
+    hal_syscfg_usb_phy0_sw_host(0);
 #endif
     /* set pin-mux */
 

@@ -48,8 +48,21 @@ enum screen_lock_mode {
     NEVER_LOCK_MODE,
 };
 
-#define USB_OSD_WAKEUP_KEY  LV_USB_OSD_SETTINGS_WAKEUP_KEY
-#define USB_OSD_UI_LOGO     LV_USB_OSD_LOGO_IMAGE
+#define USB_OSD_WAKEUP_KEY    LV_USB_OSD_SETTINGS_WAKEUP_KEY
+
+#ifdef LV_USB_OSD_LOGO_IMAGE
+#define USB_OSD_UI_LOGO_IMAGE LV_USB_OSD_LOGO_IMAGE
+#endif
+
+#ifdef LV_USB_OSD_LOGO_VIDEO
+#define USB_OSD_UI_LOGO_VIDEO_PATH  "/data/lvgl_data/"
+#define USB_OSD_UI_LOGO_VIDEO       LV_USB_OSD_LOGO_VIDEO
+#if (AIC_FB_ROTATE_DEGREE == 0)
+#define USB_OSD_UI_LOGO_VIDEO_ROTATE    0
+#else
+#define USB_OSD_UI_LOGO_VIDEO_ROTATE    AIC_FB_ROTATE_DEGREE
+#endif
+#endif /* LV_USB_OSD_LOGO_VIDEO */
 
 void usb_osd_ui_init(void);
 bool is_usb_disp_suspend(void);

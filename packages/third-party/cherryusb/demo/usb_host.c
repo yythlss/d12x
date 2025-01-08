@@ -68,7 +68,7 @@ find_class:
     } else {
     }
     // clang-format off
-delete: 
+delete:
     usb_osal_thread_delete(NULL);
     // clang-format on
 }
@@ -111,7 +111,7 @@ find_class:
         goto find_class;
     }
     // clang-format off
-delete: 
+delete:
     usb_osal_thread_delete(NULL);
     // clang-format on
 }
@@ -219,7 +219,7 @@ find_class:
     usb_msc_fatfs_test();
 #endif
     // clang-format off
-delete: 
+delete:
     usb_osal_thread_delete(NULL);
     // clang-format on
 }

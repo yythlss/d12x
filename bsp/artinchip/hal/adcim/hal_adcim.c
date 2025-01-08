@@ -38,6 +38,8 @@
 #define AIC_ADC_MAX_VAL                 0xFFF
 #define AIC_VOLTAGE_ACCURACY            10000
 #define ADCIM_CALCSR_NUM                6
+#define ADCIM_ADC_ACC_BIT               12
+#define ADCIM_ADC_ACC_RANGE             ((1 << ADCIM_ADC_ACC_BIT) - 1)
 
 #ifdef AIC_CHIP_D12X
 #define ADCIM_CAL_ADC_OFFSET_MISMATCH   0x8
@@ -48,7 +50,6 @@
 #else
 #define ADCIM_CAL_ADC_OFFSET_MISMATCH   0x0
 #endif
-
 #ifdef AIC_ADCIM_DM_DRV
 #define ADCDM_RTP_CFG   0x03F0
 #define ADCDM_RTP_STS   0x03F4
@@ -91,6 +92,8 @@ struct adcim_dev {
 #ifdef AIC_ADCIM_DM_DRV
 static struct adcim_dev g_adcim_dev = {0};
 #endif
+
+static int g_adcim_cal_param = 0;
 
 static inline void adcim_writel(u32 val, int reg)
 {
@@ -167,10 +170,10 @@ int hal_adcim_adc2voltage(u16 *val, u32 cal_data, int scale, float def_voltage)
     int cal_val = 0;
 
 #ifdef AIC_SYSCFG_DRV
-    st_voltage = syscfg_read_ldo_cfg();
+    st_voltage = hal_syscfg_read_ldo_cfg();
 #endif
     if (!st_voltage) {
-        pr_err("Failed to get standard voltage\n");
+        pr_debug("Failed to get standard voltage\n");
         st_voltage = (int)(def_voltage * AIC_VOLTAGE_ACCURACY);
     }
 
@@ -185,6 +188,20 @@ int hal_adcim_adc2voltage(u16 *val, u32 cal_data, int scale, float def_voltage)
     }
 
     return cal_voltage;
+}
+
+u32 hal_adcim_adc2caled(u32 adc_data)
+{
+    int caled_adc_val = 0;
+
+    caled_adc_val = adc_data + ADCIM_CAL_ADC_STANDARD_VAL - g_adcim_cal_param + ADCIM_CAL_ADC_OFFSET_MISMATCH;
+
+    if (caled_adc_val > ADCIM_ADC_ACC_RANGE)
+        caled_adc_val = ADCIM_ADC_ACC_RANGE;
+    if (caled_adc_val < 0)
+        caled_adc_val = 0;
+    pr_debug("Calibration param: %d\n", g_adcim_cal_param);
+    return caled_adc_val;
 }
 
 void adcim_status_show(void)
@@ -385,7 +402,13 @@ s32 hal_adcim_probe(void)
         return -1;
     }
 
+#ifdef AIC_ADCIM_DELTA_ADC
+    //Init delta ADC
+    adcim_writel(0xf002a600, ADCIM_MCSR);
+#endif
+
     hal_adcim_set_dcalmask();
+    g_adcim_cal_param = hal_adcim_auto_calibration();
 
     inited = 1;
     return 0;

@@ -438,7 +438,7 @@ static int ge_run_blit(lv_draw_ctx_t * draw_ctx, const lv_draw_img_dsc_t *draw_d
 #ifdef AIC_GE_DITHER
     if (AICFB_FORMAT == MPP_FMT_RGB_565 && draw_dsc->zoom == 256) {
         blt.ctrl.dither_en = 1;
-        if (blt.ctrl.alpha_en)
+        if (blt.ctrl.alpha_en || blt.src_buf.format == MPP_FMT_RGB_565)
             blt.ctrl.dither_en = 0;
     }
 #endif

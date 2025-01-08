@@ -284,12 +284,12 @@ void umm_init_heap(umm_heap *heap, void *ptr, size_t size)
     heap->pheap = ptr;
     UMM_HEAPSIZE = size;
     UMM_NUMBLOCKS = (UMM_HEAPSIZE / UMM_BLOCKSIZE);
-    memset(UMM_HEAP, 0x00, UMM_HEAPSIZE);
 
     /* setup initial blank heap structure */
     UMM_FRAGMENTATION_METRIC_INIT();
 
     /* Set up umm_block[0], which just points to umm_block[1] */
+    memset(&UMM_BLOCK(0), 0x00, UMM_BLOCKSIZE);
     UMM_NBLOCK(0) = 1;
     UMM_NFREE(0) = 1;
     UMM_PFREE(0) = 1;
@@ -313,6 +313,7 @@ void umm_init_heap(umm_heap *heap, void *ptr, size_t size)
      * too, there is no need to initialize these values due to the init code
      * that memsets the entire umm_ space to 0.
      */
+    memset(&UMM_BLOCK(1), 0x00, UMM_BLOCKSIZE);
     UMM_NBLOCK(1) = UMM_BLOCK_LAST | UMM_FREELIST_MASK;
 
     /*
@@ -323,6 +324,7 @@ void umm_init_heap(umm_heap *heap, void *ptr, size_t size)
      * free list, so its pointers are left at 0 too.
      */
 
+    memset(&UMM_BLOCK(UMM_BLOCK_LAST), 0x00, UMM_BLOCKSIZE);
     UMM_PBLOCK(UMM_BLOCK_LAST) = 1;
 
 // DBGLOG_FORCE(true, "nblock(0) %04x pblock(0) %04x nfree(0) %04x pfree(0) %04x\n", UMM_NBLOCK(0) & UMM_BLOCKNO_MASK, UMM_PBLOCK(0), UMM_NFREE(0), UMM_PFREE(0));

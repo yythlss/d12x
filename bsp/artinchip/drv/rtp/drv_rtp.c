@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -16,7 +16,11 @@
 
 #include "hal_rtp.h"
 
+#ifdef AIC_GPAI_USING_RTP_CHAN
+#define AIC_RTP_DEFAULT_MODE    RTP_MODE_MANUAL
+#else
 #define AIC_RTP_DEFAULT_MODE    RTP_MODE_AUTO2
+#endif
 
 static struct rt_touch_device g_rt_rtp_dev = {0};
 static struct aic_rtp_dev g_rtp_dev = {0};
@@ -101,6 +105,8 @@ static rt_size_t drv_rtp_read_point(struct rt_touch_device *touch, void *buf,
 static rt_err_t drv_rtp_control(struct rt_touch_device *touch,
                                 int cmd, void *arg)
 {
+    u16 ret = 0;
+
     switch (cmd) {
     case RT_TOUCH_CTRL_ENABLE_INT:
         hal_rtp_int_enable(&g_rtp_dev, 1);
@@ -119,6 +125,10 @@ static rt_err_t drv_rtp_control(struct rt_touch_device *touch,
             LOG_I("PDEB should be configured as 0xff%xff%x\n", val, val);
         break;
 #endif
+    case RT_TOUCH_CTRL_GET_ADC:
+        ret = hal_rtp_adc_soft_trigger(&g_rtp_dev, ((struct aic_rtp_adc_info *)arg)->ch);
+        ((struct aic_rtp_adc_info *)arg)->data = ret;
+        break;
 
     case RT_TOUCH_CTRL_SET_X_TO_Y:
         drv_rtp_plate_check(&g_rtp_dev, arg);

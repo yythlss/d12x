@@ -68,7 +68,7 @@ int hal_qspi_master_transfer_bit_mode(qspi_master_handle *h, struct qspi_bm_tran
 int hal_qspi_master_init(qspi_master_handle *h, struct qspi_master_config *cfg)
 {
     struct qspi_master_state *qspi;
-    u32 base, sclk, tmp_sclk, gclk;
+    u32 base, sclk, tmp_sclk, cur_clk;
     int ret;
 
     CHECK_PARAM(h, -EINVAL);
@@ -85,18 +85,18 @@ int hal_qspi_master_init(qspi_master_handle *h, struct qspi_master_config *cfg)
     sclk = cfg->clk_in_hz;
     if (sclk > HAL_QSPI_MAX_FREQ_HZ)
         sclk = HAL_QSPI_MAX_FREQ_HZ;
-    else if (sclk < HAL_QSPI_MIN_FREQ_HZ)
-        sclk = HAL_QSPI_MIN_FREQ_HZ;
+    else if (sclk < HAL_QSPI_INPUT_MIN_FREQ_HZ)
+        sclk = HAL_QSPI_INPUT_MIN_FREQ_HZ;
     qspi->idx = cfg->idx;
 
     tmp_sclk = sclk + HAL_QSPI_HZ_PER_MHZ;
     do {
         tmp_sclk -= HAL_QSPI_HZ_PER_MHZ;
         hal_clk_set_freq(cfg->clk_id, tmp_sclk);
-        gclk = hal_clk_get_freq(cfg->clk_id);
-    } while (gclk > sclk);
+        cur_clk = hal_clk_get_freq(cfg->clk_id);
+    } while (cur_clk > sclk);
 
-    show_freq("freq (input)", qspi->idx, gclk);
+    show_freq("freq (input)", qspi->idx, cur_clk);
     ret = hal_clk_enable(cfg->clk_id);
     if (ret < 0) {
         hal_log_err("QSPI %d clk enable failed!\n", cfg->idx);
@@ -241,18 +241,19 @@ int hal_qspi_master_set_bus_freq(qspi_master_handle *h, u32 bus_hz)
         bus_hz = HAL_QSPI_MIN_FREQ_HZ;
 
     if (h->bit_mode) {
-        qspi_hw_bit_mode_set_clk(bus_hz, sclk, base);
+        div = qspi_hw_bit_mode_set_clk(bus_hz, sclk, base);
+        cal_clk = sclk / (2 * div);
+    } else {
+        divider = qspi_master_get_best_div_param(sclk, bus_hz, &div);
+        if (divider == 1) {
+            cal_clk = sclk/(2*(div + 1));
+        } else if (divider == 0) {
+            cal_clk = sclk >> div;
+        }
+        qspi_hw_set_clk_div(base, divider, div);
     }
 
-    divider = qspi_master_get_best_div_param(sclk, bus_hz, &div);
-    if (divider == 1) {
-        cal_clk = sclk/(2*(div + 1));
-    } else if (divider == 0) {
-        cal_clk = sclk >> div;
-    }
     show_freq("freq ( bus )", qspi->idx, cal_clk);
-
-    qspi_hw_set_clk_div(base, divider, div);
     qspi->bus_hz = bus_hz;
 
     return 0;

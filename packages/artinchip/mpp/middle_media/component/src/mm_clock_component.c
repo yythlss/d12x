@@ -190,7 +190,7 @@ mm_clock_config_time_clock_state(mm_handle h_component,
     }
     memcpy(&p_clock_data->clock_state, p_clock_state,
            sizeof(mm_time_config_clock_state));
-    printf("[%s:%d]wait_mask:0x%x,clock_state:%d\n", __FUNCTION__, __LINE__,
+    logi("[%s:%d]wait_mask:0x%x,clock_state:%d\n", __FUNCTION__, __LINE__,
            p_clock_data->clock_state.wait_mask,
            p_clock_data->clock_state.state);
     //p_clock_data->clock_state.state = MM_TIME_CLOCK_STATE_WAITING_FOR_START_TIME;
@@ -251,7 +251,7 @@ mm_clock_config_time_client_start_time(mm_handle h_component,
         p_clock_data->wall_time_base = mm_clock_get_system_time();
         p_clock_data->pause_time_durtion = 0;
         p_clock_data->clock_state.state = MM_TIME_CLOCK_STATE_RUNNING;
-        printf("[%s:%d]ref_clock_time_base:" FMT_d64 ",wall_time_base:" FMT_d64
+        logi("[%s:%d]ref_clock_time_base:" FMT_d64 ",wall_time_base:" FMT_d64
                "\n",
                __FUNCTION__, __LINE__, p_clock_data->ref_clock_time_base,
                p_clock_data->wall_time_base);
@@ -504,7 +504,7 @@ static void mm_clock_state_change_to_excuting(mm_clock_data *p_clock_data)
         s64 cur_media_time;
         p_clock_data->pause_time_durtion +=
             (mm_clock_get_system_time() - p_clock_data->pause_time_point);
-        printf("[%s:%d]mm_clock_get_system_time:" FMT_d64
+        logi("[%s:%d]mm_clock_get_system_time:" FMT_d64
                ",pause_time_point:" FMT_d64 ",pause_time_durtion:" FMT_d64
                ",wall_time_base:" FMT_d64 ",ref_clock_time_base:" FMT_d64 "\n",
                __FUNCTION__, __LINE__, mm_clock_get_system_time(),
@@ -515,7 +515,7 @@ static void mm_clock_state_change_to_excuting(mm_clock_data *p_clock_data)
             (mm_clock_get_system_time() - p_clock_data->wall_time_base -
              p_clock_data->pause_time_durtion) +
             p_clock_data->ref_clock_time_base;
-        printf("[%s:%d]p_clock_data->pause_time_durtion:" FMT_d64
+        logi("[%s:%d]p_clock_data->pause_time_durtion:" FMT_d64
                ",cur_media_time:" FMT_d64 "\n",
                __FUNCTION__, __LINE__, p_clock_data->pause_time_durtion,
                cur_media_time);
@@ -543,7 +543,7 @@ static void mm_clock_state_change_to_pause(mm_clock_data *p_clock_data)
     } else if (p_clock_data->state == MM_STATE_IDLE) {
     } else if (p_clock_data->state == MM_STATE_EXECUTING) {
         s64 cur_media_time;
-        printf("[%s:%d]mm_clock_get_system_time:" FMT_d64
+        logi("[%s:%d]mm_clock_get_system_time:" FMT_d64
                ",pause_time_point:" FMT_d64 ",pause_time_durtion:" FMT_d64
                ",wall_time_base:" FMT_d64 ",ref_clock_time_base:" FMT_d64 "\n",
                __FUNCTION__, __LINE__, mm_clock_get_system_time(),
@@ -553,7 +553,7 @@ static void mm_clock_state_change_to_pause(mm_clock_data *p_clock_data)
             (mm_clock_get_system_time() - p_clock_data->wall_time_base -
              p_clock_data->pause_time_durtion) +
             p_clock_data->ref_clock_time_base;
-        printf("[%s:%d]mm_clock_get_system_time:" FMT_d64
+        logi("[%s:%d]mm_clock_get_system_time:" FMT_d64
                ",pause_time_point:" FMT_d64 ",pause_time_durtion:" FMT_d64
                ",wall_time_base:" FMT_d64 ",ref_clock_time_base:" FMT_d64
                ",cur_media_time:" FMT_d64 "\n",

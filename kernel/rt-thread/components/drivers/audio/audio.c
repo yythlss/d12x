@@ -148,16 +148,18 @@ static rt_err_t _aduio_replay_stop(struct rt_audio_device *audio)
 
     if (audio->replay->activated == RT_TRUE)
     {
-        /* flush replay remian frames */
-        _audio_flush_replay_frame(audio);
+        if (!audio->replay->transfer_mode) {
+            /* flush replay remian frames */
+            _audio_flush_replay_frame(audio);
 
-        /* notify irq(or thread) to stop the data transmission */
-        audio->replay->event |= REPLAY_EVT_STOP;
+            /* notify irq(or thread) to stop the data transmission */
+            audio->replay->event |= REPLAY_EVT_STOP;
 
-        /* waiting for the remaining data transfer to complete */
-        rt_completion_init(&audio->replay->cmp);
-        rt_completion_wait(&audio->replay->cmp, RT_WAITING_FOREVER);
-        audio->replay->event &= ~REPLAY_EVT_STOP;
+            /* waiting for the remaining data transfer to complete */
+            rt_completion_init(&audio->replay->cmp);
+            rt_completion_wait(&audio->replay->cmp, RT_WAITING_FOREVER);
+            audio->replay->event &= ~REPLAY_EVT_STOP;
+        }
 
         /* stop playback hardware device */
         if (audio->ops->stop)
@@ -314,6 +316,7 @@ static rt_err_t _audio_dev_open(struct rt_device *dev, rt_uint16_t oflag)
             audio->replay->read_index = 0;
             audio->replay->pos = 0;
             audio->replay->event = REPLAY_EVT_NONE;
+            audio->replay->transfer_mode = 0;
         }
         dev->open_flag |= RT_DEVICE_OFLAG_WRONLY;
     }
@@ -510,6 +513,14 @@ static rt_err_t _audio_dev_control(struct rt_device *dev, int cmd, void *args)
 
         LOG_D("AUDIO_CTL_PAUSE: enable = %d", enable);
         audio->ops->pause(audio, enable);
+
+        break;
+    }
+
+    case AUDIO_CTL_DIRECT_TRANSFER:
+    {
+        if (audio->ops->direct_transfer)
+            audio->ops->direct_transfer(audio);
 
         break;
     }

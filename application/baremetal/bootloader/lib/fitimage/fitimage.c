@@ -20,7 +20,6 @@
 #include <boot_param.h>
 
 extern struct boot_args boot_arg;
-//#define CRC32_MTD_READ
 
 int fit_find_config_node(const void *fdt)
 {
@@ -248,6 +247,107 @@ int fit_image_get_entry(const void *fit, int noffset, ulong *entry)
     return fit_image_get_address(fit, noffset, FIT_ENTRY_PROP, entry);
 }
 
+int fit_image_get_hash_node(const void *fit, int noffset, int index)
+{
+    char node_name[16];
+    int node;
+
+    snprintf(node_name, 16, "%s-%d", FIT_HASH_NODE_PROP, index);
+    node = fdt_subnode_offset(fit, noffset, node_name);
+    if (node < 0) {
+        printf("cannot find node '%s': %d\n", node_name, node);
+        return -1;
+    }
+
+    return node;
+}
+
+int fit_image_get_hash_crc32(const void *fit, int noffset, u32 *crc32)
+{
+    int node, ret = 0;
+    int len, index;
+    const char *algo;
+    const fdt32_t *cell;
+
+    if (!fit || !crc32)
+        return -1;
+
+    index = 1;
+    do {
+        node = fit_image_get_hash_node(fit, noffset, index);
+        if (node < 0) {
+            ret = -1;
+            break;
+        }
+        algo = fdt_getprop(fit, node, "algo", &len);
+        if (algo == NULL) {
+            ret = -1;
+            break;
+        }
+        if (memcmp(algo, "crc32", 5) == 0) {
+            ret = 0;
+            break;
+        }
+        index++;
+    } while(1);
+    if (ret)
+        return ret;
+
+    cell = fdt_getprop(fit, node, "value", &len);
+    if (cell == NULL) {
+        fit_get_debug(fit, node, "value", len);
+        return -1;
+    }
+    *crc32 = uimage_to_cpu(*cell);
+
+    return 0;
+}
+
+int fit_image_get_hash_md5(const void *fit, int noffset, u32 *md5)
+{
+    int node, ret = 0;
+    int len, index;
+    const char *algo;
+    const fdt32_t *cell;
+
+    if (!fit || !md5)
+        return -1;
+
+    index = 1;
+    do {
+        node = fit_image_get_hash_node(fit, noffset, index);
+        if (node < 0) {
+            ret = -1;
+            break;
+        }
+        algo = fdt_getprop(fit, node, "algo", &len);
+        if (algo == NULL) {
+            ret = -1;
+            break;
+        }
+        if (memcmp(algo, "md5", 3) == 0) {
+            ret = 0;
+            break;
+        }
+        index++;
+    } while(1);
+    if (ret)
+        return ret;
+
+    cell = fdt_getprop(fit, node, "value", &len);
+    if (cell == NULL || len != 16) {
+        fit_get_debug(fit, node, "value", len);
+        return -1;
+    }
+
+    md5[0] = *cell++;
+    md5[1] = *cell++;
+    md5[2] = *cell++;
+    md5[3] = *cell++;
+
+    return 0;
+}
+
 /*
  * offset: The offset relative to the itb file start location
  */
@@ -300,12 +400,17 @@ int spl_load_fit_image(struct spl_load_info *info, struct spl_fit_info *ctx, int
     const void *fit = ctx->fit;
     bool external_data = false;
     u64 start_us;
+    u32 crc1, crc2;
 
     if (fit_image_get_load(fit, node, &load_addr))
     {
         printf("Can't load %s: No load address\n", fit_get_name(fit, node, NULL));
         return -1;
     }
+
+    ret = fit_image_get_hash_crc32(fit, node, &crc1);
+    if (ret < 0)
+        crc1 = 0;
 
     if (!fit_image_get_data_position(fit, node, &offset))
     {
@@ -336,17 +441,18 @@ int spl_load_fit_image(struct spl_load_info *info, struct spl_fit_info *ctx, int
             start_us =  aic_get_time_us();
             ret = spl_read(info, offset, (u8 *)load_addr, length);
             show_speed("spl read", length, aic_get_time_us() - start_us);
-
-#ifdef CRC32_MTD_READ
-            unsigned int crc32_val = crc32(0, NULL, 0);
-            crc32_val = crc32(crc32_val, (u8 *)load_addr, length);
-            printf("mtd read crc32 = 0x%x KB/s\n", crc32_val);
-#endif
-
             if (ret < 0)
             {
                 printf("spl read external_data error\n");
                 return -1;
+            }
+            if (crc1 != 0) {
+                crc2 = crc32(0, (u8 *)load_addr, length);
+                if (crc2 != crc1) {
+                    printf("APP crc32 error: expect 0x%x, got 0x%x\n", crc1, crc2);
+                    return -1;
+                }
+                printf("CRC32 verify OK.\n");
             }
         }
     }

@@ -1,7 +1,10 @@
 /*
  * I2S driver of ArtInChip SoC
  *
- * Copyright (C) 2020-2021 ArtInChip Technology Co., Ltd.
+ * Copyright (C) 2020-2024 ArtInChip Technology Co., Ltd.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Authors:  dwj <weijie.ding@artinchip.com>
  */
 #include "hal_i2s.h"
@@ -43,7 +46,7 @@ int hal_i2s_init(aic_i2s_ctrl *i2s, uint32_t i2s_idx)
 
     ret = hal_clk_enable_deassertrst(i2s->clk_id);
     if (ret)
-        hal_log_err("I2S%lu init error!\n", i2s_idx);
+        hal_log_err("I2S%ld init error!\n", (long)i2s_idx);
 
     return ret;
 }
@@ -54,7 +57,7 @@ int hal_i2s_uninit(aic_i2s_ctrl *i2s)
 
     ret = hal_clk_disable_assertrst(i2s->clk_id);
     if (ret)
-        hal_log_err("I2S%lu uninit error!\n", i2s->idx);
+        hal_log_err("I2S%ld uninit error!\n", (long)i2s->idx);
 
     return ret;
 }
@@ -416,8 +419,8 @@ void hal_i2s_playback_start(aic_i2s_ctrl *i2s, i2s_format_t *format)
         config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
         break;
     default:
-        hal_log_err("I2S%lu not support %u sample rate\n",
-                    i2s->idx, format->width);
+        hal_log_err("I2S%ld not support %u sample rate\n",
+                    (long)i2s->idx, format->width);
         return;
     }
 
@@ -427,7 +430,7 @@ void hal_i2s_playback_start(aic_i2s_ctrl *i2s, i2s_format_t *format)
 
     info->dma_chan = hal_request_dma_chan();
     if (!info->dma_chan) {
-        hal_log_err("I2S%lu request dma channel error\n", i2s->idx);
+        hal_log_err("I2S%ld request dma channel error\n", (long)i2s->idx);
         return;
     }
 
@@ -451,6 +454,79 @@ void hal_i2s_playback_start(aic_i2s_ctrl *i2s, i2s_format_t *format)
     hal_i2s_enable_tx_block(i2s);
     hal_i2s_enable_data_out(i2s);
     hal_i2s_enable_tx_drq(i2s);
+}
+
+void hal_i2s_playback_start_single(aic_i2s_ctrl *i2s, i2s_format_t *format)
+{
+    struct dma_slave_config config;
+    struct aic_i2s_transfer_info *info;
+
+    config.direction = DMA_MEM_TO_DEV;
+    config.dst_addr = i2s->reg_base + I2S_TXFIFO_REG;
+    config.slave_id = DMA_ID_I2S0 + i2s->idx;
+    config.src_maxburst = 1;
+    config.dst_maxburst = 1;
+
+    switch (format->width)
+    {
+    case 8:
+        config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+        config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+        break;
+    case 16:
+        config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+        config.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+        break;
+    case 24:
+        config.src_addr_width = DMA_SLAVE_BUSWIDTH_3_BYTES;
+        config.dst_addr_width = DMA_SLAVE_BUSWIDTH_3_BYTES;
+        break;
+    case 32:
+        config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+        config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+        break;
+    default:
+        hal_log_err("I2S%ld not support %u sample rate\n",
+                    (long)i2s->idx, format->width);
+        return;
+    }
+
+    info = &i2s->tx_info;
+
+    info->transfer_type = I2S_TRANSFER_TYPE_TX;
+
+    if (i2s->start_flag == 0) {
+        info->dma_chan = hal_request_dma_chan();
+        if (!info->dma_chan) {
+            hal_log_err("I2S%ld request dma channel error\n", (long)i2s->idx);
+            return;
+        }
+
+        hal_dma_chan_register_cb(info->dma_chan, i2s_dma_transfer_period_callback,
+                                 (void *)info);
+        hal_dma_chan_config(info->dma_chan, &config);
+        /* Configure DMA transfer */
+        hal_dma_chan_prep_device(info->dma_chan, config.dst_addr,
+                                 (ulong)info->buf_info.buf, info->buf_info.period_len,
+                                 DMA_MEM_TO_DEV);
+    }
+
+    hal_dma_chan_start(info->dma_chan);
+    if (i2s->start_flag == 0) {
+        /* flush TXFIFO */
+        hal_i2s_clear_tx_fifo(i2s);
+        /* clear TX counter */
+        hal_i2s_clear_tx_counter(i2s);
+        /* Enable MCLK OUT */
+        hal_i2s_mclk_out_enable(i2s);
+        /* configure TXFIFO input mode */
+        hal_i2s_txfifo_input_mode(i2s);
+        hal_i2s_module_enable(i2s);
+        hal_i2s_enable_tx_block(i2s);
+        hal_i2s_enable_data_out(i2s);
+        hal_i2s_enable_tx_drq(i2s);
+    }
+    i2s->start_flag = 1;
 }
 
 void hal_i2s_record_start(aic_i2s_ctrl *i2s, i2s_format_t *format)
@@ -483,8 +559,8 @@ void hal_i2s_record_start(aic_i2s_ctrl *i2s, i2s_format_t *format)
         config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
         break;
     default:
-        hal_log_err("I2S%lu not support %u sample rate\n",
-                    i2s->idx, format->width);
+        hal_log_err("I2S%ld not support %u sample rate\n",
+                    (long)i2s->idx, format->width);
         return;
     }
 
@@ -494,7 +570,7 @@ void hal_i2s_record_start(aic_i2s_ctrl *i2s, i2s_format_t *format)
 
     info->dma_chan = hal_request_dma_chan();
     if (!info->dma_chan) {
-        hal_log_err("I2S%lu request dma channel error\n", i2s->idx);
+        hal_log_err("I2S%ld request dma channel error\n", (long)i2s->idx);
         return;
     }
 
@@ -531,6 +607,7 @@ void hal_i2s_playback_stop(aic_i2s_ctrl *i2s)
     hal_i2s_disable_tx_block(i2s);
     hal_dma_chan_stop(info->dma_chan);
     hal_release_dma_chan(info->dma_chan);
+    i2s->start_flag = 0;
 }
 
 void hal_i2s_record_stop(aic_i2s_ctrl *i2s)

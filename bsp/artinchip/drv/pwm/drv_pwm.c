@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -248,15 +248,4 @@ static void cmd_pwm_status(int argc, char **argv)
 }
 
 MSH_CMD_EXPORT_ALIAS(cmd_pwm_status, pwm_status, Show the status of PWM);
-
-static int cmd_pwm_set_tb(int argc, char**argv)
-{
-    if(argc < 3) {
-        printf("usage:pwm_set_tb <channel> <time_base freq>\n");
-        return -RT_ERROR;
-    }
-
-    return hal_pwm_set_tb(atoi(argv[1]), atoi(argv[2]));
-}
-MSH_CMD_EXPORT_ALIAS(cmd_pwm_set_tb, pwm_set_tb, Set the time_base of PWM);
 #endif

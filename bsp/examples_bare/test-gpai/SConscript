@@ -5,7 +5,8 @@ from building import *
 cwd = GetCurrentDir()
 CPPPATH = []
 src = []
-if GetDepend('KERNEL_BAREMETAL') and GetDepend('AIC_GPAI_TEST'):
+
+if GetDepend('AIC_GPAI_TEST') and (GetDepend('KERNEL_BAREMETAL') or GetDepend('KERNEL_FREERTOS')):
     src += Glob('test_gpai.c')
 
 group = DefineGroup('test-gpai', src, depend = [''], CPPPATH = CPPPATH)

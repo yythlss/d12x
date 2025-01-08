@@ -52,9 +52,13 @@ if GetDepend('SPI_NAND_QUANXING'):
 if GetDepend('SPI_NAND_XINCUN'):
     src += ['xincun.c']
 
+if GetDepend('SPI_NAND_FUDANMICRO'):
+    src += ['fudanmicro.c']
+
 if GetDepend('LPKG_USING_SPINAND'):
     src += ['spinand.c']
     src += ['bbt.c']
+    src += ['spinand_ooblayout.c']
     CPPPATH += [cwd + '/inc']
 
     if rtconfig.PLATFORM in ['gcc', 'armclang']:

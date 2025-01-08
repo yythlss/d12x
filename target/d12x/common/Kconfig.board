@@ -314,7 +314,7 @@ config AIC_USING_GPAI5
     default n
     select AIC_GPAI_DRV
 
-source "bsp/artinchip/drv/gpai/Kconfig.dev"
+source "bsp/artinchip/hal/gpai/Kconfig.dev"
 endmenu
 
 #================================================
@@ -374,7 +374,7 @@ source "bsp/artinchip/drv/audio/Kconfig"
 
 if KERNEL_BAREMETAL
 
-    config AIC_USING_TOUCH
+    config AIC_USING_BARE_TOUCH
         bool "Using Touch"
         default n
         select AIC_TOUCH_DRV

@@ -30,10 +30,15 @@ if GetDepend('AIC_GPIO_DRV'):
         src += Glob('hal/gpio/*.c')
 
 if GetDepend('AIC_SYSCFG_DRV'):
+    ver = GetConfigValue('AIC_SYSCFG_DRV_VER')
+    ver = ver.replace('"','')
     if GetDepend('DRIVER_DRV_EN'):
         src += Glob('drv/syscfg/*.c')
     if GetDepend('DRIVER_HAL_EN'):
-        src += Glob('hal/syscfg/*.c')
+        if GetDepend('FPGA_BOARD_ARTINCHIP'):
+            src += Glob('hal/syscfg/*fpga.c')
+        else:
+            src += Glob('hal/syscfg/*_v%sx.c' % (ver[0]))
 
 if GetDepend('AIC_DMA_DRV'):
     ver = GetConfigValue('AIC_DMA_DRV_VER')
@@ -185,17 +190,7 @@ if GetDepend('AIC_MTD_BARE_DRV'):
     if GetDepend('DRIVER_BARE_DRV_EN'):
         src += Glob('drv_bare/mtd/*.c')
 
-if GetDepend('AIC_BOOT_USB_DRV'):
-    if GetDepend('DRIVER_BARE_DRV_EN'):
-        src += Glob('drv_bare/boot_usb/*.c')
-        CPPPATH.append(cwd + '/drv_bare/boot_usb')
-
-if GetDepend('AIC_BOOT_USBH_DRV'):
-    if GetDepend('DRIVER_BARE_DRV_EN'):
-        src += Glob('drv_bare/boot_usbh/*.c')
-        CPPPATH.append(cwd + '/drv_bare/boot_usbh')
-
-if GetDepend('AIC_AUDIO_DRV'):
+if GetDepend('AIC_AUDIO_DRV') or GetDepend('RING_BUFFER'):
     if GetDepend('DRIVER_BARE_DRV_EN'):
         src += Glob('drv_bare/ringbuffer/*.c')
 
@@ -282,14 +277,24 @@ if GetDepend('AIC_PANEL_DBI_ILI9486L'):
 
 if GetDepend('AIC_PANEL_DBI_ST7789'):
     src += Glob('drv/display/panel/panel_dbi_st7789.c')
+
 #
 # MIPI-DBI Type C SPI Panel Driver
 #
 if GetDepend('AIC_PANEL_DBI_ILI9341'):
     src += Glob('drv/display/panel/panel_dbi_ili9341.c')
 
+if GetDepend('AIC_PANEL_DBI_ILI9327'):
+    src += Glob('drv/display/panel/panel_dbi_ili9327.c')
+
 if GetDepend('AIC_PANEL_DBI_ST77903'):
     src += Glob('drv/display/panel/panel_dbi_st77903.c')
+
+if GetDepend('AIC_PANEL_DBI_ST7789T3'):
+    src += Glob('drv/display/panel/panel_dbi_st7789t3.c')
+
+if GetDepend('AIC_PANEL_DBI_ST7789V'):
+    src += Glob('drv/display/panel/panel_dbi_st7789v.c')
 #
 # RGB Panel Driver SPI Init
 #
@@ -374,16 +379,14 @@ if GetDepend('AIC_GPAI_DRV'):
         src += Glob('drv/gpai/*.c')
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/gpai/*.c')
+    if GetDepend('DRIVER_BARE_DRV_EN'):
+        src += Glob('drv_bare/gpai/*.c')
 
 if GetDepend('AIC_PWM_DRV'):
     if GetDepend('DRIVER_DRV_EN'):
         src += Glob('drv/pwm/*.c')
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/pwm/*.c')
-
-        src += Glob('drv/xpwm/xpwm_info_v11.c')
-    if GetDepend('DRIVER_HAL_EN'):
-        src += Glob('hal/xpwm/*.c')
 
 if GetDepend('AIC_HRTIMER_DRV_V12'):
     if GetDepend('DRIVER_DRV_EN'):
@@ -456,7 +459,7 @@ if GetDepend('AIC_DCE_DRV'):
         src += Glob('hal/dce/*.c')
 
 # TOUCH driver
-if GetDepend('AIC_USING_TOUCH') and GetDepend('KERNEL_BAREMETAL'):
+if GetDepend('AIC_USING_BARE_TOUCH') and GetDepend('KERNEL_BAREMETAL'):
     if GetDepend('DRIVER_BARE_DRV_EN'):
         src += Glob('drv_bare/touch/*.c')
         CPPPATH.append(cwd + '/drv_bare/touch')
@@ -495,6 +498,14 @@ if GetDepend('AIC_PSADC_DRV'):
         src += Glob('drv/psadc/*.c')
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/psadc/*.c')
+ 
+if GetDepend('AIC_GMAC_DRV'):
+    if GetDepend('AIC_USING_GMAC0') or GetDepend('AIC_USING_GMAC1'):
+        src += Glob('hal/mac/*.c')
+        src += Glob('hal/mac/sys/*.c')
+        CPPPATH.append(cwd + '/hal/mac/')
+    if GetDepend('RT_USING_LWIP'):
+        src += Glob('drv/mac/*.c')
 
 LOCAL_CCFLAGS = ''
 # LOCAL_CCFLAGS += ' -O0'

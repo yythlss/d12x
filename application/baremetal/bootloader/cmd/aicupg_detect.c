@@ -18,8 +18,6 @@
 #include <aic_stdio.h>
 #include <boot_param.h>
 #include <boot_time.h>
-#include <usb_drv.h>
-#include <usbhost.h>
 #include <uart.h>
 #include <config_parse.h>
 #include <aicupg.h>
@@ -27,13 +25,25 @@
 #include <mmc.h>
 #include <hal_syscfg.h>
 #include <upg_uart.h>
+#ifdef LPKG_USING_USERID
 #include <userid.h>
+#endif
+#ifdef LPKG_CHERRYUSB_DEVICE
+#include <usbd_core.h>
+#endif
+#ifdef LPKG_CHERRYUSB_HOST
+#include <usbh_core.h>
+#endif
+#ifdef LPKG_CHERRYUSB_OTG
+#include <usb_otg.h>
+#endif
 
 #define UPG_TYPE_NONE 0
 #define UPG_TYPE_USB 1
-#define UPG_TYPE_UART 2
-#define UPG_TYPE_SDCARD 3
-#define UPG_TYPE_UDISK 4
+#define UPG_TYPE_HID 2
+#define UPG_TYPE_UART 3
+#define UPG_TYPE_SDCARD 4
+#define UPG_TYPE_UDISK 5
 
 #define UPG_MODE_NORMAL 0
 #define UPG_MODE_USERID 1
@@ -41,7 +51,6 @@
 
 static int upg_type;
 static int upg_mode;
-static int usb_host_id;
 
 #define ACK 0x06
 #define CHECK_TIME_INTERVAL_US 10000
@@ -105,16 +114,34 @@ static bool uart_force_upgrade_detect(void)
 
 #define RUNCMD console_run_cmd
 
+extern int usb_init(void);
 bool usbd_connect_pc_check(void)
 {
-#if defined(AICUPG_USB_ENABLE)
     /*
      * If USB is connecting to HOST PC
      */
-    usbd_connection_check_start();
-    if (usbd_connection_check_status()) {
-        usbd_connection_check_end();
-        return true;
+#if defined(AICUPG_USB_ENABLE)
+    if (usb_init() == 0) {
+        if (usbd_connect_check(500)) {
+            return true;
+        }
+    }
+#endif
+
+    return false;
+}
+
+extern int hid_init(void);
+bool usbd_hid_connect_pc_check(void)
+{
+    /*
+     * If USB is connecting to HOST PC
+     */
+#if defined(AICUPG_HID_ENABLE)
+    if (hid_init() == 0) {
+        if (usbd_connect_check(500)) {
+            return true;
+        }
     }
 #endif
 
@@ -193,6 +220,10 @@ int upg_type_check(enum boot_device bd)
     upg_type = UPG_TYPE_NONE;
     upg_mode = UPG_MODE_NORMAL;
 
+#ifdef LPKG_CHERRYUSB_OTG
+    usb_otg_init();
+#endif
+
 #ifdef AIC_WRI_DRV
     enum aic_reboot_reason r;
 
@@ -214,6 +245,19 @@ int upg_type_check(enum boot_device bd)
             upg_mode = UPG_MODE_NORMAL;
         } else {
             upg_type = UPG_TYPE_UART;
+            upg_mode = UPG_MODE_NORMAL;
+        }
+        aic_clr_reboot_reason();
+        return 0;
+    }
+
+    if (r == REBOOT_REASON_BL_HID_UPGRADE) {
+        /*
+         * User run command "aicupg gotobl" in Application, to enter upgmode of
+         * BootLoader
+         */
+        if (usbd_hid_connect_pc_check()) {
+            upg_type = UPG_TYPE_HID;
             upg_mode = UPG_MODE_NORMAL;
         }
         aic_clr_reboot_reason();
@@ -249,12 +293,13 @@ int upg_type_check(enum boot_device bd)
      * D21x udisk upgrade in bootloader
      * D13x maybe BROM not recognize the udisk but bootloader can recognize it
      */
-    usb_host_id = usbh_get_connect_id();
     boot_time_trace("UDISK checked");
-    if (usb_host_id >= 0) {
-        upg_type = UPG_TYPE_UDISK;
-        upg_mode = UPG_MODE_NORMAL;
-        return 0;
+    if (usbh_init() == 0) {
+        if (usbh_hub_connect_check()) {
+            upg_type = UPG_TYPE_UDISK;
+            upg_mode = UPG_MODE_NORMAL;
+            return 0;
+        }
     }
 #endif
 
@@ -322,10 +367,7 @@ int bl_upgmode_detect(enum boot_device bd)
             cont_boot = 0;
         }
         if (upg_type == UPG_TYPE_UDISK) {
-            if (usb_host_id == 0)
-                ret = RUNCMD("aicupg fat udisk 0");
-            else if (usb_host_id == 1)
-                ret = RUNCMD("aicupg fat udisk 1");
+            ret = RUNCMD("aicupg fat udisk 0");
             if (!ret) {
                 /* Upgrading success, no need to run boot from storage anymore */
                 cont_boot = 0;
@@ -343,6 +385,21 @@ int bl_upgmode_detect(enum boot_device bd)
             } else if (upg_mode == UPG_MODE_FORCE) {
                 /* If no host connect to device, skip it and continue to boot app */
                 ret = RUNCMD("aicupg usb 0 force");
+            }
+            if (ret)
+                cont_boot = 1;
+            else
+                cont_boot = 0;
+        }
+        if (upg_type == UPG_TYPE_HID) {
+            if (upg_mode == UPG_MODE_NORMAL) {
+                ret = RUNCMD("aicupg hid 0");
+            } else if (upg_mode == UPG_MODE_USERID) {
+                /* If no host connect to device, skip it and continue to boot app */
+                ret = RUNCMD("aicupg hid 0 userid");
+            } else if (upg_mode == UPG_MODE_FORCE) {
+                /* If no host connect to device, skip it and continue to boot app */
+                ret = RUNCMD("aicupg hid 0 force");
             }
             if (ret)
                 cont_boot = 1;

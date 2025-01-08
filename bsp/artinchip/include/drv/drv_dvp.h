@@ -28,6 +28,10 @@
 #define AIC_DVP_QOS_HIGH    0xB
 #define AIC_DVP_QOS_LOW     0x7
 
+#ifdef AIC_USING_BARCODE_DEMO
+#define AIC_DVP_IGNORE_LOSS
+#endif
+
 extern const struct v4l2_subdev_ops aic_dvp_subdev_ops;
 
 struct aic_dvp {

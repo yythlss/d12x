@@ -141,6 +141,10 @@ mm_video_render_free_frame_buffer(mm_video_render_data *p_video_render_data,
         return -1;
     }
 
+    if (0 == strcmp(PRJ_CHIP, "d13x")) {
+        return 0;
+    }
+
     comp = mm_video_render_get_component_num(p_frame->buf.format);
 
     for (i = 0; i < comp; i++) {
@@ -309,7 +313,7 @@ static int mm_video_render_set_rotation_frame_info(
                 p_video_render_data->rotation_frames[i].buf.stride[0] =
                     p_video_render_data->rotation_frames[i].buf.size.width;
                 p_video_render_data->rotation_frames[i].buf.stride[1] =
-                    p_video_render_data->rotation_frames[i].buf.stride[0] >> 1;
+                    p_video_render_data->rotation_frames[i].buf.stride[0];
                 p_video_render_data->rotation_frames[i].buf.stride[2] = 0;
 
                 if (p_video_render_data->rotation_frames[i].buf.phy_addr[0] == 0 &&
@@ -388,6 +392,12 @@ mm_video_render_init_rotation_param(mm_video_render_data *p_video_render_data,
     int cnt = 0;
 
     p_video_render_data->init_rotation_param = 0;
+
+    if (0 == strcmp(PRJ_CHIP, "d13x")) {
+        p_video_render_data->init_rotation_param = 1;
+        return 0;
+    }
+
     if (p_video_render_data->rotation_angle == MPP_ROTATION_0) {
         p_video_render_data->init_rotation_param = 1;
         return 0;
@@ -456,6 +466,41 @@ mm_video_render_deinit_rotation_param(mm_video_render_data *p_video_render_data)
     return 0;
 }
 
+static s32 mm_video_render_update_frame(mm_video_render_data *p_video_render_data,
+                                        struct mpp_frame *p_frame)
+{
+    int buf_width, buf_height;
+
+    if (!p_frame->buf.crop_en) {
+        return MM_ERROR_NONE;
+    }
+
+    if (p_video_render_data->rotation_angle == MPP_ROTATION_0 ||
+        p_video_render_data->rotation_angle == MPP_ROTATION_180) {
+        return MM_ERROR_NONE;
+    }
+
+    buf_width = p_frame->buf.size.width;
+    buf_height = p_frame->buf.size.height;
+
+    /*Get rotate info from decoder, then update to frame info.
+     *Scene1：static config ve rotate 90°，buf.size and crop.size are rotate size,
+     *        there is no need to update frame buf size and buf stride info
+     *Scene2：dynamic config ve rotate 90°，buf.size is not rotate size but crop.size
+     *        are rotate size, must be update buf.size and buf stride
+     */
+    if ((buf_width > buf_height && p_frame->buf.crop.width < p_frame->buf.crop.height) ||
+        (buf_width < buf_height && p_frame->buf.crop.width > p_frame->buf.crop.height)) {
+        p_frame->buf.size.width = buf_height;
+        p_frame->buf.size.height = buf_width;
+        p_frame->buf.stride[0] = p_frame->buf.size.width;
+        p_frame->buf.stride[1] = p_frame->buf.size.width;
+        p_frame->buf.stride[2] = 0;
+    }
+
+    return MM_ERROR_NONE;
+}
+
 static int
 mm_video_render_rotate_frame(mm_video_render_data *p_video_render_data,
                              struct mpp_frame *p_frame)
@@ -467,6 +512,12 @@ mm_video_render_rotate_frame(mm_video_render_data *p_video_render_data,
     if (p_video_render_data == NULL || p_frame == NULL) {
         loge("param error !!!\n");
         return -1;
+    }
+
+    if (0 == strcmp(PRJ_CHIP, "d13x")) {
+        mm_video_render_update_frame(p_video_render_data, p_frame);
+        p_video_render_data->p_cur_display_frame = p_frame;
+        return 0;
     }
 
     if (p_video_render_data->rotation_angle == MPP_ROTATION_0) {
@@ -575,7 +626,7 @@ static void mm_video_render_wait_frame_timeout(mm_video_render_data *p_video_ren
     mm_bind_info *p_bind_vdec;
 
     if (p_video_render_data->frame_end_flag) {
-        printf("[%s:%d]:receive video frame end flag\n", __FUNCTION__, __LINE__);
+        logi("[%s:%d]:receive video frame end flag\n", __FUNCTION__, __LINE__);
         p_video_render_data->flags |= VIDEO_RENDER_INPORT_SEND_ALL_FRAME_FLAG;
         return;
     }
@@ -672,6 +723,9 @@ static s32 mm_video_render_send_command(mm_handle h_component,
         }
         pthread_mutex_unlock(&p_video_render_data->in_frame_lock);
     } else {
+        if (MM_COMMAND_EOS == (s32)cmd) {
+            p_video_render_data->frame_end_flag = MM_TRUE;
+        }
         aic_msg_put(&p_video_render_data->s_msg, &s_msg);
     }
     return error;
@@ -747,6 +801,16 @@ static s32 mm_video_render_set_parameter(mm_handle h_component,
                 logi("cancel frame_end_flag\n");
             }
             break;
+
+        case MM_INDEX_VENDOR_VIDEO_RENDER_KEEP_LAST_FRAME:
+            if (!p_video_render_data->render) {
+                loge("video render is not initialization!!!\n");
+                return MM_ERROR_INSUFFICIENT_RESOURCES;
+            }
+            error = aic_video_render_rend_last_frame(p_video_render_data->render,
+                                                     (s32)(((mm_param_u32 *)p_param)->u32));
+            break;
+
         default:
             break;
     }
@@ -799,7 +863,7 @@ static s32 mm_video_render_set_config(mm_handle h_component,
             mm_time_config_clock_state *p_state =
                 (mm_time_config_clock_state *)p_config;
             p_video_render_data->clock_state = p_state->state;
-            printf("[%s:%d]p_video_render_data->clock_state:%d\n", __FUNCTION__,
+            logi("[%s:%d]p_video_render_data->clock_state:%d\n", __FUNCTION__,
                    __LINE__, p_video_render_data->clock_state);
             break;
         }
@@ -815,7 +879,7 @@ static s32 mm_video_render_set_config(mm_handle h_component,
                     p_video_render_data->render, p_video_render_data->layer_id,
                     p_video_render_data->dev_id);
                 if (!ret) {
-                    printf("[%s:%d]p_video_render_data->render->init ok\n",
+                    logi("[%s:%d]p_video_render_data->render->init ok\n",
                            __FUNCTION__, __LINE__);
                     p_video_render_data->video_render_init_flag = 1;
                 } else {
@@ -1201,12 +1265,12 @@ mm_video_render_state_change_to_pause(mm_video_render_data *p_video_render_data)
         if (p_bind_clock->flag) {
             mm_get_config(p_bind_clock->p_bind_comp,
                           MM_INDEX_CONFIG_TIME_CUR_MEDIA_TIME, &timestamp);
-            printf("[%s:%d]Excuting--->Pause,timestamp:" FMT_d64 "\n",
+            logi("[%s:%d]Excuting--->Pause,timestamp:" FMT_d64 "\n",
                    __FUNCTION__, __LINE__, timestamp.timestamp);
         } else {
             p_video_render_data->pause_time_point =
                 mm_video_render_clock_get_sys_time();
-            printf("[%s:%d]Excuting--->Pause,pause_time_point:" FMT_d64 "\n",
+            logi("[%s:%d]Excuting--->Pause,pause_time_point:" FMT_d64 "\n",
                    __FUNCTION__, __LINE__,
                    p_video_render_data->pause_time_point);
         }
@@ -1240,13 +1304,13 @@ static void mm_video_render_state_change_to_executing(
         if (p_bind_clock->flag) {
             mm_get_config(p_bind_clock->p_bind_comp,
                           MM_INDEX_CONFIG_TIME_CUR_MEDIA_TIME, &timestamp);
-            printf("[%s:%d]Pause--->Excuting,timestamp:" FMT_d64 "\n",
+            logi("[%s:%d]Pause--->Excuting,timestamp:" FMT_d64 "\n",
                    __FUNCTION__, __LINE__, timestamp.timestamp);
         } else {
             p_video_render_data->pause_time_durtion +=
                 (mm_video_render_clock_get_sys_time() -
                  p_video_render_data->pause_time_point);
-            printf("[%s:%d]Pause--->Excuting,pause_time_point:" FMT_d64
+            logi("[%s:%d]Pause--->Excuting,pause_time_point:" FMT_d64
                    ",curTime:" FMT_d64 ",pauseDura:" FMT_d64 "\n",
                    __FUNCTION__, __LINE__,
                    p_video_render_data->pause_time_point,
@@ -1266,76 +1330,6 @@ static void mm_video_render_state_change_to_executing(
                                  p_video_render_data->state, NULL);
 }
 
-/*
-static int mm_video_render_dump_pic(struct mpp_buf* video,int index)
-{
-    int i;
-    int data_size[3] = {0, 0, 0};
-    unsigned char* hw_data[3] = {0};
-    int comp = 3;
-    FILE* fp_save = NULL;
-    char fileName[255] = {0};
-    if (video->format == MPP_FMT_YUV420P) {
-        comp = 3;
-        data_size[0] = video->size.height * video->stride[0];
-        data_size[1] = data_size[2] = data_size[0]/4;
-    } else if (video->format == MPP_FMT_NV12 || video->format == MPP_FMT_NV21) {
-        comp = 2;
-        data_size[0] = video->size.height * video->stride[0];
-        data_size[1] =  data_size[0]/2;
-    } else if (video->format == MPP_FMT_YUV444P) {
-        comp = 3;
-        data_size[0] = video->size.height * video->stride[0];
-        data_size[1] = data_size[2] = data_size[0];
-    } else if (video->format == MPP_FMT_YUV422P) {
-        comp = 3;
-        data_size[0] = video->size.height * video->stride[0];
-        data_size[1] = data_size[2] = data_size[0]/2;
-    } else if (video->format == MPP_FMT_RGBA_8888 || video->format == MPP_FMT_BGRA_8888
-        || video->format == MPP_FMT_ARGB_8888 || video->format == MPP_FMT_ABGR_8888) {
-        comp = 1;
-        data_size[0] = video->size.height * video->stride[0];
-    } else if (video->format == MPP_FMT_RGB_888 || video->format == MPP_FMT_BGR_888) {
-        comp = 1;
-        data_size[0] = video->size.height * video->stride[0];
-    } else if (video->format == MPP_FMT_RGB_565 || video->format == MPP_FMT_BGR_565) {
-        comp = 1;
-        data_size[0] = video->size.height * video->stride[0];
-    }
-    loge("data_size: %d %d %d, height: %d, stride: %d, format: %d",
-        data_size[0], data_size[1], data_size[2],
-        video->size.height, video->stride[0], video->format);
-    snprintf(fileName,sizeof(fileName),"Pic%d.yuv",index);
-
-    fp_save = fopen(fileName, "wb");
-
-    if (fp_save  == NULL) {
-        loge("fopen %s error\n",fileName);
-        return -1;
-    }
-
-    loge("fopen %s ok\n",fileName);
-
-    // mmap dmabuf to virtual space and save the frame yuv data
-    for(i=0; i<comp; i++) {
-        hw_data[i] = mmap(NULL, data_size[i], PROT_READ, MAP_SHARED, video->fd[i], 0);
-        if (hw_data[i] == MAP_FAILED) {
-            loge("dmabuf alloc mmap failed!");
-            return -1;
-        }
-        if (fp_save)
-            fwrite(hw_data[i], 1, data_size[i], fp_save);
-    }
-
-    fclose(fp_save);
-
-    for(i=0; i<comp; i++) {
-        munmap(hw_data[i], data_size[i]);
-    }
-
-    return 0;
-}
-*/
 
 static s64
 mm_vdieo_render_get_media_time(mm_video_render_data *p_video_render_data)
@@ -1418,7 +1412,7 @@ mm_vdieo_render_process_video_sync(mm_video_render_data *p_video_render_data,
     }
 
     if (p_frame_info->flags & FRAME_FLAG_EOS) {
-        printf("[%s:%d]pts:%lld,delay_time:" FMT_d64 "\n", __FUNCTION__,
+        logi("[%s:%d]pts:%lld,delay_time:" FMT_d64 "\n", __FUNCTION__,
                __LINE__, p_frame_info->pts, delay_time);
     }
 
@@ -1556,7 +1550,7 @@ CMD_EXIT:
 
 void mm_video_render_print_frame_count(mm_video_render_data *p_video_render_data)
 {
-    printf("[%s:%d]receive_frame_num:%u,"
+    logi("[%s:%d]receive_frame_num:%u,"
            "show_frame_ok_num:%u,"
            "show_frame_fail_num:%u,"
            "giveback_frame_ok_num:%u,"
@@ -1572,7 +1566,7 @@ void mm_video_render_print_frame_count(mm_video_render_data *p_video_render_data
 
 void mm_video_render_print_frame(struct mpp_frame *p_frame)
 {
-    printf(
+    logi(
         "[%s:%d]stride[0]:%d,stride[1]:%d,stride[2]:%d,format:%d,width:%d,height:%d,"
         "crop_en:%d,crop.x:%d,crop.y:%d,crop.width:%d,crop.height:%d\n",
         __FUNCTION__, __LINE__, p_frame->buf.stride[0], p_frame->buf.stride[1],
@@ -1619,7 +1613,7 @@ static void mm_video_render_set_dis_rect(mm_video_render_data *p_video_render_da
     } else {
         p_video_render_data->render->set_dis_rect(p_video_render_data->render,
                                                   &dis_rect);
-        printf("[%s:%d]init dis rect:[%d,%d,%d,%d]!!!\n", __FUNCTION__,
+        logi("[%s:%d]init dis rect:[%d,%d,%d,%d]!!!\n", __FUNCTION__,
                __LINE__, dis_rect.x, dis_rect.y, dis_rect.width,
                dis_rect.height);
     }
@@ -1680,8 +1674,7 @@ _AIC_SHOW_DIRECT_:
                 FRAME_FLAG_EOS) {
                 p_video_render_data->flags |=
                     VIDEO_RENDER_INPORT_SEND_ALL_FRAME_FLAG;
-                //p_video_render_data->frame_end_flag = MM_TRUE;
-                printf("[%s:%d]receive frame_end_flag\n", __FUNCTION__,
+                logi("[%s:%d]receive frame_end_flag\n", __FUNCTION__,
                        __LINE__);
             }
         } else {
@@ -1719,7 +1712,7 @@ _AIC_SHOW_DIRECT_:
             FRAME_FLAG_EOS) {
             p_video_render_data->flags |=
                 VIDEO_RENDER_INPORT_SEND_ALL_FRAME_FLAG;
-            printf("[%s:%d]receive frame_end_flag\n", __FUNCTION__, __LINE__);
+            logi("[%s:%d]receive frame_end_flag\n", __FUNCTION__, __LINE__);
         }
 
         p_video_render_data->drop_frame_num++;
@@ -1853,7 +1846,7 @@ static void *mm_video_render_component_thread(void *p_thread_data)
                                          10 * 1000);
                     goto _AIC_MSG_GET_;
                 }
-                printf("[%s:%d]audio start time arrive\n", __FUNCTION__,
+                logi("[%s:%d]audio start time arrive\n", __FUNCTION__,
                        __LINE__);
             } else { //if it does not tunneld with clock ,it need calcuaute media time by self for control frame rate
                 mm_vdieo_render_set_media_clock(
@@ -1878,7 +1871,7 @@ static void *mm_video_render_component_thread(void *p_thread_data)
                     FRAME_FLAG_EOS) {
                     p_video_render_data->flags |=
                         VIDEO_RENDER_INPORT_SEND_ALL_FRAME_FLAG;
-                    printf("[%s:%d]receive frame_end_flag\n", __FUNCTION__,
+                    logi("[%s:%d]receive frame_end_flag\n", __FUNCTION__,
                            __LINE__);
                 }
             } else {
@@ -1945,7 +1938,6 @@ static void *mm_video_render_component_thread(void *p_thread_data)
 
 _EXIT:
     mm_video_render_print_frame_count(p_video_render_data);
-    printf("[%s:%d]mm_video_render_component_thread exit\n", __FUNCTION__,
-           __LINE__);
+
     return (void *)MM_ERROR_NONE;
 }

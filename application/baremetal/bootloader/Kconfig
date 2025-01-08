@@ -45,12 +45,12 @@ menu "Drivers"
     config AIC_BOOTLOADER_SPINOR_SUPPORT
         bool "SPI NOR boot support"
         default y
-        select AIC_SPINOR_DRV_TEST
+        select AIC_SPINOR_DRV
 
     config AIC_BOOTLOADER_SPINAND_SUPPORT
         bool "SPI NAND boot support"
         default y
-        select AIC_SPINAND_DRV_TEST
+        select AIC_SPINAND_DRV
 
     config AIC_BOOTLOADER_PSRAM_EN
         bool "PSRAM support"
@@ -63,19 +63,6 @@ menu "Drivers"
         default n
         select AIC_AXICFG_DRV
         source bsp/artinchip/hal/axicfg/Kconfig.dev
-
-    config AIC_BOOT_USB_DRV
-        bool "USB device driver support"
-        default n
-
-    config AIC_BOOT_USBH_DRV
-        bool "USB Uost driver support"
-        default n
-
-    config AIC_BOOTLOADER_UDISK_SUPPORT
-        bool "UDISK support"
-        default n
-        select AIC_BOOT_USBH_DRV
 
 endmenu # "Drivers"
 
@@ -98,17 +85,30 @@ menu "Upgrading"
     config AICUPG_UART_ENABLE
         bool "Upgrading by UART"
         default n
+        select LPKG_USING_CHERRYUSB
         select AIC_UART_DRV
 
     config AICUPG_USB_ENABLE
         bool "Upgrading by USB"
         default y
-        select AIC_BOOT_USB_DRV
+        select LPKG_USING_CHERRYUSB
+        select LPKG_CHERRYUSB_OTG
+        select LPKG_CHERRYUSB_DEVICE
+        select LPKG_CHERRYUSB_DEVICE_CLASS_AIC
+        select LPKG_CHERRYUSB_DEVICE_AICUPG_FOR_USB
+        select AIC_USING_USB0
+        select AIC_USING_USB0_OTG
 
-    config AICUPG_USB_DMA_ENABLE
-        bool "DMA enable for USB device"
-        depends on AICUPG_USB_ENABLE
+    config AICUPG_HID_ENABLE
+        bool "Upgrading by HID"
         default n
+        select LPKG_USING_CHERRYUSB
+        select LPKG_CHERRYUSB_OTG
+        select LPKG_CHERRYUSB_DEVICE
+        select LPKG_CHERRYUSB_DEVICE_HID
+        select LPKG_CHERRYUSB_DEVICE_AICUPG_FOR_HID
+        select AIC_USING_USB0
+        select AIC_USING_USB0_OTG
 
     config AICUPG_SDCARD_ENABLE
         bool "Upgrading by SD Card"
@@ -124,17 +124,19 @@ menu "Upgrading"
     config AICUPG_UDISK_ENABLE
         bool "Upgrading by UDISK"
         default n
-        select AIC_BOOTLOADER_UDISK_SUPPORT
+        select LPKG_USING_CHERRYUSB
+        select LPKG_CHERRYUSB_OTG
+        select LPKG_CHERRYUSB_HOST
+        select LPKG_CHERRYUSB_HOST_MSC
+        select LPKG_CHERRYUSB_HOST_AICUPG_FOR_UDISK
+        select AIC_USING_USB0
+        select AIC_USING_USB0_OTG
         select AIC_BOOTLOADER_FATFS_SUPPORT
 
-    config AICUPG_UDISK_CHECK_TIMEOUT
-        int "Set timeout value(us) for udisk check"
-        default 1000
-        depends on AICUPG_UDISK_ENABLE
-
-    config AICUPG_USB_CONTROLLER_MAX_NUM
-        int  "USB Host controller count"
-        default 1
+    config AICUPG_USB_USE_CONTROLLER_ID_1
+        bool  "USB ID 1 to be used for udisk"
+        default n
+        select AIC_USING_USB1
         depends on AICUPG_UDISK_ENABLE
 
     config AICUPG_MMC_ARTINCHIP
@@ -216,11 +218,6 @@ menu "Commands"
         bool "boot progress bar"
         depends on AIC_DE_DRV
         default n
-
-    config AIC_BOOTLOADER_CMD_PROGRESS_BAR_ROTATE
-        int "progress bar rotate degress (0/90/270)"
-        default 0
-        depends on AIC_BOOTLOADER_CMD_PROGRESS_BAR
 
     config AIC_BOOTLOADER_CMD_FB_CONSOLE
         bool "fb console support"

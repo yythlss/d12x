@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -50,12 +50,8 @@ typedef enum {
 #define SYSCFG_GMAC0_PHY_MODE   PHY_INTERFACE_MODE_RMII
 // #define SYSCFG_GMAC1_PHY_MODE   PHY_INTERFACE_MODE_RGMII
 
-void syscfg_usb_phy0_sw_host(s32 sw);
-
-s32 syscfg_fpga_de_clk_sel_by_div(u8 sclk, u8 pixclk);
-void syscfg_fpga_lcd_io_set(u32 val);
-
 s32 hal_syscfg_probe(void);
-u32 syscfg_read_ldo_cfg(void);
+u32 hal_syscfg_read_ldo_cfg(void);
+void hal_syscfg_usb_phy0_sw_host(s32 host_mode);
 
 #endif

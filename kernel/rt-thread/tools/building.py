@@ -576,6 +576,11 @@ def MergeGroup(src_group, group):
             src_group['LOCAL_ASFLAGS'] = src_group['LOCAL_ASFLAGS'] + group['LOCAL_ASFLAGS']
         else:
             src_group['LOCAL_ASFLAGS'] = group['LOCAL_ASFLAGS']
+    if 'INSTALL' in group:
+        if 'INSTALL' in src_group:
+            src_group['INSTALL'] = src_group['INSTALL'] + group['INSTALL']
+        else:
+            src_group['INSTALL'] = group['INSTALL']
 
 
 def _PretreatListParameters(target_list):
@@ -690,6 +695,14 @@ def DefineGroup(name, src, depend, **parameters):
         # only add source
         objs = group['src']
 
+    if 'INSTALL' in group:
+        for i in range(len(group['INSTALL'])):
+            ins = group['INSTALL'][i]
+            src = ins[0]
+            dst = ins[1]
+            if not src.startswith('/'):
+                src = os.path.join(GetCurrentDir(), src)
+                group['INSTALL'][i] = (src, dst)
     # merge group
     for g in Projects:
         if g['name'] == name:
@@ -914,6 +927,18 @@ def GenTargetProject(program=None):
     if GetOption('target') == 'xmake':
         from xmake import XMakeProject
         XMakeProject(Env, Projects)
+
+
+def GetInstallList():
+    global Rtt_Root
+    install = []
+    for g in Projects:
+        if 'INSTALL' in g:
+            for ins in g['INSTALL']:
+                src = ins[0]
+                dst = ins[1]
+                install.append((g['name'], src, dst))
+    return install
 
 
 def EndBuilding(target, program=None):

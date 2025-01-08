@@ -12,7 +12,9 @@
 #include <ctype.h>
 #include <console.h>
 #include <rtconfig.h>
+
 #include <aic_osal.h>
+#include "boot_param.h"
 
 #ifdef __GNUC__
 #define MAYBE_UNUSED(d) d __attribute__((unused))
@@ -51,13 +53,26 @@ struct tiny_console {
 
 static struct tiny_console *g_console = NULL;
 
+extern struct boot_args boot_arg;
 void show_version(void)
 {
-    char ver[] = PRJ_CHIP;
+    char soc[] = PRJ_CHIP;
+#ifdef KERNEL_FREERTOS
+    char *os = "FreeRTOS";
+#else
+    char *os = "Baremetal";
+#endif
 
-    ver[0] = toupper(ver[0]);
-    printf("Welcome to ArtInChip Luban-Lite %d.%d.%d [Baremetal %s Inside]\n",
-           LL_VERSION, LL_SUBVERSION, LL_REVISION, ver);
+    soc[0] = toupper(soc[0]);
+    if (isalpha((int)soc[1]))
+        soc[1] = toupper(soc[1]);
+    if (isalpha((int)soc[2]))
+        soc[2] = toupper(soc[2]);
+
+    printf("Welcome to ArtInChip Luban-Lite %d.%d.%d [%s %s Inside]\n",
+           LL_VERSION, LL_SUBVERSION, LL_REVISION, soc, os);
+    if (isdigit((int)boot_arg.image_version[0]))
+        printf("Image version: %s\n", boot_arg.image_version);
     printf("Built on %s %s\n", __DATE__, __TIME__);
 }
 
@@ -315,8 +330,10 @@ static int console_parse_opts(const char *line, char *args[], int max_argc)
                 if (*p == '|') {
                     if (!(args[argc++] = strdup("|")))
                         return 0;
-                } else if (!isspace((int)*p))
-                    word_start = p;
+                } else {
+                    if (!isspace((int)*p))
+                        word_start = p;
+                }
             }
 
             p++;
@@ -999,12 +1016,15 @@ void console_init(void)
     return;
 }
 
-void console_loop(void)
+int console_loop(void)
 {
-    if (g_console->bootcmd)
-        console_run_cmd(g_console->bootcmd);
+    if (g_console->bootcmd && console_run_cmd(g_console->bootcmd) == CONSOLE_QUIT) {
+        free(g_console->bootcmd);
+        g_console->bootcmd = NULL;
+        return CONSOLE_QUIT;
+    }
 
-    _console_loop(g_console);
+    return _console_loop(g_console);
 }
 
 int console_get_ctrlc(void)

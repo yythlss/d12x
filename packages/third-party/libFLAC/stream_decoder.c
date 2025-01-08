@@ -39,6 +39,7 @@
 #include <string.h> /* for memset/memcpy() */
 #include <sys/types.h> /* for off_t */
 #include <sys/stat.h>  /* for stat() */
+#include <inttypes.h>
 #include "share/compat.h"
 #include "FLAC/assert.h"
 #include "share/alloc.h"
@@ -2984,7 +2985,7 @@ FLAC__bool read_residual_partitioned_rice_(FLAC__StreamDecoder *decoder, uint32_
 		if(rice_parameter < pesc) {
 			partitioned_rice_contents->raw_bits[partition] = 0;
 			u = (partition == 0) ? partition_samples - predictor_order : partition_samples;
-			if(!decoder->private_->local_bitreader_read_rice_signed_block(decoder->private_->input, residual + sample, u, rice_parameter)){
+			if(!decoder->private_->local_bitreader_read_rice_signed_block(decoder->private_->input, (int*)residual + sample, u, rice_parameter)){
 				if(decoder->protected_->state == FLAC__STREAM_DECODER_READ_FRAME) {
 					/* no error was set, read_callback_ didn't set it, so
 					 * invalid rice symbol was found */
@@ -3007,7 +3008,7 @@ FLAC__bool read_residual_partitioned_rice_(FLAC__StreamDecoder *decoder, uint32_
 			}
 			else{
 				for(u = (partition == 0)? predictor_order : 0; u < partition_samples; u++, sample++) {
-					if(!FLAC__bitreader_read_raw_int32(decoder->private_->input, &i, rice_parameter))
+					if(!FLAC__bitreader_read_raw_int32(decoder->private_->input, (FLAC__int32 *)&i, rice_parameter))
 						return false; /* read_callback_ sets the state for us */
 					residual[sample] = i;
 				}

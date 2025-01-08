@@ -9,8 +9,6 @@
 #include <aic_core.h>
 #include <aic_hal.h>
 #include "board.h"
-#include <libfdt.h>
-#include <of.h>
 #include <aic_utils.h>
 
 struct aic_pinmux aic_pinmux_config[] = {
@@ -28,8 +26,23 @@ struct aic_pinmux aic_pinmux_config[] = {
     /* can0 */
     {4, PIN_PULL_DIS, 3, "PA.4"},
     {4, PIN_PULL_DIS, 3, "PA.5"},
-#else
+#endif
+#ifdef AIC_USING_GPAI0
+    {2, PIN_PULL_DIS, 3, "PA.0"},
+#endif
+#ifdef AIC_USING_GPAI1
+    {2, PIN_PULL_DIS, 3, "PA.1"},
+#endif
+#ifdef AIC_USING_GPAI2
+    {2, PIN_PULL_DIS, 3, "PA.2"},
+#endif
+#ifdef AIC_USING_GPAI3
+    {2, PIN_PULL_DIS, 3, "PA.3"},
+#endif
+#ifdef AIC_USING_GPAI4
     {2, PIN_PULL_DIS, 3, "PA.4"},
+#endif
+#ifdef AIC_USING_GPAI5
     {2, PIN_PULL_DIS, 3, "PA.5"},
 #endif
 #ifdef AIC_USING_RTP

@@ -16,6 +16,7 @@
 #include <env.h>
 #include "of.h"
 #include <math.h>
+#include <aic_partition.h>
 #ifdef KERNEL_BAREMETAL
 #include <mtd.h>
 #endif
@@ -118,6 +119,7 @@ __exit:
 
 #ifdef KERNEL_BAREMETAL
 #ifdef AIC_SDMC_DRV
+char *aic_mmc_get_partition_string(int mmc_id);
 int of_fdt_dt_init_bare_mmc(void)
 {
     int ret = -1;
@@ -128,6 +130,7 @@ int of_fdt_dt_init_bare_mmc(void)
     unsigned long blkoffset = 0;
     struct aic_sdmc *host = NULL;
     void *psram_or_ddr_dtb_addr = NULL;
+    char *partstr;
     struct aic_partition *part = NULL;
     struct aic_partition *parts = NULL;
     struct fdt_header *dtb_header_data = NULL;
@@ -144,8 +147,8 @@ int of_fdt_dt_init_bare_mmc(void)
         printf("Can't find mmc device!");
         return ret;
     }
-
-    parts = mmc_new_partition(MMC_GPT_PARTS, (GPT_HEADER_SIZE));
+    partstr = aic_mmc_get_partition_string(mmc_id);
+    parts = aic_part_gpt_parse(partstr);
     if (!parts)
         return ret;
 
@@ -217,7 +220,7 @@ __exit:
     if (dtb_header_data)
         free(dtb_header_data);
     if (parts)
-        mmc_free_partition(parts);
+        aic_part_free(parts);
     return ret;
 }
 #endif
@@ -239,7 +242,7 @@ int of_fdt_dt_init_bare_nornand(void)
 
     mtd = mtd_get_device(AIC_CONFIG_PART);
     if (!mtd) {
-        printf("Failed to get mtd %s\n", AIC_CONFIG_PART);
+        printf("No %s partition\n", AIC_CONFIG_PART);
         return -1;
     }
 

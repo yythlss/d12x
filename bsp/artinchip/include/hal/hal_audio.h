@@ -55,6 +55,7 @@ struct aic_audio_ctrl
     unsigned long reg_base;
     uint32_t irq_num;
     uint32_t clk_id;
+    uint32_t start_flag;
     struct aic_audio_transfer_info tx_info;
     struct aic_audio_transfer_info dmic_info;
     struct aic_audio_transfer_info amic_info;
@@ -266,6 +267,7 @@ void hal_audio_set_playback_by_spk1(aic_audio_ctrl *codec);
 void hal_audio_set_dmic_channel(aic_audio_ctrl *codec, uint32_t ch);
 void hal_audio_set_amic_channel(aic_audio_ctrl *codec);
 void hal_audio_playback_start(aic_audio_ctrl *codec);
+void hal_audio_playback_start_single(aic_audio_ctrl *codec);
 void hal_audio_playback_stop(aic_audio_ctrl *codec);
 void hal_audio_dmic_start(aic_audio_ctrl *codec);
 void hal_audio_dmic_stop(aic_audio_ctrl *codec);

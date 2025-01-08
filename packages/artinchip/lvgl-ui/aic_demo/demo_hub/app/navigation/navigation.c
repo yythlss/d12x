@@ -40,6 +40,11 @@ static void widgets_example_cb(lv_event_t * e)
     app_entrance(APP_WIDGETS, 1);
 }
 
+static void input_test_ui_cb(lv_event_t * e)
+{
+    app_entrance(APP_INPUT_TEST, 1);
+}
+
 static void layout_list_ui_cb(lv_event_t * e)
 {
     app_entrance(APP_LAYOUT_LIST_EXAMPLE, 1);
@@ -126,7 +131,7 @@ static icon_app_list icon_list_480_272[] = {
     {LVGL_PATH(navigator/widgets.png), LVGL_PATH(navigator/widgets_selected.png), widgets_example_cb},
     {LVGL_PATH(navigator/stress.png), LVGL_PATH(navigator/stress_selected.png), NULL},
     {LVGL_PATH(navigator/benchmark.png), LVGL_PATH(navigator/benchmark_selected.png), NULL},
-    {LVGL_PATH(navigator/keypad_encoder.png), LVGL_PATH(navigator/keypad_encoder_selected.png), NULL},
+    {LVGL_PATH(navigator/keypad_encoder.png), LVGL_PATH(navigator/keypad_encoder_selected.png), input_test_ui_cb},
     {LVGL_PATH(navigator/list.png), LVGL_PATH(navigator/list_selected.png), layout_list_ui_cb},
     {LVGL_PATH(navigator/table.png), LVGL_PATH(navigator/table_selected.png), layout_table_ui_cb},
     {LVGL_PATH(navigator/printer.png), LVGL_PATH(navigator/printer_selected.png), NULL},
@@ -155,7 +160,7 @@ static icon_app_list icon_list_1024_600[] = {
     {LVGL_PATH(navigator/widgets.png), LVGL_PATH(navigator/widgets_selected.png), widgets_example_cb},
     {LVGL_PATH(navigator/stress.png), LVGL_PATH(navigator/stress_selected.png), NULL},
     {LVGL_PATH(navigator/benchmark.png), LVGL_PATH(navigator/benchmark_selected.png), NULL},
-    {LVGL_PATH(navigator/keypad_encoder.png), LVGL_PATH(navigator/keypad_encoder_selected.png), NULL},
+    {LVGL_PATH(navigator/keypad_encoder.png), LVGL_PATH(navigator/keypad_encoder_selected.png), input_test_ui_cb},
     {LVGL_PATH(navigator/list.png), LVGL_PATH(navigator/list_selected.png), NULL},
     {LVGL_PATH(navigator/table.png), LVGL_PATH(navigator/table_selected.png), NULL},
     {LVGL_PATH(navigator/printer.png), LVGL_PATH(navigator/printer_selected.png), NULL},

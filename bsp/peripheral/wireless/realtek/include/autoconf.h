@@ -27,26 +27,24 @@
  * Public General Config ******************************************************
  */
 #ifndef DRV_NAME
-    #define DRV_NAME        					"undefine"
+	#define DRV_NAME        					"undefine"
 #endif
 
 #ifndef DRIVERVERSION
-    #define DRIVERVERSION						"undefine"
+	#define DRIVERVERSION						"undefine"
 #endif
 
-#ifndef CONFIG_PLATFOMR_CUSTOMER_RTOS
-    #define PLATFORM_FREERTOS
-#else
-    #define PLATFORM_CUSTOMER_RTOS
+#ifdef LPKG_USING_LWIP
+	#define PLATFORM_CUSTOMER_RTOS
 	#define CONFIG_LWIP_LAYER       			1
 #endif
 
 #ifndef CONFIG_LWIP_LAYER
-	#define CONFIG_LWIP_LAYER       			1
+	#define CONFIG_LWIP_LAYER       			0
 #endif
 
 #ifndef CONFIG_LITTLE_ENDIAN
-    #define CONFIG_LITTLE_ENDIAN    			1 // 0 for CONFIG_BIG_ENDIAN
+	#define CONFIG_LITTLE_ENDIAN    			1 // 0 for CONFIG_BIG_ENDIAN
 #endif
 
 

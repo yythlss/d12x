@@ -1,3 +1,90 @@
+# V1.1.2 #
+## 新增 ##
+- USB：
+  - HID keyboard：支持命令行构造字符输入
+  - MSC Host：支持无分区表的设备挂载
+  - 集成了MacOS驱动试用版
+  - 支持用VE完成JPEG旋转
+- LVGL：
+  - 适配AiUIBuilder
+  - Demo中增加Key adc按钮示例
+- MPP：
+  - 新增WMA、FLAC音频封装格式
+  - 支持AAC解码（因开源协议问题，公版不支持AAC）
+  - 支持MKV、TS、FLV视频封装格式
+- 烧写：支持HID模式的烧写；优化UART烧写的兼容性
+- Application：支持自动install资源文件的目录
+- D21x/D13x/D12x：支持栈回溯功能
+- SFUD：增加安全寄存器的读写接口
+- OTA：增加ymodel协议支持
+- PWM：支持动态调整clk频率
+- I2S：增加数据的直传接口
+- QEP：增加D13x平台的支持
+- RTP：支持RTP IO当作普通ADC来使用
+- OneStep：支持自动打开、保存所有defconfig文件
+- BT8858：新增HID device支持，并适配iOS和Android
+- TP2825：支持自动检测隔行模式
+- 新增方案配置：D13x hspi（衡山PI）
+- 新增器件支持：
+  - WiFi：AIC8800
+  - NAND：XT26G04C、FM25S01BI3
+  - Touch：ili2511、ft6336、c123hax022
+  - Panel：ili9327
+  - Audio codec：cs4344
+  - RTC：pcf8563
+## 优化 ##
+- USB副屏：
+  - Display：动态调整USB传输的报文长度
+  - OSD：增加背光控制滑动条；支持保存用户的配置参数
+  - UDC：优化setup报文的处理
+  - 优化复合设备的加载处理
+- G73：扫码Demo完成多处性能和稳定性优化；支持画面旋转
+- MPP：增加独立的Audio render框架，优化Audio播放相关的功能
+- Display：优化Vsync的处理逻辑
+- CMU：优化PLL的展频处理
+- littlefs：优化读写性能
+- UMM：优化初始化的耗时
+- SFUD：优化数据的等待延迟
+- RTP：优化休眠唤醒后的中断处理
+- NAND：优化OOB的访问处理；优化block层的访问性能
+- PBP：D13x/G73：优化FatFS对不同cluster size的兼容性
+- UART：优化FIFO的触发水位配置；优化DMA模式的处理逻辑
+- syscfg：重构代码，更容易支持多平台
+- UART烧写：大幅优化传输速度
+- FreeType：优化代码体积
+- RTP：优化自动校准的方法
+- Audio codec：es8388优化启动时间
+- SPI：调整Bit模式的分频计算，让频率更精准
+
+## 修改 ##
+- LVGL：
+  - 修正自动删除Screen时的逻辑漏洞
+  - 所有Demo修改资源文件为install方式
+  - 打包FatFS镜像：改用整个分区size，不再自动计算
+- GE：针对D13x平台增加格式有效性检查
+- UseID：修正一处buf的使用
+- RTP：去掉对 x_plate和y_plate 参数的取值范围限制
+- CE：Hash：修正多次计算的数据处理
+- aic-authorization：修正数据buf的cache处理
+- OTA：修正版本回滚的处理
+- LwIP：修正IP4中next-hop的处理
+- workqueue：修正接收和发送的处理流程
+- 启动：统一使用ArtInChip启动画面
+- VSCode：修正load方式的参数配置
+- 栈回溯：默认关闭此功能，可在menuconfig中打开
+- OneStep：解决Luban和Luban-Lite之间切换后的命令残留问题
+- Version：统一RT-Thread、FreeRTOS、Baremetal系统的version命令log内容
+- CherryUSB：修正裸机模式下的互斥锁机制
+- 打包镜像：当资源文件路径无效的时候，生成一个空的文件镜像
+- 烧写：修正sparse格式的烧写失败问题；G73减少Boot的代码段空间
+- UART：完善可选的波特率配置表
+- 开机动画：改善竖屏的兼容处理
+- syscfg：修正D12x获取LDO的返回值
+- BootLoader：不支持用户手动选择elf区域配置
+- 清理开源协议的规范使用问题
+
+
+
 # V1.1.1 #
 ## 新增 ##
 - FreeType：D13x支持独立使用PSRAM Heap

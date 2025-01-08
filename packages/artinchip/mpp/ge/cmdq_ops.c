@@ -1,5 +1,5 @@
-﻿/*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+/*
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -299,6 +299,16 @@ static inline int is_rgb(enum mpp_pixel_format format)
     }
     return 0;
 }
+
+#ifdef AIC_GE_DRV_V11
+static inline bool is_rgb_or_yuv400(enum mpp_pixel_format format)
+{
+    if (is_rgb(format) || format == MPP_FMT_YUV400)
+        return true;
+
+    return false;
+}
+#endif
 
 static inline int need_blend(struct ge_ctrl *ctrl)
 {
@@ -1763,7 +1773,6 @@ static int ge_open(struct mpp_ge *ge)
         return -1;
     }
 
-    printf("info: cmd ring buf size:%d\n", (int)cmdq->total_size);
     memset(cmdq->cmd_buf, 0, cmdq->total_size);
 
     /* init dma info lists */
@@ -1803,8 +1812,8 @@ static int ge_fillrect(struct mpp_ge *ge, struct ge_fillrect *fill)
         return -1;
 #ifdef AIC_GE_DRV_V11
     /* check rgb type */
-    if (!is_rgb(fill->dst_buf.format)) {
-        printf("fill rectangle not support yuv format\n");
+    if (!is_rgb_or_yuv400(fill->dst_buf.format)) {
+        printf("fill rectangle not support yuv format, except yuv400\n");
         return -1;
     }
 #endif
@@ -1889,9 +1898,9 @@ static int ge_bitblt(struct mpp_ge *ge, struct ge_bitblt *blt)
         return -1;
 #ifdef AIC_GE_DRV_V11
     /* check rgb type */
-    if (!is_rgb(blt->src_buf.format) ||
+    if (!is_rgb_or_yuv400(blt->src_buf.format) ||
         !is_rgb(blt->dst_buf.format)) {
-        printf("bitblt not support yuv format\n");
+        printf("bitblt not support yuv format, except src format yuv400\n");
         return -1;
     }
 #endif

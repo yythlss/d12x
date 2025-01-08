@@ -674,14 +674,10 @@ int __mjpeg_decode_frame(struct mpp_decoder *ctx)
         logi("startcode: %02x", start_code);
 
         /* process markers */
-        if (start_code >= RST0 && start_code <= RST7) {
-            //logd("restart marker: %d", start_code & 0xff);
-            /* APP fields */
-        } else if (start_code >= APP0 && start_code <= APP15) {
-            logd("app marker: %d", start_code & 0xff);
-            /* Comment */
-        } else if (start_code == COM) {
-            logd("com marker: %d", start_code & 0xff);
+        if (start_code >= JPG0 && start_code <= JPG13) {
+            loge("unsupport jpeg format");
+            s->error = JPEG_DECODER_ERROR_INPUTERROR;
+                goto _exit;
         }
 
         ret = -1;
@@ -724,8 +720,6 @@ int __mjpeg_decode_frame(struct mpp_decoder *ctx)
                 goto _exit;
             }
             break;
-        case LSE:
-            break;
         case EOI:
             if (!s->got_picture) {
                 loge("Found EOI before any SOF, skip");
@@ -753,20 +747,7 @@ int __mjpeg_decode_frame(struct mpp_decoder *ctx)
                 goto _exit;
             }
             break;
-        case SOF3:
-        case SOF48:
-        case SOF5:
-        case SOF6:
-        case SOF7:
-        case SOF9:
-        case SOF10:
-        case SOF11:
-        case SOF13:
-        case SOF14:
-        case SOF15:
-        case JPG:
-            loge("mjpeg: unsupported coding type (%x)", start_code);
-            break;
+
         default:
             logi("skip this marker: %02x", start_code);
             skip_variable_marker(s);

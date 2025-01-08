@@ -2,13 +2,13 @@
     "spi-nand": { // Device, The name should be the same with string in image:info:media:type
         "size": "128m", // Size of SPI NAND
         "partitions": {
-            "spl":      { "size": "1m" },
-            "env":      { "size": "256k" },
-            "env_r":    { "size": "256k" },
-            "os":       { "size": "4m" },
-            "os_r":     { "size": "4m" },
-            "rodata":   { "size": "12m" },
-            "rodata_r": { "size": "12m" },
+            "spl":        { "size": "1m" },
+            "env":        { "size": "256k" },
+            "env_r":      { "size": "256k" },
+            "os":         { "size": "4m" },
+            "os_r":       { "size": "4m" },
+            "rodata":     { "size": "12m" },
+            "rodata_r":   { "size": "12m" },
             "data": {
                 "size": "40m",
                 "nftl": { // Volume in NFTL device

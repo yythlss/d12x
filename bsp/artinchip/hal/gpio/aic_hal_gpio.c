@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <aic_core.h>
 #include "aic_hal_gpio.h"
+#include "aic_gpio_id.h"
 
 /* GPIO register offset */
 
@@ -51,40 +52,76 @@
 #define PIN_GEN_PIN_DRV_SHIFT       4
 #define PIN_GEN_PIN_FUN             GENMASK(3, 0)
 
-#define gen_reg(_g, _offset) \
-    (volatile void *)((_g * GROUP_FACTOR) + _offset + GPIO_BASE)
-#define cfg_reg(_g, _p) \
-    (volatile void *)((_g * GROUP_FACTOR) + (_p * PIN_FACTOR) + PIN_CFG_REG + \
-                      GPIO_BASE)
+volatile void *gen_reg(u32 group, u32 offset)
+{
+#ifdef AIC_SE_GPIO_DRV
+    if (group == SE_GPIO_GROUP_ID)
+        return (volatile void *)(offset + SE_GPIO_BASE);
+#endif
 
-unsigned int hal_gpio_name2pin(const char *name)
+    return (volatile void *)(group * GROUP_FACTOR + offset + GPIO_BASE);
+}
+
+volatile void *cfg_reg(u32 group, u32 pin)
+{
+#ifdef AIC_SE_GPIO_DRV
+    if (group == SE_GPIO_GROUP_ID)
+        return (volatile void *)(pin * PIN_FACTOR + PIN_CFG_REG + SE_GPIO_BASE);
+#endif
+
+    return (volatile void *)(group * GROUP_FACTOR + pin * PIN_FACTOR + PIN_CFG_REG + GPIO_BASE);
+}
+
+#ifdef AIC_SE_GPIO_DRV
+int hal_se_gpio_name2pin(const char *name)
 {
     unsigned int pin = 0;
     int hw_port_num, hw_pin_num = 0;
-    int i, name_len;
 
-    name_len = strlen(name);
+    hw_port_num = (int)('I' - 'A');
+    hw_pin_num = name[3] - '0';
+    pin = hw_port_num * GPIO_GROUP_SIZE + hw_pin_num;
 
-    if ((name_len < 4) || (name_len > 6))
-    {
-        return -1;
-    }
-    if ((name[0] != 'P') || (name[1] < 'A') || (name[2] != '.'))
-    {
-        return -1;
-    }
+    return pin;
+}
+#endif
+
+int hal_common_gpio_name2pin(const char *name)
+{
+    unsigned int pin = 0;
+    int hw_port_num, hw_pin_num = 0;
+    int i;
 
     hw_port_num = (int)(name[1] - 'A');
 
-    for (i = 3; i < name_len; i++)
+    for (i = 3; i < strlen(name); i++)
     {
         hw_pin_num *= 10;
         hw_pin_num += name[i] - '0';
     }
 
-    pin = hw_port_num*GPIO_GROUP_SIZE + hw_pin_num;
+    pin = hw_port_num * GPIO_GROUP_SIZE + hw_pin_num;
 
     return pin;
+}
+
+int hal_gpio_name2pin(const char *name)
+{
+    int name_len;
+
+    name_len = strlen(name);
+    if (name_len < 4)
+    {
+        return -1;
+    }
+
+    if ((name[0] == 'P') && (name[1] >= GPIO_GROUP_BEGIN) && (name[2] == '.'))
+        return hal_common_gpio_name2pin(name);
+#ifdef AIC_SE_GPIO_DRV
+    if ((name[0] == 'S') && (name[1] == SE_GPIO_GROUP_BEGIN) && (name[2] == '.'))
+        return hal_se_gpio_name2pin(name);
+#endif
+    return -1;
 }
 
 int hal_gpio_get_value(unsigned int group, unsigned int pin,

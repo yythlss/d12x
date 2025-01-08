@@ -6,7 +6,7 @@
  */
 
 #include <stdint.h>
-#include <string.h>
+#include <strings.h>
 #include <aic_core.h>
 #include <aic_hal.h>
 

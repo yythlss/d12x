@@ -1288,7 +1288,7 @@ int mov_peek_packet(struct aic_mov_parser *c, struct aic_parser_packet *pkt)
 
 	if (st->cur_sample_idx == st->nb_index_entries) {
 		// eos now
-		printf("[%s:%d] this stream eos",__FUNCTION__,__LINE__);
+		logi("[%s:%d] this stream eos",__FUNCTION__,__LINE__);
 		pkt->flag = PACKET_EOS;
 	}
 

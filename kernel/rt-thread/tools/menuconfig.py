@@ -164,9 +164,9 @@ def mk_rtconfig(filename):
         rtconfig.write(heap_base_def)
         rtconfig.write(text_base_def)
 
-        print('Insert macro definition into rtconfig.h\n')
-        print(heap_base_def)
-        print(text_base_def)
+        # print('Insert macro definition into rtconfig.h\n')
+        # print(heap_base_def)
+        # print(text_base_def)
 
     rtconfig.write('\n')
     rtconfig.write('#endif\n')

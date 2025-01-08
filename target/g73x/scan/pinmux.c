@@ -19,6 +19,9 @@ struct aic_pinmux
 };
 
 struct aic_pinmux aic_pinmux_config[] = {
+    {1, PIN_PULL_DIS, 3, "PA.4"},       // beep
+    {8, PIN_PULL_DIS, 3, "PA.10"},
+    {8, PIN_PULL_DIS, 3, "PA.11"},
 #ifdef AIC_USING_UART0
     /* uart0 */
     {5, PIN_PULL_DIS, 3, "PA.0"},
@@ -132,6 +135,15 @@ struct aic_pinmux aic_pinmux_config[] = {
     {2, PIN_PULL_UP, 3, "PC.5"},
     {2, PIN_PULL_UP, 3, "PC.6"},
 #endif
+#ifdef AIC_PANEL_DBI_ST7789V
+    /* spi 4 line */
+    // {2, PIN_PULL_DIS, 3, "PD.20"}, //backlight io
+    {2, PIN_PULL_DIS, 3, "PD.21"},
+    {2, PIN_PULL_DIS, 3, "PD.24"},
+    {2, PIN_PULL_DIS, 3, "PD.26"},
+    {2, PIN_PULL_DIS, 3, "PD.27"},
+    {1, PIN_PULL_DIS, 3, "PD.23"},
+#endif
 #ifdef AIC_USING_CAP0
     {3, PIN_PULL_UP, 3, "PC.6"},
 #endif
@@ -161,7 +173,7 @@ struct aic_pinmux aic_pinmux_config[] = {
     {1, PIN_PULL_DIS, 3, AIC_PANEL_ENABLE_GPIO},
 #endif
 #ifdef AIC_PRGB_16BIT_LD
-    {2, PIN_PULL_DIS, 3, "PD.8"},
+//    {2, PIN_PULL_DIS, 3, "PD.8"},
     {2, PIN_PULL_DIS, 3, "PD.9"},
     {2, PIN_PULL_DIS, 3, "PD.10"},
     {2, PIN_PULL_DIS, 3, "PD.11"},
@@ -250,7 +262,8 @@ struct aic_pinmux aic_pinmux_config[] = {
     //{4, PIN_PULL_DIS, 3, "PE.1"},
 #endif
 #ifdef AIC_USING_PWM1
-    {3, PIN_PULL_DIS, 3, "PE.11"},
+    {4, PIN_PULL_DIS, 3, "PD.8"},
+    //{3, PIN_PULL_DIS, 3, "PE.11"},
     //{3, PIN_PULL_DIS, 3, "PE.12"},
 #endif
 #ifdef AIC_USING_PWM2
@@ -313,7 +326,7 @@ struct aic_pinmux aic_pinmux_config[] = {
     /* usb0 */
     {2, PIN_PULL_DIS, 3, "PO.0"},   // USB-DM
     {2, PIN_PULL_DIS, 3, "PO.1"},   // USB-DP
-    {1, PIN_PULL_DIS, 3, "PD.8"},   // USB-ID
+//    {1, PIN_PULL_DIS, 3, "PD.8"},   // USB-ID
 #endif
 #ifdef AIC_USING_PSADC0
     {7, PIN_PULL_DIS, 3, "PA.0"},

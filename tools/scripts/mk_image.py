@@ -1010,6 +1010,10 @@ def aic_boot_create_image_v2(cfg, keydir, datadir):
     if "signature" in cfg:
         signature_bytes = aic_boot_gen_signature_bytes(cfg, bootimg)
         bootimg = bootimg + signature_bytes
+        if aic_boot_with_ext_loader(cfg):
+            padlen = round_up(len(bootimg), META_ALIGNED_SIZE) - len(bootimg)
+            if padlen > 0:
+                bootimg += bytearray(padlen)
         return bootimg
 
     # Secure boot is not enabled, always add md5 result to the end
@@ -1781,16 +1785,20 @@ def img_get_part_size(cfg, datadir):
 
     fwcset = cfg["image"]["target"]
     media_type = cfg["image"]["info"]["media"]["type"]
+    if media_type not in cfg:
+        print("Partition table is empty for {}".format(media_type))
+        return -1
     if media_type == "spi-nand" or media_type == "spi-nor":
         total_siz = size_str_to_int(cfg[media_type]["size"])
         partitions = cfg[media_type]["partitions"]
         if len(partitions) == 0:
             print("Partition table is empty")
-            sys.exit(1)
+            return -1
 
         for part in partitions:
             if "size" not in partitions[part]:
                 print("No size value for partition: {}".format(part))
+                return -1
             # get part size
             part_size = size_str_to_int(partitions[part]["size"])
             if partitions[part]["size"] == "-":
@@ -1801,10 +1809,11 @@ def img_get_part_size(cfg, datadir):
                 volumes = partitions[part]["ubi"]
                 if len(volumes) == 0:
                     print("Volume of {} is empty".format(part))
-                    sys.exit(1)
+                    return -1
                 for vol in volumes:
                     if "size" not in volumes[vol]:
                         print("No size value for ubi volume: {}".format(vol))
+                        return -1
                     vol_size = size_str_to_int(volumes[vol]["size"])
                     if volumes[vol]["size"] == "-":
                         vol_size = part_size
@@ -1828,10 +1837,12 @@ def img_get_part_size(cfg, datadir):
         partitions = cfg[media_type]["partitions"]
         if len(partitions) == 0:
             print("Partition table is empty")
-            sys.exit(1)
+            return -1
         for part in partitions:
             if "size" not in partitions[part]:
                 print("No size value for partition: {}".format(part))
+                return -1
+
             # get part size
             part_size = size_str_to_int(partitions[part]["size"])
             if partitions[part]["size"] == "-":
@@ -1846,7 +1857,7 @@ def img_get_part_size(cfg, datadir):
             part_offs += part_size
     else:
         print("Not supported media type: {}".format(media_type))
-        sys.exit(1)
+        return -1
 
     return 0
 

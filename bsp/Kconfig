@@ -49,6 +49,10 @@ if DRIVER_BARE_DRV_EN
         bool "Enable Tlsf Heap Bare Driver"
         default n
 
+    config RING_BUFFER
+        bool "Enable Ring Buffer Bare Driver"
+        default n
+
     endmenu
 
 endif
@@ -118,11 +122,6 @@ config AIC_GPIO_DRV_DEBUG
     default n
     depends on AIC_GPIO_DRV
 
-config AIC_SE_GPIO_DRV_DEBUG
-    bool "Enable SE_GPIO driver debug"
-    default n
-    depends on AIC_SE_GPIO_DRV
-
 config AIC_DMA_DRV_DEBUG
     bool "Enable DMA driver debug"
     default n
@@ -179,6 +178,10 @@ config AIC_CACHE_LINE_DEBUG
     bool "Enable Cache Line debug"
     default n
 
+config AIC_BACKTRACE_DEBUG
+    bool "Enable Backtrace debug"
+    default n
+
 endmenu
 
 menu "Drivers examples"
@@ -203,11 +206,6 @@ config AIC_GPIO_KEY_TEST
     default n
     depends on AIC_GPIO_DRV
 
-config AIC_SE_GPIO_DRV_TEST
-    bool "Enable SE_GPIO driver test command"
-    default n
-    depends on AIC_SE_GPIO_DRV
-
 config AIC_DMA_DRV_TEST
     bool "Enable DMA driver test command"
     default n
@@ -221,7 +219,7 @@ config AIC_UART_DRV_TEST
 config AIC_RTC_DRV_TEST
     bool "Enable RTC driver test command"
     default n
-    depends on AIC_RTC_DRV
+    depends on AIC_RTC_DRV || AIC_USING_EXTERNAL_RTC
 
 config AIC_HRTIMER_DRV_TEST
     bool "Enable HRTimer driver test command"
@@ -240,17 +238,17 @@ endif
 config AIC_QSPI_DRV_TEST
     bool "Enable SPI driver test command"
     default n
-    depends on AIC_QSPI_DRV
+    depends on AIC_QSPI_DRV && !DRIVER_BARE_DRV_EN
 
 config AIC_SPINOR_DRV_TEST
     bool "Enable SPI NOR driver test command"
     default n
-    depends on AIC_SPINOR_DRV
+    depends on AIC_SPINOR_DRV && DRIVER_BARE_DRV_EN
 
 config AIC_SPINAND_DRV_TEST
     bool "Enable SPI NAND driver test command"
     default n
-    depends on AIC_SPINAND_DRV
+    depends on AIC_SPINAND_DRV && DRIVER_BARE_DRV_EN
 
 config AIC_SDMC_DRV_TEST
     bool "Enable SDMC driver test command"
@@ -265,7 +263,7 @@ config AIC_MMC_TEST
 config AIC_MMC_BARE_TEST
     bool "Enable MMC bare test command"
     default n
-    depends on DRIVER_BARE_DRV_EN
+    depends on AIC_SDMC_DRV && DRIVER_BARE_DRV_EN
 
 config AIC_MTD_BARE_TEST
     bool "Enable MTD driver test command"
@@ -276,11 +274,13 @@ config AIC_FILE_CRC32_TEST
     bool "Enable file CRC32 test command"
     default n
     select RT_USING_LEGACY
+    depends on RT_USING_POSIX_FS
 
 config AIC_MTD_LOAD_FILE_TEST
     bool "Enable load mtd data to a file"
     default n
     select RT_USING_LEGACY
+    depends on RT_USING_MTD_NOR || RT_USING_MTD_NAND
 
 config AIC_DISPLAY_TEST
     bool "Enable Display driver test command"
@@ -405,11 +405,6 @@ config AIC_QEP_DRV_TEST
     default n
     depends on AIC_QEP_DRV
 
-config AIC_DCE_DRV_TEST
-    bool "Enable Dce driver test command"
-    default n
-    depends on AIC_DCE_DRV
-
 config AIC_ADCIM_DM_TEST
     bool "Enable ADCIM DM test command"
     default n
@@ -418,6 +413,7 @@ config AIC_ADCIM_DM_TEST
 config AIC_MONKEY_TEST
     bool "Enable Monkey test command"
     default n
+    depends on AIC_USING_TOUCH
 
 if LPKG_USING_LWIP
 
@@ -448,6 +444,7 @@ config AIC_CE_DRV_TEST
 config AIC_SOFT_AES_TEST
     bool "Enable Soft AES ECB test command"
     default n
+    depends on RT_USING_FINSH
 
 config AIC_SID_BARE_TEST
     bool "Enable SID driver test command"
@@ -464,6 +461,11 @@ config AIC_USERID_BARE_TEST
     default n
     depends on LPKG_USING_USERID
 
+config AIC_TP_BARE_TEST
+    bool "Enable touch panel driver test command"
+    default n
+    depends on AIC_USING_BARE_TOUCH
+
 config AIC_MEM_API_TEST
     bool "Enable memory API test command"
     default n
@@ -471,6 +473,7 @@ config AIC_MEM_API_TEST
 config AIC_FILE_SYSTEM_TEST
     bool "Enable filesystem test command"
     default n
+    depends on RT_USING_POSIX_FS && RT_USING_FINSH
 
 menu "Power Management examples"
     depends on AIC_PM_DRV

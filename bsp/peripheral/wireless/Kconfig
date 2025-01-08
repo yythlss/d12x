@@ -32,3 +32,12 @@ menuconfig AIC_WLAN_ASR
     if AIC_WLAN_ASR
     source "bsp/peripheral/wireless/asr/Kconfig"
     endif
+
+menuconfig AIC_WLAN_AIC8800D40L
+    bool "AIC8800 wlan driver"
+    default n
+    depends on AIC_WIRELESS_LAN
+    if AIC_WLAN_AIC8800D40L
+    source "bsp/peripheral/wireless/aic8800/Kconfig.dev"
+    ##source "bsp/peripheral/wireless/aic8800/Kconfig.drv"
+    endif

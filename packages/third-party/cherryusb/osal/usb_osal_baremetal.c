@@ -39,22 +39,22 @@ int usb_osal_sem_give(usb_osal_sem_t sem)
 
 usb_osal_mutex_t usb_osal_mutex_create(void)
 {
-    return (usb_osal_mutex_t)aicos_mutex_create();
+    return NULL;
 }
 
 void usb_osal_mutex_delete(usb_osal_mutex_t mutex)
 {
-    aicos_mutex_delete((aicos_mutex_t)mutex);
+    return;
 }
 
 int usb_osal_mutex_take(usb_osal_mutex_t mutex)
 {
-    return (int)aicos_mutex_take((aicos_mutex_t)mutex, AICOS_WAIT_FOREVER);
+    return 0;
 }
 
 int usb_osal_mutex_give(usb_osal_mutex_t mutex)
 {
-    return (int)aicos_mutex_give((aicos_mutex_t)mutex);
+    return 0;
 }
 
 usb_osal_mq_t usb_osal_mq_create(uint32_t max_msgs)
@@ -90,4 +90,14 @@ void usb_osal_leave_critical_section(size_t flag)
 void usb_osal_msleep(uint32_t delay)
 {
     aicos_msleep(delay);
+}
+
+void *usb_osal_malloc_align(uint32_t mem_type, size_t size, size_t align)
+{
+    return aicos_malloc_align(mem_type, size, align);
+}
+
+void usb_osal_free_align(uint32_t mem_type, void *mem)
+{
+    aicos_free_align(mem_type, mem);
 }

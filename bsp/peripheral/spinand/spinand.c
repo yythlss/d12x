@@ -63,6 +63,9 @@ static const struct spinand_manufacturer *spinand_manufacturers[] = {
 #ifdef SPI_NAND_XINCUN
     &xincun_spinand_manufacturer,
 #endif
+#ifdef SPI_NAND_FUDANMICRO
+    &fudanmicro_spinand_manufacturer,
+#endif
 };
 
 #define SPINAND_LIST_NUM \
@@ -523,7 +526,7 @@ int spinand_flash_init(struct aic_spinand *flash)
     pr_info("Enabled BUF, HWECC. Unprotected.\n");
 #if defined(AIC_SPIENC_DRV)
     /* Enable SPIENC */
-    printf("init %d spienc...\n", flash->info->devid);
+    printf("init %d spienc...\n", flash->bus);
     if ((result = spienc_init()) != 0) {
         pr_err("spienc init failed.\n");
         goto exit_spinand_init;
@@ -644,7 +647,11 @@ int spinand_read_page(struct aic_spinand *flash, u32 page, u8 *data,
     }
 
 #if defined(AIC_SPIENC_DRV)
-    spienc_set_cfg(flash->info->devid, page * flash->info->page_size, cpos, data_len);
+    if (data && data_len) {
+        spienc_set_cfg(flash->bus, page * flash->info->page_size, cpos, data_len);
+    } else {
+        spienc_set_cfg(flash->bus, page * flash->info->page_size, cpos, 0);
+    }
     spienc_start();
 #endif
     blk = page / flash->info->pages_per_eraseblock;
@@ -840,7 +847,6 @@ int spinand_write_page(struct aic_spinand *flash, u32 page, const u8 *data,
     }
 
     if (data && data_len) {
-
         if (!spinand_check_if_do_memcpy(flash, (u8 *)data, data_len,
                                         (u8 *)spare, spare_len)) {
             buf = (u8 *)data;
@@ -880,8 +886,11 @@ int spinand_write_page(struct aic_spinand *flash, u32 page, const u8 *data,
     }
 
 #if defined(AIC_SPIENC_DRV)
-    spienc_set_cfg(flash->info->devid, page * flash->info->page_size, cpos,
-                   data_len);
+    if (data && data_len) {
+        spienc_set_cfg(flash->bus, page * flash->info->page_size, cpos, data_len);
+    } else {
+        spienc_set_cfg(flash->bus, page * flash->info->page_size, cpos, 0);
+    }
     spienc_start();
 #endif
     blk = page / flash->info->pages_per_eraseblock;

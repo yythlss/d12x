@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -12,6 +12,7 @@
 #include "aic_hal_clk.h"
 
 #include "hal_rtp.h"
+#include "hal_adcim.h"
 
 /* Register definition for RTP */
 #define RTP_MCR             (RTP_BASE + 0x000)
@@ -52,15 +53,21 @@
 
 #define RTP_PCTL_PRES_DET_BYPASS        BIT(16)
 
+#define RTP_CHCFG_ADC_ACQ_VAL           0x2f
+#define RTP_CHCFG_ADC_ACQ_MASK          GENMASK(15, 8)
+#define RTP_CHCFG_ADC_ACQ_SHIFT         8
+
 #define RTP_MMSC_VREF_MINUS_SEL_SHIFT   22
 #define RTP_MMSC_VREF_PLUS_SEL_SHIFT    20
 #define RTP_MMSC_XY_DRV_X_PLUS          BIT(19)
 #define RTP_MMSC_XY_DRV_Y_PLUS          BIT(18)
 #define RTP_MMSC_XY_DRV_X_MINUS         BIT(17)
 #define RTP_MMSC_XY_DRV_Y_MINUS         BIT(16)
+#define RTP_MMSC_DRV_MASK               GENMASK(19, 16)
 #define RTP_MMSC_XY_DRV_SHIFT           16
 #define RTP_MMSC_SMP_CNT_PER_TRIG_SHIFT 8
 #define RTP_MMSC_SMP_CH_SEL_SHIFT       4
+#define RTP_MMSC_SMP_CH_SEL_MASK        GENMASK(5, 4)
 #define RTP_MMSC_SMP_TRIG               BIT(0)
 
 #define RTP_FIL_Z_REL_RANGE_SHIFT       28
@@ -83,8 +90,8 @@
 #define RTP_FCR_FLUSH                   BIT(0)
 
 #define RTP_DATA_UP_FLAG                BIT(20)
-#define RTP_DATA_CH_NUM_SHIFT           12
-#define RTP_DATA_CH_NUM_MASK            GENMASK(13, 12)
+#define RTP_DATA_CH_NUM_SHIFT           16
+#define RTP_DATA_CH_NUM_MASK            GENMASK(17, 16)
 #define RTP_DATA_DATA_MASK              GENMASK(11, 0)
 
 #define RTP_DOWN_PRESS_FLAG             1
@@ -224,9 +231,13 @@ void hal_rtp_enable(struct aic_rtp_dev *rtp, int en)
         pr_info("clean fifo\n");
     }
 
-    rtp_reg_enable(RTP_MCR,
-        rtp->mode << RTR_MCR_MODE_SHIFT | RTP_MCR_PRES_DET_EN | RTP_MCR_EN,
-        en);
+    if (rtp->mode != RTP_MODE_MANUAL) {
+        rtp_reg_enable(RTP_MCR,
+                       rtp->mode << RTR_MCR_MODE_SHIFT | RTP_MCR_PRES_DET_EN | RTP_MCR_EN, en);
+    } else {
+        rtp_reg_enable(RTP_MCR,
+                       rtp->mode << RTR_MCR_MODE_SHIFT | RTP_MCR_EN, en);
+    }
 
 #if defined(CONFIG_ARTINCHIP_ADCIM_DM)
     writel(0, RTP_PDEB);
@@ -249,8 +260,10 @@ void hal_rtp_int_enable(struct aic_rtp_dev *rtp, int en)
     u32 val = RTP_INTR_FIFO_ERR_IE | RTP_INTR_DAT_RDY_IE
             | RTP_INTR_RISE_DET_IE | RTP_INTR_SCI_IE;
 
-    if (rtp->mode == RTP_MODE_MANUAL)
+    if (rtp->mode == RTP_MODE_MANUAL) {
         val |= RTP_INTR_PRES_DET_IE;
+        rtp->complete = aicos_sem_create(0);
+    }
 
     rtp_reg_enable(RTP_INTR, val, en);
 }
@@ -258,6 +271,7 @@ void hal_rtp_int_enable(struct aic_rtp_dev *rtp, int en)
 static void rtp_fifo_init(enum aic_rtp_mode mode, u32 smp_period)
 {
     u32 thd = 0;
+    int val = 0;
 
     switch (mode) {
     case RTP_MODE_AUTO1:
@@ -279,6 +293,7 @@ static void rtp_fifo_init(enum aic_rtp_mode mode, u32 smp_period)
             thd = 6;
         break;
     case RTP_MODE_AUTO4:
+    case RTP_MODE_MANUAL:
     default:
         thd = 8;
         break;
@@ -286,21 +301,49 @@ static void rtp_fifo_init(enum aic_rtp_mode mode, u32 smp_period)
     thd <<= RTP_FCR_DAT_RDY_THD_SHIFT;
 
     writel(thd | RTP_FCR_UF_IE | RTP_FCR_OF_IE, RTP_FCR);
+    if (mode == RTP_MODE_MANUAL) {
+        rtp_reg_enable(RTP_MMSC, (thd - 1) << RTP_MMSC_SMP_CNT_PER_TRIG_SHIFT, 1);
+        rtp_reg_enable(RTP_CHCFG, RTP_CHCFG_ADC_ACQ_VAL << RTP_CHCFG_ADC_ACQ_SHIFT, 1);
+    } else {
+        rtp_reg_enable(RTP_CHCFG, RTP_CHCFG_ADC_ACQ_VAL << RTP_CHCFG_ADC_ACQ_SHIFT, 1);
+    }
+
+    val = readl(RTP_MMSC) & (~RTP_MMSC_DRV_MASK);
+    writel(val, RTP_MMSC);
+}
+
+u16 hal_rtp_adc_soft_trigger(struct aic_rtp_dev *rtp, int ch)
+{
+    int ret = 0;
+    int val = 0;
+
+    val = readl(RTP_MMSC) & (~RTP_MMSC_SMP_CH_SEL_MASK);
+    writel(val | (ch << RTP_MMSC_SMP_CH_SEL_SHIFT), RTP_MMSC);
+    rtp_reg_enable(RTP_MMSC, RTP_MMSC_SMP_TRIG, 1);
+
+    ret = aicos_sem_take(rtp->complete, AIC_RTP_TIMEOUT);
+    if (ret < 0) {
+        hal_log_err("Ch%d read timeout!\n", ch);
+        return -ETIMEDOUT;
+    }
+    pr_debug("ch %d val %d\n", ch, rtp->adc_info.data);
+    return rtp->adc_info.data;
 }
 
 static u32 rtp_press_calc(struct aic_rtp_dev *rtp)
 {
     struct aic_rtp_dat *dat = &rtp->latest;
-    u32 pressure = rtp->x_plate * dat->x_minus / AIC_RTP_VAL_RANGE;
+    u32 pressure = 0;
+    u32 x = 0, y = 0, zb = 0;
+    u32 adc_max = RTP_ADC_ACC_RANGE;
 
-    if (rtp->y_plate && rtp->mode != RTP_MODE_AUTO2) {
-        pressure = pressure * (AIC_RTP_VAL_RANGE - dat->z_a) / dat->z_a;
-        pressure -= rtp->y_plate * (AIC_RTP_VAL_RANGE - dat->y_minus)
-                / AIC_RTP_VAL_RANGE;
-    } else {
-        pressure = pressure * (dat->z_b - dat->z_a) / dat->z_a;
-    }
-    pr_debug("Current pressure: %d\n", pressure);
+    x = hal_adcim_adc2caled(dat->x_minus);
+    y = hal_adcim_adc2caled(dat->y_minus);
+    zb = hal_adcim_adc2caled(dat->z_b);
+
+    pressure = (((zb * rtp->y_plate) / adc_max) * (adc_max - y)) / (adc_max - zb);
+    pressure = pressure - x * rtp->x_plate / adc_max;
+    pr_debug("x:%d  y:%d  zb:%d  press:%d\n", x, y, zb, pressure);
 
     if (pressure > rtp->max_press || pressure < AIC_RTP_INVALID_MIN_VAL) {
         pr_debug("Invalid pressure %d\n", pressure);
@@ -514,6 +557,7 @@ static void aic_rtp_read_fifo(struct aic_rtp_dev *rtp, u32 cnt)
 {
     int i;
     u32 tmp;
+    u32 adc_data = 0;
     u16 data[AIC_RTP_FIFO_DEPTH] = {0};
 
     tmp = (readl(RTP_FCR) & RTP_FCR_DAT_CNT_MASK) >> RTP_FCR_DAT_CNT_SHIFT;
@@ -531,7 +575,8 @@ static void aic_rtp_read_fifo(struct aic_rtp_dev *rtp, u32 cnt)
         }
         tmp = readl(RTP_DATA);
         data[i] = tmp & RTP_DATA_DATA_MASK;
-        // pr_debug("%d/%d - Read chan %d, data %d \n", i, 12 + (tmp >> 12), tmp >> 12, data[i]);
+        pr_debug("%d - Read chan %d, data %d \n", i, tmp >> RTP_DATA_CH_NUM_SHIFT, data[i]);
+        adc_data += data[i];
     }
 
     rtp->latest.timestamp = aic_get_time_ms();
@@ -558,6 +603,10 @@ static void aic_rtp_read_fifo(struct aic_rtp_dev *rtp, u32 cnt)
     case RTP_MODE_AUTO4:
         rtp_report_abs_auto4(rtp, data, cnt);
         break;
+    case RTP_MODE_MANUAL:
+        aicos_sem_give(rtp->complete);
+        rtp->adc_info.data = adc_data / cnt;
+        break;
     default:
         return;
     }
@@ -578,14 +627,14 @@ irqreturn_t hal_rtp_isr(int irq, void *arg)
 {
     // TODO: struct aic_rtp_dev *rtp = (struct aic_rtp_dev *)arg;
     struct aic_rtp_dev *rtp = g_rtp_dev_of_user;
-    u32 intr, fcr;
+    u32 intr, fcr, data_cnt, data_thd;
 
     intr = readl(RTP_INTR);
     fcr = readl(RTP_FCR);
     writel(fcr, RTP_FCR);
     writel(intr, RTP_INTR);
 
-    pr_debug("INTS %#x, FCR %#x, Pressed %d\n", intr, fcr, !rtp_is_rise());
+    pr_debug("INTS %#x, FCR %#x\n", intr, fcr);
     if ((intr & RTP_INTR_PRES_DET_FLG) && (intr & RTP_INTR_RISE_DET_FLG)) {
         pr_debug("Press&rise happened at the same time!\n");
         goto irq_clean_fifo;
@@ -609,9 +658,13 @@ irqreturn_t hal_rtp_isr(int irq, void *arg)
         }
     }
 
-    if (intr & RTP_INTR_DRDY_FLG)
-        aic_rtp_read_fifo(rtp, (fcr & RTP_FCR_DAT_CNT_MASK)
-                              >> RTP_FCR_DAT_CNT_SHIFT);
+    data_cnt = (readl(RTP_FCR) & RTP_FCR_DAT_CNT_MASK) >> RTP_FCR_DAT_CNT_SHIFT;
+    data_thd = (readl(RTP_FCR) & RTP_FCR_DAT_RDY_THD_MASK) >> RTP_FCR_DAT_RDY_THD_SHIFT;
+    if (data_cnt != 0 && data_cnt != data_thd) {
+        goto irq_clean_fifo;
+    } else if (intr & RTP_INTR_DRDY_FLG) {
+        aic_rtp_read_fifo(rtp, (fcr & RTP_FCR_DAT_CNT_MASK) >> RTP_FCR_DAT_CNT_SHIFT);
+    }
 
     if (intr & RTP_INTR_RISE_DET_FLG)
         rtp_report_abs(rtp, 0);

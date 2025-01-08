@@ -500,6 +500,7 @@ static struct mmcsd_blk_device * rt_mmcsd_create_blkdev(struct rt_mmcsd_card *ca
             if (strcmp("mmc0p0", blk_dev->dev.parent.name) != 0 &&
                 strcmp("mmc0p1", blk_dev->dev.parent.name) != 0 &&
                 strcmp("mmc0p2", blk_dev->dev.parent.name) != 0) {
+                aic_ota_status_update();
                 aic_get_rodata_to_mount(ro_target);
                 aic_get_data_to_mount(rw_target);
                 if (strcmp(ro_target, blk_dev->dev.parent.name) == 0) {

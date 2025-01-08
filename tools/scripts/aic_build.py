@@ -12,6 +12,7 @@ import platform
 import shutil
 import tarfile
 from SCons.Script import *
+# from building import *
 
 COLOR_BEGIN = "\033["
 COLOR_RED = COLOR_BEGIN + "41;37m"
@@ -728,6 +729,52 @@ g_mem_items = {
     ],
   ],
 
+  ('g73x'):
+  [
+    # 'regions_level0':
+    [
+      [['itcm', 0], ['__itcm_start', '__itcm_end'], [0x0, 0x0]],
+      [['dtcm', 0], ['__dtcm_start', '__dtcm_end'], [0x0, 0x0]],
+      [['sram_s0', 0], ['__sram_s0_start', '__sram_s0_end'], [0x0, 0x0]],
+      [['sram_s1', 0], ['__sram_s1_start', '__sram_s1_end'], [0x0, 0x0]],
+      [['psram', 0], ['__psram_start', '__psram_end'], [0x0, 0x0]],
+      [['xip', 0], ['__xip_start', '__xip_end'], [0x0, 0x0]]
+    ],
+    # 'regions_level1':
+    [
+      [['itcm_code', 0], ['__itcm_code_start', '__itcm_code_end'], [0x0, 0x0]],
+      [['itcm_heap', 0], ['__itcm_heap_start', '__itcm_heap_end'], [0x0, 0x0]],
+      [['dtcm_data', 0], ['__dtcm_data_start', '__dtcm_data_end'], [0x0, 0x0]],
+      [['dtcm_heap', 0], ['__dtcm_heap_start', '__dtcm_heap_end'], [0x0, 0x0]],
+      [['sram_s0_static', 0], ['__sram_s0_start', '__sram_s0_sw_heap_start'], [0x0, 0x0]],
+      [['sram_s0_heap', 0], ['__sram_s0_sw_heap_start', '__sram_s0_sw_heap_end'], [0x0, 0x0]],
+      [['sram_s1_sw', 0], ['__sram_s1_sw_start', '__sram_s1_sw_end'], [0x0, 0x0]],
+      [['sram_s1_cma', 0], ['__sram_s1_cma_start', '__sram_s1_cma_end'], [0x0, 0x0]],
+      [['psram_sw', 0], ['__psram_sw_start', '__psram_sw_end'], [0x0, 0x0]],
+      [['psram_cma', 0], ['__psram_cma_start', '__psram_cma_end'], [0x0, 0x0]],
+    ],
+    # 'regions_level2':
+    [
+      [['sram_s1_sw_static', 0], ['__sram_s1_sw_start', '__sram_s1_sw_heap_start'], [0x0, 0x0]],
+      [['sram_s1_sw_heap', 0], ['__sram_s1_sw_heap_start', '__sram_s1_sw_heap_end'], [0x0, 0x0]],
+      [['sram_s1_cma_static', 0], ['__sram_s1_cma_start', '__sram_s1_cma_heap_start'], [0x0, 0x0]],
+      [['sram_s1_cma_heap', 0], ['__sram_s1_cma_heap_start', '__sram_s1_cma_heap_end'], [0x0, 0x0]],
+      [['psram_sw_static', 0], ['__psram_sw_start', '__psram_sw_heap_start'], [0x0, 0x0]],
+      [['psram_sw_heap', 0], ['__psram_sw_heap_start', '__psram_sw_heap_end'], [0x0, 0x0]],
+      [['psram_cma_static', 0], ['__psram_cma_start', '__psram_cma_heap_start'], [0x0, 0x0]],
+      [['psram_cma_heap', 0], ['__psram_cma_heap_start', '__psram_cma_heap_end'], [0x0, 0x0]],
+    ],
+    # 'regions_level3':
+    [
+      [['.text', 0], ['__stext', '__etext'], [0x0, 0x0]],
+      [['.rodata', 0], ['__srodata', '__erodata'], [0x0, 0x0]],
+      [['.data', 0], ['__sdata', '__edata'], [0x0, 0x0]],
+      [['.bss', 0], ['__sbss', '__ebss'], [0x0, 0x0]],
+      [['.heap_sys', 0], ['__heap_start', '__heap_end'], [0x0, 0x0]],
+      [['.heap_cma', 0], ['__cma_heap_start', '__cma_heap_end'], [0x0, 0x0]],
+    ],
+  ],
+
   ('d12x'):
   [
     # 'regions_level0':
@@ -1210,7 +1257,7 @@ def mkimage_gen_mkfs_action(img_id):
         srcdir_opt = 'CONFIG_AIC_FS_IMAGE_DIR_{}'.format(img_id)
         srcdir = get_config(prj_root_dir + '.config', srcdir_opt).replace('"', '')
         os.environ["aic_fs_image_dir"] = srcdir
-        srcdir = prj_root_dir + srcdir
+        srcdir = srcdir
         if srcdir.endswith('/'):
             srcdir = srcdir[0:len(srcdir) - 1]
         outimg = prj_out_dir + imgname
@@ -1234,7 +1281,9 @@ def mkimage_gen_mkfs_action(img_id):
         cmdstr = 'python3 ' + aic_script_dir + 'makefatfs.py '
         if auto_siz == 'y':
             sector_siz = 512
-            cmdstr += '--auto '
+            # use full part size
+            # cmdstr += '--auto '
+            cmdstr += '--fullpart '
         else:
             sector_opt = 'CONFIG_AIC_FATFS_SECTOR_SIZE_FOR_{}'.format(img_id)
             sector_siz = int(get_config(prj_root_dir + '.config', sector_opt))
@@ -1260,7 +1309,7 @@ def mkimage_gen_mkfs_action(img_id):
         srcdir_opt = 'CONFIG_AIC_FS_IMAGE_DIR_{}'.format(img_id)
         srcdir = get_config(prj_root_dir + '.config', srcdir_opt).replace('"', '')
         os.environ["aic_fs_image_dir"] = srcdir
-        srcdir = prj_root_dir + srcdir
+        srcdir = srcdir
         outimg = prj_out_dir + imgname
         cmdstr = 'python3 ' + aic_script_dir + 'makelittlefs.py '
         cmdstr += '--pagesize {} '.format(pagesiz)
@@ -1279,7 +1328,7 @@ def mkimage_gen_mkfs_action(img_id):
         srcdir_opt = 'CONFIG_AIC_FS_IMAGE_DIR_{}'.format(img_id)
         srcdir = get_config(prj_root_dir + '.config', srcdir_opt).replace('"', '')
         os.environ["aic_fs_image_dir"] = srcdir
-        srcdir = prj_root_dir + srcdir
+        srcdir = srcdir
         for param in nand_list:
             (pagesiz, blksiz, oobsiz) = param
             pagesiz = int(pagesiz)
@@ -1316,18 +1365,11 @@ def get_post_build_bat(aic_root_n, post_objcopy, post_build_cmd):
 
 
 def mkimage_prebuild(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defconfig):
-
     global prj_root_dir
     global aic_script_dir
     global aic_common_dir
     global aic_pack_dir
     global prj_out_dir
-    prj_root_dir = aic_root + '/'
-    aic_script_dir = os.path.join(aic_root, 'tools/scripts/')
-    aic_common_dir = os.path.join(aic_root, 'bsp/artinchip/sys/' + prj_chip)
-    aic_pack_dir = os.path.join(aic_root, 'target/' + prj_chip + '/' + prj_board + '/pack/')
-    prj_name = prj_defconfig.replace('_defconfig', '')
-    prj_out_dir = os.path.join(aic_root, 'output/' + prj_name + '/images/')
     chip_path = os.path.join(aic_root, './bsp/artinchip/sys/' + prj_chip)
     os.environ["PRJ_OUT_DIR"] = prj_out_dir
     sys.path.append(chip_path)
@@ -1739,9 +1781,48 @@ def get_prj_config(aic_root):
     # check & prepare toolchain
     chk_prepare_toolchain(aic_root, PRJ_CHIP, PRJ_BOARD, PRJ_KERNEL, PRJ_APP, PRJ_DEFCONFIG_NAME)
 
-    # make image pre_build cmd
-    MKIMAGE_POST_ACTION = mkimage_prebuild(aic_root, PRJ_CHIP, PRJ_BOARD, PRJ_KERNEL,
-                                           PRJ_APP, PRJ_DEFCONFIG_NAME)
+    return (PRJ_CHIP, PRJ_BOARD, PRJ_KERNEL, PRJ_APP, PRJ_DEFCONFIG_NAME, PRJ_CUSTOM_LDS)
 
-    return (PRJ_CHIP, PRJ_BOARD, PRJ_KERNEL, PRJ_APP, PRJ_DEFCONFIG_NAME,
-            PRJ_CUSTOM_LDS, MKIMAGE_POST_ACTION)
+
+def get_prj_post_action(aic_root, prj_chip, prj_board, prj_kernel, prj_app,
+                        prj_defconfig, fsinstall):
+    global prj_root_dir
+    global aic_script_dir
+    global aic_common_dir
+    global aic_pack_dir
+    global prj_out_dir
+
+    prj_root_dir = aic_root + '/'
+    aic_script_dir = os.path.join(aic_root, 'tools/scripts/')
+    aic_common_dir = os.path.join(aic_root, 'bsp/artinchip/sys/' + prj_chip)
+    aic_pack_dir = os.path.join(aic_root, 'target/' + prj_chip + '/' + prj_board + '/pack/')
+    prj_name = prj_defconfig.replace('_defconfig', '')
+    prj_out_dir = os.path.join(aic_root, 'output/' + prj_name + '/images/')
+
+    POST_ACTION = ''
+    if len(fsinstall):
+        installcmd = ''
+        cleandir = ''
+        cleancmd = ''
+        for i in range(len(fsinstall)):
+            item = fsinstall[i]
+            if len(item[0]) == 0 or len(item[1]) == 0 or len(item[2]) == 0:
+                continue
+            if len(cleandir) > 0:
+                cleandir += ',{}'.format(item[2])
+            else:
+                cleandir = item[2]
+            cmdstr = 'python3 ' + aic_script_dir + 'fsinstall.py '
+            cmdstr += '--sdkout {} '.format(prj_out_dir)
+            cmdstr += '--src {} '.format(item[1])
+            cmdstr += '--dst {} \n'.format(item[2])
+            installcmd += cmdstr
+        cleancmd = 'python3 ' + aic_script_dir + 'fsinstall.py '
+        cleancmd += '--sdkout {} '.format(prj_out_dir)
+        cleancmd += '--clean {} \n'.format(cleandir)
+        POST_ACTION += cleancmd
+        POST_ACTION += installcmd
+    # make image pre_build cmd
+    POST_ACTION += mkimage_prebuild(aic_root, prj_chip, prj_board, prj_kernel,
+                                    prj_app, prj_defconfig)
+    return POST_ACTION

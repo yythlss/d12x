@@ -14,6 +14,7 @@ src/core/dns.c
 src/core/inet_chksum.c
 src/core/init.c
 src/core/ip.c
+src/core/mem.c
 src/core/memp.c
 src/core/netif.c
 src/core/pbuf.c
@@ -80,6 +81,7 @@ if GetDepend(['RT_USING_LWIP_IPV6']):
 if GetDepend(['RT_LWIP_USING_PING']):
     src += Glob('src/apps/ping/ping.c')
 
-group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP', 'RT_USING_LWIP203'], CPPPATH = path)
+mycflags = ' -w'
+group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP', 'RT_USING_LWIP203'], CPPPATH = path, CFLAGS = mycflags)
 
 Return('group')

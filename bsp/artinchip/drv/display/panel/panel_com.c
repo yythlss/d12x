@@ -52,8 +52,14 @@ static struct aic_panel *panels[] = {
 #ifdef AIC_PANEL_DBI_ILI9341
     &dbi_ili9341,
 #endif
+#ifdef AIC_PANEL_DBI_ILI9327
+    &dbi_ili9327,
+#endif
 #ifdef AIC_PANEL_DBI_ST77903
     &dbi_st77903,
+#endif
+#ifdef AIC_PANEL_DBI_ST7789T3
+    &dbi_st7789t3,
 #endif
 #ifdef AIC_PANEL_RGB_ST7701S
     &rgb_st7701s,
@@ -75,6 +81,9 @@ static struct aic_panel *panels[] = {
 #endif
 #ifdef AIC_PANEL_LCOS_HX7033
     &lcos_hx7033,
+#endif
+#ifdef AIC_PANEL_DBI_ST7789V
+    &dbi_st7789v,
 #endif
 };
 
@@ -160,9 +169,12 @@ void panel_backlight_enable(struct aic_panel *panel, u32 ms)
     struct rt_device_pwm *pwm_dev;
 
     pwm_dev = (struct rt_device_pwm *)rt_device_find("pwm");
+
+#ifndef AIC_PWM_BACKLIGHT_BYPASS
     /* pwm frequency: 1KHz = 1000000ns */
     rt_pwm_set(pwm_dev, AIC_PWM_BACKLIGHT_CHANNEL,
             1000000, 10000 * AIC_PWM_BRIGHTNESS_LEVEL);
+#endif
     rt_pwm_enable(pwm_dev, AIC_PWM_BACKLIGHT_CHANNEL);
 #endif
 }

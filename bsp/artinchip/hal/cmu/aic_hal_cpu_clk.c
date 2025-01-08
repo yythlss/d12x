@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -185,16 +185,12 @@ static int clk_cpu_mod_set_rate(struct aic_clk_comm_cfg *comm_cfg,
                                 unsigned long parent_rate)
 {
     struct aic_clk_cpu_cfg *mod = to_clk_cpu_mod(comm_cfg);
-    u32 val, div0, parent_index;
+    u32 val, div0;
 
     val = readl(cmu_reg(mod->offset_reg));
-    parent_index = (readl(cmu_reg(mod->offset_reg)) >> mod->mux_bit) & mod->mux_mask;
-
-    if (parent_index == 1) {
-        try_best_divider(rate, parent_rate, mod->div0_mask + 1, &div0);
-        val &= ~(mod->div0_mask << mod->div0_bit);
-        val |= ((div0 - 1) << mod->div0_bit);
-    }
+    try_best_divider(rate, parent_rate, mod->div0_mask + 1, &div0);
+    val &= ~(mod->div0_mask << mod->div0_bit);
+    val |= ((div0 - 1) << mod->div0_bit);
 
     val = clk_cpu_mod_write_enable(mod, val);
     writel(val, cmu_reg(mod->offset_reg));

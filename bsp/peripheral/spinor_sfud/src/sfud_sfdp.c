@@ -97,7 +97,7 @@ bool sfud_read_sfdp(sfud_flash *flash) {
     if (read_sfdp_header(flash) && read_basic_header(flash, &basic_header)) {
         return read_basic_table(flash, &basic_header);
     } else {
-        SFUD_INFO("Warning: Read SFDP parameter header information failed. The %s is not support JEDEC SFDP.", flash->name);
+        SFUD_INFO("Warning: Read SFDP parameter header information failed. The %s does not support JEDEC SFDP.", flash->name);
         return false;
     }
 }
@@ -137,7 +137,7 @@ static bool read_sfdp_header(sfud_flash *flash) {
     sfdp->minor_rev = header[4];
     sfdp->major_rev = header[5];
     if (sfdp->major_rev > SUPPORT_MAX_SFDP_MAJOR_REV) {
-        SFUD_INFO("Error: This reversion(V%d.%d) SFDP is not supported.", sfdp->major_rev, sfdp->minor_rev);
+        SFUD_INFO("Error: This reversion(V%d.%d) of SFDP is not supported.", sfdp->major_rev, sfdp->minor_rev);
         return false;
     }
     SFUD_DEBUG("Check SFDP header is OK. The reversion is V%d.%d, NPN is %d.", sfdp->major_rev, sfdp->minor_rev,
@@ -174,7 +174,7 @@ static bool read_basic_header(const sfud_flash *flash, sfdp_para_header *basic_h
     basic_header->ptp       = (long)header[4] | (long)header[5] << 8 | (long)header[6] << 16;
     /* check JEDEC basic flash parameter header */
     if (basic_header->major_rev > SUPPORT_MAX_SFDP_MAJOR_REV) {
-        SFUD_INFO("Error: This reversion(V%d.%d) JEDEC basic flash parameter header is not supported.",
+        SFUD_INFO("Error: This reversion(V%d.%d) of JEDEC basic flash parameter header is not supported.",
                 basic_header->major_rev, basic_header->minor_rev);
         return false;
     }
@@ -188,6 +188,75 @@ static bool read_basic_header(const sfud_flash *flash, sfdp_para_header *basic_h
 
     return true;
 }
+
+#ifdef SFUD_USING_QSPI
+static void sfdp_fast_read(sfud_flash *flash, uint8_t *table, uint32_t bfpt_len) {
+    sfud_sfdp *sfdp = &flash->sfdp;
+    uint32_t qer, fast_read;
+
+    memcpy(&fast_read, &table[BFPT_DWORD(1)], 4);
+    if (fast_read & (1 << 22))
+        sfdp->hwcaps_fast_read |= HWCAPS_FAST_READ_1_1_4;
+    if (fast_read & (1 << 21))
+        sfdp->hwcaps_fast_read |= HWCAPS_FAST_READ_1_4_4;
+    if (fast_read & (1 << 20))
+        sfdp->hwcaps_fast_read |= HWCAPS_FAST_READ_1_2_2;
+    if (fast_read & (1 << 16))
+        sfdp->hwcaps_fast_read |= HWCAPS_FAST_READ_1_1_2;
+    if (bfpt_len > 15) {
+        memcpy(&qer, &table[BFPT_DWORD(15)], 4);
+        switch (qer & BFPT_DWORD15_QER_MASK) {
+            case BFPT_DWORD15_QER_NONE:
+                flash->quad_enable = NULL;
+                break;
+
+            case BFPT_DWORD15_QER_SR2_BIT1_BUGGY:
+                /*
+                 * Writing only one byte to the Status Register has the
+                 * side-effect of clearing Status Register 2.
+                 */
+            case BFPT_DWORD15_QER_SR2_BIT1_NO_RD:
+                /*
+                 * Read Configuration Register (35h) instruction is not
+                 * supported.
+                 */
+                flash->flags |= SNOR_F_HAS_16BIT_SR | SNOR_F_NO_READ_CR;
+
+                flash->quad_enable = spi_nor_quad_enable;
+                break;
+
+            case BFPT_DWORD15_QER_SR1_BIT6:
+                flash->flags &= ~SNOR_F_HAS_16BIT_SR;
+                flash->quad_enable = spi_nor_sr1_bit6_quad_enable;
+                break;
+
+            case BFPT_DWORD15_QER_SR2_BIT7:
+                /*
+                 * flash->flags &= ~SNOR_F_HAS_16BIT_SR;
+                 * flash->quad_enable = spi_nor_sr2_bit7_quad_enable;
+                 */
+                SFUD_INFO("sr2_bit7_quad_enable is not supported now.\n");
+                break;
+
+            case BFPT_DWORD15_QER_SR2_BIT1:
+                /*
+                 * JESD216 rev B or later does not specify if writing only one
+                 * byte to the Status Register clears or not the Status
+                 * Register 2, so let's be cautious and keep the default
+                 * assumption of a 16-bit Write Status (01h) command.
+                 */
+                flash->flags |= SNOR_F_HAS_16BIT_SR;
+
+                flash->quad_enable = spi_nor_sr2_bit1_quad_enable;
+                break;
+
+            default:
+                SFUD_INFO("BFPT QER reserved value used\n");
+                break;
+        }
+    }
+}
+#endif
 
 /**
  * Read JEDEC basic parameter table
@@ -322,9 +391,10 @@ static bool read_basic_table(sfud_flash *flash, sfdp_para_header *basic_header) 
         break;
     }
     SFUD_DEBUG("Capacity is %ld Bytes.", sfdp->capacity);
-    /* get erase size and erase command  */
+    /* some nor erase parameter offset is incorrect  */
     if (table[erase_param_off] == 0xFF)
         erase_param_off = 28;
+    /* get erase size and erase command  */
     for (i = 0, j = 0; i < SFUD_SFDP_ERASE_TYPE_MAX_NUM; i++) {
         if (table[erase_param_off + 2 * i] != 0x00) {
             sfdp->eraser[j].size = 1L << table[erase_param_off + 2 * i];
@@ -353,69 +423,7 @@ static bool read_basic_table(sfud_flash *flash, sfdp_para_header *basic_header) 
 
     sfdp->hwcaps_fast_read = HWCAPS_NO_FAST_READ;
 #ifdef SFUD_USING_QSPI
-    uint32_t qer, fast_read;
-
-    memcpy(&fast_read, &table[BFPT_DWORD(1)], 4);
-    if (fast_read & (1 << 22))
-        sfdp->hwcaps_fast_read |= HWCAPS_FAST_READ_1_1_4;
-    if (fast_read & (1 << 21))
-        sfdp->hwcaps_fast_read |= HWCAPS_FAST_READ_1_4_4;
-    if (fast_read & (1 << 20))
-        sfdp->hwcaps_fast_read |= HWCAPS_FAST_READ_1_2_2;
-    if (fast_read & (1 << 16))
-        sfdp->hwcaps_fast_read |= HWCAPS_FAST_READ_1_1_2;
-    if (basic_header->len > 15) {
-        memcpy(&qer, &table[BFPT_DWORD(15)], 4);
-        switch (qer & BFPT_DWORD15_QER_MASK) {
-            case BFPT_DWORD15_QER_NONE:
-                flash->quad_enable = NULL;
-                break;
-
-            case BFPT_DWORD15_QER_SR2_BIT1_BUGGY:
-                /*
-                 * Writing only one byte to the Status Register has the
-                 * side-effect of clearing Status Register 2.
-                 */
-            case BFPT_DWORD15_QER_SR2_BIT1_NO_RD:
-                /*
-		         * Read Configuration Register (35h) instruction is not
-		         * supported.
-		         */
-                flash->flags |= SNOR_F_HAS_16BIT_SR | SNOR_F_NO_READ_CR;
-
-                flash->quad_enable = spi_nor_quad_enable;
-                break;
-
-            case BFPT_DWORD15_QER_SR1_BIT6:
-                flash->flags &= ~SNOR_F_HAS_16BIT_SR;
-                flash->quad_enable = spi_nor_sr1_bit6_quad_enable;
-                break;
-
-            case BFPT_DWORD15_QER_SR2_BIT7:
-                /*
-                 * flash->flags &= ~SNOR_F_HAS_16BIT_SR;
-                 * flash->quad_enable = spi_nor_sr2_bit7_quad_enable;
-                 */
-                SFUD_INFO("sr2_bit7_quad_enable is not supported now.\n");
-                break;
-
-            case BFPT_DWORD15_QER_SR2_BIT1:
-                /*
-		         * JESD216 rev B or later does not specify if writing only one
-		         * byte to the Status Register clears or not the Status
-		         * Register 2, so let's be cautious and keep the default
-		         * assumption of a 16-bit Write Status (01h) command.
-		         */
-                flash->flags |= SNOR_F_HAS_16BIT_SR;
-
-                flash->quad_enable = spi_nor_sr2_bit1_quad_enable;
-                break;
-
-            default:
-                SFUD_INFO("BFPT QER reserved value used\n");
-                break;
-        }
-    }
+    sfdp_fast_read(flash, table, bfpt_len);
 #endif
     sfdp->available = true;
     return true;

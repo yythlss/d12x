@@ -9,8 +9,12 @@
  */
 #include <rtthread.h>
 #include <rtdevice.h>
-#include <rtdbg.h>
 #include "st16xx.h"
+#include "touch_common.h"
+
+#define DBG_TAG "st16xx"
+#define DBG_LVL DBG_INFO
+#include <rtdbg.h>
 
 static struct rt_i2c_client *st16xx_client;
 
@@ -251,6 +255,13 @@ static rt_size_t st16xx_read_points(struct rt_touch_device *touch, void *buf, rt
                 input_y = (read_buf[off_set + 1] & 0x07) << 8 | read_buf[off_set + 3];	/* y */
                 if (input_y)
                     input_w = 4;	/* size */
+
+                aic_touch_flip(&input_x, &input_y);
+                aic_touch_rotate(&input_x, &input_y);
+                aic_touch_scale(&input_x, &input_y);
+                if (!aic_touch_crop(&input_x, &input_y))
+                    continue;
+
                 st16xx_touch_down(buf, read_id, input_x, input_y, input_w);
             }
         }

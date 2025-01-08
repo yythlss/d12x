@@ -20,11 +20,6 @@ extern "C" {
 #define LVGL_STORAGE_PATH "/rodata/lvgl_data"
 #endif
 
-#ifdef AIC_LVGL_UI_BUILDER
-#undef LVGL_STORAGE_PATH
-#define LVGL_STORAGE_PATH "/rodata"
-#endif
-
 #define LVGL_DIR "L:"LVGL_STORAGE_PATH"/"
 #define FILE_LIST_PATH LVGL_STORAGE_PATH"/video/"
 
@@ -34,6 +29,7 @@ extern "C" {
 #define LVGL_PATH_ORI(y) CONN(LVGL_STORAGE_PATH"/", y)
 #define LVGL_FONT_PATH(y) CONN(LVGL_STORAGE_PATH"/""font/", y)
 #define LVGL_IMAGE_PATH(y) CONN(LVGL_DIR"image/", y)
+#define LVGL_VIDEO_PATH(y) CONN(LVGL_STORAGE_PATH"/""video/", y)
 
 /* use fake image to fill color */
 #define FAKE_IMAGE_DECLARE(name) char fake_##name[256];

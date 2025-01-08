@@ -373,6 +373,7 @@ static rt_err_t rt_wlan_lwip_protocol_send(rt_device_t device, struct pbuf *p)
 #ifdef AIC_WLAN_ASR
         return rt_wlan_prot_transfer_dev(wlan, p, p->tot_len);
 #else
+        rt_wlan_prot_transfer_dev(wlan, p, p->tot_len);
         return RT_EOK;
 #endif
     }
@@ -409,7 +410,13 @@ static rt_err_t rt_wlan_lwip_protocol_send(rt_device_t device, struct pbuf *p)
 #endif
         LOG_D("F:%s L:%d run len:%d", __FUNCTION__, __LINE__, p->tot_len);
         rt_free(frame);
+
+#ifdef AIC_WLAN_ASR
         return ret;
+#else
+        return RT_EOK;
+#endif
+
     }
 #endif
 }

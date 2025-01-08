@@ -2,7 +2,10 @@ Import('AIC_ROOT')
 Import('PRJ_KERNEL')
 from building import *
 
-src = Glob('*.c') + Glob("*.S")
+if GetDepend('AIC_STRIP_MODE'):
+    src = []
+else:
+    src = Glob('*.c') + Glob("*.S")
 
 cwd = GetCurrentDir()
 CPPPATH = [cwd + '/../include/', ]

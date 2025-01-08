@@ -28,6 +28,7 @@
 #define FLAC_THD_START 0
 #define FLAC_THD_STOP 1
 #define FLAC_THD_EXIT 2
+#define FLAC_MIN_FRAME_CNT 5
 
 //#define FLAC_WRITE_FILE
 
@@ -141,7 +142,8 @@ static int flac_decoder_put_frame(struct aic_audio_decoder *decoder,
 
     if (flac_decoder->sample_rate <= 0 || flac_decoder->channels < 2 ||
         flac_decoder->frame_count < 1) {
-        loge("wrong flac decoder params: sample_rate %d, channels %d, frame_count %d.",
+        loge("wrong flac decoder params: sample_rate %"PRIu32", "
+             "channels %"PRIu32", frame_count %"PRIu32".",
              flac_decoder->sample_rate, flac_decoder->channels, flac_decoder->frame_count);
         return -1;
     }
@@ -149,7 +151,8 @@ static int flac_decoder_put_frame(struct aic_audio_decoder *decoder,
         struct audio_frame_manager_cfg cfg;
         cfg.bits_per_sample = flac_decoder->bits_per_sample;
         cfg.samples_per_frame = flac_decoder->channels * flac_frame->header.blocksize;
-        cfg.frame_count = flac_decoder->frame_count;
+        cfg.frame_count = flac_decoder->frame_count > FLAC_MIN_FRAME_CNT ?
+            flac_decoder->frame_count : FLAC_MIN_FRAME_CNT;
         flac_decoder->decoder.fm = audio_fm_create(&cfg);
         if (flac_decoder->decoder.fm == NULL) {
             loge("audio_fm_create fail!!!\n");
@@ -173,7 +176,7 @@ static int flac_decoder_put_frame(struct aic_audio_decoder *decoder,
     }
     if (!frame) {
         flac_decoder->have_samples += flac_frame->header.blocksize;
-        loge("get empty cur_sample %d, total_samples %"PRIu64", "
+        loge("get empty cur_sample %"PRIu32", total_samples %"PRIu64", "
             "have_samples %"PRIu64", timeout %d ms.",
             flac_frame->header.blocksize, flac_decoder->total_samples,
             flac_decoder->have_samples, try_cnt * 10);
@@ -193,7 +196,7 @@ static int flac_decoder_put_frame(struct aic_audio_decoder *decoder,
     if (frame->flag == FRAME_FLAG_EOS)
         flac_decoder->write_end_flag = 1;
 
-    logd("write_pcm frame_id %d, blocksize %d, pts %lld.", flac_decoder->frame_id,
+    logd("write_pcm frame_id %"PRIu32", blocksize %"PRIu32", pts %lld.", flac_decoder->frame_id,
          flac_frame->header.blocksize, frame->pts);
     logd("write_pcm total_samples %" PRIu64 ", have_samples %" PRIu64 ".",
          flac_decoder->total_samples, flac_decoder->have_samples);
@@ -244,7 +247,7 @@ wait_next_data:
         return FLAC__STREAM_DECODER_READ_STATUS_END_OF_STREAM;
     }
 
-    logd("read_callback request byte %ld, data_len %d.", requested_bytes, data_len);
+    logd("read_callback request byte %d, data_len %d.", (int)requested_bytes, data_len);
     if (requested_bytes > 0) {
         if (data_len < requested_bytes)
             *bytes = mpp_ringbuffer_get(flac_decoder->ringbuf, buffer, data_len);
@@ -269,7 +272,8 @@ static FLAC__StreamDecoderWriteStatus write_callback(const FLAC__StreamDecoder *
         ((struct flac_stream_decoder_client *)client_data)->decoder;
 
     if (frame->header.channels != 2) {
-        loge("ERROR: This frame contains %u channels (should be 2)\n", frame->header.channels);
+        loge("ERROR: This frame contains %"PRIu32" channels (should be 2)\n",
+            frame->header.channels);
         return FLAC__STREAM_DECODER_WRITE_STATUS_ABORT;
     }
     if (buffer[0] == NULL) {
@@ -304,9 +308,9 @@ static void metadata_callback(const FLAC__StreamDecoder *stream_decoder,
         flac_decoder->channels = metadata->data.stream_info.channels;
         flac_decoder->bits_per_sample = metadata->data.stream_info.bits_per_sample;
 
-        printf("sample rate    : %u Hz\n", flac_decoder->sample_rate);
-        printf("channels       : %u\n", flac_decoder->channels);
-        printf("bits per sample: %u\n", flac_decoder->bits_per_sample);
+        printf("sample rate    : %"PRIu32" Hz\n", flac_decoder->sample_rate);
+        printf("channels       : %"PRIu32"\n", flac_decoder->channels);
+        printf("bits per sample: %"PRIu32"\n", flac_decoder->bits_per_sample);
         printf("total samples  : %" PRIu64 "\n", flac_decoder->total_samples);
     }
 }
@@ -485,7 +489,7 @@ int __flac_decode_frame(struct aic_audio_decoder *decoder)
     }
     if (mpp_ringbuffer_space_len(flac_decoder->ringbuf) == 0) {
         mpp_sem_signal(flac_decoder->ringbuf_sem);
-        return DEC_NO_RENDER_FRAME;
+        return DEC_NO_EMPTY_PACKET;
     }
     flac_decoder->curr_packet = audio_pm_dequeue_ready_packet(flac_decoder->decoder.pm);
     if (!flac_decoder->curr_packet) {

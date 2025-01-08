@@ -182,7 +182,7 @@ int asr_sdio_disable_int(uint8_t mask);
 int sdio_get_ioport(void);
 int asr_sdio_config_rsr(uint8_t mask);
 int asr_sdio_config_auto_reenable(void);
-int asr_sdio_tx_common_port_dispatch(struct asr_hw *asr_hw, uint8_t * src, uint32_t len, unsigned int io_addr, uint16_t bitmap_record);
+int asr_sdio_tx_common_port_dispatch(struct asr_hw *asr_hw, u8 * src, u32 len, unsigned int io_addr, u16 bitmap_record);
 
 uint8_t asr_sdio_tx_get_available_data_port(struct asr_hw *asr_hw,
                        uint16_t ava_pkt_num, uint8_t * port_num, unsigned int *io_addr, uint16_t * bitmap_record);

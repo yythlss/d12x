@@ -29,13 +29,25 @@ int toshiba_ecc_get_status(struct aic_spinand *flash, u8 status)
     return -SPINAND_ERR;
 }
 
+static int tc58cvg1s_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    if (section > 3)
+      return -SPINAND_ERR;
+
+    region->offset = (16 * section) + 0;
+    region->length = 16;
+
+    return 0;
+}
+
 const struct aic_spinand_info toshiba_spinand_table[] = {
     /*devid page_size oob_size block_per_lun pages_per_eraseblock planes_per_lun
     is_die_select*/
     /*TC58CVG1S3HRAIJ*/
-    { DEVID(0xEB), PAGESIZE(2048), OOBSIZE(128), BPL(2048), PPB(64),
+    { DEVID(0xEB, 0x40), PAGESIZE(2048), OOBSIZE(128), BPL(2048), PPB(64),
       PLANENUM(1), DIE(0), "toshiba 256MB: 2048+128@64@2048", cmd_cfg_table,
-      toshiba_ecc_get_status },
+      toshiba_ecc_get_status, tc58cvg1s_ooblayout_user },
 };
 
 const struct aic_spinand_info *toshiba_spinand_detect(struct aic_spinand *flash)

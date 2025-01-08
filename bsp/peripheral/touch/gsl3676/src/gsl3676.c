@@ -9,6 +9,7 @@
  */
 
 #include "gsl3676.h"
+#include "touch_common.h"
 
 #define DBG_TAG "gsl3676"
 #define DBG_LVL DBG_LOG
@@ -511,6 +512,12 @@ static rt_size_t gsl3676_read_points(struct rt_touch_device *touch, void *buf, r
 
             input_y = cinfo.y[read_index];
             input_x = cinfo.x[read_index];
+
+            aic_touch_flip(&input_x, &input_y);
+            aic_touch_rotate(&input_x, &input_y);
+            aic_touch_scale(&input_x, &input_y);
+            if (!aic_touch_crop(&input_x, &input_y))
+                continue;
 
             gsl3676_touch_down(buf, read_id, input_x, input_y);
         }

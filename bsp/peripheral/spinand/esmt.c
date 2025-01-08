@@ -11,12 +11,25 @@
 
 #define SPINAND_MFR_ESMT		0xC8
 
+static int f50l1g_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    if (section > 3)
+      return -SPINAND_ERR;
+
+    region->offset = (16 * section) + 4;
+    region->length = 4;
+
+    return 0;
+}
+
 const struct aic_spinand_info esmt_spinand_table[] = {
     /*devid page_size oob_size block_per_lun pages_per_eraseblock planes_per_lun
     is_die_select*/
     /*F50L1G*/
     { DEVID(0x01), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
-      DIE(0), "esmt 128MB: 2048+64@64@1024", cmd_cfg_table },
+      DIE(0), "esmt 128MB: 2048+64@64@1024", cmd_cfg_table,
+      NULL, f50l1g_ooblayout_user },
 };
 
 const struct aic_spinand_info *esmt_spinand_detect(struct aic_spinand *flash)

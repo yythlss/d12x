@@ -189,7 +189,7 @@ static s32 mm_vin_dvp_init(mm_vin_data *p_vin_data)
         mpp_list_add_tail(&p_frame_node[i].list, &p_vin_data->vin_idle_list);
     }
 
-    printf("%s, src_fmt: w(%d), h(%d); out_fmt(%d): w(%d), h(%d)\n", __func__,
+    logi("%s, src_fmt: w(%d), h(%d); out_fmt(%d): w(%d), h(%d)\n", __func__,
         p_vin_data->dvp_data.src_fmt.width, p_vin_data->dvp_data.src_fmt.height,
         p_vin_data->dvp_data.out_fmt.pixelformat, p_vin_data->dvp_data.out_fmt.width,
         p_vin_data->dvp_data.out_fmt.height);
@@ -263,7 +263,6 @@ static s32 mm_vin_file_init(mm_vin_data *p_vin_data)
         return MM_ERROR_NULL_POINTER;
     }
 
-    printf("mm_vin_file_init sucucess!\n");
     return MM_ERROR_NONE;
 }
 
@@ -355,7 +354,6 @@ static s32 mm_vin_index_param_contenturi(mm_vin_data *p_vin_data,
     }
     memcpy(p_vin_data->p_contenturi, p_contenturi, p_contenturi->size);
 
-    printf("set vin content uri:%s sucucess\n", p_vin_data->p_contenturi->content_uri);
     return ret;
 }
 
@@ -378,8 +376,6 @@ static s32 mm_vin_set_parameter(mm_handle h_component, MM_INDEX_TYPE index, void
             loge("unsupport color_format %d", port->format.video.color_format);
             return MM_ERROR_UNSUPPORT;
         }
-        printf("width:%d, height:%d\n", p_vin_data->frame.buf.size.width,
-                p_vin_data->frame.buf.size.height);
         break;
     }
 
@@ -389,7 +385,6 @@ static s32 mm_vin_set_parameter(mm_handle h_component, MM_INDEX_TYPE index, void
 
     case MM_INDEX_PARAM_VIDEO_INPUT_SOURCE:
         p_vin_data->vin_source_type = ((mm_param_u32 *)p_param)->u32;
-        printf("set source type:%d\n", p_vin_data->vin_source_type);
         break;
 
     case MM_INDEX_PARAM_PRINT_DEBUG_INFO:
@@ -920,8 +915,6 @@ static s32 mm_vin_component_capture_file_frame(mm_vin_data *p_vin_data, mm_vin_f
     for (i = 0; i < 3; i++) {
         ret = fread(p_frame_node->vir_addr[i], 1, p_frame_node->size[i], p_vin_data->p_vin_fp);
         if (ret < p_frame_node->size[i]) {
-            printf("read file size %d < %d \n", ret, p_frame_node->size[i]);
-            printf("read frame cnt %d, read to file end \n", p_vin_data->caputure_frame_ok_num);
             p_frame_node->frame.flags = FRAME_FLAG_EOS;
             p_vin_data->eos = 1;
             pthread_mutex_unlock(&p_vin_data->vin_lock);
@@ -937,7 +930,7 @@ static s32 mm_vin_component_capture_file_frame(mm_vin_data *p_vin_data, mm_vin_f
 
 static void mm_vin_component_count_print(mm_vin_data *p_vin_data)
 {
-    printf("[%s:%d]caputure_frame_ok_num:%u,caputure_frame_fail_num:%u,"
+    logi("[%s:%d]caputure_frame_ok_num:%u,caputure_frame_fail_num:%u,"
            "send_frame_ok_num:%u,send_frame_fail_num:%u,"
            "giveback_frame_ok_num:%u,giveback_frame_fail_num:%u\n",
            __FUNCTION__, __LINE__,
@@ -1039,6 +1032,5 @@ static void *mm_vin_component_thread(void *p_thread_data)
     }
 _EXIT:
     mm_vin_component_count_print(p_vin_data);
-    printf("mm_vin_component_thread exit\n");
     return (void *)MM_ERROR_NONE;
 }

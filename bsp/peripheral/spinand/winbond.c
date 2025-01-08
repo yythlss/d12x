@@ -29,27 +29,67 @@ int winbond_ecc_get_status(struct aic_spinand *flash, u8 status)
     return -SPINAND_ERR;
 }
 
+static int w25n01gv_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    if (section > 3)
+      return -SPINAND_ERR;
+
+    region->offset = (16 * section) + 4;
+    region->length = 4;
+
+    return 0;
+}
+
+static int w25n02kv_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    if (section > 3)
+      return -SPINAND_ERR;
+
+    region->offset = (16 * section) + 4;
+    region->length = 12;
+
+    return 0;
+}
+
+static int w25n01jw_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    if (section > 3)
+      return -SPINAND_ERR;
+
+    region->offset = (16 * section) + 8;
+    region->length = 4;
+
+    return 0;
+}
+
+
 const struct aic_spinand_info winbond_spinand_table[] = {
     /*devid page_size oob_size block_per_lun pages_per_eraseblock planes_per_lun
     is_die_select*/
     { DEVID(0xAA, 0x21), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
-      DIE(0), "Winbond 128MB: 2048+64@64@1024", cmd_cfg_table,
-      winbond_ecc_get_status },
+      DIE(0), "W25N01GVxxxG/T/R Winbond 128MB: 2048+64@64@1024", cmd_cfg_table,
+      winbond_ecc_get_status, w25n01gv_ooblayout_user },
     { DEVID(0xAA, 0x22), PAGESIZE(2048), OOBSIZE(128), BPL(2048), PPB(64), PLANENUM(1),
       DIE(0), "W25N02KVxxIR/U Winbond 256MB: 2048+128@64@2048", cmd_cfg_table,
-      winbond_ecc_get_status },
-    { DEVID(0xAA, 0x23), PAGESIZE(2048), OOBSIZE(256), BPL(4096), PPB(64), PLANENUM(1),
-      DIE(0), "W25N04KVxxIR/U Winbond 512MB: 2048+256@64@4096", cmd_cfg_table,
-      winbond_ecc_get_status },
-    { DEVID(0xBF), PAGESIZE(2048), OOBSIZE(64), BPL(2048), PPB(64), PLANENUM(1),
-      DIE(0), "Winbond 256MB: 2048+64@64@2048", cmd_cfg_table, NULL },
-    { DEVID(0xAB), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
-      DIE(0), "Winbond 256MB: 2048+64@64@1024, MCP", cmd_cfg_table,
-      winbond_ecc_get_status },
-    { DEVID(0xBA), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
-      DIE(0), "Winbond 128MB: 2048+64@64@1024", cmd_cfg_table, NULL },
-    { DEVID(0xAE), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
-      DIE(0), "Winbond 128MB: 2048+64@64@1024", cmd_cfg_table, NULL },
+      winbond_ecc_get_status, w25n02kv_ooblayout_user },
+    { DEVID(0xAA, 0x23), PAGESIZE(2048), OOBSIZE(128), BPL(4096), PPB(64), PLANENUM(1),
+      DIE(0), "W25N04KVxxIR/U Winbond 512MB: 2048+128@64@4096", cmd_cfg_table,
+      winbond_ecc_get_status, w25n02kv_ooblayout_user },
+    { DEVID(0xBF, 0x22), PAGESIZE(2048), OOBSIZE(64), BPL(2048), PPB(64), PLANENUM(1),
+      DIE(0), "W25N02JWxxxF/C Winbond 256MB: 2048+64@64@2048", cmd_cfg_table,
+      NULL, w25n01jw_ooblayout_user },  /* 1.8V */
+    { DEVID(0xAB, 0x21), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
+      DIE(0), "W25M02GV Winbond 256MB: 2048+64@64@1024, MCP", cmd_cfg_table,
+      winbond_ecc_get_status, w25n01gv_ooblayout_user },
+    { DEVID(0xBA, 0x22), PAGESIZE(2048), OOBSIZE(128), BPL(1024), PPB(64), PLANENUM(1),
+      DIE(0), "W25N02KW Winbond 128MB: 2048+128@64@1024", cmd_cfg_table,
+      NULL, w25n02kv_ooblayout_user },  /* 1.8V */
+    { DEVID(0xAE, 0x21), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
+      DIE(0), "W25N01KVxxxE Winbond 128MB: 2048+64@64@1024", cmd_cfg_table,
+      NULL, w25n02kv_ooblayout_user },
 };
 
 const struct aic_spinand_info *winbond_spinand_detect(struct aic_spinand *flash)

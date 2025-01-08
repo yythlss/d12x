@@ -250,11 +250,7 @@ elif PRJ_KERNEL == 'baremetal':
 
 # 19.1 aic gmac
 lwipaicgmac_SRCS = Split("""
-contrib/ports/drv/aic/aic_mac.c
-contrib/ports/drv/aic/aic_mac_ll.c
-contrib/ports/drv/aic/aic_phy.c
-contrib/ports/drv/aic/aicmac_macaddr.c
-contrib/ports/drv/aic/sys/ethernetif.c
+contrib/ports/aic/sys/ethernetif.c
 """)
 
 # 20. example
@@ -321,8 +317,7 @@ if GetDepend(['LPKG_LWIP_USING_MQTT']):
 
 if GetDepend(['AIC_GMAC_DRV']):
     src += lwipaicgmac_SRCS
-    path += [cwd + '/contrib/ports/drv/aic/sys/',
-            cwd + '/contrib/ports/drv/aic/']
+    path += [cwd + '/contrib/ports/aic/sys/']
 
 if GetDepend(['LPKG_LWIP_EXAMPLES']):
     src += lwipexample_SRCS

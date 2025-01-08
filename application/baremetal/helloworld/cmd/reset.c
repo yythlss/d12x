@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -42,6 +42,8 @@ static int cmd_aicupg(int argc, char **argv)
 #ifdef AIC_WRI_DRV
     if ((argc == 2) && !strcmp(argv[1], "gotobl"))
         aic_set_reboot_reason(REBOOT_REASON_BL_UPGRADE);
+    else if ((argc == 2) && !strcmp(argv[1], "hid"))
+        aic_set_reboot_reason(REBOOT_REASON_BL_HID_UPGRADE);
     else
         aic_set_reboot_reason(REBOOT_REASON_UPGRADE);
 #endif

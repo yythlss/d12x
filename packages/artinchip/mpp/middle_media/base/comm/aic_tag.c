@@ -1,9 +1,11 @@
 /*
-* Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
-*
-*  author: <che.jiang@artinchip.com>
-*  Desc: avi tag
-*/
+ * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Author: <che.jiang@artinchip.com>
+ * Desc: aic tag, internal header for aic based (de)muxers
+ */
 
 
 #include <string.h>
@@ -128,7 +130,9 @@ const struct codec_tag aic_codec_wav_tags[] = {
     { CODEC_ID_AAC,             0x706d },
     { CODEC_ID_AAC,             0x4143 },
     { CODEC_ID_AAC,             0xA106 },
-
+    { CODEC_ID_FLAC,            0xF1AC },
+    { CODEC_ID_WMAV1,           0x0160 },
+    { CODEC_ID_WMAV2,           0x0161 },
     /* HACK/FIXME: Does Vorbis in WAV/AVI have an (in)official ID? */
     { CODEC_ID_NONE,      0 },
 };

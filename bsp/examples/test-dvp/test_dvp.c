@@ -57,6 +57,8 @@ struct aic_dvp_data {
     int frame_cnt;
     int rotation;
     int dst_fmt;  // output format
+    struct mpp_rect dst_pos;
+
     struct mpp_video_fmt src_fmt;
     uint32_t num_buffers;
     struct vin_video_buf binfo;
@@ -76,7 +78,7 @@ static struct mpp_ge *g_ge_dev = NULL;
 static void usage(char *program)
 {
     printf("Usage: %s [options]: \n", program);
-    printf("\t -f, --format\t\tformat of input video, NV16/NV12 etc\n");
+    printf("\t -f, --format\t\tformat of input video, NV16/NV12/YUV400 etc\n");
     printf("\t -c, --count\t\tthe number of capture frame.(0 means infinity) \n");
 #ifdef SUPPORT_ROTATION
     printf("\t -a, --angle\t\tthe angle of rotation \n");
@@ -146,6 +148,12 @@ int sensor_get_fmt(void)
     g_vdata.h = g_vdata.src_fmt.height;
     pr_info("Sensor format: w %d h %d, code 0x%x, bus 0x%x, colorspace 0x%x\n",
             f.width, f.height, f.code, f.bus_type, f.colorspace);
+
+    if (f.bus_type == MEDIA_BUS_RAW8_MONO) {
+        pr_info("Forbid the output format to YUV400\n");
+        g_vdata.dst_fmt = MPP_FMT_YUV400;
+    }
+
     return 0;
 }
 
@@ -302,14 +310,7 @@ int do_rotate(struct aic_dvp_data *vdata, int index)
     struct vin_video_buf *binfo = &vdata->binfo;
     int ret = 0;
 
-    if (vdata->dst_fmt == MPP_FMT_NV16) {
-        src->format = MPP_FMT_NV16;
-        dst->format = MPP_FMT_NV16;
-    } else {
-        src->format = MPP_FMT_NV12;
-        dst->format = MPP_FMT_NV12;
-    }
-
+    src->format = vdata->dst_fmt;
     src->buf_type = MPP_PHY_ADDR;
     src->phy_addr[0] = binfo->planes[index * VID_BUF_PLANE_NUM].buf;
     src->phy_addr[1] = binfo->planes[index * VID_BUF_PLANE_NUM + 1].buf;
@@ -318,6 +319,7 @@ int do_rotate(struct aic_dvp_data *vdata, int index)
     src->size.width = vdata->w;
     src->size.height = vdata->h;
 
+    dst->format = vdata->dst_fmt;
     dst->buf_type = MPP_PHY_ADDR;
     dst->phy_addr[0] = binfo->planes[VID_BUF_NUM * VID_BUF_PLANE_NUM].buf;
     dst->phy_addr[1] = binfo->planes[VID_BUF_NUM * VID_BUF_PLANE_NUM + 1].buf;
@@ -363,6 +365,20 @@ int do_rotate(struct aic_dvp_data *vdata, int index)
 }
 #endif
 
+int dvp_set_output_pos(u32 x, u32 y, u32 width, u32 height)
+{
+    if (!width || !height || x > g_fb_info.width || y > g_fb_info.height) {
+        pr_err("Invalid position: [%d, %d] %d x %d\n", x, y, width, height);
+        return -1;
+    }
+
+    g_vdata.dst_pos.x = x;
+    g_vdata.dst_pos.y = y;
+    g_vdata.dst_pos.width = width;
+    g_vdata.dst_pos.height = height;
+    return 0;
+}
+
 int video_layer_set(struct aic_dvp_data *vdata, int index)
 {
 #ifdef AIC_DISPLAY_DRV
@@ -373,18 +389,10 @@ int video_layer_set(struct aic_dvp_data *vdata, int index)
     layer.layer_id = AICFB_LAYER_TYPE_VIDEO;
     layer.enable = 1;
 #if DVP_SCALE
-#if 1
-    layer.scale_size.width = g_fb_info.width - VID_SCALE_OFFSET * 2;
-    layer.scale_size.height = g_fb_info.height - VID_SCALE_OFFSET * 2;
-    layer.pos.x = VID_SCALE_OFFSET;
-    layer.pos.y = VID_SCALE_OFFSET;
-#else
-    /* Reduce the size to fb0*1/2 */
-    layer.scale_size.width = g_fb_info.width / 2;
-    layer.scale_size.height = g_fb_info.height / 2;
-    layer.pos.x = g_fb_info.width / 2 - VID_SCALE_OFFSET;
-    layer.pos.y = g_fb_info.height / 2 - VID_SCALE_OFFSET;
-#endif
+    layer.scale_size.width = vdata->dst_pos.width;
+    layer.scale_size.height = vdata->dst_pos.height;
+    layer.pos.x = vdata->dst_pos.x;
+    layer.pos.y = vdata->dst_pos.y;
 #else
     layer.scale_size.width = vdata->w;
     layer.scale_size.height = vdata->h;
@@ -400,11 +408,7 @@ int video_layer_set(struct aic_dvp_data *vdata, int index)
         layer.buf.size.height = vdata->w;
     }
 
-    if (vdata->dst_fmt == MPP_FMT_NV16)
-        layer.buf.format = MPP_FMT_NV16;
-    else
-        layer.buf.format = MPP_FMT_NV12;
-
+    layer.buf.format = vdata->dst_fmt;
     layer.buf.buf_type = MPP_PHY_ADDR;
 
     for (i = 0; i < VID_BUF_PLANE_NUM; i++) {
@@ -443,6 +447,10 @@ static void test_dvp_thread(void *arg)
 
 #if DVP_SCALE
     pr_info("DVP scale is enable\n");
+    if (dvp_set_output_pos(VID_SCALE_OFFSET, VID_SCALE_OFFSET,
+                           g_fb_info.width - VID_SCALE_OFFSET * 2,
+                           g_fb_info.height - VID_SCALE_OFFSET * 2))
+        return;
 #else
     pr_info("DVP scale is disable\n");
 #endif
@@ -517,6 +525,8 @@ static void cmd_test_dvp(int argc, char **argv)
         case 'f':
             if (strncasecmp("nv12", optarg, strlen(optarg)) == 0)
                 g_vdata.dst_fmt = MPP_FMT_NV12;
+            if (strncasecmp("yuv400", optarg, strlen(optarg)) == 0)
+                g_vdata.dst_fmt = MPP_FMT_YUV400;
             break;
 
         case 'c':
@@ -539,8 +549,7 @@ static void cmd_test_dvp(int argc, char **argv)
     }
 
     pr_info("Capture %d frames from camera\n", g_vdata.frame_cnt);
-    pr_info("DVP out format: %s\n",
-            g_vdata.dst_fmt == MPP_FMT_NV16 ? "NV16" : "NV12");
+    pr_info("DVP out format: %x\n", g_vdata.dst_fmt);
 
     if (mpp_vin_init(CAMERA_DEV_NAME))
         return;
@@ -553,8 +562,10 @@ static void cmd_test_dvp(int argc, char **argv)
 
     if (g_vdata.dst_fmt == MPP_FMT_NV16)
         g_vdata.frame_size = g_vdata.w * g_vdata.h * 2;
-    else if (g_vdata.dst_fmt == DVP_OUT_FMT_NV12)
+    else if (g_vdata.dst_fmt == MPP_FMT_NV12)
         g_vdata.frame_size = (g_vdata.w * g_vdata.h * 3) >> 1;
+    else if (g_vdata.dst_fmt == MPP_FMT_YUV400)
+        g_vdata.frame_size = g_vdata.w * g_vdata.h;
 
     g_fb = mpp_fb_open();
     if (!g_fb) {

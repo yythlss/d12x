@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -28,6 +28,12 @@ static struct aic_qep_data g_qep_info[] = {
 #ifdef AIC_USING_QEP1
     {.id = 1,},
 #endif
+#ifdef AIC_USING_QEP2
+    {.id = 2,},
+#endif
+#ifdef AIC_USING_QEP3
+    {.id = 3,},
+#endif
 };
 
 static rt_err_t aic_qep_init(struct rt_pulse_encoder_device *qep)
@@ -51,9 +57,11 @@ static rt_int32_t aic_qep_get_count(struct rt_pulse_encoder_device *qep)
 
     aicqep = (struct aic_qep *)qep;
 
-    LOG_I("%s enter!, id:%d\n", __FUNCTION__, aicqep->data->id);
+    rt_int32_t get_cnt = 0;
 
-    return RT_EOK;
+    get_cnt = hal_qep_get_cnt(aicqep->data->id);
+
+    return get_cnt;
 }
 
 static rt_err_t aic_qep_clear_count(struct rt_pulse_encoder_device *qep)
@@ -78,6 +86,9 @@ static rt_err_t aic_qep_control(struct rt_pulse_encoder_device *qep, rt_uint32_t
     RT_ASSERT(qep != RT_NULL);
 
     aicqep = (struct aic_qep *)qep;
+
+    hal_qep_set_cnt_ep(aicqep->data->id, 0xFFFFFFFF);
+    hal_qep_set_cnt_cmp(aicqep->data->id, 0xFFFFFFFF);
 
     switch (cmd) {
     case PULSE_ENCODER_CMD_ENABLE:

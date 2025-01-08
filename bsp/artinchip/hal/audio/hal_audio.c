@@ -392,6 +392,64 @@ void hal_audio_playback_start(aic_audio_ctrl *codec)
     hal_audio_tx_enable_drq(codec);
 }
 
+void hal_audio_playback_start_single(aic_audio_ctrl *codec)
+{
+    struct dma_slave_config config;
+    struct aic_audio_transfer_info *info;
+
+    config.direction = DMA_MEM_TO_DEV;
+    config.dst_addr = codec->reg_base + TXFIFO_DATA_REG;
+    config.slave_id = 14;
+    config.src_maxburst = 1;
+    config.dst_maxburst = 1;
+
+    /* AudioCodec only support 16bit sample width */
+    if (codec->config.channel == 2)
+    {
+        config.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+        config.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+    }
+    else if (codec->config.channel == 1)
+    {
+        config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+        config.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+    }
+
+    info = &codec->tx_info;
+
+    info->transfer_type = AUDIO_TRANSFER_TYPE_TX;
+
+    if (codec->start_flag == 0) {
+        info->dma_chan = hal_request_dma_chan();
+        if (!info->dma_chan) {
+            hal_log_err("playback request dma channel error\n");
+            return;
+        }
+
+        hal_dma_chan_register_cb(info->dma_chan, dma_transfer_period_callback,
+                                (void *)info);
+        hal_dma_chan_config(info->dma_chan, &config);
+        /* Configure DMA transfer */
+        hal_dma_chan_prep_device(info->dma_chan,
+                                config.dst_addr, (ulong)info->buf_info.buf, info->buf_info.period_len,
+                                DMA_MEM_TO_DEV);
+
+    }
+
+    hal_dma_chan_start(info->dma_chan);
+
+    if (codec->start_flag == 0) {
+        hal_audio_disable_fade(codec);
+        /* flush TXFIFO */
+        hal_audio_flush_tx_fifo(codec);
+        /* Enable TX global */
+        hal_audio_enable_tx_global(codec);
+        /* Enable AUDOUT DRQ */
+        hal_audio_tx_enable_drq(codec);
+    }
+    codec->start_flag = 1;
+}
+
 void hal_audio_dmic_start(aic_audio_ctrl *codec)
 {
     struct dma_slave_config config;
@@ -495,6 +553,7 @@ void hal_audio_playback_stop(aic_audio_ctrl *codec)
     hal_audio_disable_tx_global(codec);
     hal_dma_chan_stop(info->dma_chan);
     hal_release_dma_chan(info->dma_chan);
+    codec->start_flag = 0;
 }
 
 void hal_audio_dmic_stop(aic_audio_ctrl *codec)

@@ -23,8 +23,16 @@ enum aic_gpai_mode {
 enum aic_gpai_obtain_data_mode {
     AIC_GPAI_OBTAIN_DATA_BY_CPU = 1,
     AIC_GPAI_OBTAIN_DATA_BY_DMA = 2,
-    AIC_GPAI_OBTAIN_DATA_BY_DO = 3
+    AIC_GPAI_OBTAIN_DATA_BY_POLL = 3,
+    AIC_GPAI_OBTAIN_DATA_BY_DO = 4
 };
+
+#if defined(AIC_GPAI_DRV_V21)
+enum adc_acc_sel_type_t {
+	AIC_GPAI_ADC_12BIT = 0,
+	AIC_GPAI_ADC_14BIT = 1
+};
+#endif
 
 typedef void (*dma_callback)(void *dma_param);
 typedef void (*irq_callback)(void *cb_param);
@@ -90,7 +98,7 @@ int aich_gpai_ch_init(struct aic_gpai_ch *chan, u32 pclk);
 
 irqreturn_t aich_gpai_isr(int irq, void *arg);
 
-int aich_gpai_read(struct aic_gpai_ch *chan, u16 *val, u32 timeout);
+int hal_gpai_get_data(struct aic_gpai_ch *chan, u16 *val, u32 timeout);
 s32 aich_gpai_data2vol(u16 data);
 
 struct aic_gpai_ch *hal_gpai_ch_is_valid(u32 ch);
@@ -99,8 +107,16 @@ void hal_gpai_set_ch_num(u32 num);
 void aich_gpai_status_show(struct aic_gpai_ch *chan);
 s32 hal_gpai_clk_init(void);
 void hal_gpai_clk_get(struct aic_gpai_ch *chan);
-#if defined(AIC_GPAI_DRV_V20) && defined(AIC_DMA_DRV)
+#ifdef AIC_GPAI_DRV_DMA
 void hal_gpai_config_dma(struct aic_gpai_ch *chan);
 void hal_gpai_start_dma(struct aic_gpai_ch *chan);
+void hal_gpai_stop_dma(struct aic_gpai_ch *chan);
+#endif
+#if defined(AIC_GPAI_DRV_V21)
+void aich_gpai_adc_sel_enable(int adc_type);
+#endif
+#ifdef AIC_GPAI_DRV_DO
+int hal_gpai_do_set_ch(u8 do_ch, u8 ad_ch);
+void hal_gpai_do_enable(u8 do_ch);
 #endif
 #endif // end of _ARTINCHIP_HAL_GPAI_H_

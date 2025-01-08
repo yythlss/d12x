@@ -9,7 +9,7 @@ aic_script_path = os.path.join(AIC_ROOT, 'tools/scripts/')
 sys.path.append(aic_script_path)
 from aic_build import *
 chk_prj_config(AIC_ROOT)
-PRJ_CHIP,PRJ_BOARD,PRJ_KERNEL,PRJ_APP,PRJ_DEFCONFIG_NAME,PRJ_CUSTOM_LDS,MKIMAGE_POST_ACTION = get_prj_config(AIC_ROOT)
+PRJ_CHIP,PRJ_BOARD,PRJ_KERNEL,PRJ_APP,PRJ_DEFCONFIG_NAME,PRJ_CUSTOM_LDS = get_prj_config(AIC_ROOT)
 PRJ_NAME = PRJ_DEFCONFIG_NAME.replace('_defconfig','')
 PRJ_OUT_DIR = 'output/' + PRJ_NAME + '/images/'
 AIC_SCRIPT_DIR = aic_script_path
@@ -79,9 +79,6 @@ else:
     os.system(cmd)
 rtconfig.LFLAGS += ' -T ' + ld
 
-# add post action
-rtconfig.POST_ACTION += MKIMAGE_POST_ACTION
-
 # create env
 env  = Environment(tools = ['mingw'],
 AS   = rtconfig.AS,   ASFLAGS   = rtconfig.AFLAGS,
@@ -136,6 +133,20 @@ env['PRJ_OUT_DIR']               = PRJ_OUT_DIR
 # prepare building environment
 objs = PrepareBuilding(env, RTT_ROOT, has_libcpu=False)
 
+# Generate Filesystem install POST_ACTION
+fsinstall = GetInstallList()
+PRJ_POST_ACTION = get_prj_post_action(AIC_ROOT,
+                                          PRJ_CHIP,
+                                          PRJ_BOARD,
+                                          PRJ_KERNEL,
+                                          PRJ_APP,
+                                          PRJ_DEFCONFIG_NAME,
+                                          fsinstall)
+# add post action
+rtconfig.POST_ACTION += PRJ_POST_ACTION
+
+env.Clean(PRJ_OUT_DIR, PRJ_OUT_DIR)
+
 # make a building
 DoBuilding(TARGET, objs)
 
@@ -147,7 +158,8 @@ for i in env['CPPDEFINES']:
     cpp_defines = cpp_defines + env['CPPDEFPREFIX'] + str(i[:][0]) + ' '
 for path in env['CPPPATH']:
     related_cpppath = os.path.normpath(path).replace(AIC_ROOT + os.path.sep, '')
-    cpp_path = cpp_path + ' -I' + related_cpppath
+    if not related_cpppath.startswith(os.path.join('packages', 'artinchip', 'lvgl-ui')):
+        cpp_path += ' -I' + related_cpppath
 
 output_path = os.path.join(env['PRJ_OUT_DIR'], '.pinmux.i ')
 toolchain_path = os.path.join('toolchain', 'bin', rtconfig.CC)

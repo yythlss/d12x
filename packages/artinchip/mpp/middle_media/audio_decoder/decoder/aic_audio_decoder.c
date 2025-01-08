@@ -15,6 +15,12 @@ extern struct aic_audio_decoder* create_mp3_decoder();
 #ifdef LPKG_USING_LIBFLAC
 extern struct aic_audio_decoder* create_flac_decoder();
 #endif
+#ifdef LPKG_USING_FFMPEG
+extern struct aic_audio_decoder* create_wma_decoder();
+#endif
+#ifdef LPKG_USING_FAAD2
+extern struct aic_audio_decoder* create_aac_decoder();
+#endif
 
 struct aic_audio_decoder* aic_audio_decoder_create(enum aic_audio_codec_type type)
 {
@@ -23,6 +29,14 @@ struct aic_audio_decoder* aic_audio_decoder_create(enum aic_audio_codec_type typ
 #ifdef LPKG_USING_LIBFLAC
 	else if (type == MPP_CODEC_AUDIO_DECODER_FLAC)
 		return create_flac_decoder();
+#endif
+#ifdef LPKG_USING_FFMPEG
+	else if (type == MPP_CODEC_AUDIO_DECODER_WMA)
+		return create_wma_decoder();
+#endif
+#ifdef LPKG_USING_FAAD2
+	else if (type == MPP_CODEC_AUDIO_DECODER_AAC)
+		return create_aac_decoder();
 #endif
 	return NULL;
 }

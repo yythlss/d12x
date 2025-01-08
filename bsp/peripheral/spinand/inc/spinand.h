@@ -54,6 +54,11 @@ struct spinand_devid {
         .len = sizeof((u8[]){ __VA_ARGS__ }),   \
     }
 
+struct aic_oob_region {
+    u32 offset;
+    u32 length;
+};
+
 /* SPI NAND flash information */
 struct aic_spinand_info {
     struct spinand_devid devid;
@@ -66,6 +71,8 @@ struct aic_spinand_info {
     const char *sz_description;
     struct spi_nand_cmd_cfg *cmd;
     int (*get_status)(struct aic_spinand *flash, u8 status);
+    int (*oob_get_user)(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *oobuser);
 };
 typedef struct aic_spinand_info *aic_spinand_info_t;
 
@@ -87,6 +94,7 @@ struct aic_spinand {
     struct spinand_id id;
     void *user_data;
     void *lock;
+    u8 bus;
     u8 use_continuous_read;
     u8 qspi_dl_width;
     u8 IsInited;
@@ -261,6 +269,9 @@ extern const struct spinand_manufacturer quanxing_spinand_manufacturer;
 #ifdef SPI_NAND_XINCUN
 extern const struct spinand_manufacturer xincun_spinand_manufacturer;
 #endif
+#ifdef SPI_NAND_FUDANMICRO
+extern const struct spinand_manufacturer fudanmicro_spinand_manufacturer;
+#endif
 
 extern struct spi_nand_cmd_cfg cmd_cfg_table[];
 
@@ -270,5 +281,12 @@ spinand_match_and_init(u8 *devid, const struct aic_spinand_info *table,
 int aic_spinand_transfer_message(struct aic_spinand *flash,
                                  struct spi_nand_cmd_cfg *cfg, u32 addr,
                                  u8 *sendBuff, u8 *recvBuff, u32 DataCount);
+/* ooblayout
+ * distinguish the ECC protected bytes on the oob region
+ */
+int spinand_ooblayout_map_user(struct aic_spinand *flash, u8 *oobbuf,
+                       const u8 *spare, int start, int nbytes);
+int spinand_ooblayout_unmap_user(struct aic_spinand *flash, u8 *dst,
+                       u8 *src, int start, int nbytes);
 
 #endif /* __SPINAND_H__ */

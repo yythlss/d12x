@@ -29,21 +29,45 @@ static int em73c044vcf_ecc_get_status(struct aic_spinand *flash, u8 status)
     return -SPINAND_ERR;
 }
 
+static int em73c_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    if (section > 3)
+      return -SPINAND_ERR;
+
+    region->offset = (8 * section) + 4;
+    region->length = 4;
+
+    return 0;
+}
+
+static int em73d_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    if (section > 3)
+      return -SPINAND_ERR;
+
+    region->offset = (18 * section) + 0;
+    region->length = 18;
+
+    return 0;
+}
+
 const struct aic_spinand_info etron_spinand_table[] = {
     /*devid page_size oob_size block_per_lun pages_per_eraseblock planes_per_lun
     is_die_select*/
     /*EM73C044VCF-H*/
     { DEVID(0x25), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
       DIE(0), "etron 128MB: 2048+64@64@1024", cmd_cfg_table,
-      em73c044vcf_ecc_get_status},
+      em73c044vcf_ecc_get_status, em73c_ooblayout_user },
     /*EM73D044VCO-H*/
     { DEVID(0x3A), PAGESIZE(2048), OOBSIZE(128), BPL(2048), PPB(64),
       PLANENUM(1), DIE(0), "etron 256MB: 2048+128@64@2048", cmd_cfg_table,
-      em73c044vcf_ecc_get_status},
+      em73c044vcf_ecc_get_status, em73d_ooblayout_user },
     /*EM73E044VCE-H*/
     { DEVID(0x3B), PAGESIZE(2048), OOBSIZE(128), BPL(4096), PPB(64),
       PLANENUM(1), DIE(0), "etron 512MB: 2048+128@64@4096", cmd_cfg_table,
-      em73c044vcf_ecc_get_status},
+      em73c044vcf_ecc_get_status, em73d_ooblayout_user },
 };
 
 const struct aic_spinand_info *etron_spinand_detect(struct aic_spinand *flash)

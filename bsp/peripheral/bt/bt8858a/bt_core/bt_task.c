@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-/////ÏûÏ¢¶ÓÁĞ/////
+/////æ¶ˆæ¯é˜Ÿåˆ—/////
 typedef enum
 {
 	FIFO_NULL = 0,
@@ -20,8 +20,8 @@ typedef enum
 
 
 __u8	bt_keycmd_buf[BT_MSG_MAX] 	= {'\0'};
-__u8  	system_do_msg[BT_MSG_MAX];				//////ÏµÍ³Òª´¦ÀíµÄÏûÏ¢
-__u8  	system_tmp_msg[BT_MSG_MAX];				//////ÏµÍ³Òª´¦ÀíµÄÏûÏ¢
+__u8  	system_do_msg[BT_MSG_MAX];				//////ç³»ç»Ÿè¦å¤„ç†çš„æ¶ˆæ¯
+__u8  	system_tmp_msg[BT_MSG_MAX];				//////ç³»ç»Ÿè¦å¤„ç†çš„æ¶ˆæ¯
 __u8	sys_cmd[BT_CMD_MAX][BT_MSG_MAX]={'\0'};
 
 __s32   fifo_in = 0;
@@ -31,29 +31,29 @@ __s32 	fifo_sta = FIFO_NULL;
 
 
 /***********************************************/
-/*Èë¶Ó*/
+/*å…¥é˜Ÿ*/
 __s32 fifo_push(__u8 *string_in,__u8 len)
 {
 	__s32 i=0;
 	if(fifo_sta == FIFO_FULL)
 	{
-		//printf("===============err¶ÓÂú:in:%d,out:%d===============\n",fifo_in,fifo_out);
+		//printf("===============erré˜Ÿæ»¡:in:%d,out:%d===============\n",fifo_in,fifo_out);
 		return 0;
 	}
 	//printf("-fifoIN [%d]len:%d-",fifo_in,len);
-	///Èë¶Ó
+	///å…¥é˜Ÿ
 	for(i=0;i<=len;i++)
 	{
 		sys_cmd[fifo_in][i]=string_in[i];
 		//printf("-%x-",sys_cmd[fifo_in][i]);
 	}
 	//printf("fifoin over\n");
-	///Ç°ÒÆ
+	///å‰ç§»
 	if((++fifo_in)>=BT_CMD_MAX)
 	{
 		fifo_in = 0;
 	}
-	//¶ÓÁĞÊÇ·ñÂú
+	//é˜Ÿåˆ—æ˜¯å¦æ»¡
 	if(fifo_sta == FIFO_NULL)
 	{
 		//printf("===============null in:%d,out:%d===============\n",fifo_in,fifo_out);
@@ -70,7 +70,7 @@ __s32 fifo_push(__u8 *string_in,__u8 len)
 	}
 	return 0;
 }
-/*³ö¶Ó*/
+/*å‡ºé˜Ÿ*/
 __s32 fifo_pop(__u8 *string_out)
 {
 	__s32 i=0;
@@ -85,22 +85,22 @@ __s32 fifo_pop(__u8 *string_out)
 		fifo_sta = FIFO_HAVE;
 	}
 	//printf("===queue pop====\n");
-	///³ö¶Ó
-	for(i=0;i<200;i++)///×î¶à200¸ö
+	///å‡ºé˜Ÿ
+	for(i=0;i<200;i++)///æœ€å¤š200ä¸ª
 	{
 		string_out[i] = sys_cmd[fifo_out][i];
 		//__msg("-%x-",string_out[i]);
 	}
 	//printf("=outover=\n");
-	///Ç°ÒÆ
+	///å‰ç§»
 	if((++fifo_out)>=BT_CMD_MAX)
 	{
 		fifo_out = 0;
 	}
-	//¶ÓÁĞÊÇ·ñÎª¿Õ
+	//é˜Ÿåˆ—æ˜¯å¦ä¸ºç©º
 	if(fifo_in == fifo_out)
 	{
-		/////printf("===============¶ÓÁĞ¿Õ===============\n");
+		/////printf("===============é˜Ÿåˆ—ç©º===============\n");
 		fifo_sta = FIFO_NULL;
 	}
 	return 0;
@@ -115,20 +115,20 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 	static	__s32 	index = 0;
 
 	p_end+= str_len;
-	while(p<p_end)///È¡³öÃüÁî
+	while(p<p_end)///å–å‡ºå‘½ä»¤
 	{
 		//printf("get len:[%d][%x]\n",str_len,*p);
-		///¿ªÊ¼
+		///å¼€å§‹
 #if(comm_mode == 1)
-		if(strncmp(p,"\r\n",2)==0)////ÓĞĞÅÏ¢ÁË"\r\nk012345678\r\n"È¡³öµÄÎª:"012345678"
+		if(strncmp(p,"\r\n",2)==0)////æœ‰ä¿¡æ¯äº†"\r\nk012345678\r\n"å–å‡ºçš„ä¸º:"012345678"
         {
 			p = p+1;
 #elif(comm_mode == 2)
-        if(strncmp(p,"\\r\\n",4)==0)////ÓĞĞÅÏ¢ÁË"\\r\\nk012345678\\r\\n"È¡³öµÄÎª:"012345678"
+        if(strncmp(p,"\\r\\n",4)==0)////æœ‰ä¿¡æ¯äº†"\\r\\nk012345678\\r\\n"å–å‡ºçš„ä¸º:"012345678"
         {
 			p = p+3;
 #elif (comm_mode == 3)
-		if(*p == 0xFF)////ÓĞĞÅÏ¢ÁË"\r\nk012345678\r\n"È¡³öµÄÎª:"012345678"
+		if(*p == 0xFF)////æœ‰ä¿¡æ¯äº†"\r\nk012345678\r\n"å–å‡ºçš„ä¸º:"012345678"
 		{
 #endif
             // printf("system_tmp_msg[0] =%x",system_tmp_msg[0]);
@@ -156,9 +156,7 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 	__s32 		ret 			= -1;
 	__s32 		i 			= 0;
 	static 		__s32 		clear_cnt=0;
-	//com_uart_read(bt_keycmd_buf, 255, &ret);
 	com_uart_read(bt_keycmd_buf, BT_MSG_MAX-1, &ret);
-	printf("bt_keycmd_buf[%x],size[%d]\n",bt_keycmd_buf[0],ret);
 	if(ret>0)
 	{
 		bt_cmp_cmd(bt_keycmd_buf,ret);
@@ -172,6 +170,7 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 			printf("=====cear uart buffer====\n");
 			com_uart_flush();
 		}
+        msleep(10);
 	}
 	return;
 }
@@ -183,19 +182,19 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 	ret = fifo_pop(system_do_msg);
 	if(ret == -1)
 	{
-		//printf("fifo_pop fail");
+		msleep(10);
 		return ;
 	}
-	printf("system_do_msg[0]:0x%x 0x%x 0x%x \n",system_do_msg[0],system_do_msg[1],system_do_msg[2]);
+	//printf("system_do_msg[0]:0x%x 0x%x 0x%x \n",system_do_msg[0],system_do_msg[1],system_do_msg[2]);
 	switch(system_do_msg[0])
 	{
-		case 'B':////µç»°±¾
+		case 'B':////ç”µè¯æœ¬
 		{
 			printf("system_do_msg[0]:%x \n",system_do_msg[0]);
 			sys_bt_set_phonebook(system_do_msg);
 		}
 		break;
-		case 'C'://///¿ØÖÆÃüÁî
+		case 'C'://///æ§åˆ¶å‘½ä»¤
 		{
 			switch(system_do_msg[1])
 			{
@@ -204,7 +203,7 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 				    sys_bt_ctrl_lcd(system_do_msg[2]);
 				}
 				break;
-				case 'I':///´óµÆ
+				case 'I':///å¤§ç¯
 				{
                     sys_bt_ctrl_light(system_do_msg[2]);
 				}
@@ -214,13 +213,13 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 			}
 		}
 		break;
-		case 'D':///·½Ïò¼ü
+		case 'D':///æ–¹å‘é”®
 		{
 			printf("**************Direction key***************\n");
 			//sys_bt_dirkey_pro(system_do_msg);
 		}
 		break;
-		case 'E':///FM·µ»ØµÄĞÅÏ¢
+		case 'E':///FMè¿”å›çš„ä¿¡æ¯
 		{
 			printf("**************fm_process***************\n");
 			sys_bt_fm_process();
@@ -240,13 +239,13 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 			//sys_bt_key_pro(system_do_msg);
 		}
 		break;
-		case 'P':////µ¹³µ
+		case 'P':////å€’è½¦
 		{
 
 			sys_bt_ctrl_pev(system_do_msg[1]);
 		}
 		break;
-		case 'R':////ir °´¼ü
+		case 'R':////ir æŒ‰é”®
 		{
 			///printf("====ir:[%x]sta:[%d][0:up 1:down]====\n",system_do_msg[1],system_do_msg[2]);
 			//cky modify
@@ -255,7 +254,7 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 		break;
 		case 'T':///T LEN YEAR....
 		{
-			sys_bt_set_time(&system_do_msg[2]);//system_do_msg[1]Îª³¤¶È
+			sys_bt_set_time(&system_do_msg[2]);//system_do_msg[1]ä¸ºé•¿åº¦
 
 		}
 		break;
@@ -271,12 +270,12 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 			sys_bt_set_music_info();
 		}
 		break;
-		case 'M':///ÒôÀÖ²¥·Å×´Ì¬
+		case 'M':///éŸ³ä¹æ’­æ”¾çŠ¶æ€
 		{
 			sys_bt_set_music_status(system_do_msg[1]);
 		}
 		break;
-		case '#':///SPPĞ­Òé²¿·Ö
+		case '#':///SPPåè®®éƒ¨åˆ†
 		{
 			printf("=====SPP strlen[%d],cmd:%c%c\n\n",strlen(system_do_msg),system_do_msg[1],system_do_msg[2]);
 			if(system_do_msg[1]=='P')
@@ -287,6 +286,19 @@ __s32 bt_cmp_cmd(char *string_buf,__s32 str_len)
 			{
 			    bt_spp_rx_data(&system_do_msg[1],strlen(system_do_msg)-1);
 			}
+		}
+		break;
+		case '*':///bleåè®®éƒ¨åˆ†
+		{
+			printf("=====BLE strlen[%d],cmd:%c%c\n\n",strlen(system_do_msg),system_do_msg[1],system_do_msg[2]);
+		//	bt_ble_rx_data(&system_do_msg[1],strlen(system_do_msg)-1);
+
+		}
+		break;
+		case '@':///hidåè®®éƒ¨åˆ†
+		{
+			printf("=====HID strlen[%d],cmd:%c%c\n\n",strlen(system_do_msg),system_do_msg[1],system_do_msg[2]);
+			bt_hid_rx_data(&system_do_msg[1],strlen(system_do_msg)-1);
 		}
 		break;
 		default:
@@ -343,7 +355,7 @@ __s32 check_pev_key(void)
 			{
 				switch(system_do_msg[0])
 				{
-					case 'P':////µ¹³µ
+					case 'P':////å€’è½¦
 					{
 						///printf("=====pev:%x,%x====\n",system_do_msg[1],system_do_msg[2]);
 						if(system_do_msg[1]==1)///pev  1->0  2->1
@@ -360,7 +372,7 @@ __s32 check_pev_key(void)
 					break;
 					case 'T':///T LEN YEAR....
 					{
-            			sys_bt_set_time(&system_do_msg[2]);//system_do_msg[1]Îª³¤¶È
+            			sys_bt_set_time(&system_do_msg[2]);//system_do_msg[1]ä¸ºé•¿åº¦
             		}
 					break;
 					default:

@@ -19,6 +19,7 @@ enum aic_audio_codec_type {
     MPP_CODEC_AUDIO_DECODER_AAC,
     MPP_CODEC_AUDIO_DECODER_PCM,
     MPP_CODEC_AUDIO_DECODER_FLAC,
+    MPP_CODEC_AUDIO_DECODER_WMA,
 };
 
 struct aic_audio_frame {
@@ -36,6 +37,16 @@ struct aic_audio_decode_config {
     s32 packet_buffer_size;				// video bytestream size
     s32 packet_count;				// packet buffer count
     s32 frame_count;				// packet buffer count
+};
+
+struct aic_audio_decode_params {
+    s32  sample_rate;
+    s32  bits_per_sample;
+    s32  channels;
+    s32  bit_rate;
+    s32  block_align;               // number of bytes per packet
+    void  *extradata;
+    int  extradata_size;
 };
 
 struct aic_audio_decoder;

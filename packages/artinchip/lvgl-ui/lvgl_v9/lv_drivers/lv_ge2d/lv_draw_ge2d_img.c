@@ -308,11 +308,13 @@ void lv_draw_ge2d_blit(lv_draw_unit_t *draw_unit, const lv_draw_sw_blend_dsc_t *
     blt.ctrl.src_alpha_mode = 2;
     blt.ctrl.src_global_alpha = opa;
 
+#ifdef AIC_GE_DITHER
     if (dst_color_format == LV_COLOR_FORMAT_RGB565) {
         blt.ctrl.dither_en = 1;
-        if (blt.ctrl.alpha_en)
+        if (blt.ctrl.alpha_en || blt.src_buf.format == MPP_FMT_RGB_565)
             blt.ctrl.dither_en = 0;
     }
+#endif
 
     int ret = mpp_ge_bitblt(ge2d_dev, &blt);
     if (ret < 0) {

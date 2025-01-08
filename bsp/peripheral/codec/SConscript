@@ -18,6 +18,10 @@ if GetDepend('AIC_I2S_CODEC_TLV320'):
     CPPPATH.append(cwd + 'tlv320aic3101/')
     src += Glob('tlv320aic3101/*.c')
 
+if GetDepend('AIC_I2S_CODEC_CS4344'):
+    CPPPATH.append(cwd + 'cs4344/')
+    src += Glob('cs4344/*.c')
+
 group = DefineGroup('codec', src, depend = [''], CPPPATH = CPPPATH)
 
 Return('group')

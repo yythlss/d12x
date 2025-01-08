@@ -120,7 +120,7 @@ int vin_vb_q_buf(struct vb_queue *q, u32 index)
     if (q->streaming)
         vin_vb_stream_on(q);
 
-    pr_debug("qbuf of buffer %d succeeded\n", vb->index);
+    pr_debug("Qbuf buffer %d [%d]\n", vb->index, q->queued_count);
     return 0;
 }
 
@@ -163,7 +163,8 @@ int vin_vb_dq_buf(struct vb_queue *q, u32 *pindex)
     vb = list_first_entry(&q->done_list, struct vb_buffer, done_entry);
     list_del(&vb->done_entry);
 
-    pr_debug("DQ buf: %d, state: %s\n", vb->index, vb_state_name(vb->state));
+    pr_debug("DQ buf %d [%d], state: %s\n",
+             vb->index, q->queued_count, vb_state_name(vb->state));
     switch (vb->state) {
     case VB_BUF_STATE_DONE:
         break;
@@ -358,4 +359,25 @@ void vin_vb_deinit(struct vb_queue *q)
 
     aicos_sem_delete(q->done);
     g_vb_ops = NULL;
+}
+
+void vin_vb_show_info(struct vb_queue *q)
+{
+    struct vb_buffer *vb = NULL;
+
+    printf("In VIN buffer queue: total %d\n", q->num_buffers);
+    printf("Stream State : %s\n", q->streaming ? "StreamOn" : "StreamOff");
+    printf("Buf has error: %d\n", q->error);
+
+    printf("Queued list  : %d [", q->queued_count);
+    list_for_each_entry(vb, &q->queued_list, queued_entry)
+        printf("%d ", vb->index);
+    printf("]\n");
+
+    printf("Done list    : [");
+    list_for_each_entry(vb, &q->done_list, done_entry)
+        printf("%d ", vb->index);
+    printf("]\n");
+
+    printf("Owned by drv : %d\n", q->owned_by_drv_count);
 }

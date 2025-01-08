@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -20,6 +20,7 @@
 #define TX_FIFO_PERIOD_COUNT        2
 #define TX_FIFO_SIZE                (RT_AUDIO_REPLAY_MP_BLOCK_SIZE *\
                                      TX_FIFO_PERIOD_COUNT)
+#define MIN_AUDIO_VOLUME_THRESHOLD  80
 static rt_uint8_t audio_tx_fifo[TX_FIFO_SIZE] __attribute__((aligned(64)));
 
 struct aic_audio
@@ -45,8 +46,6 @@ rt_err_t drv_audio_init(struct rt_audio_device *audio)
     pcodec->tx_info.buf_info.buf = (void *)audio_tx_fifo;
     pcodec->tx_info.buf_info.buf_len = TX_FIFO_SIZE;
     pcodec->tx_info.buf_info.period_len = TX_FIFO_SIZE / TX_FIFO_PERIOD_COUNT;
-
-    hal_audio_attach_callback(pcodec, drv_audio_callback, NULL);
 
     return RT_EOK;
 }
@@ -77,6 +76,9 @@ rt_err_t drv_audio_start(struct rt_audio_device *audio, int stream)
     group = GPIO_GROUP(p_snd_dev->gpio_pa);
     pin = GPIO_GROUP_PIN(p_snd_dev->gpio_pa);
 
+    if (!audio->replay->transfer_mode)
+        hal_audio_attach_callback(pcodec, drv_audio_callback, NULL);
+
     if (stream == AUDIO_STREAM_REPLAY)
     {
         #ifdef AIC_AUDIO_SPK_0
@@ -95,10 +97,11 @@ rt_err_t drv_audio_start(struct rt_audio_device *audio, int stream)
         hal_audio_set_pwm1_differential(pcodec);
         #endif
         #endif
+        if (!audio->replay->transfer_mode) {
+            rt_audio_tx_complete(audio);
+            hal_audio_playback_start(pcodec);
+        }
 
-        rt_audio_tx_complete(audio);
-
-        hal_audio_playback_start(pcodec);
         /* Delay 10ms and then enable the PA to prevent pop */
         rt_thread_mdelay(10);
         /* Enable PA */
@@ -169,11 +172,16 @@ rt_err_t drv_audio_configure(struct rt_audio_device *audio,
             /*
              * Set max user volume to 0db
              */
-            reg_volume = volume * MAX_VOLUME_0DB / 100;
+            reg_volume = volume * (MAX_VOLUME_0DB - MIN_AUDIO_VOLUME_THRESHOLD) / 100 +
+                         MIN_AUDIO_VOLUME_THRESHOLD;
 
             hal_audio_set_playback_volume(pcodec, reg_volume);
             hal_audio_set_dmic_volume(pcodec, reg_volume);
             p_snd_dev->volume = volume;
+            break;
+
+        case AUDIO_MIXER_EXTEND:
+            audio->replay->transfer_mode = caps->udata.value;
             break;
 
         default:
@@ -299,6 +307,10 @@ static rt_err_t drv_audio_getcaps(struct rt_audio_device *audio,
             caps->udata.value = p_snd_dev->volume;
             break;
 
+        case AUDIO_MIXER_EXTEND:
+            caps->udata.value = audio->replay->transfer_mode;
+            break;
+
         default:
             ret = -RT_ERROR;
             break;
@@ -377,6 +389,16 @@ rt_err_t drv_audio_pause(struct rt_audio_device *audio, int enable)
     return RT_EOK;
 }
 
+static void drv_audio_direct_transfer(struct rt_audio_device *audio)
+{
+    struct aic_audio *p_snd_dev;
+    aic_audio_ctrl *pcodec;
+
+    p_snd_dev = (struct aic_audio *)audio;
+    pcodec = &p_snd_dev->codec;
+
+    hal_audio_playback_start_single(pcodec);
+}
 
 struct rt_audio_ops aic_audio_ops =
 {
@@ -389,6 +411,7 @@ struct rt_audio_ops aic_audio_ops =
     .buffer_info = drv_audio_buffer_info,
     .get_avail   = drv_audio_get_playback_avail,
     .pause       = drv_audio_pause,
+    .direct_transfer = drv_audio_direct_transfer,
 };
 
 #ifdef RT_USING_PM

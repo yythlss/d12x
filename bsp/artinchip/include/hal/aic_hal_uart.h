@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -621,6 +621,7 @@ int32_t hal_usart_config_rs485(usart_handle_t handle, bool rs485, bool compactio
 int32_t hal_usart_rts_ctl_soft_mode_set(usart_handle_t handle);
 int32_t hal_usart_rts_ctl_soft_mode_clr(usart_handle_t handle);
 int32_t hal_usart_halt_tx_enable(usart_handle_t handle, uint8_t halt_tx_enable);
+uint32_t hal_usart_get_cur_baudrate(usart_handle_t handle);
 void hal_usart_intr_recv_line(int32_t idx, aic_usart_priv_t *usart_priv);
 void hal_usart_clear_rxfifo(usart_handle_t handle);
 

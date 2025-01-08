@@ -10,12 +10,13 @@
 
 #include <rtthread.h>
 #include <rtdevice.h>
-#include "cst826.h"
 #include <string.h>
-#include <rtdbg.h>
+#include "cst826.h"
+#include "touch_common.h"
 
 #define DBG_TAG "cst826"
 #define DBG_LVL DBG_INFO
+#include <rtdbg.h>
 
 static struct rt_i2c_client cst826_client;
 
@@ -167,6 +168,12 @@ static rt_size_t cst826_read_point(struct rt_touch_device *touch, void *buf,
             pre_id[read_index] = read_id;
             input_x = ((read_buf[off_set + 3] & 0x0f) << 8) | read_buf[off_set + 4];
             input_y = ((read_buf[off_set + 5] & 0x0f) << 8) | read_buf[off_set + 6];
+
+            aic_touch_flip(&input_x, &input_y);
+            aic_touch_rotate(&input_x, &input_y);
+            aic_touch_scale(&input_x, &input_y);
+            if (!aic_touch_crop(&input_x, &input_y))
+                continue;
 
             cst826_touch_down(buf, read_id, input_x, input_y);
         }

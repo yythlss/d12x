@@ -36,6 +36,7 @@ lang_item_t *lang_item_add(lv_ll_t *list, lv_obj_t *obj, lv_style_t *style,
 void lang_item_remove(lv_ll_t *list, lang_item_t *item)
 {
     _lv_ll_remove(list, item);
+    lv_mem_free(item);
 }
 
 void lang_item_clear(lv_ll_t *list)

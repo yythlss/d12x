@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2022, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -10,7 +10,23 @@
 #include "usbh_core.h"
 #include "usb_ehci_priv.h"
 
-extern void USBH_IRQHandler(void);
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+#include "../ohci/usb_hc_ohci.h"
+
+static void aic_ohci_isr(int vector, void *arg)
+{
+    struct usbh_bus *bus = (struct usbh_bus *)arg;
+    extern void OHCI_IRQHandler(struct usbh_bus *bus);
+    OHCI_IRQHandler(bus);
+}
+#endif
+
+static void aic_ehci_isr(int vector, void *arg)
+{
+    struct usbh_bus *bus = (struct usbh_bus *)arg;
+    extern void USBH_IRQHandler(struct usbh_bus *bus);
+    USBH_IRQHandler(bus);
+}
 
 typedef struct aic_ehci_config {
     uint32_t base_addr;
@@ -68,7 +84,7 @@ void usb_hc_low_level_init(struct usbh_bus *bus)
 
     /* set usb0 phy switch: Host/Device */
     if (i == 0)
-        syscfg_usb_phy0_sw_host(1);
+        hal_syscfg_usb_phy0_sw_host(1);
 
     /* enable clock */
     hal_clk_enable(config[i].phy_clk_id);
@@ -98,9 +114,14 @@ void usb_hc_low_level_init(struct usbh_bus *bus)
     writel((32 | (127 << 16)), (volatile void *)(unsigned long)(config[i].base_addr+0x94));
 
     /* register interrupt callback */
-    aicos_request_irq(config[i].irq_num, (irq_handler_t)USBH_IRQHandler,
-                      0, "usb_host_ehci", bus);
+    aicos_request_irq(config[i].irq_num, (irq_handler_t)aic_ehci_isr,
+                       0, "usb_host_ehci", bus);
     aicos_irq_enable(config[i].irq_num);
+#if defined(LPKG_CHERRYUSB_HOST_OHCI)
+    aicos_request_irq(config[i].irq_num + 1, (irq_handler_t)aic_ohci_isr,
+                      0, "usb_host_ohci", bus);
+    aicos_irq_enable(config[i].irq_num + 1);
+#endif
 }
 
 void usb_hc_low_level_deinit(struct usbh_bus *bus)
@@ -137,17 +158,17 @@ uint8_t usbh_get_port_speed(struct usbh_bus *bus, const uint8_t port)
         return USB_SPEED_FULL;
 }
 
-void usb_ehci_dcache_clean(uintptr_t addr, uint32_t len)
+void usb_dcache_clean(uintptr_t addr, uint32_t len)
 {
     aicos_dcache_clean_range((size_t *)addr, len);
 }
 
-void usb_ehci_dcache_invalidate(uintptr_t addr, uint32_t len)
+void usb_dcache_invalidate(uintptr_t addr, uint32_t len)
 {
     aicos_dcache_invalid_range((size_t *)addr, len);
 }
 
-void usb_ehci_dcache_clean_invalidate(uintptr_t addr, uint32_t len)
+void usb_dcache_clean_invalidate(uintptr_t addr, uint32_t len)
 {
     aicos_dcache_clean_invalid_range((size_t *)addr, len);
 }

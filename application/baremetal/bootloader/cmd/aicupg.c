@@ -16,8 +16,6 @@
 #include <aic_common.h>
 #include <aic_errno.h>
 #include <boot_param.h>
-#include <usb_drv.h>
-#include <usbhost.h>
 #include <config_parse.h>
 #include <aicupg.h>
 #include <fatfs.h>
@@ -27,6 +25,9 @@
 #include <hal_rtc.h>
 #include <wdt.h>
 #include <progress_bar.h>
+#ifdef LPKG_CHERRYUSB_HOST
+#include <usbh_core.h>
+#endif
 
 #define WAIT_UPG_MODE_TMO_US 2000000
 #define AICUPG_HELP                                                      \
@@ -53,7 +54,6 @@ static void aicupg_help(void)
 }
 
 #define AICUPG_ARGS_MAX 4
-extern struct usb_device usbupg_device;
 extern void stdio_unset_uart(int id);
 
 __USED static int ctrlc (void)
@@ -174,6 +174,7 @@ static int do_uart_protocol_upg(int intf, char *mode)
     return ret;
 }
 
+extern int usb_init(void);
 static int do_usb_protocol_upg(int intf, char *mode)
 {
     int ret = 0;
@@ -184,7 +185,7 @@ static int do_usb_protocol_upg(int intf, char *mode)
     u64 start_tm;
 
 #ifndef AIC_SYSCFG_DRV_V12
-    syscfg_usb_phy0_sw_host(0);
+    hal_syscfg_usb_phy0_sw_host(0);
 #endif
     init.mode_bits = INIT_MODE(UPG_MODE_FULL_DISK_UPGRADE);
     if (mode) {
@@ -201,12 +202,68 @@ static int do_usb_protocol_upg(int intf, char *mode)
         }
     }
     aicupg_initialize(&init);
-    aic_udc_init(&usbupg_device);
+    usb_init();
     start_tm = aic_get_time_us();
     while (1) {
         if (ctrlc())
             break;
-        aic_udc_state_loop();
+        if (need_ckmode) {
+            /* Need to check the correct upg mode for Burn UserID
+             * and Force Image upgrading
+             */
+            int rst = check_upg_mode(start_tm, WAIT_UPG_MODE_TMO_US);
+            if (rst == CHECK_MODE_TIMEOUT) {
+                /* Host tool not set the mode in WAIT_UPG_MODE_TMO_US
+                 * exit upg loop and boot kernel
+                 */
+                ret = -1;
+                break;
+            } else if (rst == CHECK_MODE_OK) {
+                /* Update the start time.
+                 * Host tool may change the mode to exit loop
+                 */
+                start_tm = aic_get_time_us();
+            }
+        }
+    }
+#endif
+
+    return ret;
+}
+
+extern int hid_init(void);
+static int do_hid_protocol_upg(int intf, char *mode)
+{
+    int ret = 0;
+
+#if defined(AICUPG_HID_ENABLE)
+    struct upg_init init;
+    int need_ckmode = 0;
+    u64 start_tm;
+
+#ifndef AIC_SYSCFG_DRV_V12
+    hal_syscfg_usb_phy0_sw_host(0);
+#endif
+    init.mode_bits = INIT_MODE(UPG_MODE_FULL_DISK_UPGRADE);
+    if (mode) {
+        if (!strcmp(mode, "userid")) {
+            need_ckmode = 1;
+            init.mode_bits = INIT_MODE(UPG_MODE_BURN_USER_ID);
+#if defined(AICUPG_FORCE_UPGRADE_SUPPORT)
+            /* Enter burn USERID mode also support force burn image */
+            init.mode_bits |= INIT_MODE(UPG_MODE_BURN_IMG_FORCE);
+#endif
+        } else if (!strcmp(mode, "force")) {
+            need_ckmode = 1;
+            init.mode_bits = INIT_MODE(UPG_MODE_BURN_IMG_FORCE);
+        }
+    }
+    aicupg_initialize(&init);
+    hid_init();
+    start_tm = aic_get_time_us();
+    while (1) {
+        if (ctrlc())
+            break;
         if (need_ckmode) {
             /* Need to check the correct upg mode for Burn UserID
              * and Force Image upgrading
@@ -446,7 +503,7 @@ static int do_fat_upg(int intf, char *const blktype)
     if (!strcmp(blktype, "udisk")) {
         /*usb init*/
 #if defined(AICUPG_UDISK_ENABLE)
-        if (usbh_initialize(intf) < 0) {
+        if (usbh_init() < 0) {
             pr_err("usbh init failed!\n");
             ret = -1;
             return ret;
@@ -457,6 +514,8 @@ static int do_fat_upg(int intf, char *const blktype)
             pr_err("set blk dev failed.\n");
             return ret;
         }
+
+        usbh_hub_poll();
 #else
         pr_err("udisk upgrade disabled.\n");
 #endif
@@ -581,6 +640,11 @@ static int do_aicupg(int argc, char *argv[])
         if (argc >= 4)
             mode = argv[3];
         ret = do_usb_protocol_upg(intf, mode);
+    }
+    if (!strcmp(devtype, "hid")) {
+        if (argc >= 4)
+            mode = argv[3];
+        ret = do_hid_protocol_upg(intf, mode);
     }
     if (!strcmp(devtype, "mmc"))
         ret = do_sdcard_upg(intf);

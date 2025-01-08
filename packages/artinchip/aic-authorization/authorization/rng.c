@@ -48,10 +48,7 @@ static int aic_rng_task_cfg(struct crypto_task *task,
 
 static inline bool is_need_copy_dst(struct rng_request *req)
 {
-    struct aic_rng_req_ctx *rctx;
-
-    rctx = rng_request_ctx(req);
-    if ((u32)(uintptr_t)req->dst % rctx->seedsize) {
+    if ((u32)(uintptr_t)req->dst % CACHE_LINE_SIZE) {
         pr_debug("%s, offset(0x%x) is not aligned.\n", __func__, (u32)(uintptr_t)req->dst);
         return true;
     }
@@ -60,7 +57,7 @@ static inline bool is_need_copy_dst(struct rng_request *req)
 	 * if data length is not block size alignment,
 	 * still need to use dst copy buffer.
 	 */
-    if (req->dst_len % rctx->seedsize) {
+    if (req->dst_len % CACHE_LINE_SIZE) {
         pr_debug("%s, dst_len(%d) is not aligned.\n", __func__, req->dst_len);
         return true;
     }
@@ -107,7 +104,7 @@ static int aic_rng_prepare_req(struct rng_tfm *tfm, struct rng_request *req)
     rctx->seedsize = rng_tfm_seedsize(tfm);
 
     if (is_need_copy_dst(req)) {
-        pages = ALIGN_UP(req->dst_len, rctx->seedsize);
+        pages = ALIGN_UP(req->dst_len, CACHE_LINE_SIZE);
         rctx->dst_cpy_buf = (void *)aicos_malloc_align(0, pages, CACHE_LINE_SIZE);
         if (!rctx->dst_cpy_buf) {
             pr_err("Failed to allocate pages for dst.\n");

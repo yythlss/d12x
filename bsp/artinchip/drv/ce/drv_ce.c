@@ -38,6 +38,7 @@ struct sha_priv {
     u32 alg_tag;
     u32 out_len;
     u32 digest_len;
+    u32 block_size;
 };
 
 typedef enum {
@@ -241,6 +242,7 @@ rt_err_t drv_sha_start(struct rt_hwcrypto_ctx *ctx)
             context->priv.alg_tag = ALG_MD5;
             context->priv.out_len = MD5_CE_OUT_LEN;
             context->priv.digest_len = MD5_DIGEST_SIZE;
+            context->priv.block_size = MD5_BLOCK_SIZE;
             u32 md5_iv[] = { MD5_H0, MD5_H1, MD5_H2, MD5_H3 };
             memcpy(context->priv.digest, md5_iv, sizeof(md5_iv));
             break;
@@ -248,6 +250,7 @@ rt_err_t drv_sha_start(struct rt_hwcrypto_ctx *ctx)
             context->priv.alg_tag = ALG_SHA1;
             context->priv.out_len = SHA1_CE_OUT_LEN;
             context->priv.digest_len = SHA1_DIGEST_SIZE;
+            context->priv.block_size = SHA1_BLOCK_SIZE;
             u32 sha1_iv[] = { BE_SHA1_H0, BE_SHA1_H1, BE_SHA1_H2,
                                        BE_SHA1_H3, BE_SHA1_H4 };
             memcpy(context->priv.digest, sha1_iv, sizeof(sha1_iv));
@@ -256,6 +259,7 @@ rt_err_t drv_sha_start(struct rt_hwcrypto_ctx *ctx)
             context->priv.alg_tag = ALG_SHA256;
             context->priv.out_len = SHA256_CE_OUT_LEN;
             context->priv.digest_len = SHA256_DIGEST_SIZE;
+            context->priv.block_size = SHA256_BLOCK_SIZE;
             u32 sha256_iv[] = { BE_SHA256_H0, BE_SHA256_H1,
                                          BE_SHA256_H2, BE_SHA256_H3,
                                          BE_SHA256_H4, BE_SHA256_H5,
@@ -266,6 +270,7 @@ rt_err_t drv_sha_start(struct rt_hwcrypto_ctx *ctx)
             context->priv.alg_tag = ALG_SHA224;
             context->priv.out_len = SHA224_CE_OUT_LEN;
             context->priv.digest_len = SHA224_DIGEST_SIZE;
+            context->priv.block_size = SHA224_BLOCK_SIZE;
             u32 sha224_iv[] = { BE_SHA224_H0, BE_SHA224_H1,
                                          BE_SHA224_H2, BE_SHA224_H3,
                                          BE_SHA224_H4, BE_SHA224_H5,
@@ -276,6 +281,7 @@ rt_err_t drv_sha_start(struct rt_hwcrypto_ctx *ctx)
             context->priv.alg_tag = ALG_SHA512;
             context->priv.out_len = SHA512_CE_OUT_LEN;
             context->priv.digest_len = SHA512_DIGEST_SIZE;
+            context->priv.block_size = SHA512_BLOCK_SIZE;
             u64 sha512_iv[] = { BE_SHA512_H0, BE_SHA512_H1,
                                           BE_SHA512_H2, BE_SHA512_H3,
                                           BE_SHA512_H4, BE_SHA512_H5,
@@ -286,6 +292,7 @@ rt_err_t drv_sha_start(struct rt_hwcrypto_ctx *ctx)
             context->priv.alg_tag = ALG_SHA384;
             context->priv.out_len = SHA384_CE_OUT_LEN;
             context->priv.digest_len = SHA384_DIGEST_SIZE;
+            context->priv.block_size = SHA384_BLOCK_SIZE;
             u64 sha384_iv[] = { BE_SHA384_H0, BE_SHA384_H1,
                                           BE_SHA384_H2, BE_SHA384_H3,
                                           BE_SHA384_H4, BE_SHA384_H5,
@@ -327,6 +334,11 @@ rt_err_t drv_sha_update(aic_sha_context_t *context, const void *input,
 
     in = (u8 *)input;
 
+    if ((size % priv->block_size)) {
+        task.data.last_flag = 1;
+        task.data.total_bytelen = total_len;
+    }
+
     dolen = size;
     do {
         aicos_dcache_clean_range((void *)(unsigned long)in, dolen);
@@ -334,10 +346,6 @@ rt_err_t drv_sha_update(aic_sha_context_t *context, const void *input,
         task.data.in_len = dolen;
         task.data.out_addr = (u32)(uintptr_t)(out);
         task.data.out_len = priv->out_len;
-        if ((size - dolen) <= 0) {
-            task.data.last_flag = 1;
-            task.data.total_bytelen = total_len;
-        }
 
         aicos_dcache_clean_range((void *)(unsigned long)&task,
                                  sizeof(struct crypto_task));
@@ -367,14 +375,49 @@ rt_err_t drv_sha_finish(struct hwcrypto_hash *ctx, void *output,
                         rt_size_t *out_size)
 {
     aic_sha_context_t *context = ctx->parent.contex;
+    struct crypto_task task __attribute__((aligned(CACHE_LINE_SIZE)));
     struct sha_priv *priv;
-    u8 *out;
+    u8 *in, *out, *iv;
+    u64 total_len;
 
     if (!context || !output || !out_size)
         return RT_ERROR;
 
     priv = (struct sha_priv *)&context->priv;
+    iv = priv->digest;
+    in = priv->digest;
     out = priv->digest;
+    memcpy(&total_len, context->total, 8);
+    if ((total_len % priv->block_size) == 0) {
+        aicos_dcache_clean_range((void *)(unsigned long)iv, priv->digest_len);
+        memset(&task, 0, sizeof(struct crypto_task));
+        task.alg.hash.alg_tag = priv->alg_tag;
+        task.alg.hash.iv_mode = 1;
+        task.alg.hash.iv_addr = (u32)(uintptr_t)iv;
+
+        task.data.in_addr = (u32)(uintptr_t)(in);
+        task.data.in_len = 0;
+        task.data.out_addr = (u32)(uintptr_t)(out);
+        task.data.out_len = priv->out_len;
+        task.data.last_flag = 1;
+        task.data.total_bytelen = total_len;
+
+        aicos_dcache_clean_range((void *)(unsigned long)&task,
+                                 sizeof(struct crypto_task));
+        hal_crypto_start_hash(&task);
+
+        while (!hal_crypto_poll_finish(ALG_HASH_ACCELERATOR)) {
+            continue;
+        }
+        hal_crypto_pending_clear(ALG_HASH_ACCELERATOR);
+
+        if (hal_crypto_get_err(ALG_HASH_ACCELERATOR)) {
+            pr_err("SHA run error.\n");
+            return RT_ERROR;
+        }
+        aicos_dma_sync();
+        aicos_dcache_invalid_range((void *)(unsigned long)out, SHA_MAX_OUTPUT_LEN);
+    }
     memcpy(output, out, priv->digest_len);
     *out_size = priv->digest_len;
 

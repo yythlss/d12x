@@ -33,6 +33,8 @@ enum de_qos_plane {
 
 #define DE_DITHER_WIDTH_MAX     2048
 
+#define LAYER_CONFIG_TIME_US    15
+
 #elif defined(AIC_DE_DRV_V11) || defined(AIC_DE_V11)
 #define DE_FREQ             (150 * 1000 * 1000)
 
@@ -46,6 +48,8 @@ enum de_qos_plane {
 
 #define DE_DITHER_WIDTH_MAX     1366
 
+#define LAYER_CONFIG_TIME_US    30
+
 #elif defined(AIC_DE_DRV_V12) || defined(AIC_DE_V12)
 #define DE_FREQ             (100 * 1000 * 1000)
 
@@ -58,6 +62,8 @@ enum de_qos_plane {
 #define VI_LAYER_HEIGHT_MAX     0
 
 #define DE_DITHER_WIDTH_MAX     1024
+
+#define LAYER_CONFIG_TIME_US    20
 
 #endif
 

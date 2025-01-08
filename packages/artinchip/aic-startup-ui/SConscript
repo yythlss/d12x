@@ -10,6 +10,7 @@ src = []
 if GetDepend('AIC_STARTUP_UI_SHOW'):
     src = Glob('*.c')
 
-group = DefineGroup('startup-ui', src, depend = [''], CPPPATH = CPPPATH)
+install=[('assets/', 'data/')]
+group = DefineGroup('startup-ui', src, depend = ['AIC_STARTUP_UI_SHOW'], CPPPATH = CPPPATH, INSTALL=install)
 
 Return('group')

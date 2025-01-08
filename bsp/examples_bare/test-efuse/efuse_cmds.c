@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -21,6 +21,8 @@ static void cmd_efuse_help(void)
     printf("  efuse write    addr offset len : Write data to eFuse from RAM addr.\n");
     printf("  efuse writehex offset data     : Write data to eFuse from input hex string.\n");
     printf("  efuse writestr offset data     : Write data to eFuse from input string.\n");
+    printf("  efuse authenticate sjtag key   : Authenticate secure jtag from hex string key.\n");
+    printf("  efuse authenticate szone key   : Authenticate secure zone from hex string key.\n");
 }
 
 static void cmd_efuse_read(int argc, char **argv)
@@ -48,7 +50,7 @@ static void cmd_efuse_dump(int argc, char **argv)
 {
     ulong offset, len;
     int i, j, ret;
-    u8 data[256], c;
+    u8 data[512], c;
 
     if (argc != 3) {
         printf("Invalid parameter.\n");
@@ -107,7 +109,7 @@ static void cmd_efuse_writehex(int argc, char **argv)
     ulong offset, len;
     int ret, i, j;
     char *data, byte[3] = { 0x00, 0x00, 0x00 };
-    u8 buf[256];
+    u8 buf[512];
 
     if (argc != 3) {
         printf("Invalid parameter.\n");
@@ -156,9 +158,38 @@ static void cmd_efuse_writestr(int argc, char **argv)
     printf("Program efuse done.\n");
 }
 
+static void cmd_efuse_authenticate(int argc, char **argv)
+{
+    ulong len;
+    int i, j;
+    char *data, byte[3] = { 0x00, 0x00, 0x00 };
+    u8 key[512];
+
+    if (argc != 3) {
+        printf("Invalid parameter.\n");
+        return;
+    }
+    data = argv[2];
+    len = strlen(data) / 2;
+
+    /* hex string to hex value */
+    for (i = 0, j = 0; i < strlen(data) - 1; i += 2, j += 1) {
+        byte[0] = data[i];
+        byte[1] = data[i + 1];
+        key[j] = strtol(byte, NULL, 16);
+    }
+
+    if (!strcmp(argv[1], "sjtag")) {
+        sjtag_auth((u32 *)key, len / 4);
+    } else if (!strcmp(argv[1], "szone")) {
+        szone_auth((u32 *)key, len / 4);
+    }
+}
+
 static int cmd_efuse_do(int argc, char **argv)
 {
     if (argc < 2) {
+        cmd_efuse_help();
         return -1;
     }
     if (!strcmp(argv[1], "read")) {
@@ -179,6 +210,10 @@ static int cmd_efuse_do(int argc, char **argv)
     }
     if (!strcmp(argv[1], "writestr")) {
         cmd_efuse_writestr(argc - 1, &argv[1]);
+        return 0;
+    }
+    if (!strcmp(argv[1], "authenticate")) {
+        cmd_efuse_authenticate(argc - 1, &argv[1]);
         return 0;
     }
     cmd_efuse_help();
