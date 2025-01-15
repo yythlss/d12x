@@ -516,9 +516,9 @@ static void drv_uart_callback(aic_usart_priv_t *uart, void *arg)
             memcpy((rx_fifo->buffer + rx_fifo->put_index), (rt_uint8_t *)g_info[uart->idx].uart_rx_fifo, g_info[uart->idx].rx_size);
         } else {
             memcpy((rx_fifo->buffer + rx_fifo->put_index), (rt_uint8_t *)g_info[uart->idx].uart_rx_fifo,
-                    g_serial->config.bufsz - rx_fifo->put_index);
-            memcpy((rx_fifo->buffer), ((rt_uint8_t *)g_info[uart->idx].uart_rx_fifo + g_serial->config.bufsz -
-                    rx_fifo->put_index), g_info[uart->idx].rx_size + rx_fifo->put_index - g_serial->config.bufsz);
+                    g_serial[uart->idx].config.bufsz - rx_fifo->put_index);
+            memcpy((rx_fifo->buffer), ((rt_uint8_t *)g_info[uart->idx].uart_rx_fifo + g_serial[uart->idx].config.bufsz -
+                    rx_fifo->put_index), g_info[uart->idx].rx_size + rx_fifo->put_index - g_serial[uart->idx].config.bufsz);
         }
         hal_usart_set_interrupt(uart, USART_INTR_READ, 1);
 
