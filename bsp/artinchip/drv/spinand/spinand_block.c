@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -95,15 +95,13 @@ static u32 spinand_start_page_calculate(rt_device_t dev, rt_off_t pos)
     u32 start_page = 0, block, pos_block;
 
     start_page = pos / SECTORS_PP + mtd_dev->block_start * mtd_dev->pages_per_block;
-    if (!(start_page % mtd_dev->pages_per_block)) {
-        block = start_page / mtd_dev->pages_per_block;
-        pos_block = mtd_dev->ops->get_block_status(mtd_dev, block);
-        pr_debug("block = %d, pos_block = %d\n", block, pos_block);
-        if (pos_block != 0) {
-            block += pos_block;
-            pos += pos_block * mtd_dev->pages_per_block * SECTORS_PP;
-            start_page = pos / SECTORS_PP + mtd_dev->block_start * mtd_dev->pages_per_block;
-        }
+    block = start_page / mtd_dev->pages_per_block;
+    pos_block = mtd_dev->ops->get_block_status(mtd_dev, block);
+    pr_debug("block = %d, pos_block = %d\n", block, pos_block);
+    if (pos_block != 0) {
+        block += pos_block;
+        pos += pos_block * mtd_dev->pages_per_block * SECTORS_PP;
+        start_page = pos / SECTORS_PP + mtd_dev->block_start * mtd_dev->pages_per_block;
     }
 
     return start_page;
