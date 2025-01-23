@@ -165,8 +165,9 @@ static rt_size_t blk_dev_write(rt_device_t dev, rt_off_t pos, const void* buffer
         }
 
         phy_pos += do_phy_len;
+        buffer += do_phy_len - buf_pos;
         pos += do_copy_len / part->geometry.bytes_per_sector;
-        buf_pos = pos % FATFS_CLUSTER_SIZE * part->geometry.bytes_per_sector;
+        buf_pos = 0;
         total_copy_len -= do_copy_len;
         total_phy_len -= do_phy_len;
     }
