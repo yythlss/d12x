@@ -130,7 +130,7 @@ static struct rt_serial_device g_serial[AIC_UART_DEV_NUM];
 struct aic_uart_info {
     uint32_t *uart_tx_fifo;
     uint32_t *uart_rx_fifo;
-    uint8_t rx_size;
+    uint32_t rx_size;
     rt_sem_t tx_semaphore;
 };
 static struct aic_uart_info g_info[AIC_UART_DEV_NUM] = {0};
