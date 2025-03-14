@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -14,18 +14,9 @@
 #include <aic_utils.h>
 #include "spi_aes_key.h"
 
-// #define D12X_BURN_SPIENC_KEY_ENABLE
-// #define D13X_BURN_SPIENC_KEY_ENABLE
-// #define DRY_RUN_TO_CONFIRM_KEY_VAL
-// Enable one of the above as required
-
-/* The eFuse size */
-#define D12X_EFUSE_SIZE (512 / 8)
-#define D13X_EFUSE_SIZE (2048 / 8)
-
 int write_efuse(char *msg, u32 offset, const void *val, u32 size)
 {
-#if defined(DRY_RUN_TO_CONFIRM_KEY_VAL)
+#if defined(AIC_SID_BURN_SIMULATED)
     printf("eFuse %s:\n", msg);
     hexdump((unsigned char *)val, size, 1);
     return size;
@@ -39,11 +30,11 @@ int burn_brom_spienc_bit(void)
     u32 offset = 0xFFFF, val;
     int ret;
 
-#if defined(D12X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D12X)
     offset = 0x4;
     val = 0;
     val |= (1 << 28); // SPIENC boot bit for brom
-#elif defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#elif defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0x38;
     val = 0;
     val |= (1 << 16); // Secure boot bit for brom
@@ -63,11 +54,11 @@ int check_brom_spienc_bit(void)
     u32 offset = 0xFFFF, val, mskval = 0;
     int ret;
 
-#if defined(D12X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D12X)
     offset = 4;
     mskval = 0;
     mskval |= (1 << 28); // SPIENC boot bit for brom
-#elif defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#elif defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0x38;
     mskval = 0;
     mskval |= (1 << 16); // Secure boot bit for brom
@@ -92,11 +83,11 @@ int burn_jtag_lock_bit(void)
     u32 offset = 0xFFFF, val;
     int ret;
 
-#if defined(D12X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D12X)
     offset = 4;
     val = 0;
     val |= (1 << 24); // JTAG LOCK
-#elif defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#elif defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0x38;
     val = 0;
     val |= (1 << 0); // JTAG LOCK
@@ -115,11 +106,11 @@ int check_jtag_lock_bit(void)
     u32 offset = 0xFFFF, val, mskval = 0;
     int ret;
 
-#if defined(D12X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D12X)
     offset = 4;
     mskval = 0;
     mskval |= (1 << 24); // JTAG LOCK
-#elif defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#elif defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0x38;
     mskval = 0;
     mskval |= (1 << 0); // JTAG LOCK
@@ -143,9 +134,9 @@ int burn_spienc_key(void)
     u32 offset = 0xFFFF;
     int ret;
 
-#if defined(D12X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D12X)
     offset = 0x20;
-#elif defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#elif defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0xA0;
 #endif
     ret = write_efuse("spi_aes.key", offset, (const void *)spi_aes_key, spi_aes_key_len);
@@ -163,9 +154,9 @@ int check_spienc_key(void)
     u8 data[256];
     int ret;
 
-#if defined(D12X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D12X)
     offset = 0x20;
-#elif defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#elif defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0xA0;
 #endif
     ret = efuse_read(offset, (void *)data, 16);
@@ -181,7 +172,7 @@ int check_spienc_key(void)
 
 int burn_spienc_nonce(void)
 {
-#ifdef D13X_BURN_SPIENC_KEY_ENABLE
+#if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     u32 offset;
     int ret;
 
@@ -197,7 +188,7 @@ int burn_spienc_nonce(void)
 
 int check_spienc_nonce(void)
 {
-#ifdef D13X_BURN_SPIENC_KEY_ENABLE
+#if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     u32 offset;
     u8 data[256];
     int ret;
@@ -215,13 +206,13 @@ int check_spienc_nonce(void)
     return 0;
 }
 
-#if defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
 int burn_spienc_rotpk(void)
 {
     u32 offset = 0xFFFF;
     int ret;
 
-#if defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0x40;
 #endif
     ret = write_efuse("rotpk.bin", offset, (const void *)rotpk_bin, rotpk_bin_len);
@@ -239,7 +230,7 @@ int check_spienc_rotpk(void)
     u8 data[256];
     int ret;
 
-#if defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0x40;
 #endif
     ret = efuse_read(offset, (void *)data, 16);
@@ -256,7 +247,7 @@ int check_spienc_rotpk(void)
 
 int burn_spienc_key_read_write_disable_bits(void)
 {
-#if defined(D12X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D12X)
     u32 offset, val;
     int ret;
 
@@ -268,7 +259,7 @@ int burn_spienc_key_read_write_disable_bits(void)
         printf("Write r/w disable bit efuse error.\n");
         return -1;
     }
-#elif defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#elif defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     u32 offset, val;
     int ret;
 
@@ -308,7 +299,7 @@ int burn_spienc_key_read_write_disable_bits(void)
 
 int check_spienc_key_read_write_disable_bits(void)
 {
-#if defined(D12X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D12X)
     u32 offset, val, mskval;
     int ret;
 
@@ -328,7 +319,7 @@ int check_spienc_key_read_write_disable_bits(void)
         printf("SPI ENC Key is write DISABLED\n");
     else
         printf("SPI ENC Key is NOT write disabled\n");
-#elif defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#elif defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     u32 offset, val, mskval;
     int ret;
 
@@ -381,29 +372,34 @@ int cmd_efuse_do_spienc(int argc, char **argv)
     int ret;
 
     efuse_init();
+    efuse_write_enable();
 
-#if defined(D12X_BURN_SPIENC_KEY_ENABLE) || defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D12X) || defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     ret = burn_brom_spienc_bit();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
 
     ret = burn_spienc_key();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
 
     ret = burn_spienc_nonce();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
 
-#if defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     ret = burn_spienc_rotpk();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
@@ -411,12 +407,14 @@ int cmd_efuse_do_spienc(int argc, char **argv)
 
     ret = burn_spienc_key_read_write_disable_bits();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
 
     ret = burn_jtag_lock_bit();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
@@ -424,30 +422,35 @@ int cmd_efuse_do_spienc(int argc, char **argv)
 
     ret = check_brom_spienc_bit();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
 
     ret = check_jtag_lock_bit();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
     ret = check_spienc_key();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
 
     ret = check_spienc_nonce();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
 
-#if defined(D13X_BURN_SPIENC_KEY_ENABLE)
+#if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     ret = check_spienc_rotpk();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
@@ -455,17 +458,21 @@ int cmd_efuse_do_spienc(int argc, char **argv)
 
     ret = check_spienc_key_read_write_disable_bits();
     if (ret) {
+        efuse_write_disable();
         printf("Error\n");
         return -1;
     }
 
+    efuse_write_disable();
     printf("\n");
     printf("Write SPI ENC eFuse done.\n");
-#if defined(DRY_RUN_TO_CONFIRM_KEY_VAL)
+#if defined(AIC_SID_BURN_SIMULATED)
     printf("WARNING: This is a dry run to check the eFuse content, key is not burn to eFuse yet.\n");
 #endif
+#if !defined(AIC_SID_CONTINUE_BOOT_BURN_AFTER)
     while (1)
         continue;
+#endif
     return 0;
 }
 

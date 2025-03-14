@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -126,26 +126,33 @@ void show_mem_info_debug()
 }
 
 /***************************** physic memory *****************************************/
-#define ALIGN_1024B(x) ((x+1023)&(~1023))
-// base address of reserved buffer
-#define BASE_ADDR 0x43a00000
-#define MEMORY_NUM 48
-//#define USE_CARVOUT
+#define DEBUG_PHY_MEM (0)
 
+#if DEBUG_PHY_MEM
+#include <pthread.h>
+#define MEMORY_NUM 48
 struct phy_mem_info {
     unsigned int addr;
-    unsigned int align_addr; // 8 bytes align
     int size;
     int used;
 };
-
+static pthread_mutex_t  g_phy_mem_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct phy_mem_info info[MEMORY_NUM];
-unsigned int g_addr = BASE_ADDR;
 int total_cnt = 0;
+#endif
+
 unsigned int mpp_phy_alloc(size_t size)
 {
-    int i;
+    unsigned int addr = (unsigned long)aicos_malloc_align_try_cma(size, 1024);
+    if (addr == 0) {
+        loge("mpp_phy_alloc failed");
+        return 0;
+    }
+    aicos_dcache_clean_invalid_range((unsigned long *)((unsigned long)addr), size);
 
+#if DEBUG_PHY_MEM
+    int i;
+    pthread_mutex_lock(&g_phy_mem_mutex);
     for(i=0; i<MEMORY_NUM; i++) {
         if(info[i].used == 0)
             break;
@@ -153,37 +160,30 @@ unsigned int mpp_phy_alloc(size_t size)
 
     if(i == MEMORY_NUM) {
         loge("memory count exceed max number");
+        pthread_mutex_unlock(&g_phy_mem_mutex);
         return 0;
     }
 
-#ifdef USE_CARVOUT
-    info[i].addr = g_addr;
-    info[i].align_addr = info[i].addr;
-    info[i].size = ALIGN_1024B(size);
-    g_addr += info[total_cnt].size;
-#else
-    info[i].addr = (unsigned long)aicos_malloc_try_cma(ALIGN_UP(size, CACHE_LINE_SIZE) + 1024);
-    info[i].align_addr = ALIGN_1024B(info[i].addr);
+    info[i].addr = addr;
     info[i].size = size;
-#endif
     info[i].used = 1;
     total_cnt ++;
+    pthread_mutex_unlock(&g_phy_mem_mutex);
+#endif
 
-    aicos_dcache_clean_invalid_range((unsigned long *)((unsigned long)info[i].align_addr),
-                                     ALIGN_UP(info[i].size, CACHE_LINE_SIZE));
-
-    logw("mpp_phy_alloc success, addr: %08x, align_addr: %08x, size: %d",
-        info[i].addr, info[i].align_addr, info[i].size);
-    return info[i].align_addr;
+    logw("mpp_phy_alloc success, addr: %08x, size: %d", addr, (int)size);
+    return addr;
 }
 
 void mpp_phy_free(unsigned int addr)
 {
+#if DEBUG_PHY_MEM
     int i;
-
+    pthread_mutex_lock(&g_phy_mem_mutex);
     for(i=0; i<MEMORY_NUM; i++) {
-        if(info[i].align_addr == addr) {
+        if(info[i].addr == addr) {
             if(info[i].used == 0) {
+                pthread_mutex_unlock(&g_phy_mem_mutex);
                 loge("the buffer not alloc, addr: %08x, size: %d", addr, info[i].size);
                 return;
             }
@@ -192,20 +192,17 @@ void mpp_phy_free(unsigned int addr)
     }
 
     if(i == MEMORY_NUM) {
+        pthread_mutex_unlock(&g_phy_mem_mutex);
         loge("not found the addr: %08x, maybe error!", addr);
         return;
     }
 
     info[i].used = 0;
     total_cnt --;
-
-    if(total_cnt == 0) {
-        logw("reset base address");
-        g_addr = BASE_ADDR;
-    }
-
-#ifndef USE_CARVOUT
-    aicos_free(MEM_CMA, (void*)(unsigned long)info[i].addr);
+    pthread_mutex_unlock(&g_phy_mem_mutex);
 #endif
-    logw("phy_free success, addr: %08x, size: %d", info[i].addr, info[i].size);
+
+    aicos_free_align(MEM_CMA, (void*)(unsigned long)addr);
+
+    logw("phy_free success, addr: %08x", addr);
 }

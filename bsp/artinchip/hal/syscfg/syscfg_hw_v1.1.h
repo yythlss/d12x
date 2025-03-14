@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2024-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -248,7 +248,9 @@ static inline void syscfg_hw_sip_flash_init(void)
 #if defined(AIC_USING_SID)
 u32 map;
     /* 1. Read eFuse to set SiP flash IO mapping */
+    hal_efuse_clk_enable();
     hal_efuse_read(IOMAP_EFUSE_WID, &val);
+    hal_efuse_clk_disable();
     map = (val >> EFUSE_DATA_IOMAP_POS) & 0xFF;
 
     /* 2. Set the SiP flash's access Controller */

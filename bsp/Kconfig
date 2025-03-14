@@ -451,6 +451,24 @@ config AIC_SID_BARE_TEST
     default n
     depends on AIC_SID_DRV
 
+config AIC_SID_BURN_SPIENC_KEY_TEST
+    bool "Enable SID burn spienc key command"
+    default n
+    depends on AIC_SID_DRV
+    depends on EFUSE_WRITE_SUPPORT
+    depends on DRIVER_BARE_DRV_EN
+
+if AIC_SID_BURN_SPIENC_KEY_TEST
+
+    config AIC_SID_BURN_SIMULATED
+        bool "Enable SID simulated burning"
+        default n
+
+    config AIC_SID_CONTINUE_BOOT_BURN_AFTER
+        bool "Enable SID continue to boot after burning"
+        default n
+endif
+
 config AIC_DM_LIB_TEST
     bool "Enable DM Lib test command"
     default n

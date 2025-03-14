@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -99,5 +99,24 @@ extern bool lv_drop_one_cached_image();
     }
 #else
     return aicos_malloc(MEM_CMA, size);
+#endif
+}
+
+void *aicos_malloc_align_try_cma(size_t size, size_t align)
+{
+#if defined(LPKG_USING_LVGL)
+extern bool lv_drop_one_cached_image();
+    while (1) {
+        void *data = aicos_malloc_align(MEM_CMA, size, align);
+        if (data)
+            return data;
+
+        bool res = lv_drop_one_cached_image();
+        if (res == false) {
+            return NULL;
+        }
+    }
+#else
+    return aicos_malloc_align(MEM_CMA, size, align);
 #endif
 }

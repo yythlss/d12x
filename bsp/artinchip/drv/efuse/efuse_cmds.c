@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -16,9 +16,11 @@ static void cmd_efuse_help(void)
     printf("  efuse help                     : Get this help.\n");
     printf("  efuse dump     offset len      : Dump data from eFuse offset.\n");
     printf("  efuse read     addr offset len : Read eFuse data to RAM addr.\n");
+#ifdef EFUSE_WRITE_SUPPORT
     printf("  efuse write    addr offset len : Write data to eFuse from RAM addr.\n");
     printf("  efuse writehex offset data     : Write data to eFuse from input hex string.\n");
     printf("  efuse writestr offset data     : Write data to eFuse from input string.\n");
+#endif
     printf("  efuse authenticate sjtag key   : Authenticate secure jtag from hex string key.\n");
     printf("  efuse authenticate szone key   : Authenticate secure zone from hex string key.\n");
 }
@@ -80,6 +82,7 @@ static void cmd_efuse_dump(int argc, char **argv)
     printf("\n");
 }
 
+#ifdef EFUSE_WRITE_SUPPORT
 static void cmd_efuse_write(int argc, char **argv)
 {
     ulong addr, offset, len;
@@ -155,6 +158,7 @@ static void cmd_efuse_writestr(int argc, char **argv)
 
     printf("Program efuse done.\n");
 }
+#endif
 
 static void cmd_efuse_authenticate(int argc, char **argv)
 {
@@ -203,18 +207,26 @@ static void cmd_efuse_do(int argc, char **argv)
         cmd_efuse_dump(argc - 1, &argv[1]);
         return;
     }
+#ifdef EFUSE_WRITE_SUPPORT
     if (!strcmp(argv[1], "write")) {
+        drv_efuse_write_enable();
         cmd_efuse_write(argc - 1, &argv[1]);
+        drv_efuse_write_disable();
         return;
     }
     if (!strcmp(argv[1], "writehex")) {
+        drv_efuse_write_enable();
         cmd_efuse_writehex(argc - 1, &argv[1]);
+        drv_efuse_write_disable();
         return;
     }
     if (!strcmp(argv[1], "writestr")) {
+        drv_efuse_write_enable();
         cmd_efuse_writestr(argc - 1, &argv[1]);
+        drv_efuse_write_disable();
         return;
     }
+#endif
     if (!strcmp(argv[1], "authenticate")) {
         cmd_efuse_authenticate(argc - 1, &argv[1]);
         return;

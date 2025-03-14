@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -9,7 +9,12 @@
 #include "aic_log.h"
 #include <string.h>
 
-#define AICMAC_CHIPID_LENGTH    6
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
+
+#include "md5.h"
+#define AICMAC_CHIPID_LENGTH    8
 
 
 static int aicmac_efuse_read(u32 addr, void *data, u32 size)
@@ -17,6 +22,10 @@ static int aicmac_efuse_read(u32 addr, void *data, u32 size)
     u32 wid, wval, rest, cnt;
     u8 *pd, *pw;
     int ret;
+
+    if (hal_efuse_clk_enable()) {
+        return -1;
+    }
 
     if (hal_efuse_wait_ready()) {
         pr_err("eFuse is not ready.\n");
@@ -46,6 +55,8 @@ static int aicmac_efuse_read(u32 addr, void *data, u32 size)
         rest -= cnt;
     }
 
+    hal_efuse_clk_disable();
+
     return (int)(size - rest);
 }
 
@@ -56,22 +67,29 @@ static inline int aicmac_get_chipid(unsigned char out_chipid[AICMAC_CHIPID_LENGT
 
 void aicmac_get_macaddr_from_chipid(int port, unsigned char out_addr[6])
 {
-    unsigned char chipid[AICMAC_CHIPID_LENGTH];
-    unsigned char key[AICMAC_CHIPID_LENGTH] = {'a', 'i', 'c', 'k', 'e', 'y'};
+    unsigned char hex_chipid[AICMAC_CHIPID_LENGTH] = { 0 };
+    char char_chipid[AICMAC_CHIPID_LENGTH * 2 + 1] = { 0 };
+    uint8_t md5_ahash[16] = { 0 };
     int i;
 
-    if (!aicmac_get_chipid(chipid))
+    if (!aicmac_get_chipid(hex_chipid))
         return;
 
-    for (i = 0; i < AICMAC_CHIPID_LENGTH; i++) {
-        out_addr[AICMAC_CHIPID_LENGTH - 1 - i] = chipid[i] ^ key[i];
+    for (i = 0; i < AICMAC_CHIPID_LENGTH ; i++) {
+        sprintf(&char_chipid[i * 2], "%02X", hex_chipid[i]);
     }
 
     if (port)
-        out_addr[1] ^= 0x55;
+        char_chipid[15] = 'a';
     else
-        out_addr[1] ^= 0xAA;
+        char_chipid[15] = 'A';
 
-    out_addr[0] &= 0xFE;
-    out_addr[0] |= 0x02;
+    MD5Buffer(char_chipid, 16, md5_ahash);
+
+    /* Choose md5 result's [0][2][4][6][8][10] byte as mac address */
+    for (i = 0; i < 6; i++)
+        out_addr[i] = md5_ahash[2 * i];
+
+    out_addr[0] &= 0xfe; /* clear multicast bit */
+    out_addr[0] |= 0x02; /* set local assignment bit (IEEE802) */
 }

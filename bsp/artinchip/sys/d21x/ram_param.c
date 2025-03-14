@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2024 ArtInChip Technology Co.,Ltd
+ * Copyright (C) 2024-2025 ArtInChip Technology Co.,Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Author: Xiong Hao <hao.xiong@artinchip.com>
  */
 
@@ -43,6 +46,7 @@ static u32 efuse_get_ddr_size(void)
         default:
             pr_info("No DDR info\n");
     }
+    writel(0x0, EFUSE_CMU_REG);
 
     return size;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -17,6 +17,10 @@ extern "C" {
 
 int hal_efuse_init(void);
 int hal_efuse_deinit(void);
+int hal_efuse_clk_enable(void);
+int hal_efuse_clk_disable(void);
+void hal_efuse_write_enable(void);
+void hal_efuse_write_disable(void);
 int hal_efuse_get_version(void);
 int hal_efuse_wait_ready(void);
 int hal_efuse_read(u32 wid, u32 *wval);

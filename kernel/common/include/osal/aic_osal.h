@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -161,6 +161,7 @@ static inline void aicos_msleep(uint32_t delay) {}
 
 // memory
 void *aicos_malloc_try_cma(size_t size);
+void *aicos_malloc_align_try_cma(size_t size, size_t align);
 
 #ifdef __cplusplus
  }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -233,6 +233,10 @@ int hal_tsen_efuse_read(u32 addr, u32 *data, u32 size)
     int ret;
     int length = TSEN_EFUSE_STANDARD_LENGTH;
 
+    if (hal_efuse_clk_enable()) {
+        return -1;
+    }
+
     rest = size;
     while (rest > 0) {
         wid = addr >> 2;
@@ -251,6 +255,8 @@ int hal_tsen_efuse_read(u32 addr, u32 *data, u32 size)
         addr += cnt;
         rest -= cnt;
     }
+
+    hal_efuse_clk_disable();
 
     return (int)(size - rest);
 }

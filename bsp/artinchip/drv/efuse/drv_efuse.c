@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -26,13 +26,28 @@ static int drv_efuse_init(void)
     return RT_TRUE;
 }
 
+void drv_efuse_write_enable(void)
+{
+    hal_efuse_write_enable();
+}
+
+void drv_efuse_write_disable(void)
+{
+    hal_efuse_write_disable();
+}
+
 int drv_efuse_read(u32 addr, void *data, u32 size)
 {
     u32 wid, wval, rest, cnt;
     u8 *pd, *pw;
     int ret;
 
+    if (hal_efuse_clk_enable()) {
+        return RT_FALSE;
+    }
+
     if (hal_efuse_wait_ready()) {
+        hal_efuse_clk_disable();
         LOG_E("eFuse is not ready.\n");
         return RT_FALSE;
     }
@@ -59,6 +74,8 @@ int drv_efuse_read(u32 addr, void *data, u32 size)
         addr += cnt;
         rest -= cnt;
     }
+
+    hal_efuse_clk_disable();
 
     return (int)(size - rest);
 }
@@ -125,6 +142,7 @@ int drv_efuse_read_reserved_2(void *data)
     return 0;
 }
 
+#ifdef EFUSE_WRITE_SUPPORT
 int drv_efuse_program(u32 addr, const void *data, u32 size)
 {
     u32 wid, wval, rest, cnt;
@@ -132,7 +150,12 @@ int drv_efuse_program(u32 addr, const void *data, u32 size)
     u8 *pw;
     int ret;
 
+    if (hal_efuse_clk_enable()) {
+        return RT_FALSE;
+    }
+
     if (hal_efuse_wait_ready()) {
+        hal_efuse_clk_disable();
         LOG_E("eFuse is not ready.\n");
         return RT_FALSE;
     }
@@ -162,17 +185,40 @@ int drv_efuse_program(u32 addr, const void *data, u32 size)
         rest -= cnt;
     }
 
+    hal_efuse_clk_disable();
+
     return (int)(size - rest);
 }
+#endif
 
 int drv_sjtag_auth(u32 *key, u32 kwlen)
 {
-    return hal_sjtag_auth(key, kwlen);
+    int ret;
+
+    if (hal_efuse_clk_enable()) {
+        return RT_FALSE;
+    }
+
+    ret = hal_sjtag_auth(key, kwlen);
+
+    hal_efuse_clk_disable();
+
+    return ret;
 }
 
 int drv_szone_auth(u32 *key, u32 kwlen)
 {
-    return hal_szone_auth(key, kwlen);
+    int ret;
+
+    if (hal_efuse_clk_enable()) {
+        return RT_FALSE;
+    }
+
+    ret = hal_szone_auth(key, kwlen);
+
+    hal_efuse_clk_disable();
+
+    return ret;
 }
 
 INIT_DEVICE_EXPORT(drv_efuse_init);

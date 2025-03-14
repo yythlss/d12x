@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -43,7 +43,19 @@
 #define EFUSE_STS_WRITING      3
 #define EFUSE_STS_READING      4
 
+static u32 opcode = 0;
+
 int hal_efuse_init(void)
+{
+    return 0;
+}
+
+int hal_efuse_deinit(void)
+{
+    return 0;
+}
+
+int hal_efuse_clk_enable(void)
 {
     int ret = 0, val = EFUSE_TIMING_VALUE;
 
@@ -64,12 +76,22 @@ int hal_efuse_init(void)
     return 0;
 }
 
-int hal_efuse_deinit(void)
+int hal_efuse_clk_disable(void)
 {
     hal_clk_disable_assertrst(CLK_SID);
     hal_clk_disable(CLK_SID);
 
     return 0;
+}
+
+void hal_efuse_write_enable(void)
+{
+    opcode = EFUSE_OP_CODE;
+}
+
+void hal_efuse_write_disable(void)
+{
+    opcode = 0;
 }
 
 int hal_efuse_get_version(void)
@@ -126,6 +148,7 @@ int hal_efuse_read(u32 wid, u32 *wval)
     return 0;
 }
 
+#ifdef EFUSE_WRITE_SUPPORT
 int hal_efuse_write(u32 wid, u32 wval)
 {
     u32 addr, val, i;
@@ -134,7 +157,7 @@ int hal_efuse_write(u32 wid, u32 wval)
         hal_log_err("Error, word id is too large.\n");
         return -EINVAL;
     }
-    
+
     for (i = 0; i < 2; i++) {
         addr = (wid + EFUSE_MAX_WORD * i) << 2;
         writel(addr, EFUSE_REG_ADDR);
@@ -146,7 +169,7 @@ int hal_efuse_write(u32 wid, u32 wval)
         */
         val = readl(EFUSE_REG_CTL);
         val &= ~((0xFFF << 16) | (1 << 0));
-        val |= ((EFUSE_OP_CODE << 16) | (1 << 0));
+        val |= ((opcode << 16) | (1 << 0));
         writel(val, EFUSE_REG_CTL);
 
         /* Wait write finish */
@@ -157,6 +180,7 @@ int hal_efuse_write(u32 wid, u32 wval)
 
     return 0;
 }
+#endif
 
 int hal_write_auth_key(u32 *key, u32 kwlen)
 {

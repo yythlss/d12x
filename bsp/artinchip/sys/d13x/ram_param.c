@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2024 ArtInChip Technology Co.,Ltd
+ * Copyright (C) 2024-2025 ArtInChip Technology Co.,Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * Author: Xiong Hao <hao.xiong@artinchip.com>
  */
 
@@ -7,6 +10,10 @@
 #include <aic_core.h>
 #include <aic_common.h>
 #include <ram_param.h>
+
+#define EFUSE_CMU_REG ((void *)0x18020904)
+#define EFUSE_218_REG ((void *)0x19010218)
+#define EFUSE_224_REG ((void *)0x19010224)
 
 #define PSRAM_SINGLE   0
 #define PSRAM_PARALLEL 1
@@ -65,7 +72,7 @@ struct _psram_info psram_table_info[] = PSRAM_TABLE_INFO;
 
 u8 psram_get_mark_id(void)
 {
-    u32 fuse_218 = readl(0x19010218);
+    u32 fuse_218 = readl(EFUSE_218_REG);
     u8 mark_id = fuse_218 & 0xff;
 
     pr_info("fuse_218(0x19010218)=0x%x, mark_id=0x%x\n", fuse_218, mark_id);
@@ -74,7 +81,7 @@ u8 psram_get_mark_id(void)
 
 u8 psram_get_psram_id(void)
 {
-    u32 fuse_224 = readl(0x19010224);
+    u32 fuse_224 = readl(EFUSE_224_REG);
     u8 psram_id = (fuse_224 & 0xff0000) >> 20;
 
     pr_info("fuse_224(0x19010224)=0x%x, psram_id=0x%x\n", fuse_224, psram_id);
@@ -100,9 +107,11 @@ u32 aic_get_ram_size(void)
     struct _psram_info *psram_info;
     u8 mark_id, psram_id;
 
+    writel(0x1100, EFUSE_CMU_REG);
     mark_id = psram_get_mark_id();
     psram_id = psram_get_psram_id();
     psram_info = psram_get_info(mark_id, psram_id);
+    writel(0x0, EFUSE_CMU_REG);
 
     return psram_info->psram_size;
 }
