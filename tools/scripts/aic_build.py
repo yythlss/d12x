@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 #
-# Copyright (C) 2021-2024 ArtInChip Technology Co., Ltd
+# Copyright (C) 2021-2025 ArtInChip Technology Co., Ltd
 
 import os
 import re
@@ -11,6 +11,8 @@ import glob
 import platform
 import shutil
 import tarfile
+import hashlib
+import operator
 from SCons.Script import *
 # from building import *
 
@@ -128,6 +130,48 @@ def list_defconfig(aic_root, noboot=False):
     return v, maxlen
 
 
+def mk_kconfig_prj(aic_root, filename):
+    # generate .Kconfig.prj
+    try:
+        config = open(filename, 'r')
+    except Exception as e:
+        print('open config: {} failed: {}'.format(filename, e))
+        return
+    prj_chip = None
+    prj_board = None
+    prj_kernel = None
+    prj_app = None
+    for line in config:
+        line = line.lstrip(' ').replace('\n', '').replace('\r', '')
+
+        if len(line) == 0:
+            continue
+        if line.startswith('CONFIG_PRJ_CHIP'):
+            prj_chip = line.split('=')[1].replace('"', '').strip()
+        if line.startswith('CONFIG_PRJ_BOARD'):
+            prj_board = line.split('=')[1].replace('"', '').strip()
+        if line.startswith('CONFIG_PRJ_KERNEL'):
+            prj_kernel = line.split('=')[1].replace('"', '').strip()
+        if line.startswith('CONFIG_PRJ_APP'):
+            prj_app = line.split('=')[1].replace('"', '').strip()
+
+    if prj_chip is None or prj_board is None or prj_kernel is None or prj_app is None:
+        return
+
+    with open(".Kconfig.prj", "w") as f:
+        f.write('source "bsp/artinchip/sys/{}/Kconfig.chip"\n'.format(prj_chip))
+        f.write('source "target/{}/common/Kconfig.board"\n'.format(prj_chip))
+
+        tmp = os.path.join(aic_root, "target", prj_chip, prj_board, "Kconfig.extend")
+        if os.path.exists(tmp):
+            f.write('source "target/{}/{}/Kconfig.extend"\n'.format(prj_chip, prj_board))
+
+        f.write('source "kernel/{}/Kconfig"\n'.format(prj_kernel))
+        f.write('source "application/{}/{}/Kconfig"\n'.format(prj_kernel, prj_app))
+        if prj_kernel == 'rt-thread':
+            f.write('source "$PKGS_DIR/Kconfig"\n')
+
+
 def apply_defconfig(aic_root, defconfig):
     src = os.path.join(aic_root, 'target', 'configs', defconfig)
     if not os.path.exists(src):
@@ -141,8 +185,18 @@ def apply_defconfig(aic_root, defconfig):
     dst = os.path.join(aic_root, '.config')
     shutil.copy(src, dst)
     sys.path.append(os.path.join(aic_root, 'kernel/rt-thread/tools'))
+
+    # Should generate .Kconfig.prj before apply defconfig, because project depends on this file.
+    mk_kconfig_prj(aic_root, src)
+    os.environ['PKGS_ROOT'] = os.path.join(aic_root, 'packages')
+    os.environ['PKGS_DIR'] = os.path.join(aic_root, 'packages')
+    os.environ['RTT_ROOT'] = os.path.join(aic_root, 'kernel/rt-thread/')
+    os.environ['RTT_DIR'] = os.path.join(aic_root, 'kernel/rt-thread/')
+    pydefconfig = os.path.join(aic_root, 'kernel', 'rt-thread', 'tools',  'defconfig.py')
+    defconf_cmd = 'python3 {} {}'.format(pydefconfig, src)
+    os.system(defconf_cmd)
     from menuconfig import mk_rtconfig
-    mk_rtconfig(".config")
+    mk_rtconfig('.config')
 
 
 def save_defconfig(aic_root):
@@ -153,17 +207,23 @@ def save_defconfig(aic_root):
     defconfig = get_prj_defconfig(aic_root)
     if defconfig:
         dst = os.path.join(aic_root, 'target', 'configs', defconfig)
-        shutil.copy(src, dst)
+        os.environ['PKGS_ROOT'] = os.path.join(aic_root, 'packages')
+        os.environ['PKGS_DIR'] = os.path.join(aic_root, 'packages')
+        os.environ['RTT_ROOT'] = os.path.join(aic_root, 'kernel/rt-thread/')
+        os.environ['RTT_DIR'] = os.path.join(aic_root, 'kernel/rt-thread/')
+        pydefconfig = os.path.join(aic_root, 'kernel', 'rt-thread', 'tools',  'savedefconfig.py')
+        defconf_cmd = 'python3 {} --out {}'.format(pydefconfig, dst)
+        os.system(defconf_cmd)
 
 
 def update_defconfig(aic_root):
-    defconfig = get_prj_defconfig(aic_root)
-    if defconfig:
-        src = os.path.join(aic_root, 'target', 'configs', defconfig)
-        if not os.path.exists(src):
-            sys.exit(110)
-        dst = os.path.join(aic_root, '.config')
-        shutil.copy(src, dst)
+    os.environ['PKGS_ROOT'] = os.path.join(aic_root, 'packages')
+    os.environ['PKGS_DIR'] = os.path.join(aic_root, 'packages')
+    os.environ['RTT_ROOT'] = os.path.join(aic_root, 'kernel/rt-thread/')
+    os.environ['RTT_DIR'] = os.path.join(aic_root, 'kernel/rt-thread/')
+    pydefconfig = os.path.join(aic_root, 'kernel', 'rt-thread', 'tools',  'olddefconfig.py')
+    defconf_cmd = 'python3 {}'.format(pydefconfig)
+    os.system(defconf_cmd)
 
 
 # cmd-option: list defconfig without bootloader
@@ -530,30 +590,28 @@ def aicupg_cmd(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defconfig
     sys.exit(0)
 
 
+def get_file_md5(file):
+    MD5 = hashlib.new('md5')
+    with open(file, 'r') as fp:
+        MD5.update(fp.read().encode('utf8'))
+        fp_md5 = MD5.hexdigest()
+        return fp_md5
+
+
 # cmd-option: windows menuconfig
 def win_menuconfig_cmd(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defconfig):
-    # generate .Kconfig.prj
-    with open(".Kconfig.prj", "w") as f:
-        f.write('source "bsp/artinchip/sys/{}/Kconfig.chip"\n'.format(prj_chip))
-        f.write('source "target/{}/common/Kconfig.board"\n'.format(prj_chip))
-
-        tmp = "target/" + prj_chip + "/" + prj_board + "/Kconfig.extend"
-        if os.path.exists(os.path.join(aic_root, tmp)):
-            f.write('source "{}"\n'.format(tmp))
-
-        f.write('source "kernel/{}/Kconfig"\n'.format(prj_kernel))
-        f.write('source "application/{}/{}/Kconfig"\n'.format(prj_kernel, prj_app))
-        if prj_kernel == 'rt-thread':
-            f.write('source "$PKGS_DIR/Kconfig"\n')
-
     # windows run menuconfig cmd
     if platform.system() == 'Windows':
         AddOption('--menuconfig', dest='win_menuconfig', action='store_true',
                   default=False, help='make menuconfig for luban-lite')
         win_menuconfig = GetOption('win_menuconfig')
         if win_menuconfig:
+            md5dot0 = get_file_md5('.config')
             os.system('menuconfig')
-            save_defconfig(aic_root)
+            md5dot1 = get_file_md5('.config')
+            changed = not operator.eq(md5dot0, md5dot1)
+            if changed:
+                save_defconfig(aic_root)
             # If 'output/xxxx/project_eclipse' folder exists need update eclipse project
             prj_name = prj_defconfig.replace('_defconfig', '')
             prj_eclipse_dir = os.path.join(aic_root, 'output', prj_name, 'project_eclipse')
@@ -1364,7 +1422,7 @@ def get_post_build_bat(aic_root_n, post_objcopy, post_build_cmd):
         f.write('pause\n')
 
 
-def mkimage_prebuild(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defconfig):
+def mkimage_prebuild(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defconfig, fsinstall):
     global prj_root_dir
     global aic_script_dir
     global aic_common_dir
@@ -1379,6 +1437,29 @@ def mkimage_prebuild(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_def
     import rtconfig
 
     POST_ACTION = ''
+
+    if len(fsinstall):
+        installcmd = ''
+        cleandir = ''
+        cleancmd = ''
+        for i in range(len(fsinstall)):
+            item = fsinstall[i]
+            if len(item[0]) == 0 or len(item[1]) == 0 or len(item[2]) == 0:
+                continue
+            if len(cleandir) > 0:
+                cleandir += ',{}'.format(item[2])
+            else:
+                cleandir = item[2]
+            cmdstr = 'python3 ' + aic_script_dir + 'fsinstall.py '
+            cmdstr += '--sdkout {} '.format(prj_out_dir)
+            cmdstr += '--src {} '.format(item[1])
+            cmdstr += '--dst {} \n'.format(item[2])
+            installcmd += cmdstr
+        cleancmd = 'python3 ' + aic_script_dir + 'fsinstall.py '
+        cleancmd += '--sdkout {} '.format(prj_out_dir)
+        cleancmd += '--clean {} \n'.format(cleandir)
+        POST_ACTION += cleancmd
+        POST_ACTION += installcmd
 
     if prj_kernel != 'baremetal' and "bootloader" != prj_app:
         if get_config(prj_root_dir + '.config', env_enable) == 'y':
@@ -1799,30 +1880,7 @@ def get_prj_post_action(aic_root, prj_chip, prj_board, prj_kernel, prj_app,
     prj_name = prj_defconfig.replace('_defconfig', '')
     prj_out_dir = os.path.join(aic_root, 'output/' + prj_name + '/images/')
 
-    POST_ACTION = ''
-    if len(fsinstall):
-        installcmd = ''
-        cleandir = ''
-        cleancmd = ''
-        for i in range(len(fsinstall)):
-            item = fsinstall[i]
-            if len(item[0]) == 0 or len(item[1]) == 0 or len(item[2]) == 0:
-                continue
-            if len(cleandir) > 0:
-                cleandir += ',{}'.format(item[2])
-            else:
-                cleandir = item[2]
-            cmdstr = 'python3 ' + aic_script_dir + 'fsinstall.py '
-            cmdstr += '--sdkout {} '.format(prj_out_dir)
-            cmdstr += '--src {} '.format(item[1])
-            cmdstr += '--dst {} \n'.format(item[2])
-            installcmd += cmdstr
-        cleancmd = 'python3 ' + aic_script_dir + 'fsinstall.py '
-        cleancmd += '--sdkout {} '.format(prj_out_dir)
-        cleancmd += '--clean {} \n'.format(cleandir)
-        POST_ACTION += cleancmd
-        POST_ACTION += installcmd
     # make image pre_build cmd
-    POST_ACTION += mkimage_prebuild(aic_root, prj_chip, prj_board, prj_kernel,
-                                    prj_app, prj_defconfig)
+    POST_ACTION = mkimage_prebuild(aic_root, prj_chip, prj_board, prj_kernel,
+                                   prj_app, prj_defconfig, fsinstall)
     return POST_ACTION

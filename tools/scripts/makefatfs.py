@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Dehuang.Wu
-# Copyright (C) 2021-2024 ArtInChip Technology Co., Ltd
+# Copyright (C) 2021-2025 ArtInChip Technology Co., Ltd
 
 import os
 import re
@@ -39,7 +39,7 @@ def mkimage_get_part_size(outfile):
         lines = f.readlines()
         for ln in lines:
             name = ln.split(',')[1].replace('"', '').replace('*', '')
-            if imgname == re.sub(".sparse", "", name):
+            if any(imgname == re.sub(pat, "", name) for pat in [".enc", ".sparse.enc", ".sparse"]):
                 size = int(ln.split(',')[2])
                 return size
     print('Image {} is not used in any partition'.format(imgname))
@@ -127,7 +127,11 @@ def gen_fatfs(tooldir, srcdir, outimg, volab, imgsiz, sector_siz, cluster):
         truncate = '{}truncate.exe -s {} {}'.format(tooldir, imgsiz, outimg)
         run_cmd(truncate)
 
-        mformat = '{}mformat.exe -M {} -T {} -c {} -i {}'.format(tooldir, sector_siz, sector_cnt, cluster, outimg)
+        mformat = '{}mformat.exe -i {}'.format(tooldir, outimg)
+        mformat += ' -M {} -T {} -c {}'.format(sector_siz, sector_cnt, cluster)
+        if volab != 'default':
+            mformat += ' -v {}'.format(volab)
+
         run_cmd(mformat)
 
         if os.path.exists(srcdir) is True:
@@ -169,7 +173,7 @@ def main(args):
     if os.path.exists(inputdir_1st):
         inputdir = inputdir_1st
     if os.path.exists(inputdir) is False:
-        print('Error: inputdir {} is not exist.'.format(inputdir))
+        print('Warning: inputdir {} is not exist.'.format(inputdir))
     if args.auto:
         # No need to strip size in auto mode
         strip_siz = False

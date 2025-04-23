@@ -10,22 +10,19 @@ comment "-- Important: If following options have been changed, you need save & r
 config PRJ_CHIP
     string "Chip name"
     #option env="PRJ_CHIP"
-    default "d21x"
+    # Don't set default value to make defconfig contain CONFIG_PRJ_CHIP option
 
 config PRJ_BOARD
     string "Board name"
     #option env="PRJ_BOARD"
-    default "fpga"
 
 config PRJ_KERNEL
     string "Kernel name"
     #option env="PRJ_KERNEL"
-    default "rt-thread"
 
 config PRJ_APP
     string "Application name"
     #option env="PRJ_APP"
-    default "helloworld"
 
 endmenu
 

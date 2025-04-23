@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # Dehuang.Wu
-# Copyright (C) 2021-2024 ArtInChip Technology Co., Ltd
+# Copyright (C) 2021-2025 ArtInChip Technology Co., Ltd
 
 import os
 import re
@@ -58,7 +58,7 @@ def main(args):
     if os.path.exists(inputdir_1st):
         inputdir = inputdir_1st
     if os.path.exists(inputdir) is False:
-        print('Error: inputdir {} is not exist, use a empty one.'.format(inputdir))
+        print('Warning: inputdir {} is not exist, use a empty one.'.format(inputdir))
         inputdir = os.path.dirname(args.outfile) + '/empty'
         os.makedirs(inputdir, exist_ok=True)
     print(inputdir)

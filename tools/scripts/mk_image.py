@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 #
-# Copyright (C) 2021-2024 ArtInChip Technology Co., Ltd
+# Copyright (C) 2021-2025 ArtInChip Technology Co., Ltd
 # Dehuang Wu <dehuang.wu@artinchip.com>
 
 import os
@@ -1089,6 +1089,38 @@ def spienc_create_image(imgcfg, script_dir):
         sys.exit(1)
 
 
+def data_crypt_create_image(imgcfg, script_dir):
+    keypath = get_file_path(imgcfg["key"], imgcfg["keydir"])
+    if keypath is None:
+        keypath = get_file_path(imgcfg["key"], imgcfg["datadir"])
+
+    mkcmd = os.path.join(script_dir, "firmware_security_encrypt")
+    if os.path.exists(mkcmd) is False:
+        mkcmd = "firmware_security_encrypt"
+    if sys.platform == "win32":
+        mkcmd += ".exe"
+    cmd = [mkcmd]
+    cmd.append("--key")
+    cmd.append("{}".format(keypath))
+    if "nonce" in imgcfg:
+        noncepath = get_file_path(imgcfg["nonce"], imgcfg["keydir"])
+        if noncepath is None:
+            noncepath = get_file_path(imgcfg["nonce"], imgcfg["datadir"])
+        cmd.append("--nonce")
+        cmd.append("{}".format(noncepath))
+    if "tweak" in imgcfg:
+        cmd.append("--tweak")
+        cmd.append("{}".format(imgcfg["tweak"]))
+    cmd.append("--infile")
+    cmd.append("{}".format(imgcfg["input"]))
+    cmd.append("--outfile")
+    cmd.append("{}".format(imgcfg["output"]))
+    ret = subprocess.run(cmd, stdout=subprocess.PIPE)
+    if ret.returncode != 0:
+        print(ret.stdout.decode("utf-8"))
+        sys.exit(1)
+
+
 def concatenate_create_image(outname, flist, datadir):
     with open(outname, "wb") as fout:
         for fn in flist:
@@ -1155,6 +1187,25 @@ def size_str_to_int(size_str):
     if "0x" in size_str or "0X" in size_str:
         return int(size_str, 16)
     return 0
+
+
+def str_to_int(s):
+    """ String to number
+    """
+    if s.startswith('0x') or s.startswith('0X'):
+        return int(s, 16)
+    else:
+        return int(s)
+
+
+def bytes_to_int(s):
+    """ String to number
+    """
+    s = str_from_nbytes(s)
+    if s.startswith('0x') or s.startswith('0X'):
+        return int(s, 16)
+    else:
+        return int(s)
 
 
 def str_to_nbytes(s, n):
@@ -2094,6 +2145,21 @@ def firmware_component_preproc_spienc(cfg, datadir, keydir, bindir):
         spienc_create_image(imgcfg, bindir)
 
 
+def firmware_component_preproc_data_crypt(cfg, datadir, keydir, bindir):
+    preproc_cfg = get_pre_process_cfg(cfg)
+    imgnames = preproc_cfg["data_crypt"].keys()
+    for name in imgnames:
+        imgcfg = preproc_cfg["data_crypt"][name]
+        imgcfg["keydir"] = keydir
+        imgcfg["datadir"] = datadir
+        outname = datadir + name
+        imgcfg["input"] = datadir + imgcfg["file"]
+        imgcfg["output"] = outname
+        if VERBOSE:
+            print("\tCreating {} ...".format(outname))
+        data_crypt_create_image(imgcfg, bindir)
+
+
 def firmware_component_preproc_concatenate(cfg, datadir, keydir, bindir):
     preproc_cfg = get_pre_process_cfg(cfg)
     imgnames = preproc_cfg["concatenate"].keys()
@@ -2128,10 +2194,12 @@ def firmware_component_preproc(cfg, datadir, keydir, bindir):
         firmware_component_preproc_aicboot(cfg, datadir, keydir, bindir)
     if "aicimage" in preproc_cfg:
         firmware_component_preproc_aicimage(cfg, datadir, keydir, bindir)
-    if "spienc" in preproc_cfg:
-        firmware_component_preproc_spienc(cfg, datadir, keydir, bindir)
     if "concatenate" in preproc_cfg:
         firmware_component_preproc_concatenate(cfg, datadir, keydir, bindir)
+    if "spienc" in preproc_cfg:
+        firmware_component_preproc_spienc(cfg, datadir, keydir, bindir)
+    if "data_crypt" in preproc_cfg:
+        firmware_component_preproc_data_crypt(cfg, datadir, keydir, bindir)
 
 
 def generate_bootcfg(bcfgfile, cfg):
@@ -2301,7 +2369,7 @@ def build_pinmux_check(cfg, image_path):
 
     # Get all configured pins and multiplexed functions in the pre-processed file pinmux.i
     with open(preproc_path, 'r') as file:
-        pin_pattern = r'\{(\d+),\s*([^,]+),\s*(\d+),\s*("[^"]+"|[^,]+)(,\s*(\d+))?\}'
+        pin_pattern = r'\{(\d+),\s*([^,]+),\s*(\d+),\s*("[^"]+"|[^,]+)(,\s*\(\d+\))?\}'
         for f in file:
             match = re.search(pin_pattern, f)
             if match:
