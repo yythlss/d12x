@@ -168,8 +168,6 @@ def mk_kconfig_prj(aic_root, filename):
 
         f.write('source "kernel/{}/Kconfig"\n'.format(prj_kernel))
         f.write('source "application/{}/{}/Kconfig"\n'.format(prj_kernel, prj_app))
-        if prj_kernel == 'rt-thread':
-            f.write('source "$PKGS_DIR/Kconfig"\n')
 
 
 def apply_defconfig(aic_root, defconfig):
