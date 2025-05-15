@@ -31,15 +31,14 @@ config PLATFORM_LUBANLITE
     default y
 
 config PKGS_DIR
-    string
-    option env="PKGS_ROOT"
-    default "packages"
+    default "tools/env/packages"
+	help
+        packages directory for RT-Thread online packages
+
 
 if ! AIC_BOOTLOADER
 source "application/Kconfig"
 endif
-#source "kernel/$PRJ_KERNEL/Kconfig"
-#source "$PKGS_DIR/Kconfig"
 source ".Kconfig.prj"
 source "packages/Kconfig"
 source "bsp/Kconfig"

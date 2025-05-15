@@ -168,6 +168,15 @@ def mk_kconfig_prj(aic_root, filename):
 
         f.write('source "kernel/{}/Kconfig"\n'.format(prj_kernel))
         f.write('source "application/{}/{}/Kconfig"\n'.format(prj_kernel, prj_app))
+        if prj_kernel == 'rt-thread':
+            f.write('source "tools/env/packages/packages/Kconfig"\n')
+
+
+def update_project_env(aic_root):
+    os.environ['PKGS_ROOT'] = os.path.join(aic_root, 'tools', 'env', 'packages')
+    os.environ['PKGS_DIR'] = os.path.join(aic_root, 'tools', 'env', 'packages')
+    os.environ['RTT_ROOT'] = os.path.join(aic_root, 'kernel', 'rt-thread/')
+    os.environ['RTT_DIR'] = os.path.join(aic_root, 'kernel', 'rt-thread/')
 
 
 def apply_defconfig(aic_root, defconfig):
@@ -186,10 +195,7 @@ def apply_defconfig(aic_root, defconfig):
 
     # Should generate .Kconfig.prj before apply defconfig, because project depends on this file.
     mk_kconfig_prj(aic_root, src)
-    os.environ['PKGS_ROOT'] = os.path.join(aic_root, 'packages')
-    os.environ['PKGS_DIR'] = os.path.join(aic_root, 'packages')
-    os.environ['RTT_ROOT'] = os.path.join(aic_root, 'kernel/rt-thread/')
-    os.environ['RTT_DIR'] = os.path.join(aic_root, 'kernel/rt-thread/')
+    update_project_env(aic_root)
     pydefconfig = os.path.join(aic_root, 'kernel', 'rt-thread', 'tools',  'defconfig.py')
     defconf_cmd = 'python3 {} {}'.format(pydefconfig, src)
     os.system(defconf_cmd)
@@ -205,23 +211,16 @@ def save_defconfig(aic_root):
     defconfig = get_prj_defconfig(aic_root)
     if defconfig:
         dst = os.path.join(aic_root, 'target', 'configs', defconfig)
-        os.environ['PKGS_ROOT'] = os.path.join(aic_root, 'packages')
-        os.environ['PKGS_DIR'] = os.path.join(aic_root, 'packages')
-        os.environ['RTT_ROOT'] = os.path.join(aic_root, 'kernel/rt-thread/')
-        os.environ['RTT_DIR'] = os.path.join(aic_root, 'kernel/rt-thread/')
+        update_project_env(aic_root)
         pydefconfig = os.path.join(aic_root, 'kernel', 'rt-thread', 'tools',  'savedefconfig.py')
         defconf_cmd = 'python3 {} --out {}'.format(pydefconfig, dst)
         os.system(defconf_cmd)
 
 
 def update_defconfig(aic_root):
-    os.environ['PKGS_ROOT'] = os.path.join(aic_root, 'packages')
-    os.environ['PKGS_DIR'] = os.path.join(aic_root, 'packages')
-    os.environ['RTT_ROOT'] = os.path.join(aic_root, 'kernel/rt-thread/')
-    os.environ['RTT_DIR'] = os.path.join(aic_root, 'kernel/rt-thread/')
-    pydefconfig = os.path.join(aic_root, 'kernel', 'rt-thread', 'tools',  'olddefconfig.py')
-    defconf_cmd = 'python3 {}'.format(pydefconfig)
-    os.system(defconf_cmd)
+    defconfig = get_prj_defconfig(aic_root)
+    if defconfig:
+        apply_defconfig(aic_root, defconfig)
 
 
 # cmd-option: list defconfig without bootloader
