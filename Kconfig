@@ -31,6 +31,7 @@ config PLATFORM_LUBANLITE
     default y
 
 config PKGS_DIR
+    string
     default "tools/env/packages"
 	help
         packages directory for RT-Thread online packages
