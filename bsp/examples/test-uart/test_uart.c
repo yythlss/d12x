@@ -15,6 +15,7 @@
 #include <aic_core.h>
 
 #define TEST_UART_DEBUG 0
+#define TEST_UART_CONFIG 1
 #define TEST_UART_PORT "uart4"
 #define TEST_UART_BUF_LEN 128
 #define TEST_UART_COUNT 10
@@ -76,28 +77,30 @@ static rt_err_t serial_input_mq(rt_device_t dev, rt_size_t size)
     return result;
 }
 
-static int serial_config_uart(void)
+static int serial_config_uart(rt_device_t serial)
 {
-    struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
-    config.baud_rate = BAUD_RATE_115200;
-    config.data_bits = 8;
-    config.stop_bits = 1;
-    config.parity = PARITY_NONE;
+#if TEST_UART_CONFIG
+    rt_serial_t *uart = container_of(serial, rt_serial_t, parent);
+    uart->config.baud_rate = BAUD_RATE_9600;
+    uart->config.data_bits = 8;
+    uart->config.stop_bits = 1;
+    uart->config.parity = PARITY_NONE;
 
-    if (rt_device_control(g_serial, RT_DEVICE_CTRL_CONFIG, &config) != RT_EOK) {
+    if (rt_device_control(serial, RT_DEVICE_CTRL_CONFIG, &uart->config) != RT_EOK) {
         rt_kprintf("uart set baudrate fail!\n");
         return -1;
     }
-
+#endif
     return 0;
 }
 
 static void serial_init_variable(void)
 {
-
     g_exit = 0;
-    if(g_test_mode == TEST_UART_MODE_SEMAPHORE)
+    if(g_test_mode == TEST_UART_MODE_SEMAPHORE) {
+        rt_device_set_rx_indicate(g_serial, serial_input_sem);
         rt_sem_init(&g_rx_sem, "uart_rx_sem", 0, RT_IPC_FLAG_FIFO);
+    }
 
     if(g_test_mode == TEST_UART_MODE_MESSAGEQUEUE) {
         rt_device_set_rx_indicate(g_serial, serial_input_mq);
@@ -222,7 +225,7 @@ int test_uart(int argc, char *argv[])
         return -RT_ERROR;
     }
 
-    serial_config_uart();
+    serial_config_uart(g_serial);
     serial_init_variable();
 
     ret = rt_device_open(g_serial, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX);
