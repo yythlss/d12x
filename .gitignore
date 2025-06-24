@@ -14,6 +14,7 @@ partition_table.h
 output/
 /toolchain/
 build/
+!bsp/peripheral/wireless/aic8800/build/
 tools/toolchain/Xuantie-900-gcc-elf-newlib-x86_64
 tools/toolchain/Xuantie-900-gcc-elf-newlib-mingw
 tools/env/tools/qemu/qemu-win
