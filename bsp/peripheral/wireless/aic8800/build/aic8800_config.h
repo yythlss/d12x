@@ -15,6 +15,7 @@
 #=========================================================================*/
 #ifndef _AICWF_CONFIG_H
 #define	_AICWF_CONFIG_H
+#include "rtconfig.h"
 
 #define     CONFIG_AIC8800DW_SUPPORT
 #define     CONFIG_AIC8800D80_SUPPORT
@@ -24,6 +25,7 @@
 //// firmware bin file
 #define     CONFIG_DOWNLOAD_FW
 //#define     CONFIG_LOAD_FW_FROM_FLASH
+#define     CONFIG_WIFI_MODE_RFTEST
 
 //// wifi setting
 #define     CONFIG_RWNX_FULLMAC
@@ -34,7 +36,9 @@
 //// hardware settings
 #define     CONFIG_PMIC_SETTING
 #define     CONFIG_LOAD_USERCONFIG
+#ifdef CONFIG_AIC8800_VRF_DCDC_MODE
 #define     CONFIG_VRF_DCDC_MODE
+#endif
 #define     CONFIG_DPD
 #define     CONFIG_FORCE_DPD_CALIB
 
@@ -47,6 +51,7 @@
 #define     CONFIG_REORD_FORWARD_LIST
 //#define     CONFIG_RX_NOCOPY
 #define     CONFIG_RX_WAIT_LWIP
+//#define     CONFIG_APP_IPERF
 
 /// WPA3 Need
 #define     CONFIG_MBEDTLS
@@ -59,10 +64,16 @@
 #define     AIC_LOG_DEBUG_ON
 
 ////rm driver one key ,just reset env
-#define     CONFIG_DRIVER_ORM
+//#define     CONFIG_DRIVER_ORM
 
 //rtthread os
 //#define     PLATFORM_ASR_THREADX
 #define     CONFIG_RTTHEAD_PLAT
+
+//bt support
+#ifdef CONFIG_AIC8800_BT_SUPPORT
+#define CONFIG_BT_SUPPORT
+#endif
+
 #endif
 

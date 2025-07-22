@@ -965,7 +965,7 @@ def list_module_cmd(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defc
               default=False, help='list all opened module info')
     list_module = GetOption('list_module')
     if list_module:
-        prj_out_dir = os.path.join(aic_root, 'target/configs/' + prj_defconfig)
+        prj_out_dir = os.path.join(aic_root, '.config')
         prj_name = prj_defconfig.replace('_defconfig', '')
         print('Load modules information from ' + prj_name)
 
@@ -1007,6 +1007,10 @@ def list_module_cmd(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defc
             # Sort in ascending order based on the first value of each element
             sorted_list_items = sorted(list_item, key=lambda x: x[0])
             file.close()
+
+        if not sorted_list_items:
+            pr_err('The module list is empty')
+            exit(110)
 
         items_mod = [x[0] for x in sorted_list_items]
         items_ver = [x[1] for x in sorted_list_items]

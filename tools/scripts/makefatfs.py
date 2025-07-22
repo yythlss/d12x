@@ -124,7 +124,7 @@ def gen_fatfs(tooldir, srcdir, outimg, volab, imgsiz, sector_siz, cluster):
         srcdir = srcdir.replace(' ', '\\ ')
         srcdir = srcdir.replace('/', '\\')
 
-        truncate = '{}truncate.exe -s {} {}'.format(tooldir, imgsiz, outimg)
+        truncate = '{}truncate.exe {} {}'.format(tooldir, outimg, imgsiz)
         run_cmd(truncate)
 
         mformat = '{}mformat.exe -i {}'.format(tooldir, outimg)
@@ -173,7 +173,7 @@ def main(args):
     if os.path.exists(inputdir_1st):
         inputdir = inputdir_1st
     if os.path.exists(inputdir) is False:
-        print('Warning: inputdir {} is not exist.'.format(inputdir))
+        print('Info: inputdir {} is not exist.'.format(inputdir))
     if args.auto:
         # No need to strip size in auto mode
         strip_siz = False
@@ -276,7 +276,7 @@ def main(args):
             truncate = 'truncate -s {} {}'.format(minimal_siz, args.outfile)
             run_cmd(truncate)
         elif platform.system() == 'Windows':
-            truncate = '{}truncate.exe -s {} {}'.format(args.tooldir, minimal_siz, args.outfile)
+            truncate = '{}truncate.exe {} {}'.format(args.tooldir, args.outfile, minimal_siz)
             run_cmd(truncate)
 
 

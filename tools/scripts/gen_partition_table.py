@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 #
-# Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+# Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
 # Dehuang Wu <dehuang.wu@artinchip.com>
 
 import os
@@ -94,7 +94,8 @@ def aic_creat_two_flash_partjson(cfg, media_type, part_type):
     partitions = cfg[media_type]["partitions1"]
     media_type1 = media_type = cfg["image"]["info"]["media1"]["type"]
 
-    mtd += itemstr + ";"
+    mtd = mtd[0:-1]
+    mtd += ";"
     mtd += "spi{}.0:".format(cfg["image"]["info"]["media1"]["device_id"])
     part_size = 0
     part_offs = 0
@@ -147,6 +148,7 @@ def aic_create_parts_json(cfg):
     ubi = ""
     nftl = ""
     gpt = ""
+    levelx = ""
 
     part_str = '{\n\t"partitions": {\n'
     part_type = []
@@ -218,6 +220,25 @@ def aic_create_parts_json(cfg):
                         nftl += itemstr + ","
                     nftl = nftl[0:-1] + ";"
 
+                if "levelx" in partitions[part]:
+                    if "levelx" not in part_type:
+                        part_type.append("levelx")
+                    levelx_volumes = partitions[part]["levelx"]
+                    if len(levelx_volumes) == 0:
+                        print("Volume of {} is empty".format(part))
+                        sys.exit(1)
+                    levelx += "{}:".format(part)
+                    for vol in levelx_volumes:
+                        itemstr = ""
+                        if "size" not in levelx_volumes[vol]:
+                            print("No size value for levelx volume: {}".format(vol))
+                        itemstr += levelx_volumes[vol]["size"]
+                        if "offset" in levelx_volumes[vol]:
+                            itemstr += "@{}".format(levelx_volumes[vol]["offset"])
+                        itemstr += "({})".format(vol)
+                        levelx += itemstr + ","
+                    levelx = levelx[0:-1] + ";"
+
             mtd = mtd[0:-1]
             part_str += "\t\t\"mtd\" : \"{}\",\n".format(mtd)
             if len(ubi) > 0:
@@ -226,6 +247,9 @@ def aic_create_parts_json(cfg):
             if len(nftl) > 0:
                 nftl = nftl[0:-1]
                 part_str += "\t\t\"nftl\" : \"{}\",\n".format(nftl)
+            if len(levelx) > 0:
+                levelx = levelx[0:-1]
+                part_str += "\t\t\"levelx\" : \"{}\",\n".format(levelx)
         elif cfg.get(media_type, {}).get("device_count", None) == "2":
             # two flashes
             part_str = aic_creat_two_flash_partjson(cfg, media_type, part_type)
@@ -300,7 +324,8 @@ def aic_creat_two_flash_partstr(cfg, media_type):
     media_type1 = cfg["image"]["info"]["media1"]["type"]
 
     # handle mtd&fal
-    mtd += itemstr + ";"
+    mtd = mtd[0:-1]
+    mtd += ";"
     mtd += "spi{}.0:".format(cfg["image"]["info"]["media1"]["device_id"])
     part_size = 0
     part_offs = 0
@@ -360,6 +385,7 @@ def aic_create_parts_string(cfg):
     ubi = ""
     nftl = ""
     gpt = ""
+    levelx = ""
 
     part_str = ""
     fal_cfg = "\n"
@@ -426,6 +452,23 @@ def aic_create_parts_string(cfg):
                         nftl += itemstr + ","
                     nftl = nftl[0:-1] + ";"
 
+                if "levelx" in partitions[part]:
+                    levelx_volumes = partitions[part]["levelx"]
+                    if len(levelx_volumes) == 0:
+                        print("Volume of {} is empty".format(part))
+                        sys.exit(1)
+                    levelx += "{}:".format(part)
+                    for vol in levelx_volumes:
+                        itemstr = ""
+                        if "size" not in levelx_volumes[vol]:
+                            print("No size value for ubi volume: {}".format(vol))
+                        itemstr += levelx_volumes[vol]["size"]
+                        if "offset" in levelx_volumes[vol]:
+                            itemstr += "@{}".format(levelx_volumes[vol]["offset"])
+                        itemstr += "({})".format(vol)
+                        levelx += itemstr + ","
+                    levelx = levelx[0:-1] + ";"
+
                 if media_type == "spi-nor":
                     fal_cfg += "    {}FAL_PART_MAGIC_WORD, \"{}\",".format("{", part)
                     fal_cfg += "FAL_USING_NOR_FLASH_DEV_NAME, "
@@ -439,6 +482,9 @@ def aic_create_parts_string(cfg):
             if len(nftl) > 0:
                 nftl = nftl[0:-1]
                 part_str += "#define IMAGE_CFG_JSON_PARTS_NFTL \"{}\"\n".format(nftl)
+            if len(levelx) > 0:
+                levelx = levelx[0:-1]
+                part_str += "#define IMAGE_CFG_JSON_PARTS_LEVELX \"{}\"\n".format(levelx)
 
             if media_type == "spi-nor":
                 fal_cfg += "}\n#endif\n"

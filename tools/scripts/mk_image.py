@@ -15,6 +15,7 @@ import struct
 import argparse
 import platform
 import subprocess
+from pathlib import Path
 from collections import namedtuple
 from collections import OrderedDict
 from Cryptodome.PublicKey import RSA
@@ -1711,6 +1712,7 @@ def img_write_fwc_file_to_binfile(binfile, cfg, datadir):
     start_block = 0
     last_block = 0
     used_block = 0
+    total_block = 0
 
     if VERBOSE:
         print("\tPacking file data:")
@@ -1743,7 +1745,16 @@ def img_write_fwc_file_to_binfile(binfile, cfg, datadir):
                     used_block = filesize // block_size // 1024 + 1
                 else:
                     used_block = filesize // block_size // 1024
-                last_block = start_block + used_block - 1
+                total_block = (part_size // block_size // 1024)
+                if (total_block - used_block) <= (total_block // 50):
+                    print("\t\tPart {} reserved blocks are less than 2%, \
+                            bad blocks may cause burning failures".format(part_name))
+
+                last_block = start_block + total_block - 1
+                if last_block < (start_block + used_block - 1):
+                    print("\t\tFile {} exceeds the part {} size".format(path, part_name))
+                    sys.exit(1)
+
             elif cfg["image"]["info"]["media"]["type"] == "spi-nor":
                 block_size = 64
                 start_block = part_offset // block_size // 1024
@@ -2572,6 +2583,60 @@ def build_firmware_image(cfg, datadir, outdir):
     return 0
 
 
+def make_untar(src_file, out_dir):
+    with tarfile.open(src_file) as t:
+        t.extractall(out_dir)
+        print("Extract {} file data to {}".format(src_file, out_dir))
+
+
+def extract_img_meta_data(imgfile, datadir, meta_off):
+    magic = str_from_nbytes(imgfile.read(8))
+    name = str_from_nbytes(imgfile.read(64))
+    partition = str_from_nbytes(imgfile.read(64))
+    offset = int_from_uint32_bytes(imgfile.read(4))
+    size = int_from_uint32_bytes(imgfile.read(4))
+    crc = int_from_uint32_bytes(imgfile.read(4))
+    ram = int_from_uint32_bytes(imgfile.read(4))
+    attr = str_from_nbytes(imgfile.read(64))
+    filename = str_from_nbytes(imgfile.read(64)).strip(b'\x00'.decode())
+
+    imgfile.seek(offset)
+    pathfile = datadir + '/' + filename
+    with open(pathfile, 'wb') as f:
+        f.write(imgfile.read(size))
+
+    if Path(pathfile).suffix == ".tar":
+        make_untar(pathfile, datadir)
+
+
+def extract_img_data(img):
+    datadir = os.path.join(os.path.dirname(img), Path(img).stem)
+    os.makedirs(datadir, exist_ok=True)
+    with open(img, 'rb+') as imgfile:
+        magic = str_from_nbytes(imgfile.read(8))
+        platform = str_from_nbytes(imgfile.read(64))
+        product = str_from_nbytes(imgfile.read(64))
+        version = str_from_nbytes(imgfile.read(64))
+        media_type = str_from_nbytes(imgfile.read(64))
+        media_dev_id = int_from_uint32_bytes(imgfile.read(4))
+        nand_array_org = str_from_nbytes(imgfile.read(64))
+        meta_offset = int_from_uint32_bytes(imgfile.read(4))
+        meta_size = int_from_uint32_bytes(imgfile.read(4))
+        file_offset = int_from_uint32_bytes(imgfile.read(4))
+        file_size = int_from_uint32_bytes(imgfile.read(4))
+        ex_flag = int_from_uint32_bytes(imgfile.read(4))
+        ex_offset = int_from_uint32_bytes(imgfile.read(4))
+        ex_size = int_from_uint32_bytes(imgfile.read(4))
+
+        count = (int)(meta_size / META_ALIGNED_SIZE)
+        for i in range(0, count):
+            imgfile.seek(meta_offset)
+            extract_img_meta_data(imgfile, datadir, meta_offset)
+            meta_offset += META_ALIGNED_SIZE
+
+    return datadir
+
+
 if __name__ == "__main__":
     default_bin_root = os.path.dirname(sys.argv[0])
     if sys.platform.startswith("win"):
@@ -2599,9 +2664,6 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", action='store_true',
                         help="show detail information")
     args = parser.parse_args()
-    if args.config is None:
-        print('Error, option --config is required.')
-        sys.exit(1)
     # If user not specified data directory, use current directory as default
     if args.datadir is None:
         args.datadir = './'
@@ -2624,6 +2686,9 @@ if __name__ == "__main__":
     if args.verbose:
         VERBOSE = True
     if args.extract:
+        sys.exit(1)
+    if args.config is None:
+        print('Error, option --config is required.')
         sys.exit(1)
 
     cfg = parse_image_cfg(args.config)

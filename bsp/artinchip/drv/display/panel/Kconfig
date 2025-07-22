@@ -45,6 +45,19 @@ if !AIC_DISP_PQ_TOOL
     config AIC_PANEL_DSI_AXS15231B
         bool "ArtInChip MIPI DSI AXS15231B panel"
         depends on AIC_DISP_MIPI_DSI
+
+    config AIC_PANEL_DSI_NV3051
+        bool "ArtInChip MIPI DSI NV3051 panel"
+        depends on AIC_DISP_MIPI_DSI
+
+    config AIC_PANEL_DSI_FL7707
+        bool "ArtInChip MIPI DSI FL7707 panel"
+        depends on AIC_DISP_MIPI_DSI
+
+    config AIC_PANEL_DSI_FT8201
+        bool "ArtInChip MIPI DSI FT8201 panel"
+        depends on AIC_DISP_MIPI_DSI
+
 #
 # MIPI-DBI Type B I8080 Panel
 #
@@ -85,6 +98,12 @@ if !AIC_DISP_PQ_TOOL
         depends on AIC_DISP_MIPI_DBI
         help
             MIPI-DBI Type C, SPI_4LINE_RGB565
+
+    config AIC_PANEL_DBI_CO5300
+        bool "ArtInChip MIPI DBI CO5300 panel"
+        depends on AIC_DISP_MIPI_DBI
+        help
+            MIPI-DBI Type C, SPI_4DA_RGB888
 #
 # RGB Panel SPI Init
 #

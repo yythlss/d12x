@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 #
-# Copyright (C) 2021-2024 ArtInChip Technology Co., Ltd
+# Copyright (C) 2021-2025 ArtInChip Technology Co., Ltd
 # Dehuang Wu <dehuang.wu@artinchip.com>
 
 import os
@@ -27,6 +27,7 @@ DATA_SECT_TYPE_SYS_JTAG = int("0x41490003", 16)
 DATA_SECT_TYPE_SYS_UPGMODE = int("0x41490004", 16)
 DATA_SECT_TYPE_PARTITION = int("0x41490005", 16)
 DATA_SECT_TYPE_PSRAM = int("0x41490006", 16)
+DATA_SECT_TYPE_SYS_REGCFG = int("0x41490007", 16)
 DATA_SECT_TYPE_END = int("0x4149FFFF", 16)
 
 
@@ -296,6 +297,7 @@ def gen_psram_init_data(psram):
     data_len = int_to_u32_bytes(len(data))
     return data_type + data_len + data
 
+
 """
 struct system_uart {
     u32 uart_id;
@@ -329,6 +331,7 @@ def gen_system_uart(sys_uart):
         data += gen_system_uart_data(sys_uart[uarti])
     data_len = int_to_u32_bytes(len(data))
     return data_type + data_len + data
+
 
 """
 struct system_jtag {
@@ -374,6 +377,45 @@ def gen_system_jtag(sys_jtag):
     for jtagi in sys_jtag.keys():
         if isinstance(sys_jtag[jtagi], OrderedDict):
             data += gen_system_jtag_data(sys_jtag[jtagi])
+    data_len = int_to_u32_bytes(len(data))
+    return data_type + data_len + data
+
+
+"""
+struct system_reg_cfg {
+    u32 reg;
+    u32 val;
+    u32 dly;
+};
+struct system_reg_cfg_data {
+    u32 data_type;
+    u32 data_len; // length of rest of this structure
+    u32 entry_cnt;
+    struct system_reg_cfg param[entry_cnt];
+};
+"""
+
+
+def gen_system_reg_cfg_data(regcfg):
+    data = get_bytes_by_str(regcfg, "reg")
+    data += get_bytes_by_str(regcfg, "val")
+    data += get_bytes_by_str(regcfg, "dly")
+    return data
+
+
+def gen_system_reg_cfg(cfgs):
+    data_type = int_to_u32_bytes(DATA_SECT_TYPE_SYS_REGCFG)
+    data = bytes()
+    count = param_str_to_int(cfgs["count"])
+    if count > len(cfgs["regs"]):
+        count = len(cfgs["regs"])
+    entry_cnt = param_str_to_u32_bytes(str(count))
+    data += entry_cnt
+
+    for i in range(count):
+        regi = cfgs["regs"][i]
+        if isinstance(regi, OrderedDict):
+            data += gen_system_reg_cfg_data(regi)
     data_len = int_to_u32_bytes(len(data))
     return data_type + data_len + data
 
@@ -469,6 +511,8 @@ def gen_private_data(cfg):
                     data += gen_system_uart(cfg[item][sysi])
                 if sysi == "jtag":
                     data += gen_system_jtag(cfg[item][sysi])
+                if sysi == "regcfg":
+                    data += gen_system_reg_cfg(cfg[item][sysi])
     data += gen_end_flag()
     return data
 
@@ -488,25 +532,25 @@ if __name__ == "__main__":
     parser.add_argument("-v", "--verbose", action='store_true',
                         help="show detail information")
     args = parser.parse_args()
-    if args.config == None and args.config_list == None:
+    if args.config is None and args.config_list is None:
         print('Error, option --config or --config_list is required.')
         sys.exit(1)
-    if args.output == None:
+    if args.output is None:
         args.output = os.path.splitext(args.config)[0] + ".bin"
     if args.verbose:
         VERBOSE = True
 
     cfg = {}
-    if args.config != None:
+    if args.config is not None:
         ncfg = parse_private_data_cfg(args.config)
         cfg.update(ncfg)
-    if args.config_list != None:
+    if args.config_list is not None:
         for c in args.config_list:
             ncfg = parse_private_data_cfg(c)
             cfg.update(ncfg)
 
     data = gen_private_data(cfg)
-    if data != None:
+    if data is not None:
         f = open(args.output, 'wb')
         f.write(data)
         f.flush()

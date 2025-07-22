@@ -2,7 +2,7 @@
 # -*- coding:utf-8 -*-
 # SPDX-License-Identifier: Apache-2.0
 #
-# Copyright (C) 2021-2024 ArtInChip Technology Co., Ltd
+# Copyright (C) 2021-2025 ArtInChip Technology Co., Ltd
 # Authors: dwj <weijie.ding@artinchip.com>
 import os
 import sys
@@ -18,6 +18,7 @@ def parse_elf_segment(src_file, prj_out_dir, toolchain_prefix):
     genSegIdx = 0
     bitmask = 0
     option = ""
+    entry_point = ""
 
     SEG_INFO_TMP = prj_out_dir + '.seg_info_tmp'
     SEG_BIN_PREFIX = prj_out_dir + 'seg'
