@@ -134,9 +134,9 @@ static sfud_err spi_set_speed(const sfud_spi *spi, uint32_t bus_hz)
 
     rtt_dev = sfud_dev->user_data;
 #ifndef SFUD_USING_QSPI
-    struct rt_spi_configuration cfg = RT_SFUD_DEFAULT_SPI_CFG;
+    struct rt_spi_configuration spi_cfg = RT_SFUD_DEFAULT_SPI_CFG;
 
-    cfg.max_hz = bus_hz;
+    spi_cfg.max_hz = bus_hz;
     return rt_spi_configure(rtt_dev->rt_spi_device, &spi_cfg);
 #else
     struct rt_qspi_configuration qspi_cfg = RT_SFUD_DEFAULT_QSPI_CFG;

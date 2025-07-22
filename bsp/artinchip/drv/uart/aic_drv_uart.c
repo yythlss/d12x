@@ -311,6 +311,7 @@ void drv_usart_irqhandler(int irq, void * data)
 static rt_err_t drv_uart_configure(struct rt_serial_device *serial, struct serial_configure *cfg)
 {
     int ret;
+    uint32_t index = 0;
     usart_handle_t uart;
 
     uint32_t bauds;
@@ -324,6 +325,7 @@ static rt_err_t drv_uart_configure(struct rt_serial_device *serial, struct seria
     RT_ASSERT(uart != RT_NULL);
 
     /* set baudrate parity...*/
+    index = serial->config.uart_index;
     bauds = cfg->baud_rate;
     mode = USART_MODE_ASYNCHRONOUS;
 
@@ -356,6 +358,10 @@ static rt_err_t drv_uart_configure(struct rt_serial_device *serial, struct seria
     else
         databits = USART_DATA_BITS_8;
 
+    hal_clk_disable(CLK_UART0 + index);
+    drv_usart_set_freq(bauds, index);
+    hal_clk_enable(CLK_UART0 + index);
+    aic_udelay(1000);
     hal_usart_set_loopback(uart, 1);
     hal_uart_reset_fifo(uart);
 

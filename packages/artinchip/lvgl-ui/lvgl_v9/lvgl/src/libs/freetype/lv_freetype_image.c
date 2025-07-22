@@ -123,15 +123,21 @@ static bool freetype_image_create_cb(lv_freetype_image_cache_data_t * data, void
 
     FT_Error error;
 
+    lv_mutex_lock(&dsc->cache_node->face_lock);
+
     FT_Face face = dsc->cache_node->face;
+
     FT_Set_Pixel_Sizes(face, 0, dsc->size);
+
     error = FT_Load_Glyph(face, data->glyph_index,  FT_LOAD_RENDER | FT_LOAD_TARGET_NORMAL);
     if(error) {
+        lv_mutex_unlock(&dsc->cache_node->face_lock);
         FT_ERROR_MSG("FT_Load_Glyph", error);
         return false;
     }
     error = FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
     if(error) {
+        lv_mutex_unlock(&dsc->cache_node->face_lock);
         FT_ERROR_MSG("FT_Render_Glyph", error);
         return false;
     }
@@ -139,6 +145,7 @@ static bool freetype_image_create_cb(lv_freetype_image_cache_data_t * data, void
     FT_Glyph glyph;
     error = FT_Get_Glyph(face->glyph, &glyph);
     if(error) {
+        lv_mutex_unlock(&dsc->cache_node->face_lock);
         FT_ERROR_MSG("FT_Get_Glyph", error);
         return false;
     }
@@ -150,13 +157,20 @@ static bool freetype_image_create_cb(lv_freetype_image_cache_data_t * data, void
 
     uint32_t stride = lv_draw_buf_width_to_stride(box_w, LV_COLOR_FORMAT_A8);
     data->draw_buf = lv_draw_buf_create(box_w, box_h, LV_COLOR_FORMAT_A8, stride);
-
+    if (!data->draw_buf) {
+        FT_Done_Glyph(glyph);
+        lv_mutex_unlock(&dsc->cache_node->face_lock);
+        LV_LOG_ERROR("Can not create freetype draw buf");
+        return false;
+    }
     for(int y = 0; y < box_h; ++y) {
         lv_memcpy((uint8_t *)(data->draw_buf->data) + y * stride, glyph_bitmap->bitmap.buffer + y * box_w,
                   box_w);
     }
 
     FT_Done_Glyph(glyph);
+
+    lv_mutex_unlock(&dsc->cache_node->face_lock);
 
     return true;
 }
