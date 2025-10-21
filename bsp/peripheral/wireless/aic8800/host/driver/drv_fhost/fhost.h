@@ -74,6 +74,10 @@ enum fhost_msg_type {
      * Messages received from tx cfm callback (for 802.11 frame)
      */
     FHOST_MSG_TXCFM_CB,
+    /**
+     * Messages received from wifi api
+     */
+    FHOST_MSG_WIFI_API,
 };
 
 /*
@@ -120,11 +124,6 @@ struct vif_info_tag
     /// TBTT timer structure
     struct mm_timer_tag tbtt_timer;
     #endif //(NX_MULTI_ROLE || NX_CHNL_CTXT || (NX_P2P_GO && NX_POWERSAVE))
-
-    #if (NX_P2P || NX_CHNL_CTXT)
-    /// Timer used for Beacon Reception Timeout
-    struct mm_timer_tag tmr_bcn_to;
-    #endif //(NX_P2P || NX_CHNL_CTXT)
 
     #if (NX_MULTI_ROLE || NX_TDLS)
     /// BSSID this VIF belongs to
@@ -269,6 +268,8 @@ struct fhost_vif_tag
     int conn_sock;
     /// Socket for AP
     int ap_sock;
+    /// Socket for p2p
+    int p2p_sock;
     /// Pointer to the MAC VIF structure
     struct vif_info_tag *mac_vif;
     /// Index of the STA being the AP peer of the device - TODO rework
@@ -390,6 +391,8 @@ net_if_t *fhost_to_net_if(uint8_t fhost_vif_idx);
  */
 int fhost_vif_name(int fhost_vif_idx, char *name, int len);
 
+struct fhost_vif_tag * fhost_vif_get_first_free_itf(void);
+
 /**
  ****************************************************************************************
  * @brief Get FHOST VIF index from its name.
@@ -400,6 +403,8 @@ int fhost_vif_name(int fhost_vif_idx, char *name, int len);
  ****************************************************************************************
  */
 int fhost_vif_idx_from_name(const char *name);
+
+int fhost_vif_idx_from_vif_tag(struct fhost_vif_tag *tag);
 
 /**
  ****************************************************************************************
@@ -516,6 +521,8 @@ int fhost_sta_cfg(int fhost_vif_idx, struct fhost_vif_sta_cfg *cfg);
  */
 int fhost_ap_cfg(int fhost_vif_idx, struct fhost_vif_ap_cfg *cfg);
 
+int fhost_p2p_cfg(int fhost_vif_idx);
+int fhost_p2p_go_cfg(int fhost_vif_idx, struct fhost_vif_p2p_cfg *cfg);
 
 extern struct vif_info_tag vif_info_tab[NX_VIRT_DEV_MAX];
 extern struct sta_info_tag sta_info_tab[STA_MAX + NX_VIRT_DEV_MAX];

@@ -250,7 +250,7 @@ int aic_disk_dump_gpt_parts(struct blk_desc *dev_desc)
 
 int aic_disk_dump_mbr_parts(struct blk_desc *dev_desc)
 {
-    u8 mbr_buf[512];
+    u8 mbr_buf[512] = {0};
     legacy_mbr *p_mbr = (void *)mbr_buf;
     struct partition *pp;
     int i;
@@ -310,7 +310,7 @@ struct aic_partition *aic_disk_get_parts(struct blk_desc *dev_desc)
 
 struct aic_partition *aic_disk_get_mbr_parts(struct blk_desc *dev_desc)
 {
-    u8 mbr_buf[512];
+    u8 mbr_buf[512] = {0};
     legacy_mbr *p_mbr = (void *)mbr_buf;
     struct partition *pp;
     struct aic_partition *parts, *p, *n;
@@ -432,7 +432,7 @@ err:
 static int set_protective_mbr(struct blk_desc *dev_desc)
 {
     /* Setup the Protective MBR */
-    u8 mbr_buf[512];
+    u8 mbr_buf[512] = {0};
     legacy_mbr *p_mbr = (void *)mbr_buf;
 
     if (p_mbr == NULL) {
@@ -888,7 +888,7 @@ int is_pmbr_valid(legacy_mbr *mbr)
 int is_gpt_valid(struct blk_desc *dev_desc, u64 lba, gpt_header *pgpt_head,
                  gpt_entry **pgpt_pte)
 {
-    u8 mbr_buf[512];
+    u8 mbr_buf[512] = {0};
     legacy_mbr *mbr = (void *)mbr_buf;
     /* Confirm valid arguments prior to allocation. */
     if (!dev_desc || !pgpt_head) {
@@ -968,6 +968,8 @@ int find_valid_gpt(struct blk_desc *dev_desc, gpt_header *gpt_head,
  * Allocates space for PTEs based on information found in @gpt.
  * Notes: remember to free pte when you're done!
  */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
 gpt_entry *alloc_read_gpt_entries(struct blk_desc *dev_desc,
                                   gpt_header *pgpt_head)
 {
@@ -1008,7 +1010,7 @@ gpt_entry *alloc_read_gpt_entries(struct blk_desc *dev_desc,
     }
     return pte;
 }
-
+#pragma GCC diagnostic pop
 /**
  * is_pte_valid(): validates a single Partition Table Entry
  * @gpt_entry - Pointer to a single Partition Table Entry

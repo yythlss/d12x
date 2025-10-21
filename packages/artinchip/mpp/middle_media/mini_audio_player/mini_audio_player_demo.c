@@ -35,133 +35,92 @@
 unsigned char g_file_path[AUDIO_PLAYER_FILE_PATH_MAX_LEN] = {0};
 #define MINI_AUDIO_PLAYER_WAVE_BUFF_SIZE (8*1024)
 
-static void audio_play(struct aic_parser *parser, struct aic_audio_render *render)
+void play_wav(void *file_path)
 {
-    int ret;
-    struct aic_parser_packet packet;
     int wav_buff_size = MINI_AUDIO_PLAYER_WAVE_BUFF_SIZE;
-    unsigned char *wav_buff = aicos_malloc(MEM_DEFAULT, wav_buff_size);
-    if (wav_buff == NULL) {
-        loge("aicos_malloc error\n");
-        goto out;
-    }
-
-    while (1) {
-        memset(&packet, 0, sizeof(struct aic_parser_packet));
-        ret = aic_parser_peek(parser, &packet);
-        if (ret == PARSER_EOS) {
-            break;
-        }
-        if (packet.size > wav_buff_size) {
-            loge("pkt size[%d] larger than wav_buf_size[%d]\n", packet.size, wav_buff_size);
-            break;
-        }
-        packet.data = wav_buff;
-        aic_parser_read(parser, &packet);
-        aic_audio_render_rend(render, packet.data, packet.size);
-        usleep(1000);
-    }
-
-out:
-    if (wav_buff)
-        free(wav_buff);
-}
-
-static int set_render_param(struct aic_parser *parser, struct aic_audio_render *render)
-{
-    int value;
-    struct aic_audio_render_attr attr;
-    struct aic_parser_av_media_info media_info;
-    if (aic_parser_get_media_info(parser, &media_info)) {
-        loge("aic_parser_get_media_info fail\n");
-        return -1;
-    }
-
-    value = AUDIO_RENDER_SCENE_HIGHEST_PRIORITY;
-    if (aic_audio_render_control(render,
-                                 AUDIO_RENDER_CMD_SET_SCENE_PRIORITY,
-                                 &value)) {
-        loge("aic_audio_render_control set priority failed\n");
-        return -1;
-    }
-
-    if (aic_audio_render_control(render,
-                                 AUDIO_RENDER_CMD_CLEAR_CACHE,
-                                 NULL)) {
-        loge("aic_audio_render_control clear cache failed\n");
-        return -1;
-    }
-
-    attr.bits_per_sample = media_info.audio_stream.bits_per_sample;
-    attr.channels = media_info.audio_stream.nb_channel;
-    attr.sample_rate = media_info.audio_stream.sample_rate;
-    /*Set warnning tone audio params*/
-    if (aic_audio_render_control(render,
-                                AUDIO_RENDER_CMD_SET_ATTR,
-                                &attr)) {
-        loge("aic_audio_render_control set new attribute failed\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-static int play_wav(unsigned char *file_path)
-{
-    s32 ret = 0;
-    struct aic_audio_render_attr ao_attr;
-    struct aic_audio_render *render = NULL;
     struct audio_render_create_params create_params;
-    struct aic_parser *parser = NULL;
-
-    aic_parser_create(file_path, &parser);
-    if (parser == NULL) {
-        loge("parser create failed");
-        goto exit;
-    }
-    if (aic_parser_init(parser)) {
-        loge("aic_parser_init fail\n");
-        goto exit;
-    }
+    struct aic_parser_av_media_info media_info;
+    struct aic_audio_render_attr attr;
+    struct aic_audio_render *render;
+    struct aic_parser *parser;
+    char *wav_buff = NULL;
+    int parser_ret = 0;
 
     create_params.dev_id = 0;
+    create_params.mix_enable = 1;
     create_params.scene_type = AUDIO_RENDER_SCENE_WARNING_TONE;
     if (aic_audio_render_create(&render, &create_params)) {
         loge("aic_audio_render_create failed\n");
-        goto exit;
+        return;
     }
 
-    if (aic_audio_render_init(render)) {
-        loge("aic_audio_render_init failed\n");
-        ret = -1;
-        goto exit;
+    aic_parser_create((unsigned char *)file_path, &parser);
+    if (parser == NULL) {
+        printf("aic_parser_create fail\n");
+        goto free_render;
+    }
+    if (aic_parser_init(parser)) {
+        printf("aic_parser_init fail\n");
+        goto free_parser;
+    }
+    if (aic_parser_get_media_info(parser, &media_info)) {
+        printf("aic_parser_get_media_info fail\n");
+        goto free_parser;
     }
 
-    if (aic_audio_render_control(render,
-                                AUDIO_RENDER_CMD_GET_ATTR,
-                                &ao_attr)) {
-        loge("aic_audio_render_control set new attribute failed\n");
-        return -1;
+    // set attr
+    attr.bits_per_sample = media_info.audio_stream.bits_per_sample;
+    attr.channels = media_info.audio_stream.nb_channel;
+    attr.sample_rate = media_info.audio_stream.sample_rate;
+    printf("<%s:%d> sample_rate: %d, bit_per_sample: %d, channel: %d\n",
+        __func__, __LINE__, attr.sample_rate, attr.bits_per_sample, attr.channels);
+    if (aic_audio_render_control(render, AUDIO_RENDER_CMD_SET_ATTR, &attr)) {
+        printf("aic_audio_render_set_attr fail\n");
+        goto free_parser;
     }
 
-    set_render_param(parser, render);
+    struct aic_parser_packet parser_pkt;
+    wav_buff = aicos_malloc(MEM_DEFAULT, wav_buff_size);
+    if (wav_buff == NULL) {
+        printf("aicos_malloc error\n");
+        goto free_parser;
+    }
+    while (1) {
+        memset(&parser_pkt, 0, sizeof(struct aic_parser_packet));
+        parser_ret = aic_parser_peek(parser, &parser_pkt);
+        if (parser_ret == PARSER_EOS) {
+            break;
+        }
+        if (parser_pkt.size > wav_buff_size) {
+            printf("pkt size[%d] larger than wav_buf_size[%d]\n", parser_pkt.size, wav_buff_size);
+            break;
+        }
+        parser_pkt.data = wav_buff;
+        aic_parser_read(parser, &parser_pkt);
 
-    audio_play(parser, render);
-
-exit:
-    /*Play warnning tone over, change to the last audio attribute*/
-    if (aic_audio_render_control(render,
-                                AUDIO_RENDER_CMD_SET_ATTR,
-                                &ao_attr))  {
-        loge("aic_audio_render_control set the last attribute failed\n");
+        aic_audio_render_rend(render, parser_pkt.data, parser_pkt.size);
     }
 
-    if (render)
-        aic_audio_render_destroy(render);
+    if (1 == create_params.mix_enable) {
+        while (1) {
+            unsigned long remain = 0;
+            aic_audio_render_control(render, AUDIO_RENDER_CMD_GET_SUB_TRACK_REMAIN_DATA, &remain);
+            // printf("ramain:%ld\n", remain);
+            if (remain < 1024) {
+                break;
+            }
+            usleep(10000);
+        }
+    }
+
+    if (wav_buff)
+        aicos_free(MEM_DEFAULT, wav_buff);
+free_parser:
     if (parser)
         aic_parser_destroy(parser);
-
-    return ret;
+free_render:
+    if (render)
+        aic_audio_render_destroy(render);
 }
 
 struct audio_file_list {
@@ -172,7 +131,6 @@ struct audio_file_list {
 static void print_help(const char* prog)
 {
     printf("name: %s\n", prog);
-    printf("Compile time: %s\n", __TIME__);
     printf("Usage: player_demo [options]:\n"
         "\t-i                             input stream file name\n"
         "\t-t                             directory of test files\n"

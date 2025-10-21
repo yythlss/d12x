@@ -34,24 +34,31 @@ choice
 
 config AIC_PRGB_24BIT
     bool "PRGB 24 BIT"
+    depends on PRGB_MODE
 
 config AIC_PRGB_18BIT_LD
     bool "PRGB 18 BIT LD"
+    depends on PRGB_MODE
 
 config AIC_PRGB_18BIT_HD
     bool "PRGB 18 BIT HD"
+    depends on PRGB_MODE
 
 config AIC_PRGB_16BIT_LD
     bool "PRGB 16 BIT LD"
+    depends on PRGB_MODE
 
 config AIC_PRGB_16BIT_HD
     bool "PRGB 16 BIT HD"
+    depends on PRGB_MODE
 
 config AIC_SRGB_8BIT
     bool "SRGB_8BIT"
+    depends on SRGB_MODE
 
 config AIC_SRGB_6BIT
     bool "SRGB_6BIT"
+    depends on SRGB_MODE
 
 endchoice
 
@@ -62,8 +69,8 @@ config AIC_RGB_FORMAT
     default 2 if AIC_PRGB_18BIT_HD
     default 3 if AIC_PRGB_16BIT_LD
     default 4 if AIC_PRGB_16BIT_HD
-    default 5 if AIC_SRGB_8BIT
-    default 6 if AIC_SRGB_6BIT
+    default 0 if AIC_SRGB_8BIT
+    default 1 if AIC_SRGB_6BIT
 
 choice
     prompt "data order"

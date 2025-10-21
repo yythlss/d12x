@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2024-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -15,12 +15,12 @@
 #include <upg_internal.h>
 #include <aic_core.h>
 #include <aicupg.h>
-#include <fatfs.h>
 #include <mtd.h>
 #include <aic_utils.h>
 #include "nand_fwc_spl.h"
 #include <upg_fat_direct.h>
 #include <spienc.h>
+#include <dfs_file.h>
 
 extern struct aic_spinand *spinand_probe(u32 spi_bus);
 static struct mtd_dev *fat_direct_spinand_probe(u32 spi_id)
@@ -45,6 +45,7 @@ static struct mtd_dev *fat_direct_spinand_probe(u32 spi_id)
 
 static int fat_direct_spinand_write_boot(char *fpath, struct mtd_dev *mtd)
 {
+    struct dfs_fd fd;
     struct aicupg_nand_priv priv;
     struct fwc_info fwc = { 0 };
     u32 soffset;
@@ -65,13 +66,26 @@ static int fat_direct_spinand_write_boot(char *fpath, struct mtd_dev *mtd)
         return -1;
     }
 
+    if (dfs_file_open(&fd, fpath, O_RDONLY) < 0) {
+        printf("Open %s failed.\n", fpath);
+        return -1;
+    }
+
     buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     soffset = 0;
     while (1) {
         actread = 0;
         dolen = MAX_WRITE_SIZE;
-        ret = aic_fat_read_file(fpath, (void *)buf, soffset, dolen, &actread);
-        if (ret) {
+        if (dfs_file_lseek(&fd, soffset) != soffset) {
+            printf("Error:seek file %s failed!\n", fpath);
+            ret = 0;
+            break;
+        }
+
+        actread = dfs_file_read(&fd, buf, dolen);
+        if (actread <= 0) {
+            pr_err("Error:read file %s failed!\n", fpath);
+            ret = 0;
             break;
         }
         pr_debug("Going to read %ld from offset 0x%x, got 0x%ld\n", dolen,
@@ -92,16 +106,23 @@ static int fat_direct_spinand_write_boot(char *fpath, struct mtd_dev *mtd)
 
     if (buf)
         aicupg_free_align(buf);
-    return 0;
+    dfs_file_close(&fd);
+    return ret;
 }
 
 static int fat_direct_spinand_write_data(char *fpath, struct mtd_dev *mtd,
                                          u32 doffset)
 {
+    struct dfs_fd fd;
     u8 *buf = NULL, *p;
     int ret = 0, endflag = 0;
     u32 soffset;
     ulong dolen, actread, writecnt;
+
+    if (dfs_file_open(&fd, fpath, O_RDONLY) < 0) {
+        printf("Open %s failed.\n", fpath);
+        return 0;
+    }
 
     buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     soffset = 0;
@@ -110,8 +131,15 @@ static int fat_direct_spinand_write_data(char *fpath, struct mtd_dev *mtd,
     while (1) {
         actread = 0;
         dolen = MAX_WRITE_SIZE;
-        ret = aic_fat_read_file(fpath, (void *)buf, soffset, dolen, &actread);
-        if (ret) {
+        if (dfs_file_lseek(&fd, soffset) != soffset) {
+            printf("Error:seek file %s failed!\n", fpath);
+            ret = 0;
+            break;
+        }
+
+        actread = dfs_file_read(&fd, buf, dolen);
+        if (actread <= 0) {
+            pr_err("Error:read file %s failed!\n", fpath);
             ret = 0;
             break;
         }
@@ -156,6 +184,7 @@ static int fat_direct_spinand_write_data(char *fpath, struct mtd_dev *mtd,
 
     if (buf)
         aicupg_free_align(buf);
+    dfs_file_close(&fd);
     return ret;
 }
 
@@ -168,6 +197,7 @@ static int fat_direct_spinand_write_nftl(char *fpath, u32 doffset)
     ulong dolen, actread, writecnt;
     struct mtd_dev *mtd;
     struct nftl_api_handler_t *nftl;
+    struct dfs_fd fd;
 
     part_cnt = mtd_get_device_count();
     for (i = 0; i < part_cnt; i++) {
@@ -216,6 +246,12 @@ static int fat_direct_spinand_write_nftl(char *fpath, u32 doffset)
         goto out;
     }
 
+    if (dfs_file_open(&fd, fpath, O_RDONLY) < 0) {
+        printf("Open %s failed.\n", fpath);
+        ret = -1;
+        goto out;
+    }
+
     buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     if (!buf) {
         pr_err("Failed to malloc buffer.\n");
@@ -228,8 +264,15 @@ static int fat_direct_spinand_write_nftl(char *fpath, u32 doffset)
     while (1) {
         actread = 0;
         dolen = MAX_WRITE_SIZE;
-        ret = aic_fat_read_file(fpath, (void *)buf, soffset, dolen, &actread);
-        if (ret) {
+        if (dfs_file_lseek(&fd, soffset) != soffset) {
+            printf("Error:seek file %s failed!\n", fpath);
+            ret = 0;
+            break;
+        }
+
+        actread = dfs_file_read(&fd, buf, dolen);
+        if (actread <= 0) {
+            pr_err("Error:read file %s failed!\n", fpath);
             ret = 0;
             break;
         }
@@ -260,6 +303,7 @@ out:
         aicos_free(MEM_CMA, nftl->nandt);
     if (nftl)
         aicos_free(MEM_CMA, nftl);
+    dfs_file_close(&fd);
 
     return ret;
 }

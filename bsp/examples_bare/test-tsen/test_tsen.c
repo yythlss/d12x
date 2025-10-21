@@ -17,7 +17,6 @@
 
 static void cmd_tsen_usage(void)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: test_tsen [options]\n");
     printf("test_tsen read <sensor_id>         : Select one channel in [0, %d], default is 0\n", AIC_TSEN_CH_NUM - 1);
     printf("test_tsen help                     : Get this help\n");

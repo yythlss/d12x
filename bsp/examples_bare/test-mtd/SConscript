@@ -8,6 +8,8 @@ src = []
 
 if GetDepend('AIC_MTD_BARE_TEST'):
     src += Glob('mtd.c')
+    if GetDepend('AIC_EXAMPLE'):
+        src += Glob('mtd_example.c')
 
 CFLAGS = ' -c -ffunction-sections'
 

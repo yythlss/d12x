@@ -33,7 +33,6 @@ static struct aic_psadc_queue *queue = &aic_psadc_queues[AIC_PSADC_QC];
 
 static void cmd_psadc_usage(void)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: test_psadc [options]\n");
     printf("test_psadc read                       : Get the adc value\n");
     printf("test_psadc modify <default_voltage>   : Modify default voltage\n");

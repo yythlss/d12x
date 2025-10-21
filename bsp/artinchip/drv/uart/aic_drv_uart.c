@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025, Artinchip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -109,16 +109,16 @@ struct
 const drv_usart_config[AIC_UART_DEV_NUM] =
 {
 #if (AIC_UART_DEV_NUM >= 4)
-    {UART0_BASE, UART0_IRQn, drv_usart_irqhandler},
-    {UART1_BASE, UART1_IRQn, drv_usart_irqhandler},
-    {UART2_BASE, UART2_IRQn, drv_usart_irqhandler},
-    {UART3_BASE, UART3_IRQn, drv_usart_irqhandler},
+    {UART_BASE(0), UART_IRQn(0), drv_usart_irqhandler},
+    {UART_BASE(1), UART_IRQn(1), drv_usart_irqhandler},
+    {UART_BASE(2), UART_IRQn(2), drv_usart_irqhandler},
+    {UART_BASE(3), UART_IRQn(3), drv_usart_irqhandler},
 #endif
 #if (AIC_UART_DEV_NUM >= 8)
-    {UART4_BASE, UART4_IRQn, drv_usart_irqhandler},
-    {UART5_BASE, UART5_IRQn, drv_usart_irqhandler},
-    {UART6_BASE, UART6_IRQn, drv_usart_irqhandler},
-    {UART7_BASE, UART7_IRQn, drv_usart_irqhandler},
+    {UART_BASE(4), UART_IRQn(4), drv_usart_irqhandler},
+    {UART_BASE(5), UART_IRQn(5), drv_usart_irqhandler},
+    {UART_BASE(6), UART_IRQn(6), drv_usart_irqhandler},
+    {UART_BASE(7), UART_IRQn(7), drv_usart_irqhandler},
 #endif
 };
 
@@ -252,14 +252,14 @@ void drv_usart_cb_event(int32_t index, usart_event_e event)
 
 void drv_usart_irqhandler(int irq, void * data)
 {
-    int index = irq - UART0_IRQn;
+    int index = irq - UART_IRQn(0);
     uint8_t status= 0;
     usart_handle_t uart;
 
     RT_ASSERT(g_serial != RT_NULL);
     uart = (usart_handle_t)g_serial[index].parent.user_data;
 
-    if (index >= AIC_UART_DEV_NUM)
+    if (index < 0 || index >= AIC_UART_DEV_NUM)
         return;
 
     status = hal_usart_get_irqstatus(index);
@@ -326,7 +326,17 @@ static rt_err_t drv_uart_configure(struct rt_serial_device *serial, struct seria
 
     /* set baudrate parity...*/
     index = serial->config.uart_index;
+    if (index >= AIC_UART_DEV_NUM) {
+        hal_log_err("index parameter error(%d)!\n", index);
+        return -RT_EINVAL;
+    }
+
     bauds = cfg->baud_rate;
+    if (bauds >= AIC_UART_MAX_BAUDRATE) {
+        hal_log_err("bauds parameter error(%d)!\n", bauds);
+        return -RT_EINVAL;
+    }
+
     mode = USART_MODE_ASYNCHRONOUS;
 
     if (cfg->parity == PARITY_EVEN)
@@ -697,6 +707,52 @@ void drv_usart_set_freq(uint32_t baudrate, int u)
     hal_clk_set_freq(CLK_UART0 + u, g_serial[u].config.uart_freq);
 }
 
+#ifdef AIC_USING_PM
+static int aic_usart_suspend(const struct rt_device *device, rt_uint8_t mode)
+{
+    aic_usart_priv_t *uart_data = device->user_data;
+
+    switch (mode)
+    {
+    case PM_SLEEP_MODE_IDLE:
+        break;
+    case PM_SLEEP_MODE_LIGHT:
+    case PM_SLEEP_MODE_DEEP:
+    case PM_SLEEP_MODE_STANDBY:
+        hal_clk_disable(CLK_UART0 + uart_data->idx);
+        break;
+    default:
+        break;
+    }
+
+    return 0;
+}
+
+static void aic_usart_resume(const struct rt_device *device, rt_uint8_t mode)
+{
+    aic_usart_priv_t *uart_data = device->user_data;
+
+    switch (mode)
+    {
+    case PM_SLEEP_MODE_IDLE:
+        break;
+    case PM_SLEEP_MODE_LIGHT:
+    case PM_SLEEP_MODE_DEEP:
+    case PM_SLEEP_MODE_STANDBY:
+        hal_clk_enable(CLK_UART0 + uart_data->idx);
+        break;
+    default:
+        break;
+    }
+}
+
+static struct rt_device_pm_ops aic_usart_pm_ops =
+{
+    SET_DEVICE_PM_OPS(aic_usart_suspend, aic_usart_resume)
+    NULL,
+};
+#endif
+
 int drv_usart_init(void)
 {
     struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
@@ -755,6 +811,9 @@ int drv_usart_init(void)
         }
 #endif
         drv_usart_function_init(i, u);
+#ifdef AIC_USING_PM
+        rt_pm_device_register(&g_serial[u].parent, &aic_usart_pm_ops);
+#endif
     }
 
     return 0;

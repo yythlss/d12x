@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -65,7 +65,7 @@ DSTATUS spinand_disk_status(void *hdisk);
  * @retval RES_PARERR Failed.
  * @retval RES_OK Success.
  */
-DRESULT spinand_disk_read(void *hdisk, uint8_t *buf, uint32_t sector, uint8_t cnt);
+DRESULT spinand_disk_read(void *hdisk, uint8_t *buf, uint32_t sector, rt_size_t cnt);
 
 /*!
  * @brief Writes SPINAND disk.
@@ -77,7 +77,7 @@ DRESULT spinand_disk_read(void *hdisk, uint8_t *buf, uint32_t sector, uint8_t cn
  * @retval RES_PARERR Failed.
  * @retval RES_OK Success.
  */
-DRESULT spinand_disk_write(void *hdisk, const uint8_t *buf, uint32_t sector, uint8_t cnt);
+DRESULT spinand_disk_write(void *hdisk, const uint8_t *buf, uint32_t sector, rt_size_t cnt);
 
 /*!
  * @brief SPINAND disk IO operation.

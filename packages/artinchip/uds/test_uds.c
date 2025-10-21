@@ -19,13 +19,14 @@
  * CAN0 sends data and CAN1 receives data.
  * can_rx needs to be executed before can_tx.
  */
+#if 0
 #define CAN_TX_DEV_NAME                 "can0"
 #define CAN_RX_DEV_NAME                 "can1"
 #define CAN_RX_FILTER_ENABLE            0
 
 static struct rt_semaphore rx_sem = {0};
 static rt_device_t can_rx_dev = RT_NULL;
-uint8_t rxThreadInited = 0;
+uint8_t uds_rxThreadInited = 0;
 
 static rt_err_t can_rx_call(rt_device_t dev, rt_size_t size)
 {
@@ -50,7 +51,7 @@ static void can_rx_thread(void *parameter)
         }
         //print raw CAN frame for debug
         rt_kprintf("[CAN] RX ID:0x%03X LEN:%d DATA: ", rxmsg.id, rxmsg.len);
-        for (int i = 0; i < rxmsg.len; i++) 
+        for (int i = 0; i < rxmsg.len; i++)
             rt_kprintf("%02X ", rxmsg.data[i]);
         rt_kprintf("\n");
 
@@ -69,7 +70,7 @@ int test_uds_can_rx(int argc, char *argv[])
     rt_thread_t thread;
     rt_timer_t uds_timer = RT_NULL;
 
-    if (!rxThreadInited) {
+    if (!uds_rxThreadInited) {
         /* can rx configuration */
         can_rx_dev = rt_device_find(CAN_RX_DEV_NAME);
         if (!can_rx_dev)
@@ -139,7 +140,7 @@ int test_uds_can_rx(int argc, char *argv[])
             ret = -RT_ERROR;
         }
 
-        rxThreadInited = 1;
+        uds_rxThreadInited = 1;
         rt_kprintf("The "CAN_RX_DEV_NAME" received thread is ready...\n");
     }
     else
@@ -209,7 +210,7 @@ int test_uds_can_tx(int argc, char *argv[])
         return -RT_EINVAL;
     }
 
-    if (!rxThreadInited)
+    if (!uds_rxThreadInited)
     {
         rt_kprintf("Please execute can_rx at first!\n");
         return -RT_EINVAL;
@@ -307,3 +308,4 @@ int test_uds_service(int argc, char *argv[])
 }
 
 MSH_CMD_EXPORT(test_uds_service, UDS service test);
+#endif

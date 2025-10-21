@@ -246,12 +246,11 @@ int main(void)
     lv_log_register_print_cb(lv_rt_log);
 #endif /* LV_USE_LOG */
     lv_init();
-    lv_port_disp_init();
-    lv_user_gui_init();
-
 #if defined(LVGL_V_9)
     lv_tick_set_cb(&lv_tick_get_ms);
 #endif
+    lv_port_disp_init();
+    lv_user_gui_init();
 
 #ifdef AIC_LVGL_GIF_DEMO
     extern int gif_check_finish(void);

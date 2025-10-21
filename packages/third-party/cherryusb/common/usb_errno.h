@@ -21,5 +21,6 @@
 #define USB_ERR_SHUTDOWN 13
 #define USB_ERR_TIMEOUT  14
 #define USB_ERR_ALIGN    15
+#define USB_ERR_UNDERFLOAW 16
 
 #endif /* USB_ERRNO_H */

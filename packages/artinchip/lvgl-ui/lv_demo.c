@@ -1,11 +1,8 @@
 /*
- * Copyright (c) 2006-2021, RT-Thread Development Team
+ * Copyright (C) 2022-2025 ArtInChip Technology Co., Ltd.
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * Change Logs:
- * Date           Author        Notes
- * 2021-10-17     Meco Man      First version
  */
 #include <lvgl.h>
 #ifdef KERNEL_RTTHREAD
@@ -37,14 +34,17 @@ void lv_wait_fs_mounted(void)
 
 void lv_user_gui_init(void)
 {
-#ifdef AIC_LVGL_DEMO
+#if defined(AIC_LVGL_DEMO) && !defined(RT_USING_MODULE)
     aic_ui_init();
 #endif
 }
 
-#ifdef KERNEL_RTTHREAD
+#if defined KERNEL_RTTHREAD
+#ifdef RT_USING_MODULE
+extern int dm_daemon(void);
+INIT_LATE_APP_EXPORT(dm_daemon);
+#else
 extern int lvgl_thread_init(void);
-
 INIT_LATE_APP_EXPORT(lvgl_thread_init);
-
-#endif
+#endif  // RT_USING_MODULE
+#endif  // KERNEL_RTTHREAD

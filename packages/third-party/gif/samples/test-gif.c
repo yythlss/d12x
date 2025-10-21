@@ -48,7 +48,6 @@ struct gif_ctx {
 static void print_help(const char* prog)
 {
     printf("name: %s\n", prog);
-    printf("Compile time: %s\n", __TIME__);
     printf("Usage: gif_test [options]:\n"
         "\t-i                             input gif file name\n"
         "\t-l                             loop time,default 1\n"

@@ -105,21 +105,32 @@ static const struct can_bittiming_const btc = {
     .brp_inc = 1,
 };
 
-void hal_can_set_mode(can_handle *phandle, u32 mode)
+void hal_can_set_mode(can_handle *phandle, can_mode_t mode)
 {
     u32 reg_val;
 
     reg_val = readl(phandle->can_base + CAN_MODE_REG);
-    reg_val |= mode;
+    reg_val &= ~CAN_MODE_MASK;
+    if (mode != CAN_NORMAL_MODE)
+        reg_val |= (1 << mode);
     writel(reg_val, phandle->can_base + CAN_MODE_REG);
 }
 
-void hal_can_mode_release(can_handle *phandle, u32 mode)
+static void hal_can_set_reset_mode(can_handle *phandle)
 {
     u32 reg_val;
 
     reg_val = readl(phandle->can_base + CAN_MODE_REG);
-    reg_val &= ~mode;
+    reg_val |= CAN_MODE_RST;
+    writel(reg_val, phandle->can_base + CAN_MODE_REG);
+}
+
+static void hal_can_release_reset_mode(can_handle *phandle)
+{
+    u32 reg_val;
+
+    reg_val = readl(phandle->can_base + CAN_MODE_REG);
+    reg_val &= ~CAN_MODE_RST;
     writel(reg_val, phandle->can_base + CAN_MODE_REG);
 }
 
@@ -148,7 +159,7 @@ int hal_can_init(can_handle *phandle, u32 can_idx)
         return ret;
     }
 
-    hal_can_set_mode(phandle, CAN_RESET_MODE);
+    hal_can_set_reset_mode(phandle);
     /* accept all frame */
     writel(0, phandle->can_base + CAN_RXCODE0_REG);
     writel(0, phandle->can_base + CAN_RXCODE1_REG);
@@ -159,7 +170,7 @@ int hal_can_init(can_handle *phandle, u32 can_idx)
     writel(0xFF, phandle->can_base + CAN_RXMASK1_REG);
     writel(0xFF, phandle->can_base + CAN_RXMASK2_REG);
     writel(0xFF, phandle->can_base + CAN_RXMASK3_REG);
-    hal_can_mode_release(phandle, CAN_RESET_MODE);
+    hal_can_release_reset_mode(phandle);
 
     return ret;
 }
@@ -279,7 +290,7 @@ void hal_can_set_baudrate(can_handle *phandle, unsigned long baudrate)
                   "sample_point = %.2f\n", best_brp, best_tseg, tseg1,
                   tseg2, sjw, (float)(1 + tseg1) / (1 + tseg1 + tseg2));
 
-    hal_can_set_mode(phandle, CAN_MODE_RST);
+    hal_can_set_reset_mode(phandle);
     /* write value to register */
     reg_val = ((sjw - 1) << 6) | (best_brp - 1);
     writel(reg_val, phandle->can_base + CAN_BTR0_REG);
@@ -287,7 +298,7 @@ void hal_can_set_baudrate(can_handle *phandle, unsigned long baudrate)
     reg_val = (sample_time << 7) | ((tseg2 - 1) << 4) | (tseg1 - 1);
     hal_log_debug("BTR1: %02x\n", reg_val);
     writel(reg_val, phandle->can_base + CAN_BTR1_REG);
-    hal_can_mode_release(phandle, CAN_MODE_RST);
+    hal_can_release_reset_mode(phandle);
 }
 
 static void hal_can_bus_error_msg(can_handle *phandle)
@@ -388,8 +399,8 @@ static void hal_can_error_handle(can_handle *phandle, u32 err_status)
     if (err_status & CAN_INTR_OVF) {
         phandle->status.othererrcnt++;
         phandle->status.recverrcnt++;
-        hal_can_set_mode(phandle, CAN_MODE_RST);
-        hal_can_mode_release(phandle, CAN_MODE_RST);
+        hal_can_set_reset_mode(phandle);
+        hal_can_release_reset_mode(phandle);
         if (phandle->callback)
             phandle->callback(phandle, (void *)CAN_EVENT_RXOF_IND);
         /* clear bit */
@@ -405,8 +416,12 @@ static void hal_can_error_handle(can_handle *phandle, u32 err_status)
             phandle->status.current_state = ACTIVE_STATUS;
     }
 
-    if (phandle->status.current_state == BUS_OFF)
-        hal_can_mode_release(phandle, CAN_MODE_RST);
+    if (phandle->status.current_state == BUS_OFF) {
+        if (phandle->callback)
+            phandle->callback(phandle, (void *)CAN_EVENT_TX_FAIL);
+        if (phandle->autoBusoff)
+            hal_can_release_reset_mode(phandle);
+    }
 }
 
 int hal_can_attach_callback(can_handle *phandle, void *callback, void *arg)
@@ -458,10 +473,10 @@ static void hal_can_rx_frame(u32 reg_base, can_msg_t *msg)
     writel(RXB_REL_REQ, can_base + CAN_MCR_REG);
 }
 
-void hal_can_send_frame(can_handle *phandle, can_msg_t * msg, can_op_req_t req)
+int hal_can_send_frame(can_handle *phandle, can_msg_t * msg, can_op_req_t req)
 {
-    CHECK_PARAM_RET(phandle);
-    CHECK_PARAM_RET(msg);
+    CHECK_RET_WITH_RET(phandle, -CAN_SEND_STATUS_PAR_ERROR);
+    CHECK_RET_WITH_RET(msg, -CAN_SEND_STATUS_PAR_ERROR);
     u32 dreg, i;
     unsigned long can_base = phandle->can_base;
     u8 ide = msg->ide;
@@ -471,11 +486,17 @@ void hal_can_send_frame(can_handle *phandle, can_msg_t * msg, can_op_req_t req)
 
     if (req == CLR_OF_REQ || req == RXB_REL_REQ) {
         hal_log_err("invalid parameter: req\n");
-        return;
+        return -CAN_SEND_STATUS_REQ_ERROR;
     }
 
     if (rtr)
         buf0_val |= CAN_BUF0_MSG_RTR_FLAG;
+
+    /*check hardware, if not writable, refuse, avoid two frame mix*/
+    if (!(readl(phandle->can_base + CAN_STAT_REG) & CAN_STAT_TXB)) {
+        hal_log_err("hardware write refuse\n");
+        return -CAN_SEND_STATUS_HR_REFUSE;
+    }
 
     if (ide) {
         /* extended frame */
@@ -496,8 +517,9 @@ void hal_can_send_frame(can_handle *phandle, can_msg_t * msg, can_op_req_t req)
         writel(msg->data[i], can_base + dreg + i * 4);
 
     writel(buf0_val, can_base + CAN_BUF0_REG);
-
     writel(req, can_base + CAN_MCR_REG);
+
+    return CAN_SEND_STATUS_SUCCESS;
 }
 
 void hal_can_receive_frame(can_handle *phandle, can_msg_t * msg)
@@ -575,7 +597,7 @@ static int hal_can_set_filter(can_handle *phandle, can_filter_mode_t mode,
 
     reg_val = readl(phandle->can_base + CAN_MODE_REG);
 
-    hal_can_set_mode(phandle, CAN_RESET_MODE);
+    hal_can_set_reset_mode(phandle);
 
     switch (mode) {
     case SINGLE_FILTER_MODE:
@@ -664,7 +686,7 @@ static int hal_can_set_filter(can_handle *phandle, can_filter_mode_t mode,
     writel(rxmask2, phandle->can_base + CAN_RXMASK2_REG);
     writel(rxmask3, phandle->can_base + CAN_RXMASK3_REG);
 
-    hal_can_mode_release(phandle, CAN_RESET_MODE);
+    hal_can_release_reset_mode(phandle);
     writel(reg_val, phandle->can_base + CAN_MODE_REG);
 
     return 0;
@@ -691,9 +713,8 @@ int hal_can_ioctl(can_handle *phandle, int cmd, void *arg)
         ret = hal_can_set_filter(phandle, cfg->filter_mode, &cfg->rxcode,
                                  &cfg->rxmask, cfg->is_eff);
         break;
-    case CAN_IOCTL_RELEASE_MODE:
-        hal_can_mode_release(phandle, (can_mode_t)arg);
-        break;
+    case CAN_IOCTL_SET_AUTOBUSOFF:
+        phandle->autoBusoff = (unsigned long)arg;
     default:
         return -EOPNOTSUPP;
     }

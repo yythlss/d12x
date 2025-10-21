@@ -71,10 +71,9 @@
 #define NX_AMSDU_DEAGG 0
 
 #define NX_VHT 1
-//#define USE_CX_DMA
 
 #define NX_SMARTCONFIG 0
-#define NX_FHOST_MONITOR 0
+#define NX_FHOST_MONITOR 1
 
 #define NX_UF_EN 0
 
@@ -88,7 +87,15 @@
 
 #define NX_MULTI_ROLE 0
 
+#if 1//defined(CFG_P2P)
+#define NX_P2P 1
+#define NX_P2P_VIF_MAX     2
+#define NX_P2P_GO 1
+#else
 #define NX_P2P 0
+#define NX_P2P_VIF_MAX     2
+#define NX_P2P_GO 0
+#endif
 #define NX_CHNL_CTXT 0
 #define NX_TDLS 0
 #define NX_POWERSAVE 0
@@ -101,7 +108,6 @@
 
 #define NX_TX_FRAME 0
 #define RW_MESH_EN 0
-#define NX_P2P_GO 0
 
 #define NX_AMSDU_TX 0
 // Force MFP support if HE is enabled, as it is mandatory for WiFi certification

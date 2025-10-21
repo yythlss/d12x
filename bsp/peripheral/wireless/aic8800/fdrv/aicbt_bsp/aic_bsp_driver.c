@@ -6,6 +6,8 @@
 #include <string.h>
 #include "sys_al.h"
 
+u8 is_chip_id_h = 0;
+
 static int rwnx_load_firmware(uint32_t **fw_buf, enum aic_fw name)
 {
     int size = 0;
@@ -218,8 +220,23 @@ int aicbt_ext_patch_data_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_info_t
                 //id);
             aic_dbg("%s ext_patch_id:%x ext_patch_addr:%x \r\n",
                 __func__, id, addr);
-            
-            if (rwnx_plat_bin_fw_upload_android(rwnx_hw, addr, FW_PATCH_8800D80_U02_EXT)) {
+            enum aic_fw patch_ext_name;
+            switch(rwnx_hw->chipid){
+                case PRODUCT_ID_AIC8800DC:
+                    if(is_chip_id_h){
+
+                    }else{
+                        patch_ext_name = FW_PATCH_8800DC_U02_EXT;
+
+                    }break;
+                case PRODUCT_ID_AIC8800D80:
+                    patch_ext_name = FW_PATCH_8800D80_U02_EXT;
+                    break;
+                default:
+                    break;
+            }
+
+            if (rwnx_plat_bin_fw_upload_android(rwnx_hw, addr, patch_ext_name)) {
                 ret = -1;
                 break;
             }
@@ -259,6 +276,17 @@ int aicbt_patch_trap_data_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_table
 		patch_info.addr_patch = FW_RAM_PATCH_BASE_ADDR;
 	}
 	else if(rwnx_hw->chipid == PRODUCT_ID_AIC8800DC){
+        aicbt_patch_info_unpack(&patch_info, head);
+        if(patch_info.reset_addr == 0) {
+            patch_info.reset_addr        = FW_RESET_START_ADDR;
+            patch_info.reset_val         = FW_RESET_START_VAL;
+            patch_info.adid_flag_addr    = FW_ADID_FLAG_ADDR;
+            patch_info.adid_flag         = FW_ADID_FLAG_VAL;
+            if (rwnx_send_dbg_mem_write_req(rwnx_hw, patch_info.reset_addr, patch_info.reset_val))
+                return -1;
+            if (rwnx_send_dbg_mem_write_req(rwnx_hw, patch_info.adid_flag_addr, patch_info.adid_flag))
+                return -1;
+        }
 	}
 	else{
 		aicbt_patch_info_unpack(&patch_info,head);
@@ -269,9 +297,30 @@ int aicbt_patch_trap_data_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_table
 		aic_dbg("%s, chipid = %x\n",__func__,rwnx_hw->chipid);
 	}
 
-	if (rwnx_plat_bin_fw_upload_android(rwnx_hw, patch_info.addr_adid, FW_ADID_8800D80_U02))
+    
+    enum aic_fw  adid_name;
+    enum aic_fw  patch_name;
+    switch(rwnx_hw->chipid){
+        case PRODUCT_ID_AIC8800DC:
+            if(is_chip_id_h){
+                adid_name = FW_ADID_8800DC_U02H;
+                patch_name = FW_PATCH_8800DC_U02H;
+            }else{
+                adid_name = FW_ADID_8800DC_U02;
+                patch_name = FW_PATCH_8800DC_U02;
+            }break;
+        case PRODUCT_ID_AIC8800D80:
+            adid_name = FW_ADID_8800D80_U02;
+            patch_name = FW_PATCH_8800D80_U02;
+            break;
+        default:
+            break;
+    }
+
+	if (rwnx_plat_bin_fw_upload_android(rwnx_hw, patch_info.addr_adid, adid_name))
 		return -1;
-	if (rwnx_plat_bin_fw_upload_android(rwnx_hw, patch_info.addr_patch, FW_PATCH_8800D80_U02))
+
+	if (rwnx_plat_bin_fw_upload_android(rwnx_hw, patch_info.addr_patch, patch_name))
 		return -1;
 	if (aicbt_ext_patch_data_load(rwnx_hw, &patch_info))
 		return -1;
@@ -410,10 +459,45 @@ int aicbt_patch_table_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_table *he
 #endif
 int aicbt_init(struct rwnx_hw *rwnx_hw)
 {
+    enum aic_fw patch_name;
     RWNX_DBG(RWNX_FN_ENTRY_STR);
-
+	u32 mem_addr;
+	struct dbg_mem_read_cfm rd_mem_addr_cfm;
+	u32 btenable = 0;
     int ret = 0;
-    struct aicbt_patch_table *head = aicbt_patch_table_alloc(FW_PATCH_TABLE_8800D80_U02);
+
+	mem_addr = 0x40500000;
+    if (rwnx_send_dbg_mem_read_req(rwnx_hw, mem_addr, &rd_mem_addr_cfm))
+        return -1;
+
+    aicbsp_info.chip_rev = (u8)((rd_mem_addr_cfm.memdata >> 16) & 0x3F);
+    is_chip_id_h = (u8)(((rd_mem_addr_cfm.memdata >> 16) & 0xC0) == 0xC0);
+
+    aic_dbg( "chipid %d,is_chip_id_h %x ,chip_rev %x\n",rwnx_hw->chipid,is_chip_id_h,aicbsp_info.chip_rev);
+
+    switch(rwnx_hw->chipid){
+        case PRODUCT_ID_AIC8800DC:
+            btenable = 1;
+            if(is_chip_id_h)
+                patch_name = FW_PATCH_TABLE_8800DC_U02H;
+            else
+                patch_name = FW_PATCH_TABLE_8800DC_U02;
+            break;
+        case PRODUCT_ID_AIC8800DW:
+            btenable = 0;
+            break;
+        case PRODUCT_ID_AIC8800D80:
+            btenable = 1;
+            patch_name = FW_PATCH_TABLE_8800D80_U02;
+            break;
+        default:
+            break;
+    }
+    if(btenable == 0){
+        aic_dbg("btenable 0\n");
+        return -1;
+    }
+    struct aicbt_patch_table *head = aicbt_patch_table_alloc(patch_name);
 	if (head == NULL){
         aic_dbg("aicbt_patch_table_alloc fail\n");
         return -1;

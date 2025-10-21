@@ -28,7 +28,6 @@ static aicos_sem_t g_gpai_sem = NULL;
 
 static void cmd_gpai_usage(void)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: test_gpai [options]\n");
     printf("test_gpai read <channel_id>         : Select one channel in [0, %d], default is 0\n",
            AIC_GPAI_CH_NUM - 1);

@@ -115,153 +115,223 @@ static int aicfb_pan_display(struct aicfb_info *fbi, u32 buf_id)
     return 0;
 }
 
+static int aicfb_ioctl_wait_for_vsync(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->wait_for_vsync();
+}
+
+static int aicfb_ioctl_get_screen_register(struct aicfb_info *fbi, void *args)
+{
+    if (!fbi->di->di_funcs->read_cmd) {
+        pr_err("display interface do not supports AICFB_GET_SCREENREG\n");
+        return -EINVAL;
+    }
+
+    return fbi->di->di_funcs->read_cmd(*(u32 *)args);
+}
+
+static int aicfb_ioctl_get_screen_info(struct aicfb_info *fbi, void *args)
+{
+    struct aicfb_screeninfo *info;
+
+    info = (struct aicfb_screeninfo *) args;
+    info->format = AICFB_FORMAT;
+    info->bits_per_pixel = fbi->bits_per_pixel;
+    info->stride = fbi->stride;
+    info->framebuffer = (unsigned char *)fbi->fb_start;
+    info->width = fbi->width;
+    info->height = fbi->height;
+    info->smem_len = fbi->fb_size;
+    return 0;
+}
+
+static int aicfb_ioctl_pan_display(struct aicfb_info *fbi, void *args)
+{
+    return aicfb_pan_display(fbi, *(int *)args);
+}
+
+static int aicfb_ioctl_power_on(struct aicfb_info *fbi, void *args)
+{
+    struct aicfb_layer_data layer = {0};
+    struct platform_driver *de = fbi->de;
+
+    if (fbi->power_on)
+        return 0;
+
+    aicfb_enable_clk(fbi, AICFB_ON);
+
+    layer.layer_id = AICFB_LAYER_TYPE_UI;
+    layer.rect_id = 0;
+    de->de_funcs->get_layer_config(&layer);
+
+    layer.enable = 1;
+    de->de_funcs->update_layer_config(&layer);
+
+    aicfb_enable_panel(fbi, AICFB_ON);
+    fbi->power_on = true;
+    return 0;
+}
+
+static int aicfb_ioctl_power_off(struct aicfb_info *fbi, void *args)
+{
+    struct aicfb_layer_data layer = {0};
+    struct platform_driver *de = fbi->de;
+
+    if (!fbi->power_on)
+        return 0;
+
+    aicfb_enable_panel(fbi, AICFB_OFF);
+
+    layer.layer_id = AICFB_LAYER_TYPE_UI;
+    layer.rect_id = 0;
+    de->de_funcs->get_layer_config(&layer);
+
+    layer.enable = 0;
+    de->de_funcs->update_layer_config(&layer);
+
+    aicfb_enable_clk(fbi, AICFB_OFF);
+    fbi->power_on = false;
+    return 0;
+}
+
+static int aicfb_ioctl_get_layer_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->get_layer_config(args);
+}
+
+static int aicfb_ioctl_update_layer_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->update_layer_config(args);
+}
+
+static int aicfb_ioctl_update_layer_cfg_list(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->update_layer_config_list(args);
+}
+
+static int aicfb_ioctl_get_alpha_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->get_alpha_config(args);
+}
+
+static int aicfb_ioctl_update_alpha_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->update_alpha_config(args);
+}
+
+static int aicfb_ioctl_get_ck_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->get_ck_config(args);
+}
+
+static int aicfb_ioctl_update_ck_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->update_ck_config(args);
+}
+
+static int aicfb_ioctl_set_disp_prop(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->set_display_prop(args);
+}
+
+static int aicfb_ioctl_get_disp_prop(struct aicfb_info *fbi, void *args)
+{
+    u32 ret = 0;
+    struct aicfb_disp_prop prop;
+
+    ret = fbi->de->de_funcs->get_display_prop(&prop);
+    if (ret)
+        return ret;
+
+    memcpy(args, &prop, sizeof(struct aicfb_disp_prop));
+    return ret;
+}
+
+static int aicfb_ioctl_get_ccm_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->get_ccm_config(args);
+}
+
+static int aicfb_ioctl_update_ccm_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->set_ccm_config(args);
+}
+
+static int aicfb_ioctl_update_gamma_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->set_gamma_config(args);
+}
+
+static int aicfb_ioctl_get_gamma_cfg(struct aicfb_info *fbi, void *args)
+{
+    return fbi->de->de_funcs->get_gamma_config(args);
+}
+
+#ifdef AIC_DISPLAY_TEST
+static int aicfb_ioctl_pq_set_cfg(struct aicfb_info *fbi, void *args)
+{
+    struct aicfb_pq_config *config = args;
+
+    aicfb_pq_set_config(fbi, config);
+
+    return 0;
+}
+static int aicfb_ioctl_pq_get_cfg(struct aicfb_info *fbi, void *args)
+{
+    struct aicfb_pq_config *config = args;
+
+    aicfb_pq_get_config(fbi, config);
+    return 0;
+}
+#endif /* AIC_DISPLAY_TEST */
+
+struct aicfb_ioctl_cmd {
+    u32 cmd;
+    int (*f)(struct aicfb_info *fbi, void *args);
+    char desc[32];
+};
+
+struct aicfb_ioctl_cmd aicfb_ioctl_cmds[] = {
+{AICFB_WAIT_FOR_VSYNC, aicfb_ioctl_wait_for_vsync, "Wait for vsync"},
+{AICFB_PAN_DISPLAY, aicfb_ioctl_pan_display, "Pan display"},
+{AICFB_UPDATE_LAYER_CONFIG, aicfb_ioctl_update_layer_cfg, "Update layer cfg"},
+{AICFB_GET_LAYER_CONFIG, aicfb_ioctl_get_layer_cfg,"Get layer cfg"},
+{AICFB_GET_SCREENINFO, aicfb_ioctl_get_screen_info, "Get screen info"},
+{AICFB_UPDATE_LAYER_CONFIG_LISTS, aicfb_ioctl_update_layer_cfg_list, "Update layer cfg list"},
+{AICFB_GET_ALPHA_CONFIG, aicfb_ioctl_get_alpha_cfg, "Get alpha cfg"},
+{AICFB_UPDATE_ALPHA_CONFIG, aicfb_ioctl_update_alpha_cfg, "Update alpha cfg"},
+{AICFB_GET_CK_CONFIG, aicfb_ioctl_get_ck_cfg, "Get Color Key cfg"},
+{AICFB_UPDATE_CK_CONFIG, aicfb_ioctl_update_ck_cfg, "Update Color Key cfg"},
+{AICFB_SET_DISP_PROP, aicfb_ioctl_set_disp_prop, "Set display prop"},
+{AICFB_GET_DISP_PROP, aicfb_ioctl_get_disp_prop, "Get display prop"},
+{AICFB_GET_CCM_CONFIG, aicfb_ioctl_get_ccm_cfg, "Get CCM cfg"},
+{AICFB_UPDATE_CCM_CONFIG, aicfb_ioctl_update_ccm_cfg, "Update CCM cfg"},
+{AICFB_UPDATE_GAMMA_CONFIG, aicfb_ioctl_update_gamma_cfg, "Update gamma cfg"},
+{AICFB_GET_GAMMA_CONFIG, aicfb_ioctl_get_gamma_cfg, "Get gamma cfg"},
+{AICFB_POWERON, aicfb_ioctl_power_on, "Power on screen"},
+{AICFB_POWEROFF, aicfb_ioctl_power_off, "Power off screen"},
+{AICFB_GET_SCREENREG, aicfb_ioctl_get_screen_register, "Get screen register"},
+#ifdef AIC_DISPLAY_TEST
+{AICFB_PQ_SET_CONFIG, aicfb_ioctl_pq_set_cfg, "PQ Tools set cfg"},
+{AICFB_PQ_GET_CONFIG, aicfb_ioctl_pq_get_cfg, "PQ Tools get cfg"},
+#endif
+{0xFFFF, NULL, ""}
+};
+
 int aicfb_ioctl(int cmd, void *args)
 {
+    struct aicfb_ioctl_cmd *ioctl = aicfb_ioctl_cmds;
     struct aicfb_info *fbi = aicfb_get_drvdata();
 
-    if (!fbi)
-        return -EINVAL;
+    do {
+        if ((ioctl->cmd == cmd) && ioctl->f)
+            return ioctl->f(fbi, args);
 
-    switch (cmd)
-    {
-    case AICFB_WAIT_FOR_VSYNC:
-        return fbi->de->de_funcs->wait_for_vsync();
+        ioctl++;
+    } while (ioctl->cmd != 0xFFFF);
 
-    case AICFB_GET_SCREENREG:
-    {
-        if (!fbi->di->di_funcs->read_cmd) {
-            pr_err("display interface do not supports AICFB_GET_SCREENREG\n");
-            return -EINVAL;
-        }
-
-        return fbi->di->di_funcs->read_cmd(*(u32 *)args);
-    }
-    case AICFB_GET_SCREENINFO:
-    {
-        struct aicfb_screeninfo *info;
-
-        info = (struct aicfb_screeninfo *) args;
-        info->format = AICFB_FORMAT;
-        info->bits_per_pixel = fbi->bits_per_pixel;
-        info->stride = fbi->stride;
-        info->framebuffer = (unsigned char *)fbi->fb_start;
-        info->width = fbi->width;
-        info->height = fbi->height;
-        info->smem_len = fbi->fb_size;
-        break;
-    }
-    case AICFB_PAN_DISPLAY:
-        return aicfb_pan_display(fbi, *(int *)args);
-
-    case AICFB_POWERON:
-    {
-        struct aicfb_layer_data layer = {0};
-        struct platform_driver *de = fbi->de;
-
-        if (fbi->power_on)
-            break;
-
-        aicfb_enable_clk(fbi, AICFB_ON);
-
-        layer.layer_id = AICFB_LAYER_TYPE_UI;
-        layer.rect_id = 0;
-        de->de_funcs->get_layer_config(&layer);
-
-        layer.enable = 1;
-        de->de_funcs->update_layer_config(&layer);
-
-        aicfb_enable_panel(fbi, AICFB_ON);
-        fbi->power_on = true;
-        break;
-    }
-    case AICFB_POWEROFF:
-    {
-        struct aicfb_layer_data layer = {0};
-        struct platform_driver *de = fbi->de;
-
-        if (!fbi->power_on)
-            break;
-
-        aicfb_enable_panel(fbi, AICFB_OFF);
-
-        layer.layer_id = AICFB_LAYER_TYPE_UI;
-        layer.rect_id = 0;
-        de->de_funcs->get_layer_config(&layer);
-
-        layer.enable = 0;
-        de->de_funcs->update_layer_config(&layer);
-
-        aicfb_enable_clk(fbi, AICFB_OFF);
-        fbi->power_on = false;
-        break;
-    }
-    case AICFB_GET_LAYER_CONFIG:
-        return fbi->de->de_funcs->get_layer_config(args);
-
-    case AICFB_UPDATE_LAYER_CONFIG:
-        return fbi->de->de_funcs->update_layer_config(args);
-
-    case AICFB_UPDATE_LAYER_CONFIG_LISTS:
-        return fbi->de->de_funcs->update_layer_config_list(args);
-
-    case AICFB_GET_ALPHA_CONFIG:
-        return fbi->de->de_funcs->get_alpha_config(args);
-
-    case AICFB_UPDATE_ALPHA_CONFIG:
-        return fbi->de->de_funcs->update_alpha_config(args);
-
-    case AICFB_GET_CK_CONFIG:
-        return fbi->de->de_funcs->get_ck_config(args);
-
-    case AICFB_UPDATE_CK_CONFIG:
-        return fbi->de->de_funcs->update_ck_config(args);
-
-    case AICFB_SET_DISP_PROP:
-        return fbi->de->de_funcs->set_display_prop(args);
-
-    case AICFB_GET_DISP_PROP:
-    {
-        s32 ret = 0;
-        struct aicfb_disp_prop prop;
-
-        ret = fbi->de->de_funcs->get_display_prop(&prop);
-        if (ret)
-            return ret;
-
-        memcpy(args, &prop, sizeof(struct aicfb_disp_prop));
-        break;
-    }
-    case AICFB_GET_CCM_CONFIG:
-        return fbi->de->de_funcs->get_ccm_config(args);
-
-    case AICFB_UPDATE_CCM_CONFIG:
-        return fbi->de->de_funcs->set_ccm_config(args);
-
-    case AICFB_UPDATE_GAMMA_CONFIG:
-        return fbi->de->de_funcs->set_gamma_config(args);
-
-    case AICFB_GET_GAMMA_CONFIG:
-        return fbi->de->de_funcs->get_gamma_config(args);
-
-    case AICFB_PQ_SET_CONFIG:
-    {
-        struct aicfb_pq_config *config = args;
-
-        aicfb_pq_set_config(fbi, config);
-        break;
-    }
-    case AICFB_PQ_GET_CONFIG:
-    {
-        struct aicfb_pq_config *config = args;
-
-        aicfb_pq_get_config(fbi, config);
-        break;
-    }
-    default:
-        pr_err("Invalid ioctl cmd %#x\n", cmd);
-        return -EINVAL;
-    }
-    return 0;
+    pr_err("Invalid ioctl cmd %#x\n", cmd);
+    return -EINVAL;
 }
 
 #if defined(KERNEL_RTTHREAD)
@@ -502,7 +572,7 @@ int aicfb_probe(void)
 {
     struct aicfb_info *fbi;
 #ifndef AIC_MPP_VIN_DEV
-    size_t fb_size;
+    size_t fb_size = 0;
 #endif
     int ret = -EINVAL;
 
@@ -553,9 +623,9 @@ int aicfb_probe(void)
         goto err;
     }
     pr_info("fb0 allocated at 0x%x\n", (u32)(uintptr_t)fbi->fb_start);
-#endif
 
-    fb_color_block(fbi);
+    fb_color_block(fbi, fb_size);
+#endif
 
 #if defined(KERNEL_RTTHREAD)
     ret = aic_rt_fb_device_init(fbi);

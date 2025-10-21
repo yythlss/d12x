@@ -15,7 +15,7 @@
 /* code  begin */
 
 #undef LV_USE_FREETYPE
-#define LV_USE_FREETYPE 1
+#define LV_USE_FREETYPE 0
 
 /* code end */
 

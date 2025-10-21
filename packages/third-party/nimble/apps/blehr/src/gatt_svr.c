@@ -23,18 +23,17 @@
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
 #include "blehr_sens.h"
+#include "services/gatt/ble_svc_gatt.h"
 
 static const char *manuf_name = "Apache Mynewt";
 static const char *model_num = "Mynewt HR Sensor";
 uint16_t hrs_hrm_handle;
 
-static int
-gatt_svr_chr_access_heart_rate(uint16_t conn_handle, uint16_t attr_handle,
-                               struct ble_gatt_access_ctxt *ctxt, void *arg);
+static int gatt_svr_chr_access_heart_rate(uint16_t conn_handle, uint16_t attr_handle,
+                                          struct ble_gatt_access_ctxt *ctxt, void *arg);
 
-static int
-gatt_svr_chr_access_device_info(uint16_t conn_handle, uint16_t attr_handle,
-                                struct ble_gatt_access_ctxt *ctxt, void *arg);
+static int gatt_svr_chr_access_device_info(uint16_t conn_handle, uint16_t attr_handle,
+                                           struct ble_gatt_access_ctxt *ctxt, void *arg);
 
 static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
     {
@@ -81,9 +80,8 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
         },
 };
 
-static int
-gatt_svr_chr_access_heart_rate(uint16_t conn_handle, uint16_t attr_handle,
-                               struct ble_gatt_access_ctxt *ctxt, void *arg)
+static int gatt_svr_chr_access_heart_rate(uint16_t conn_handle, uint16_t attr_handle,
+                                          struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     /* Sensor location, set to "Chest" */
     static uint8_t body_sens_loc = 0x01;
@@ -102,9 +100,8 @@ gatt_svr_chr_access_heart_rate(uint16_t conn_handle, uint16_t attr_handle,
     return BLE_ATT_ERR_UNLIKELY;
 }
 
-static int
-gatt_svr_chr_access_device_info(uint16_t conn_handle, uint16_t attr_handle,
-                                struct ble_gatt_access_ctxt *ctxt, void *arg)
+static int gatt_svr_chr_access_device_info(uint16_t conn_handle, uint16_t attr_handle,
+                                           struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     uint16_t uuid;
     int rc;
@@ -125,8 +122,7 @@ gatt_svr_chr_access_device_info(uint16_t conn_handle, uint16_t attr_handle,
     return BLE_ATT_ERR_UNLIKELY;
 }
 
-void
-gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
+void gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
 {
     char buf[BLE_UUID_STR_LEN] __attribute__((unused));
 
@@ -157,10 +153,11 @@ gatt_svr_register_cb(struct ble_gatt_register_ctxt *ctxt, void *arg)
     }
 }
 
-int
-gatt_svr_init(void)
+int gatt_svr_init(void)
 {
     int rc;
+
+    ble_svc_gatt_init();
 
     rc = ble_gatts_count_cfg(gatt_svr_svcs);
     if (rc != 0) {

@@ -267,9 +267,16 @@ void aicfb_register_panel_callback(struct aicfb_info *fbi)
         panel->funcs->register_callback(panel, &cb);
 }
 
-void fb_color_block(struct aicfb_info *fbi)
+void fb_color_block(struct aicfb_info *fbi, size_t fb_size)
 {
 #ifdef AIC_DISP_COLOR_BLOCK
+#ifdef AIC_FB_ROTATE_EN
+    if (!fb_size)
+        return;
+
+    memset(fbi->fb_start, 0x0, fb_size);
+    aicos_dcache_clean_range((unsigned long *)fbi->fb_start, fb_size);
+#else
     u32 width, height;
     u32 i, j, index;
     unsigned char color[5][3] = {
@@ -280,6 +287,7 @@ void fb_color_block(struct aicfb_info *fbi)
         { 0xFF, 0xFF, 0xFF },
     };
     unsigned char *pos = (unsigned char *)fbi->fb_start;
+    (void)fb_size;
 
     width = fbi->width;
     height = fbi->height;
@@ -341,6 +349,14 @@ void fb_color_block(struct aicfb_info *fbi)
     }
 
     aicos_dcache_clean_range((unsigned long *)fbi->fb_start, fbi->fb_size);
+#endif /* AIC_FB_ROTATE_EN */
+#endif /* AIC_DISP_COLOR_BLOCK */
+#ifdef AIC_DISP_BLACK_SCREEN
+    if (!fb_size)
+        return;
+
+    memset(fbi->fb_start, 0x0, fb_size);
+    aicos_dcache_clean_range((unsigned long *)fbi->fb_start, fb_size);
 #endif
 }
 

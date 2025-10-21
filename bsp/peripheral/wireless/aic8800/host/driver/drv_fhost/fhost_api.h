@@ -41,6 +41,7 @@
  */
 #include "mac.h"
 #include "rwnx_defs.h"
+#include "rwnx_rx.h"
 
 /**
  * FHOST configuration item description
@@ -345,6 +346,10 @@ struct fhost_frame_info
      * true. In this case all other fields are still valid.
      */
     uint8_t *payload;
+    /**
+     * PHY information about the received frame
+     */
+    struct rx_info *prinfo;
 };
 
 /**
@@ -377,6 +382,10 @@ struct fhost_vif_monitor_cfg
      * Parameter for the monitor callback
      */
     void *cb_arg;
+    /**
+     * RX filter setting
+     */
+    uint32_t rx_filter;
 };
 
 /**
@@ -415,6 +424,37 @@ struct fhost_vif_sta_cfg
      * will return without waiting for the connection to complete.
      */
     int timeout_ms;
+};
+
+/**
+ * Configuration for p2p interface
+ */
+struct fhost_vif_p2p_cfg
+{
+    /**
+     * SSID to connect to (mandatory)
+     */
+    struct mac_ssid ssid;
+    /**
+     * AP operating channel (tx_power and flags fields are ignored).
+     */
+    struct mac_chan_op chan;
+    /**
+     * AP password/PSK passed as a string (i.e. MUST be terminated by a null byte)
+     */
+    char key[64 + 1];
+    /**
+     * Enable HE
+     */
+    uint8_t enable_he;
+    /**
+     * Enable ACS
+     */
+    uint8_t enable_acs;
+    /**
+     * Vendor IE
+     */
+    const char *vendor_ie;
 };
 
 /**

@@ -18,10 +18,10 @@
 #define EPWM_BASE               (PWMCS_BASE)
 #define GLB_BASE_E              (PWMCS_BASE + 0xF000)
 
-#ifdef AIC_EPWM_DRV_V11
+#if defined (AIC_EPWM_DRV_V11) || defined (AIC_EPWM_DRV_V12)
 #define GLB_CLK_CTL_E            0x020
 #define GLB_DLL_LDO_EN           0x080
-#else
+#elif defined (AIC_EPWM_DRV_V10)
 #define GLB_CLK_CTL_E            0x000
 #endif
 #define GLB_PWM_INT_STS          0x004
@@ -44,11 +44,20 @@
 #define EPWM_EVENT_CLR(n)        ((((n) & 0xF) << 8) + 0x064)
 #define EPWM_HRPWM_EN(n)         ((((n) & 0xF) << 8) + 0x080)
 #define EPWM_HRPWM_CFG(n)        ((((n) & 0xF) << 8) + 0x084)
-#ifdef AIC_EPWM_DRV_V11
+#if defined (AIC_EPWM_DRV_V11) || defined (AIC_EPWM_DRV_V12)
 #define EPWM_PUL_OUT_CFG(n)      ((((n) & 0xF) << 8) + 0x0A0)
 #define EPWM_PUL_OUT_NUM(n)      ((((n) & 0xF) << 8) + 0x0A4)
 #endif
 #define EPWM_VERSION(n)          ((((n) & 0xF) << 8) + 0x0FC)
+
+enum epwm_adc_cvra_mode {
+    PWM_ADC_CVRA_CNT_Z = 0,
+    PWM_ADC_CVRA_CNT_PRD,
+    PWM_ADC_CVRA_CNT_U_AV,
+    PWM_ADC_CVRA_CNT_D_AV,
+    PWM_ADC_CVRA_CNT_U_BV,
+    PWM_ADC_CVRA_CNT_D_BV
+};
 
 #define GLB_EPWM_EN_B            BIT(0)
 #define EPWM_S0_CLK_EN           BIT(0)
@@ -70,9 +79,23 @@
 #define EPWM_CLK_DIV1_MASK       GENMASK(9, 7)
 #define EPWM_CNT_MOD_MASK        GENMASK(1, 0)
 #define EPWM_CNT_MOD_SHIFT       0
-#define EPWM_INT_EN_SHITF        3
+
+#define EPWM_ADC_CVRA_SEL_EN     BIT(11)
+#define EPWM_ADC_CVRA_SEL_MASK   GENMASK(10, 8)
+#define EPWM_ADC_CVRA_SEL_SHIFT  8
+#if defined (AIC_EPWM_DRV_V12)
+#define EPWM_INT_EN              BIT(4)
+#else
+#define EPWM_INT_EN              BIT(3)
+#endif
 #define EPWM_INT_SEL_SHIFT       0
+#define EPWM_INT_SEL_MASK        GENMASK(2, 0)
 #define EPWM_INT_CLR             BIT(0)
+
+#define EPWM_ADC_CRVA_DIV_MASK   GENMASK(9, 8)
+#define EPWM_ADC_CRVA_DIV_SHIFT  8
+#define EPWM_INT_DIV_1           BIT(0)
+
 #define EPWM_ACT_SW_CT_UPDT_PUL  0x4
 #define EPWM_ACT_SW_CT_UPDT_MASK GENMASK(8, 6)
 #define EPWM_ACT_SW_CT_UPDT      6
@@ -94,7 +117,7 @@
 #define EPWM_CMPB_LP_MASK        GENMASK(5, 3)
 #define EPWM_CMP_LP_CNT_ZRO      0x0
 #define EPWM_CMP_LP_PUL_CNT_ZRO  0x4
-#ifdef AIC_EPWM_DRV_V11
+#if defined (AIC_EPWM_DRV_V11) || defined (AIC_EPWM_DRV_V12)
 #define EPWM_PUL_CNT_SRC_SHIFT   1
 #define EPWM_PUL_CNT_SRC_MASK    GENMASK(3, 1)
 #define EPWM_PUL_CNT_SRC_CNT_DB  0x5
@@ -130,7 +153,7 @@ static void aic_epwm_ch_info(char *buf, u32 ch, u32 en, struct aic_epwm_arg *arg
 
     snprintf(buf, 128, "%2d %2d %4s %11d %3d %3s %3s %3s %3s %3s %3s\n"
         "%30s %3s %3s %3s %3s %3s\n",
-        ch, en & EPMW_SX_CLK_EN(ch) ? 1 : 0,
+        ch, (en & EPMW_SX_CLK_EN(ch)) ? 1 : 0,
         mode[arg->mode], arg->tb_clk_rate, arg->def_level,
         act[arg->action0.CBD], act[arg->action0.CBU],
         act[arg->action0.CAD], act[arg->action0.CAU],
@@ -188,26 +211,32 @@ void hal_epwm_clr_int(u32 stat, u32 ch)
 
 void hal_epwm_int_config(u32 ch, u8 irq_mode, u8 enable)
 {
-    epwm_writel(enable, EPWM_ADC_INT_PRE(ch));
-    epwm_writel((enable << EPWM_INT_EN_SHITF) | ((irq_mode + 2) << EPWM_INT_SEL_SHIFT), EPWM_ADC_INT_CTL(ch));
+    epwm_reg_enable(EPWM_BASE + EPWM_ADC_INT_PRE(ch), EPWM_INT_DIV_1, enable);
+
+    if (enable)
+        epwm_writel_bits(irq_mode + 2, EPWM_INT_SEL_MASK, EPWM_INT_SEL_SHIFT, EPWM_ADC_INT_CTL(ch));
+
+    epwm_reg_enable(EPWM_BASE + EPWM_ADC_INT_CTL(ch), EPWM_INT_EN, enable);
 }
 
-void hal_epwm_ch_init(u32 ch, bool sync_mode, enum aic_epwm_mode mode, u32 default_level,
-                     struct aic_epwm_action *a0, struct aic_epwm_action *a1)
+void hal_epwm_ch_init(struct aic_epwm_arg *epwm_arg)
 {
     struct aic_epwm_arg *arg =  NULL;
+    u32 ch = 0;
+
+    ch = epwm_arg->id;
 
     if (hal_epwm_ch_check(ch) < 0)
         return;
 
     arg = &g_epwm_args[ch];
 
-    arg->sync_mode = sync_mode;
-    arg->mode = mode;
+    arg->sync_mode = epwm_arg->sync_mode;
+    arg->mode = epwm_arg->mode;
     arg->available = 1;
-    arg->def_level = default_level;
-    memcpy(&arg->action0, a0, sizeof(struct aic_epwm_action));
-    memcpy(&arg->action1, a1, sizeof(struct aic_epwm_action));
+    arg->def_level = epwm_arg->def_level;
+    memcpy(&arg->action0, &epwm_arg->action0, sizeof(struct aic_epwm_action));
+    memcpy(&arg->action1, &epwm_arg->action1, sizeof(struct aic_epwm_action));
 
     epwm_reg_enable(GLB_BASE_E + GLB_CLK_CTL_E, EPMW_SX_CLK_EN(ch), 1);
     epwm_writel(EPWM_SWACT_UPDT, EPWM_SW_ACT(ch));
@@ -355,7 +384,7 @@ void hal_epwm_count_ct(u32 ch, enum aic_epwm_mode mode)
     epwm_writel_bits(mode, EPWM_CNT_MOD_MASK, EPWM_CNT_MOD_SHIFT, EPWM_CNT_CONF(ch));
 }
 
-#ifdef AIC_EPWM_DRV_V11
+#if defined (AIC_EPWM_DRV_V11) || defined (AIC_EPWM_DRV_V12)
 void hal_epwm_pul_config(u32 ch)
 {
     hal_epwm_act_sw_ct(ch, EPWM_SET_CMPA_CMPB, EPWM_ACT_SW_LOW);
@@ -374,11 +403,11 @@ int hal_epwm_pul_set(u32 ch, u32 duty_ns, u32 period_ns, u32 output, u32 num)
 {
     int ret;
 
-    epwm_writel(num - 1, EPWM_PUL_OUT_NUM(ch));
-
     ret = hal_epwm_set(ch, duty_ns, period_ns, output);
     if (ret)
         return ret;
+
+    epwm_writel(num - 1, EPWM_PUL_OUT_NUM(ch));
 
     return 0;
 }
@@ -448,6 +477,29 @@ static void epwm_action_set(u32 ch, struct aic_epwm_action *act, char *name)
     epwm_writel(action, offset);
 }
 
+#ifdef AIC_EPWM_TRIG_PSADC
+int hal_epwm_trig_psadc(u32 ch, bool enable)
+{
+    static bool active = false;
+
+    /* ONLY enable trigger mode once time */
+    if ((active && enable) || (!active && !enable))
+        return 0;
+
+    if (enable) {
+        epwm_writel_bits(PWM_ADC_CVRA_CNT_PRD,
+                         EPWM_ADC_CVRA_SEL_MASK, EPWM_ADC_CVRA_SEL_SHIFT,
+                         EPWM_ADC_INT_CTL(ch));
+        epwm_writel_bits(AIC_EPWM_TRIG_PERIOD,
+                         EPWM_ADC_CRVA_DIV_MASK, EPWM_ADC_CRVA_DIV_SHIFT,
+                         EPWM_ADC_INT_PRE(ch));
+    }
+    epwm_reg_enable(EPWM_BASE + EPWM_ADC_INT_CTL(ch), EPWM_ADC_CVRA_SEL_EN, enable);
+    active = enable;
+    return 0;
+}
+#endif
+
 int hal_epwm_enable(u32 ch)
 {
     struct aic_epwm_arg *arg =  NULL;
@@ -466,6 +518,10 @@ int hal_epwm_enable(u32 ch)
 
     epwm_action_set(ch, &arg->action0, "action0");
     epwm_action_set(ch, &arg->action1, "action1");
+
+#ifdef AIC_EPWM_TRIG_PSADC
+    hal_epwm_trig_psadc(ch, true);
+#endif
 
     //For sync mode
     if (arg->sync_mode) {
@@ -510,7 +566,11 @@ int hal_epwm_disable(u32 ch)
 
     hal_log_debug("ch%d disable\n", ch);
 
-#ifdef AIC_EPWM_DRV_V11
+#if defined (AIC_EPWM_DRV_V11) || defined (AIC_EPWM_DRV_V12)
+
+#ifdef AIC_EPWM_TRIG_PSADC
+    hal_epwm_trig_psadc(ch, false);
+#endif
     epwm_writel_bits(EPWM_PRD_LD_CNT_ZRO, EPWM_CNT_PRD_LD_MASK, EPWM_CNT_PRD_LD_SHIFT, EPWM_CNT_CONF(ch));
     epwm_writel_bits(EPWM_CMP_LP_CNT_ZRO, EPWM_CMPA_LP_MASK, EPWM_CMPA_LP_SHIFT, EPWM_UPDT_MOD(ch));
     epwm_writel_bits(EPWM_CMP_LP_CNT_ZRO, EPWM_CMPB_LP_MASK, EPWM_CMPB_LP_SHIFT, EPWM_UPDT_MOD(ch));
@@ -536,20 +596,21 @@ int hal_epwm_disable(u32 ch)
 int hal_epwm_init(void)
 {
     int i, ret = 0;
-    u32 clk_id = 0;
     int clock_rate;
 
-#ifdef AIC_EPWM_DRV_V11
-    clk_id = CLK_PWMCS_SDFM;
-#else
-    clk_id = CLK_PWMCS;
+#if defined (AIC_EPWM_DRV_V11)
+    u32 clk_id = CLK_PWMCS_SDFM;
+#elif defined (AIC_EPWM_DRV_V10)
+    u32 clk_id = CLK_PWMCS;
 #endif
 
+#if defined (AIC_EPWM_DRV_V10) || defined (AIC_EPWM_DRV_V11)
     ret = hal_clk_set_freq(clk_id, EPWM_CLK_RATE);
     if (ret < 0) {
         hal_log_err("Failed to set EPWM clk %d\n", EPWM_CLK_RATE);
         return -1;
     }
+#endif
 
     clock_rate = hal_clk_get_freq(clk_id);
     if (clock_rate < 0) {
@@ -577,8 +638,6 @@ int hal_epwm_init(void)
 
     /* default configuration */
     for (i = 0; i < AIC_EPWM_CH_NUM; i++) {
-        g_epwm_args[i].id = i;
-        g_epwm_args[i].mode = EPWM_MODE_UP_COUNT;
         g_epwm_args[i].tb_clk_rate = clock_rate / 8;
         g_epwm_args[i].clk_rate = clock_rate;
     }

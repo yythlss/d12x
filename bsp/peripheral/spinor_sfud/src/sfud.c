@@ -76,7 +76,6 @@ static sfud_err read_jedec_id(sfud_flash *flash);
 sfud_err set_write_enabled(const sfud_flash *flash, bool enabled);
 static sfud_err set_4_byte_address_mode(sfud_flash *flash, bool enabled);
 static int make_adress_byte_array(const sfud_flash *flash, uint32_t addr, uint8_t *array);
-static sfud_err check_wp_mode(sfud_flash *flash);
 static sfud_err auto_set_rx_delay_mode(sfud_flash *flash);
 
 /**
@@ -431,7 +430,7 @@ static sfud_err hardware_init(sfud_flash *flash) {
 #endif
 
     /* Check whether the flash is in write protect state. If it is, exit the state. */
-    check_wp_mode(flash);
+    spi_nor_sr_unlock_all(flash);
 
 #ifdef SFUD_USING_QSPI
     quad_enable_func qe = flash->quad_enable;
@@ -1068,7 +1067,7 @@ sfud_err set_write_enabled(const sfud_flash *flash, bool enabled) {
 
     if (result == SFUD_SUCCESS) {
         result = sfud_read_status(flash, &register_status);
-        if (register_status & SFUD_WRITE_PROTECTION_MASK)
+        if (register_status & flash->bp_mask)
             SFUD_WP_INFO("Flash is in write protection state: 0x%x.\n", register_status);
     }
 
@@ -1162,7 +1161,7 @@ static sfud_err wait_busy(const sfud_flash *flash, size_t tmo_us) {
         if (result == SFUD_SUCCESS && ((status & SFUD_STATUS_REGISTER_BUSY)) == 0) {
             break;
         }
-        if (status & SFUD_WRITE_PROTECTION_MASK)
+        if (status & flash->bp_mask)
             SFUD_WP_INFO("Flash is in write protection state: 0x%x.\n", status);
         /* retry counts */
         SFUD_RETRY_PROCESS(flash->retry.delay, tmo_us, result);
@@ -1326,47 +1325,6 @@ sfud_err sfud_read_reg(const sfud_flash *flash, uint8_t reg, uint8_t *status) {
     SFUD_ASSERT(status);
 
     return flash->spi.wr(&flash->spi, &cmd, 1, status, 1);
-}
-
-/**
- * ensure the flash is not in write protect state
- *
- * @note The value of status regester0 is 0 or the falsh may be in the state of write protection.
- *
- * @param flash flash device
- *
- * @return result
- */
-static sfud_err check_wp_mode(sfud_flash *flash) {
-
-    sfud_err result = SFUD_SUCCESS;
-    uint8_t reg = 0x5;
-    uint8_t val = 0x0;
-
-    SFUD_ASSERT(flash);
-
-    result = sfud_read_reg(flash, reg, &val);
-    if (result == SFUD_SUCCESS) {
-        if (val & SFUD_WRITE_PROTECTION_MASK)
-            SFUD_WP_INFO("Flash is in write protection state: 0x%x.\n", val);
-    } else {
-        pr_warn("Read status register0  failed.\n");
-        return result;
-    }
-
-    result = sfud_write_status(flash, true, 0x00);
-    if (result != SFUD_SUCCESS) {
-        pr_warn("Write status register0  failed.\n");
-        return result;
-    }
-
-    result = sfud_read_reg(flash, reg, &val);
-    if (result == SFUD_SUCCESS) {
-        if (val & SFUD_WRITE_PROTECTION_MASK)
-            SFUD_WP_INFO("Flash is in write protection state: 0x%x.\n", val);
-    }
-
-    return result;
 }
 
 /**

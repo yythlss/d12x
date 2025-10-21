@@ -26,6 +26,7 @@
 #define BAUD_RATE_230400                230400
 #define BAUD_RATE_460800                460800
 #define BAUD_RATE_921600                921600
+#define BAUD_RATE_1500000               1500000
 #define BAUD_RATE_2000000               2000000
 #define BAUD_RATE_2500000               2500000
 #define BAUD_RATE_3000000               3000000
@@ -96,6 +97,7 @@
 #define RT_SERIAL_SW_FLOW_CTRL          0x85
 #define RT_SERIAL_SW_RECEIVE_ON_OFF     0x86
 #define RT_SERIAL_SET_BAUDRATE          0x87
+#define RT_SERIAL_GET_CONFIG            0x88
 
 typedef enum
 {
@@ -147,7 +149,7 @@ struct serial_configure
     rt_uint32_t flow_ctrl_suspend       :1;
     rt_uint32_t flowctrl_cts_enable     :1;
     rt_uint32_t flowctrl_rts_enable     :1;
-    rt_uint32_t uart_index              :4;
+    rt_uint32_t uart_index;
     rt_uint32_t uart_freq;
 };
 

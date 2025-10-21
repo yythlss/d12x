@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025, sakumisu
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ */
+
 #include "usbh_core.h"
 #include "usbh_cdc_acm.h"
 #include "usbh_hid.h"
@@ -15,9 +22,11 @@
 #if __has_include("lwip/pbuf.h")
 #define TEST_USBH_CDC_ECM 1
 #define TEST_USBH_RNDIS   1
+#define TEST_USBH_CDC_NCM   1
 #else
 #define TEST_USBH_CDC_ECM 0
 #define TEST_USBH_RNDIS   0
+#define TEST_USBH_CDC_NCM   0
 #endif
 
 #if TEST_USBH_CDC_ACM
@@ -58,7 +67,7 @@ find_class:
         USB_LOG_RAW("bulk out error,ret:%d\r\n", ret);
         goto find_class;
     } else {
-        USB_LOG_RAW("send over:%ld\r\n", cdc_acm_class->bulkout_urb.actual_length);
+        USB_LOG_RAW("send over:%d\r\n", cdc_acm_class->bulkout_urb.actual_length);
     }
 
     usbh_bulk_urb_fill(&cdc_acm_class->bulkin_urb, cdc_acm_class->hport, cdc_acm_class->bulkin, cdc_buffer, cdc_acm_class->bulkin->wMaxPacketSize, 3000, usbh_cdc_acm_callback, cdc_acm_class);
@@ -437,7 +446,7 @@ static rt_err_t rt_usbh_cdc_ecm_eth_tx(rt_device_t dev, struct pbuf *p)
 {
     return usbh_cdc_ecm_linkoutput(NULL, p);
 }
-#endif
+#else
 
 static err_t usbh_cdc_ecm_if_init(struct netif *netif)
 {
@@ -452,15 +461,24 @@ static err_t usbh_cdc_ecm_if_init(struct netif *netif)
     netif->linkoutput = usbh_cdc_ecm_linkoutput;
     return ERR_OK;
 }
+#endif
+
+#ifdef RT_USING_DEVICE_OPS
+static const struct rt_device_ops aicusb_host_ecm_ops = {
+    .control = rt_usbh_cdc_ecm_control,
+};
+#endif
 
 void usbh_cdc_ecm_run(struct usbh_cdc_ecm *cdc_ecm_class)
 {
 #ifdef __RTTHREAD__
-    struct netdev *netdev;
-
     memset(&cdc_ecm_dev, 0, sizeof(struct eth_device));
 
+#ifdef RT_USING_DEVICE_OPS
+    cdc_ecm_dev.parent.ops = &aicusb_host_ecm_ops;
+#else
     cdc_ecm_dev.parent.control = rt_usbh_cdc_ecm_control;
+#endif
     cdc_ecm_dev.eth_rx = NULL;
     cdc_ecm_dev.eth_tx = rt_usbh_cdc_ecm_eth_tx;
     cdc_ecm_dev.parent.user_data = cdc_ecm_class;
@@ -592,7 +610,6 @@ void timer_init(struct usbh_rndis *rndis_class)
         }
     }
 }
-#endif
 
 static err_t usbh_rndis_if_init(struct netif *netif)
 {
@@ -607,15 +624,25 @@ static err_t usbh_rndis_if_init(struct netif *netif)
     netif->linkoutput = usbh_rndis_linkoutput;
     return ERR_OK;
 }
+#endif
+
+
+
+#ifdef RT_USING_DEVICE_OPS
+static const struct rt_device_ops aicusb_host_rndis_ops = {
+    .control = rt_usbh_rndis_control,
+};
+#endif
 
 void usbh_rndis_run(struct usbh_rndis *rndis_class)
 {
 #ifdef __RTTHREAD__
-    struct netdev *netdev;
-
     memset(&rndis_dev, 0, sizeof(struct eth_device));
-
+#ifdef RT_USING_DEVICE_OPS
+    rndis_dev.parent.ops = &aicusb_host_rndis_ops;
+#else
     rndis_dev.parent.control = rt_usbh_rndis_control;
+#endif
     rndis_dev.eth_rx = NULL;
     rndis_dev.eth_tx = rt_usbh_rndis_eth_tx;
     rndis_dev.parent.user_data = rndis_class;
@@ -747,3 +774,120 @@ void usbh_class_test(void)
 #endif
 #endif
 }
+
+#if TEST_USBH_CDC_NCM
+#include "usbh_cdc_ncm.h"
+
+static struct eth_device g_cdc_ncm_dev;
+
+void usbh_lwip_eth_output_common(struct pbuf *p, uint8_t *buf)
+{
+    struct pbuf *q;
+    uint8_t *buffer;
+
+    buffer = buf;
+    for (q = p; q != NULL; q = q->next) {
+        rt_memcpy(buffer, q->payload, q->len);
+        buffer += q->len;
+    }
+}
+
+void usbh_lwip_eth_input_common(struct netif *netif, uint8_t *buf, uint32_t len)
+{
+#if LWIP_TCPIP_CORE_LOCKING_INPUT
+    pbuf_type type = PBUF_REF;
+#else
+    pbuf_type type = PBUF_POOL;
+#endif
+    err_t err;
+    struct pbuf *p;
+
+    p = pbuf_alloc(PBUF_RAW, len, type);
+    if (p != NULL) {
+#if LWIP_TCPIP_CORE_LOCKING_INPUT
+        p->payload = buf;
+#else
+        rt_memcpy(p->payload, buf, len);
+#endif
+        err = netif->input(p, netif);
+        if (err != ERR_OK) {
+            pbuf_free(p);
+        }
+    } else {
+        USB_LOG_ERR("No memory to alloc pbuf\r\n");
+    }
+}
+
+static rt_err_t rt_usbh_cdc_ncm_control(rt_device_t dev, int cmd, void *args)
+{
+    struct usbh_cdc_ncm *cdc_ncm_class = (struct usbh_cdc_ncm *)dev->user_data;
+
+    switch (cmd) {
+        case NIOCTL_GADDR:
+
+            /* get mac address */
+            if (args)
+                rt_memcpy(args, cdc_ncm_class->mac, 6);
+            else
+                return -RT_ERROR;
+
+            break;
+
+        default:
+            break;
+    }
+
+    return RT_EOK;
+}
+
+static rt_err_t rt_usbh_cdc_ncm_eth_tx(rt_device_t dev, struct pbuf *p)
+{
+    int ret;
+    (void)dev;
+
+    usbh_lwip_eth_output_common(p, usbh_cdc_ncm_get_eth_txbuf());
+    ret = usbh_cdc_ncm_eth_output(p->tot_len);
+    if (ret < 0) {
+        return -RT_ERROR;
+    } else {
+        return RT_EOK;
+    }
+}
+
+void usbh_cdc_ncm_eth_input(uint8_t *buf, uint32_t buflen)
+{
+    usbh_lwip_eth_input_common(g_cdc_ncm_dev.netif, buf, buflen);
+}
+
+#ifdef RT_USING_DEVICE_OPS
+static const struct rt_device_ops aicusb_host_ncm_ops = {
+    .control = rt_usbh_cdc_ncm_control,
+};
+#endif
+
+void usbh_cdc_ncm_run(struct usbh_cdc_ncm *cdc_ncm_class)
+{
+    memset(&g_cdc_ncm_dev, 0, sizeof(struct eth_device));
+
+#ifdef RT_USING_DEVICE_OPS
+    cdc_ecm_dev.parent.ops = &aicusb_host_ncm_ops;
+#else
+    cdc_ecm_dev.parent.control = rt_usbh_cdc_ncm_control;
+#endif
+    g_cdc_ncm_dev.eth_rx = NULL;
+    g_cdc_ncm_dev.eth_tx = rt_usbh_cdc_ncm_eth_tx;
+    g_cdc_ncm_dev.parent.user_data = cdc_ncm_class;
+
+    eth_device_init(&g_cdc_ncm_dev, "u1");
+    eth_device_linkchange(&g_cdc_ncm_dev, RT_TRUE);
+
+    usb_osal_thread_create("usbh_cdc_ncm_rx", 2048, CONFIG_USBHOST_PSC_PRIO + 1, usbh_cdc_ncm_rx_thread, NULL);
+}
+
+void usbh_cdc_ncm_stop(struct usbh_cdc_ncm *cdc_ncm_class)
+{
+    (void)cdc_ncm_class;
+
+    eth_device_deinit(&g_cdc_ncm_dev);
+}
+#endif

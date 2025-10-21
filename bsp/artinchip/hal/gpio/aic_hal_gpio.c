@@ -92,7 +92,7 @@ int hal_common_gpio_name2pin(const char *name)
     int hw_port_num, hw_pin_num = 0;
     int i;
 
-    hw_port_num = (int)(name[1] - 'A');
+    hw_port_num = (int)(name[1] - GPIO_GROUP_BEGIN);
 
     for (i = 3; i < strlen(name); i++)
     {
@@ -124,13 +124,11 @@ int hal_gpio_name2pin(const char *name)
     return -1;
 }
 
-int hal_gpio_get_value(unsigned int group, unsigned int pin,
-                       unsigned int *pvalue)
+int hal_gpio_get_value(unsigned int group, unsigned int pin, unsigned int *pvalue)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(gen_reg(group, GEN_IN_STAT_REG));
 
@@ -139,13 +137,11 @@ int hal_gpio_get_value(unsigned int group, unsigned int pin,
     return 0;
 }
 
-int hal_gpio_get_outcfg(unsigned int group, unsigned int pin,
-                        unsigned int *pvalue)
+int hal_gpio_get_outcfg(unsigned int group, unsigned int pin, unsigned int *pvalue)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(gen_reg(group, GEN_OUT_CFG_REG));
 
@@ -158,8 +154,7 @@ int hal_gpio_set_value(unsigned int group, unsigned int pin, unsigned int value)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(gen_reg(group, GEN_OUT_CFG_REG));
 
@@ -171,12 +166,26 @@ int hal_gpio_set_value(unsigned int group, unsigned int pin, unsigned int value)
     return 0;
 }
 
+int hal_gpio_set_pin_value(unsigned int pin, unsigned int value)
+{
+    unsigned int g;
+    unsigned int p;
+
+    CHECK_PARAM(pin < (GPIO_GROUP_MAX * GPIO_GROUP_SIZE) && pin >= 0, -EINVAL);
+
+    g = GPIO_GROUP(pin);
+    p = GPIO_GROUP_PIN(pin);
+
+    hal_gpio_set_value(g, p, value);
+
+    return 0;
+}
+
 int hal_gpio_clr_output(unsigned int group, unsigned int pin)
 {
     unsigned int val;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = 1 << pin;
 
@@ -189,8 +198,7 @@ int hal_gpio_set_output(unsigned int group, unsigned int pin)
 {
     unsigned int val;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = 1 << pin;
 
@@ -203,8 +211,7 @@ int hal_gpio_toggle_output(unsigned int group, unsigned int pin)
 {
     unsigned int val;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = 1 << pin;
 
@@ -217,8 +224,7 @@ int hal_gpio_enable_irq_no_clr(unsigned int group, unsigned int pin)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(gen_reg(group, GEN_TRQ_EN_REG));
 
@@ -233,8 +239,7 @@ int hal_gpio_enable_irq(unsigned int group, unsigned int pin)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     hal_gpio_clr_irq_stat(group, pin);
     val = readl(gen_reg(group, GEN_TRQ_EN_REG));
@@ -250,8 +255,7 @@ int hal_gpio_disable_irq(unsigned int group, unsigned int pin)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(gen_reg(group, GEN_TRQ_EN_REG));
 
@@ -307,14 +311,11 @@ int hal_gpio_group_set_irq_stat(unsigned int group, unsigned int stat)
     return 0;
 }
 
-
-int hal_gpio_get_irq_stat(unsigned int group, unsigned int pin,
-                          unsigned int *pstat)
+int hal_gpio_get_irq_stat(unsigned int group, unsigned int pin, unsigned int *pstat)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(gen_reg(group, GEN_IRQ_STAT_REG));
 
@@ -327,8 +328,7 @@ int hal_gpio_clr_irq_stat(unsigned int group, unsigned int pin)
 {
     unsigned int val;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = 1 << pin;
 
@@ -341,8 +341,7 @@ int hal_gpio_set_func(unsigned int group, unsigned int pin, unsigned int func)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(cfg_reg(group, pin));
 
@@ -358,8 +357,7 @@ int hal_gpio_get_func(unsigned int group, unsigned int pin, unsigned int *pfunc)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(cfg_reg(group, pin));
 
@@ -368,13 +366,11 @@ int hal_gpio_get_func(unsigned int group, unsigned int pin, unsigned int *pfunc)
     return 0;
 }
 
-int hal_gpio_set_drive_strength(unsigned int group, unsigned int pin,
-                                unsigned int strength)
+int hal_gpio_set_drive_strength(unsigned int group, unsigned int pin, unsigned int strength)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(cfg_reg(group, pin));
 
@@ -386,13 +382,11 @@ int hal_gpio_set_drive_strength(unsigned int group, unsigned int pin,
     return 0;
 }
 
-int hal_gpio_set_bias_pull(unsigned int group, unsigned int pin,
-                           unsigned int pull)
+int hal_gpio_set_bias_pull(unsigned int group, unsigned int pin, unsigned int pull)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(cfg_reg(group, pin));
 
@@ -404,13 +398,11 @@ int hal_gpio_set_bias_pull(unsigned int group, unsigned int pin,
     return 0;
 }
 
-int hal_gpio_set_irq_mode(unsigned int group, unsigned int pin,
-                          unsigned int irq_mode)
+int hal_gpio_set_irq_mode(unsigned int group, unsigned int pin, unsigned int irq_mode)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(cfg_reg(group, pin));
 
@@ -426,8 +418,7 @@ int hal_gpio_direction_input(unsigned int group, unsigned int pin)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(cfg_reg(group, pin));
 
@@ -443,8 +434,7 @@ int hal_gpio_direction_output(unsigned int group, unsigned int pin)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(cfg_reg(group, pin));
 
@@ -456,13 +446,11 @@ int hal_gpio_direction_output(unsigned int group, unsigned int pin)
     return 0;
 }
 
-int hal_gpio_set_debounce(unsigned int group, unsigned int pin,
-                          unsigned int debounce)
+int hal_gpio_set_debounce(unsigned int group, unsigned int pin, unsigned int debounce)
 {
     unsigned int val = 0;
 
-    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0,
-                -EINVAL);
+    CHECK_PARAM(group < GPIO_GROUP_MAX && group >= 0 && pin < 32 && pin >= 0, -EINVAL);
 
     val = readl(cfg_reg(group, pin));
 

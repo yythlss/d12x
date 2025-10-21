@@ -35,6 +35,11 @@
 #include "mpp_ge.h"
 #endif
 
+/* MUST and ONLY enable one of follow mode: */
+#define DE_SCALE_ENABLE        0    // Scale by DE video layer
+#define DE_CROP_ENABLE         0    // Crop by DE video layer
+#define DVP_CROP_ENABLE        1    // Crop by DVP
+
 /* Global macro and variables */
 
 #define VID_BUF_NUM             3
@@ -68,10 +73,10 @@ struct aic_dvp_data {
     int frame_cnt;
     int fresh_frame;
     int rotation;
-    int dst_fmt;  // output format
-    struct mpp_rect dst_pos;
+    struct mpp_rect dst_pos;        // position in DE video player
 
-    struct mpp_video_fmt src_fmt;
+    struct mpp_video_fmt src_fmt;   // format of DVP input, i.e. camera output
+    struct dvp_out_fmt   dst_fmt;   // format of DVP output
     uint32_t num_buffers;
     struct vin_video_buf binfo;
 };
@@ -150,7 +155,7 @@ int sensor_get_fmt(void)
 
     if (f.bus_type == MEDIA_BUS_RAW8_MONO) {
         pr_info("Forbid the output format to YUV400\n");
-        g_vdata.dst_fmt = MPP_FMT_YUV400;
+        g_vdata.dst_fmt.pixelformat = MPP_FMT_YUV400;
     }
 
     return 0;
@@ -169,18 +174,45 @@ int dvp_subdev_set_fmt(void)
     return 0;
 }
 
-int dvp_cfg(int width, int height, int format)
+int dvp_cfg(void)
 {
+    struct mpp_video_fmt *src = &g_vdata.src_fmt;
+    struct dvp_out_fmt *dst = &g_vdata.dst_fmt;
     int ret = 0;
-    struct dvp_out_fmt f = {0};
 
-    f.width = g_vdata.src_fmt.width;
-    f.height = g_vdata.src_fmt.height;
-    f.pixelformat = format;
-    f.num_planes = VID_BUF_PLANE_NUM;
-    f.frame_offset = 0;
+#if DVP_CROP_ENABLE
+    /* Crop the camera image in center-aligned way */
+    if (src->width > g_fb_info.width) {
+        dst->width = g_fb_info.width;
+        dst->crop_x = (src->width - g_fb_info.width) / 2;
+    } else {
+        dst->width = src->width;
+    }
 
-    ret = mpp_dvp_ioctl(DVP_OUT_S_FMT, &f);
+    if (src->height > g_fb_info.height) {
+        dst->height = g_fb_info.height;
+        dst->crop_y = (src->height - g_fb_info.height) / 2;
+    } else {
+        dst->height = src->height;
+    }
+    pr_info("DVP crop: x %d, y %d, w %d, h %d\n",
+            dst->crop_x, dst->crop_y, dst->width, dst->height);
+#else
+    dst->width = src->width;
+    dst->height = src->height;
+#endif
+
+    if (dst->pixelformat == MPP_FMT_NV16)
+        g_vdata.frame_size = g_vdata.w * g_vdata.h * 2;
+    else if (dst->pixelformat == MPP_FMT_NV12)
+        g_vdata.frame_size = (g_vdata.w * g_vdata.h * 3) >> 1;
+    else if (dst->pixelformat == MPP_FMT_YUV400)
+        g_vdata.frame_size = g_vdata.w * g_vdata.h;
+
+    dst->num_planes = VID_BUF_PLANE_NUM;
+    dst->frame_offset = 0;
+
+    ret = mpp_dvp_ioctl(DVP_OUT_S_FMT, dst);
     if (ret < 0) {
         pr_err("Failed to set DVP out-format! err -%d\n", -ret);
         return -1;
@@ -294,10 +326,6 @@ static int dvp_stop(void)
     return 0;
 }
 
-/* Enable one of follow: SCALE or CROP */
-#define DVP_SCALE       1
-#define DVP_CROP        0
-
 int video_layer_disable(void)
 {
     int ret = 0;
@@ -321,7 +349,7 @@ int do_rotate(struct aic_dvp_data *vdata, int index)
     struct vin_video_buf *binfo = &vdata->binfo;
     int ret = 0;
 
-    src->format = vdata->dst_fmt;
+    src->format = vdata->dst_fmt.pixelformat;
     src->buf_type = MPP_PHY_ADDR;
     src->phy_addr[0] = binfo->planes[index * VID_BUF_PLANE_NUM].buf;
     src->phy_addr[1] = binfo->planes[index * VID_BUF_PLANE_NUM + 1].buf;
@@ -330,7 +358,7 @@ int do_rotate(struct aic_dvp_data *vdata, int index)
     src->size.width = vdata->w;
     src->size.height = vdata->h;
 
-    dst->format = vdata->dst_fmt;
+    dst->format = vdata->dst_fmt.pixelformat;
     dst->buf_type = MPP_PHY_ADDR;
     dst->phy_addr[0] = binfo->planes[g_vdata.num_buffers * VID_BUF_PLANE_NUM].buf;
     dst->phy_addr[1] = binfo->planes[g_vdata.num_buffers * VID_BUF_PLANE_NUM + 1].buf;
@@ -394,7 +422,7 @@ int video_layer_set(struct aic_dvp_data *vdata, int index)
 {
 #ifdef AIC_DISPLAY_DRV
     int i;
-#if DVP_SCALE
+#if DE_SCALE_ENABLE
     u32 min_side = 0, max_side = 0;
 #endif
     struct aicfb_layer_data layer = {0};
@@ -406,10 +434,11 @@ int video_layer_set(struct aic_dvp_data *vdata, int index)
     /* Dst image */
     layer.pos.x = vdata->dst_pos.x;
     layer.pos.y = vdata->dst_pos.y;
-#if DVP_SCALE
+#if DE_SCALE_ENABLE
     min_side = min(vdata->dst_pos.width, vdata->dst_pos.height);
     max_side = max(vdata->dst_pos.width, vdata->dst_pos.height);
     if (max_side > (min_side * 2)) {
+        /* When the aspect ratio is too high, stretch it to a square */
         layer.scale_size.width = min_side;
         layer.scale_size.height = min_side;
         if (vdata->dst_pos.width > vdata->dst_pos.height)
@@ -421,39 +450,40 @@ int video_layer_set(struct aic_dvp_data *vdata, int index)
         layer.scale_size.height = vdata->dst_pos.height;
     }
 #else
-    layer.scale_size.width = vdata->w;
-    layer.scale_size.height = vdata->h;
-    if (g_fb_info.width > vdata->w)
-        layer.pos.x = (g_fb_info.width - vdata->w) / 2;
-    if (g_fb_info.height > vdata->h)
-        layer.pos.y = (g_fb_info.height - vdata->h) / 2;
+    layer.scale_size.width = vdata->dst_pos.width;
+    layer.scale_size.height = vdata->dst_pos.height;
+    /* Be center-aligned if screen size is bigger than DVP output */
+    if (g_fb_info.width > vdata->dst_pos.width)
+        layer.pos.x = (g_fb_info.width - vdata->dst_pos.width) / 2;
+    if (g_fb_info.height > vdata->dst_pos.height)
+        layer.pos.y = (g_fb_info.height - vdata->dst_pos.height) / 2;
 #endif
 
-#if DVP_CROP
+#if DE_CROP_ENABLE
     layer.buf.crop_en = 1;
     layer.buf.crop.x = 0;
     layer.buf.crop.y = 0;
-    layer.buf.crop.width = min(vdata->w, (int)g_fb_info.width);
-    layer.buf.crop.height = min(vdata->h, (int)g_fb_info.height);
+    layer.buf.crop.width = min(vdata->dst_fmt.width, g_fb_info.width);
+    layer.buf.crop.height = min(vdata->dst_fmt.height, g_fb_info.height);
 #endif
 
     /* Src image */
     if (vdata->rotation == MPP_ROTATION_0
         || vdata->rotation == MPP_ROTATION_180) {
-        layer.buf.size.width = vdata->w;
+        layer.buf.size.width = vdata->dst_fmt.width;
         if (aic_dvp_sfield_mode())
-            layer.buf.size.height = vdata->h / 2;
+            layer.buf.size.height = vdata->dst_fmt.height / 2;
         else
-            layer.buf.size.height = vdata->h;
+            layer.buf.size.height = vdata->dst_fmt.height;
     } else {
         if (aic_dvp_sfield_mode())
-            layer.buf.size.width = vdata->h / 2;
+            layer.buf.size.width = vdata->dst_fmt.height / 2;
         else
-            layer.buf.size.width = vdata->h;
-        layer.buf.size.height = vdata->w;
+            layer.buf.size.width = vdata->dst_fmt.height;
+        layer.buf.size.height = vdata->dst_fmt.width;
     }
 
-    layer.buf.format = vdata->dst_fmt;
+    layer.buf.format = vdata->dst_fmt.pixelformat;
     layer.buf.buf_type = MPP_PHY_ADDR;
 
     for (i = 0; i < VID_BUF_PLANE_NUM; i++) {
@@ -530,14 +560,31 @@ static void test_dvp_thread(void *arg)
     if (dvp_start() < 0)
         return;
 
-#if DVP_SCALE
-    pr_info("DVP scale is enable\n");
+#if DE_SCALE_ENABLE
+
+    pr_info("DE scale is enable\n");
     if (dvp_set_output_pos(VID_SCALE_OFFSET, VID_SCALE_OFFSET,
                            g_fb_info.width - VID_SCALE_OFFSET * 2,
                            g_fb_info.height - VID_SCALE_OFFSET * 2))
         return;
+
+#elif DVP_CROP_ENABLE
+
+    pr_info("DVP crop is enable\n");
+    if (dvp_set_output_pos(0, 0,
+                           min(g_fb_info.width, g_vdata.src_fmt.width),
+                           min(g_fb_info.height, g_vdata.src_fmt.height)))
+        return;
+
 #else
-    pr_info("DVP scale is disable\n");
+
+    if (dvp_set_output_pos(0, 0, g_vdata.dst_fmt.width, g_vdata.dst_fmt.height))
+        return;
+
+#endif // end of DE_SCALE_ENABLE
+
+#if DE_CROP_ENABLE
+    pr_info("DE crop is enable\n");
 #endif
 
     gettimespec(&begin);
@@ -642,16 +689,16 @@ static int cmd_test_dvp(int argc, char **argv)
     }
 
     memset(&g_vdata, 0, sizeof(struct aic_dvp_data));
-    g_vdata.dst_fmt = MPP_FMT_NV16;
+    g_vdata.dst_fmt.pixelformat = MPP_FMT_NV16;
     g_vdata.frame_cnt = 1;
     optind = 0;
     while ((c = getopt_long(argc, argv, sopts, lopts, NULL)) != -1) {
         switch (c) {
         case 'f':
             if (strncasecmp("nv12", optarg, strlen(optarg)) == 0)
-                g_vdata.dst_fmt = MPP_FMT_NV12;
+                g_vdata.dst_fmt.pixelformat = MPP_FMT_NV12;
             if (strncasecmp("yuv400", optarg, strlen(optarg)) == 0)
-                g_vdata.dst_fmt = MPP_FMT_YUV400;
+                g_vdata.dst_fmt.pixelformat = MPP_FMT_YUV400;
             break;
 
         case 'c':
@@ -674,7 +721,7 @@ static int cmd_test_dvp(int argc, char **argv)
     }
 
     pr_info("Capture %d frames from camera\n", g_vdata.frame_cnt);
-    pr_info("DVP out format: 0x%x\n", g_vdata.dst_fmt);
+    pr_info("DVP out format: 0x%x\n", g_vdata.dst_fmt.pixelformat);
 
     if (mpp_vin_init(CAMERA_DEV_NAME))
         return -1;
@@ -684,13 +731,6 @@ static int cmd_test_dvp(int argc, char **argv)
 
     if (dvp_subdev_set_fmt() < 0)
         goto error_out;
-
-    if (g_vdata.dst_fmt == MPP_FMT_NV16)
-        g_vdata.frame_size = g_vdata.w * g_vdata.h * 2;
-    else if (g_vdata.dst_fmt == MPP_FMT_NV12)
-        g_vdata.frame_size = (g_vdata.w * g_vdata.h * 3) >> 1;
-    else if (g_vdata.dst_fmt == MPP_FMT_YUV400)
-        g_vdata.frame_size = g_vdata.w * g_vdata.h;
 
     g_fb = mpp_fb_open();
     if (!g_fb) {
@@ -713,7 +753,7 @@ static int cmd_test_dvp(int argc, char **argv)
     if (set_ui_layer_alpha(0) < 0)
         goto error_out;
 
-    if (dvp_cfg(g_vdata.w, g_vdata.h, g_vdata.dst_fmt) < 0)
+    if (dvp_cfg() < 0)
         goto error_out;
 
     thid = aicos_thread_create("test_dvp", 4096, 0, test_dvp_thread, NULL);

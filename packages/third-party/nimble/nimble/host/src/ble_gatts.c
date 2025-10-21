@@ -1619,7 +1619,7 @@ ble_gatts_peer_cl_sup_feat_update(uint16_t conn_handle, struct os_mbuf *om)
     int rc = 0;
     int i;
 
-    BLE_HS_LOG(DEBUG, "");
+    BLE_HS_LOG(DEBUG, "%s", __func__);
 
     if (!om) {
         return BLE_ATT_ERR_INSUFFICIENT_RES;

@@ -127,15 +127,20 @@ static void _aic_dvp_try_fmt(struct dvp_out_fmt *pix)
 
 int aic_dvp_set_out_fmt(struct dvp_out_fmt *fmt)
 {
-    int i;
+    int i, ret = 0;
 
     _aic_dvp_try_fmt(fmt);
     g_dvp.fmt = *fmt;
 
     /* Save the configuration for DVP controller */
-    g_dvp.cfg.output = aic_dvp_out_fmt_valid(g_dvp.fmt.pixelformat);
+    ret = aic_dvp_out_fmt_valid(g_dvp.fmt.pixelformat);
+    if (ret < 0)
+        return -1;
+    g_dvp.cfg.output = ret;
     g_dvp.cfg.width = g_dvp.fmt.width;
     g_dvp.cfg.height = g_dvp.fmt.height;
+    g_dvp.cfg.crop_x = g_dvp.fmt.crop_x;
+    g_dvp.cfg.crop_y = g_dvp.fmt.crop_y;
     for (i = 0; i < DVP_PLANE_NUM; i++) {
         g_dvp.cfg.stride[i] = g_dvp.fmt.plane_fmt[i].bytesperline;
         g_dvp.cfg.sizeimage[i] = g_dvp.fmt.plane_fmt[i].sizeimage;
@@ -275,7 +280,13 @@ static int aic_dvp_top_field_done(struct aic_dvp *dvp, u32 err)
 
 static int aic_dvp_frame_done(struct aic_dvp *dvp, int err)
 {
+    static bool need_skip = false;
     struct vb_buffer *cur_buf = NULL;
+
+    if (need_skip) {
+        need_skip = false;
+        return 0;
+    }
 
     if (list_empty(&dvp->active_list)) {
 #ifndef AIC_DVP_IGNORE_LOSS
@@ -294,9 +305,10 @@ static int aic_dvp_frame_done(struct aic_dvp *dvp, int err)
 
     /* If cur_buf is a new one queued, DVP should use it first */
     if (!cur_buf->hw_using) {
-        pr_debug("Good! Buf %d is free again\n", cur_buf->index);
+        pr_debug("Buf %d is free just now\n", cur_buf->index);
         aic_dvp_buf_reload(dvp, cur_buf);
         dvp->sequence++;
+        need_skip = true;
         return 0;
     }
 
@@ -352,8 +364,8 @@ static int aic_dvp_update_addr(struct aic_dvp *dvp)
     } else {
         /* This should not happened! */
         if (!dvp->cfg.interlaced)
-            pr_info("Weird! DVP is using two buf %d & %d!\n",
-                    cur_buf->index, next_buf->index);
+            pr_debug("Weird! DVP is using two buf %d & %d!\n",
+                     cur_buf->index, next_buf->index);
         return -1;
     }
 
@@ -455,7 +467,7 @@ static irqreturn_t aic_dvp_isr(int irq, void *data)
         g_dvp_full_cnt++;
         /* should tag the buf error, so APP can ignore it */
         err = 1;
-        pr_debug("DVP FIFO is full! Count %d (0x%x)\n", g_dvp_full_cnt, sta);
+        pr_warn("DVP FIFO is full! Count %d (0x%x)\n", g_dvp_full_cnt, sta);
     } else if (sta & DVP_IRQ_STA_XY_CODE_ERR) {
         err = 1;
         pr_warn("DVP checksum has error! (0x%x)\n", sta);

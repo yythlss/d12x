@@ -22,6 +22,9 @@
 #include "host/ble_hs.h"
 #include "host/ble_hs_hci.h"
 #include "ble_hs_priv.h"
+#ifdef AIC_BT_REALTEK
+#include <realtek_bt_drv.h>
+#endif
 
 #if !MYNEWT_VAL(BLE_CONTROLLER)
 static int
@@ -402,6 +405,10 @@ ble_hs_startup_go(void)
 {
     struct ble_store_gen_key gen_key;
     int rc;
+
+#ifdef AIC_BT_REALTEK
+    realtek_bt_init();
+#endif
 
     rc = ble_hs_startup_reset_tx();
     if (rc != 0) {

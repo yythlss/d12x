@@ -127,8 +127,8 @@ if GetDepend('AIC_WRI_DRV'):
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/wri/*.c', exclude=['hal/wri/*_v*.c'])
         ver_num = int(ver)
-        if ver_num == 13:
-            src += Glob('hal/wri/*_v13.c')
+        if ver_num >= 20:
+            src += Glob('hal/wri/*_v20.c')
         else:
             src += Glob('hal/wri/*_v10*.c')
 
@@ -278,6 +278,12 @@ if GetDepend('AIC_PANEL_DSI_FL7707'):
 
 if GetDepend('AIC_PANEL_DSI_FT8201'):
     src += Glob('drv/display/panel/panel_dsi_ft8201.c')
+
+if GetDepend('AIC_PANEL_DSI_ST7701S'):
+    src += Glob('drv/display/panel/panel_dsi_st7701s.c')
+
+if GetDepend('AIC_PANEL_DSI_EDP_LT9811EXB'):
+    src += Glob('drv/display/panel/panel_dsi_edp_lt8911exb.c')
 #
 # MIPI-DBI Panel Driver
 #
@@ -304,8 +310,17 @@ if GetDepend('AIC_PANEL_DBI_ILI9327'):
 if GetDepend('AIC_PANEL_DBI_ST77903'):
     src += Glob('drv/display/panel/panel_dbi_st77903.c')
 
+if GetDepend('AIC_PANEL_DBI_ST77916'):
+    src += Glob('drv/display/panel/panel_dbi_st77916.c')
+
+if GetDepend('AIC_PANEL_DBI_ST77912'):
+    src += Glob('drv/display/panel/panel_dbi_st77912.c')
+
 if GetDepend('AIC_PANEL_DBI_CO5300'):
     src += Glob('drv/display/panel/panel_dbi_co5300.c')
+
+if GetDepend('AIC_PANEL_DBI_GC0D01N'):
+    src += Glob('drv/display/panel/panel_dbi_gc9d01n.c')
 #
 # RGB Panel Driver SPI Init
 #
@@ -422,6 +437,7 @@ if GetDepend('AIC_EPWM_DRV'):
         src += Glob('drv/epwm/*.c')
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/pwmcs/hal_epwm.c')
+        src += Glob('hal/pwmcs/ewpm_info.c')
 
 if GetDepend('AIC_QEP_DRV'):
     if GetDepend('DRIVER_DRV_EN'):
@@ -517,6 +533,12 @@ if GetDepend('AIC_GMAC_DRV'):
         CPPPATH.append(cwd + '/hal/mac/')
     if GetDepend('RT_USING_LWIP'):
         src += Glob('drv/mac/*.c')
+
+if GetDepend('AIC_PBUS_DRV'):
+    if GetDepend('DRIVER_DRV_EN'):
+        src += Glob('drv/pbus/*.c')
+    if GetDepend('DRIVER_HAL_EN'):
+        src += Glob('hal/pbus/*.c')
 
 LOCAL_CCFLAGS = ''
 # LOCAL_CCFLAGS += ' -O0'

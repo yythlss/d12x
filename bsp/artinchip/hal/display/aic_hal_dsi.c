@@ -28,6 +28,15 @@ void dsi_set_data_clk_polrs(void *base, u32 dc_inv)
         reg_clr_bit(base + DSI_ANA_CFG1, DSI_DATA_CLK_POL);
 }
 
+void dsi_interrupt_init(void *base, u32 irq1_flag, u32 irq2_flag)
+{
+    if (irq1_flag)
+        reg_write(base + DSI_IRQ_EN1, irq1_flag);
+
+    if (irq2_flag)
+        reg_write(base + DSI_IRQ_EN2, irq2_flag);
+}
+
 void dsi_dcs_lw(void *base, u32 enable)
 {
     if (enable)

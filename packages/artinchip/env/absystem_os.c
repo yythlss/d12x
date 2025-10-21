@@ -103,6 +103,7 @@ int aic_upgrade_end(void)
     }
     /* update rodatafatfs */
     if (rodatafs_status) {
+#ifndef OTA_RODATA_DIRECT
         now = fw_getenv("rodataAB_now");
         if (strncmp(now, "A", 1) == 0) {
             ret = fw_env_write("rodataAB_next", "B");
@@ -117,9 +118,11 @@ int aic_upgrade_end(void)
 
         if (ret)
             goto aic_upgrade_end_out;
+#endif
     }
     /* update datafatfs */
     if (datafs_status) {
+#ifndef OTA_DATA_DIRECT
         now = fw_getenv("dataAB_now");
         if (strncmp(now, "A", 1) == 0) {
             ret = fw_env_write("dataAB_next", "B");
@@ -134,6 +137,7 @@ int aic_upgrade_end(void)
 
         if (ret)
             goto aic_upgrade_end_out;
+#endif
     }
     ret = fw_env_write("bootcount", "0");
     if (ret)

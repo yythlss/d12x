@@ -53,6 +53,8 @@
 #define LWIP_IPV6                   0
 #endif /* RT_USING_LWIP_IPV6 */
 
+#define LWIP_IPV6_ADDRESS_LIFETIMES 1
+
 #define NO_SYS                      0
 #define SYS_LIGHTWEIGHT_PROT        1
 #define LWIP_SOCKET                 1
@@ -299,9 +301,7 @@
    sends a lot of data out of ROM (or other static memory), this
    should be set high. */
 #define MEMP_NUM_PBUF               32 //16
-#ifdef AIC_WLAN_AIC8800D40L
 #define MEMP_NUM_NETBUF             32
-#endif
 
 /* the number of struct netconns */
 #ifdef RT_MEMP_NUM_NETCONN
@@ -342,8 +342,8 @@
 /* MEMP_NUM_TCPIP_MSG_*: the number of struct tcpip_msg, which is used
    for sequential API communication and incoming packets. Used in
    src/api/tcpip.c. */
-// #define MEMP_NUM_TCPIP_MSG_API      16
-// #define MEMP_NUM_TCPIP_MSG_INPKT    16
+#define MEMP_NUM_TCPIP_MSG_API      128
+#define MEMP_NUM_TCPIP_MSG_INPKT    128
 
 /* ---------- Pbuf options ---------- */
 /* PBUF_POOL_SIZE: the number of buffers in the pbuf pool. */
@@ -395,20 +395,12 @@
 
 /* TCP sender buffer space (pbufs). This must be at least = 2 *
    TCP_SND_BUF/TCP_MSS for things to work. */
-#ifdef AIC_WLAN_ASR
-#define TCP_SND_QUEUELEN            (2 * TCP_SND_BUF/TCP_MSS)
-#else
 #define TCP_SND_QUEUELEN            (4 * TCP_SND_BUF/TCP_MSS)
-#endif
 
 /* TCP writable space (bytes). This must be less than or equal
    to TCP_SND_BUF. It is the amount of space which must be
    available in the tcp snd_buf for select to return writable */
-#ifdef AIC_WLAN_ASR
-#define TCP_SNDLOWAT                LWIP_MIN(LWIP_MAX(((TCP_SND_BUF)/7), (2*TCP_MSS)+1), (TCP_SND_BUF)-1)
-#else
 #define TCP_SNDLOWAT                (TCP_SND_BUF/2)
-#endif
 #define TCP_SNDQUEUELOWAT           TCP_SND_QUEUELEN/2
 
 /* TCP receive window. */
@@ -435,13 +427,8 @@
 #define TCPIP_THREAD_STACKSIZE      4096
 #endif
 #define TCPIP_THREAD_NAME           "tcpip"
-#ifdef AIC_WLAN_ASR
-#define DEFAULT_TCP_RECVMBOX_SIZE   60
-#elif defined(AIC_WLAN_AIC8800D40L)
-#define DEFAULT_TCP_RECVMBOX_SIZE   32
-#else
-#define DEFAULT_TCP_RECVMBOX_SIZE   10
-#endif
+
+#define DEFAULT_TCP_RECVMBOX_SIZE   128
 
 /* ---------- ARP options ---------- */
 #define LWIP_ARP                    1
@@ -620,7 +607,7 @@
 #endif
 
 /* MEMP_NUM_SYS_TIMEOUT: the number of simulateously active timeouts. */
-#define MEMP_NUM_SYS_TIMEOUT       (LWIP_TCP + IP_REASSEMBLY + LWIP_ARP + (2*LWIP_DHCP) + LWIP_AUTOIP + LWIP_IGMP + LWIP_DNS + PPP_SUPPORT)
+#define MEMP_NUM_SYS_TIMEOUT       (LWIP_TCP + IP_REASSEMBLY + LWIP_ARP + (2*LWIP_DHCP) + LWIP_AUTOIP + LWIP_IGMP + LWIP_DNS + PPP_SUPPORT + (LWIP_IPV6 ? ( 1 + ( 2*LWIP_IPV6)) : 0))
 
 /*
  * LWIP_COMPAT_SOCKETS==1: Enable BSD-style sockets functions names.
@@ -673,8 +660,6 @@
 
 #if RT_USING_LWIP_VER_NUM >= 0x20000 /* >= v2.0.0 */
 #define LWIP_HOOK_IP4_ROUTE_SRC(dest, src)  lwip_ip4_route_src(dest, src)
-#include "lwip/ip_addr.h"
-struct netif *lwip_ip4_route_src(const ip4_addr_t *dest, const ip4_addr_t *src);
 #endif /* RT_USING_LWIP_VER_NUM >= 0x20000 */
 
 #endif /* __LWIPOPTS_H__ */

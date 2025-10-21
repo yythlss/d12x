@@ -46,6 +46,8 @@ struct _psram_info {
     {0x22, 0, 0, {0, 0}},       \
     /* G730BDU 4MB PSRAM*/      \
     {0x23, 1, 0x400000, {APS3208K, 0x80c980c9}},       \
+    /* G730BEU NON PSRAM*/      \
+    {0x24, 0, 0, {0, 0}},       \
 }
 
 struct _psram_info psram_table_info[] = PSRAM_TABLE_INFO;

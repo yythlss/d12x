@@ -1,6 +1,7 @@
 /*
-* Copyright (C) 2020-2022 Artinchip Technology Co. Ltd
+* Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
 *
+*  SPDX-License-Identifier: Apache-2.0
 *  author: <qi.xu@artinchip.com>
 *  Desc: png decode
 *
@@ -73,6 +74,7 @@ struct png_dec_ctx {
 	struct ve_buffer_allocator *ve_buf_handle;
 	int bitstream_buffer_size;
 	int ve_fd;
+	int extra_frame_num;
 
 	int packet_size;
 
@@ -94,6 +96,7 @@ struct png_dec_ctx {
 	int x_offset, y_offset;
 	uint8_t dispose_op, blend_op;
 	uint8_t last_dispose_op;
+	uint8_t decode_next_dat;
 	int bit_depth;
 	int color_type;
 	int compression_type;
@@ -105,6 +108,7 @@ struct png_dec_ctx {
 
 	int hw_size;
 	int vbv_offset;
+	unsigned char *fdat_buf;
 };
 
 #endif /* PNG_DECODER_H */

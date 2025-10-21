@@ -2,6 +2,16 @@
 # EPWM devices local parameter
 #-----------------------------
 
+config AIC_EPWM_TRIG_PSADC
+    default n
+    bool "Enable trigger PSADC"
+
+config AIC_EPWM_TRIG_PERIOD
+    depends on AIC_EPWM_TRIG_PSADC
+    default 1
+    range 1 3
+    int "Generate a trigger every X periods"
+
 # EPWM0 parameter
 
 menu "EPWM0 Parameter"
@@ -12,7 +22,7 @@ config AIC_EPWM0_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -26,7 +36,7 @@ config AIC_EPWM1_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -40,7 +50,7 @@ config AIC_EPWM2_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -54,7 +64,7 @@ config AIC_EPWM3_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -68,7 +78,7 @@ config AIC_EPWM4_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -82,7 +92,7 @@ config AIC_EPWM5_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -96,7 +106,7 @@ config AIC_EPWM6_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -110,7 +120,7 @@ config AIC_EPWM7_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -124,7 +134,7 @@ config AIC_EPWM8_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -138,7 +148,7 @@ config AIC_EPWM9_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -152,7 +162,7 @@ config AIC_EPWM10_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 
@@ -166,7 +176,7 @@ config AIC_EPWM11_SYNC
     range 0 1
     default 0
     help
-        set 0 to unuse sync mode, set 1 to use sync mode
+        set 0 to disable sync mode, set 1 to enable sync mode
 
 endmenu
 

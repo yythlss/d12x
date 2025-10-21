@@ -418,8 +418,8 @@ os_mbuf_append(struct os_mbuf *om, const void *data,  uint16_t len)
     struct os_mbuf_pool *omp;
     struct os_mbuf *last;
     struct os_mbuf *new;
-    int remainder;
-    int space;
+    uint16_t remainder;
+    uint16_t space;
     int rc;
 
     if (om == NULL) {
@@ -501,7 +501,7 @@ os_mbuf_appendfrom(struct os_mbuf *dst, const struct os_mbuf *src,
             return OS_EINVAL;
         }
 
-        chunk_sz = min(len, src_cur_om->om_len - src_cur_off);
+        chunk_sz = min(len, (uint16_t)(src_cur_om->om_len - src_cur_off));
         rc = os_mbuf_append(dst, src_cur_om->om_data + src_cur_off, chunk_sz);
         if (rc != 0) {
             return rc;
@@ -777,7 +777,7 @@ os_mbuf_cmpm(const struct os_mbuf *om1, uint16_t offset1,
 
         om1_left = cur1->om_len - om1_off;
         om2_left = cur2->om_len - om2_off;
-        chunk_sz = min(min(om1_left, om2_left), bytes_remaining);
+        chunk_sz = min((uint16_t)min(om1_left, om2_left), bytes_remaining);
 
         rc = memcmp(cur1->om_data + om1_off, cur2->om_data + om2_off,
                     chunk_sz);
@@ -801,7 +801,7 @@ os_mbuf_prepend(struct os_mbuf *om, int len)
         /* Fill the available space at the front of the head of the chain, as
          * needed.
          */
-        leading = min(len, OS_MBUF_LEADINGSPACE(om));
+        leading = min((uint16_t)len, OS_MBUF_LEADINGSPACE(om));
 
         om->om_data -= leading;
         om->om_len += leading;

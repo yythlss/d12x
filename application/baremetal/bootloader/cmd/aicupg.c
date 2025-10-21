@@ -18,8 +18,8 @@
 #include <boot_param.h>
 #include <config_parse.h>
 #include <aicupg.h>
-#include <fatfs.h>
 #include <mmc.h>
+#include <block_dev.h>
 #include <hal_syscfg.h>
 #include <aicupg_for_uart.h>
 #include <hal_rtc.h>
@@ -27,6 +27,10 @@
 #include <progress_bar.h>
 #ifdef LPKG_CHERRYUSB_HOST
 #include <usbh_core.h>
+#endif
+#if defined(LPKG_USING_DFS_ELMFAT)
+#include <dfs_file.h>
+#include <dfs_elm.h>
 #endif
 
 #define WAIT_UPG_MODE_TMO_US 2000000
@@ -79,7 +83,7 @@ static void reboot_device(void)
 #endif
 }
 
-#if defined(AIC_BOOTLOADER_FATFS_SUPPORT)
+#if defined(LPKG_USING_DFS_ELMFAT)
 static int image_header_check(struct image_header_pack *header)
 {
     /*check header*/
@@ -361,7 +365,7 @@ int boot_cfg_parse_direct_mode_val(char *strofs, char *name, u32 *offset,
     return 0;
 }
 
-#if defined(AIC_BOOTLOADER_FATFS_SUPPORT)
+#if defined(LPKG_USING_DFS_ELMFAT)
 /* Direct mode:
  * # writetype value can be: spi-nor, spi-nand, mmc
  * writetype=spi-nor
@@ -453,8 +457,9 @@ out:
 static int do_fat_upg_by_single_image(char *image_name, char *protection)
 {
     struct image_header_pack *hdrpack;
+    struct dfs_fd fd;
     int ret;
-    ulong actread;
+    int actread;
 
     hdrpack = (void *)aicos_malloc_align(0, sizeof(struct image_header_pack), CACHE_LINE_SIZE);
     if (!hdrpack) {
@@ -463,13 +468,20 @@ static int do_fat_upg_by_single_image(char *image_name, char *protection)
     }
     memset(hdrpack, 0, sizeof(struct image_header_pack));
 
-    ret = aic_fat_read_file(image_name, (void *)hdrpack, 0,
-                            sizeof(struct image_header_pack), &actread);
-    if (actread != sizeof(struct image_header_pack) || ret) {
+    if (dfs_file_open(&fd, image_name, O_RDONLY) < 0) {
+        printf("Open %s failed.\n", image_name);
+        ret = -1;
+        goto err;
+    }
+
+    actread = dfs_file_read(&fd, hdrpack, sizeof(struct image_header_pack));
+    if (actread != sizeof(struct image_header_pack)) {
         printf("Error:read file %s failed!\n", image_name);
         ret = -1;
         goto err;
     }
+
+    dfs_file_close(&fd);
 
     /*check header*/
     ret = image_header_check(hdrpack);
@@ -495,15 +507,26 @@ err:
 }
 #endif
 
+#if defined(AICUPG_UDISK_ENABLE)
+static bool usbh_hub_check_msc_connect(void)
+{
+    return (usbh_find_class_instance("/dev/sda") != NULL) ? true : false;
+}
+#endif
+
 static int do_fat_upg(int intf, char *const blktype)
 {
-
     int ret = 0;
-#if defined(AIC_BOOTLOADER_FATFS_SUPPORT)
+#if defined(LPKG_USING_DFS_ELMFAT)
+    struct dfs_fd fd;
     char image_name[IMG_NAME_MAX_SIZ] = {0};
     char protection[PROTECTION_PARTITION_LEN] = {0};
-    ulong actread, offset, bootlen;
-    char *file_buf;
+    int actread, offset, bootlen;
+    char __attribute__((unused)) *devname = NULL;
+    char *file_buf = NULL;
+
+    dfs_init();
+    elm_init();
 
     if (!strcmp(blktype, "udisk")) {
         /*usb init*/
@@ -514,28 +537,41 @@ static int do_fat_upg(int intf, char *const blktype)
             return ret;
         }
 
-        ret = aic_fat_set_blk_dev(intf, BLK_DEV_TYPE_MSC);
-        if (ret) {
-            pr_err("set blk dev failed.\n");
+        usbh_hub_poll();
+
+        if (!usbh_hub_check_msc_connect()) {
+            pr_info("Maybe device is not a MSC device, exit\n");
+            ret = -1;
             return ret;
         }
 
-        usbh_hub_poll();
+        if (dfs_mount("udisk", "/", "elm", 0, DEVICE_TYPE_USB_DISK) < 0) {
+            pr_err("Failed to mount udisk with FatFS\n");
+            ret = -1;
+            goto err;
+        } else {
+            pr_info("mount udisk ok\n");
+        }
 #else
         pr_err("udisk upgrade disabled.\n");
 #endif
     } else if (!strcmp(blktype, "mmc")) {
 #if defined(AICUPG_SDCARD_ENABLE)
+
         ret = mmc_init(intf);
         if (ret) {
             printf("sdmc %d init failed.\n", intf);
             return ret;
         }
 
-        ret = aic_fat_set_blk_dev(intf, BLK_DEV_TYPE_MMC);
-        if (ret) {
-            pr_err("set blk dev failed.\n");
-            return ret;
+        devname = block_get_name_by_id(intf);
+
+        if (dfs_mount(devname, "/", "elm", 0, DEVICE_TYPE_SDMC_DISK) < 0) {
+            pr_err("Failed to mount %s with FatFS\n", devname);
+            ret = -1;
+            goto err;
+        } else {
+            pr_info("mount %s ok\n", devname);
         }
 #else
         pr_err("sdcard upgrade disabled.\n");
@@ -552,14 +588,26 @@ static int do_fat_upg(int intf, char *const blktype)
     }
     memset((void *)file_buf, 0, 2048);
 
-    ret = aic_fat_read_file("bootcfg.txt", (void *)file_buf, 0, 2048, &actread);
-    if (actread == 0 || ret) {
+    if (dfs_file_open(&fd, "bootcfg.txt", O_RDONLY) < 0) {
+        printf("Open bootcfg.txt failed.\n");
+        ret = -1;
+        goto err;
+    }
+
+    actread = dfs_file_read(&fd, file_buf, 2048);
+    if (actread <= 0) {
         printf("Error:read file bootcfg.txt failed!\n");
+        ret = -1;
         goto err;
     }
 
     ret = boot_cfg_get_boot0(file_buf, actread, image_name, IMG_NAME_MAX_SIZ,
                              &offset, &bootlen);
+    if (ret <= 0) {
+        printf("Error:get boot0 failed!\n");
+        ret = -1;
+        goto err;
+    }
 
     aicupg_fat_set_process_cb(fat_upg_progress);
 
@@ -583,9 +631,9 @@ static int do_fat_upg(int intf, char *const blktype)
         /* Reboot when SDCard/UDISK plug-out */
         while (1) {
             /* If failed to read data, reboot */
-            ret = aic_fat_read_file("bootcfg.txt", (void *)file_buf, 0, 2048,
-                                    &actread);
-            if (actread == 0 || ret) {
+            dfs_file_lseek(&fd, 0);
+            actread = dfs_file_read(&fd, file_buf, 2048);
+            if (actread <= 0) {
                 aicos_mdelay(1000);
                 reboot_device();
             }
@@ -602,6 +650,7 @@ static int do_fat_upg(int intf, char *const blktype)
 err:
     if (file_buf)
         aicos_free_align(0, file_buf);
+    dfs_file_close(&fd);
 #endif
     return ret;
 }

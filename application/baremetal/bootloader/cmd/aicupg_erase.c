@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -51,19 +51,17 @@ static int spinor_erase_boot(sfud_flash *flash)
 {
     u8 data[256];
     u32 head;
-    int i, err;
+    int i;
 
     /* Two image backup */
     for (i = 0; i < 2; i++) {
-        err = sfud_read(flash, i * AIC_SPL_SIZE, 256, data);
-        if (err) {
+        if (sfud_read(flash, i * AIC_SPL_SIZE, 256, data)) {
             printf("Failed to read data from spinor.\n");
             return -1;
         }
         memcpy(&head, data, 4);
         if (head == AIC_IMAGE_MAGIC) {
-            err = sfud_erase(flash, i * AIC_SPL_SIZE, AIC_SPL_SIZE);
-            if (err) {
+            if (sfud_erase(flash, i * AIC_SPL_SIZE, AIC_SPL_SIZE)) {
                 printf("Failed to erase spinor.\n");
                 return -1;
             }
@@ -206,8 +204,13 @@ static int do_spinand_erase(int argc, char *argv[])
 static int mmc_erase_boot(struct aic_sdmc *host)
 {
     u32 blkoffset, blkcnt, head;
-    u8 data[512];
+    u8 *data = NULL;
 
+    data = aicos_malloc_align(0, 512, CACHE_LINE_SIZE);
+    if (!data) {
+        printf("Failed to malloc buffer.\n");
+        return -1;
+    }
     memset(data, 0, 512);
     blkcnt = (AIC_SPL_SIZE / 512);
     for (int i = 0; i < 2; i++) {
@@ -219,6 +222,8 @@ static int mmc_erase_boot(struct aic_sdmc *host)
             mmc_bwrite(host, blkoffset, 1, (void *)data);
         }
     }
+
+    aicos_free_align(0, data);
     return 0;
 }
 #endif
@@ -255,12 +260,11 @@ static int do_mmc_erase(int argc, char *argv[])
     length = strtol(argv[2], NULL, 0);
     grp_size = host->dev->erase_grp_size * 512;
     if (offset % grp_size) {
-        printf("The start offset is not alignment with group size %ld.\n",
-               grp_size);
+        printf("The start offset is not alignment with group size %lu.\n", grp_size);
         return -1;
     }
     if (length % grp_size) {
-        printf("The length is not alignment with group size: %ld.\n", grp_size);
+        printf("The length is not alignment with group size: %lu.\n", grp_size);
         return -1;
     }
     blkoffset = offset / 512;

@@ -60,6 +60,74 @@ static void lv_rt_log(lv_log_level_t level, const char *buf)
 }
 #endif /* LV_USE_LOG */
 
+#if LV_USE_PROFILER
+#include <aic_core.h>
+
+static uint32_t tick_start = 0;
+static FILE *log_file = NULL;
+
+static uint32_t my_get_tick_us_cb(void)
+{
+    return (uint32_t)aic_get_time_us();
+}
+
+static int my_get_tid_cb(void)
+{
+    return (int)((int)rt_thread_self() & 0xFFFFFFFF);
+}
+
+static int my_get_cpu_cb(void)
+{
+    return 0;
+}
+
+static void my_log_print_cb(const char * buf)
+{
+    int elaps = lv_tick_elaps(tick_start);
+    if (elaps < 0)
+        return;
+
+    if (elaps > LV_PROFILE_END_TIME_MS) {
+        if (log_file) {
+            rt_kprintf("Write file finish, file = %s\n", LV_PROFILE_FILE);
+            fclose(log_file);
+            log_file = NULL;
+        }
+        return;
+    }
+
+    if (elaps > LV_PROFILE_START_TIME_MS && elaps < LV_PROFILE_END_TIME_MS) {
+        if (log_file) {
+            fprintf(log_file, "%s", buf);
+        } else {
+            printf("%s", buf);
+        }
+    }
+}
+
+static void my_profiler_init(void)
+{
+    rt_thread_mdelay(LV_PROFILE_INIT_SLEEP_MS);
+
+    log_file = fopen(LV_PROFILE_FILE, "a");
+    if (!log_file) {
+        LV_LOG_ERROR("Failed to open log file, %s", LV_PROFILE_FILE);
+        log_file = NULL;
+    }
+
+    lv_profiler_builtin_config_t config;
+    lv_profiler_builtin_config_init(&config);
+    config.tick_per_sec = 1000000; /* One second is equal to 1000000 microseconds */
+    config.tick_get_cb = my_get_tick_us_cb;
+    config.tid_get_cb = my_get_tid_cb;
+    config.cpu_get_cb = my_get_cpu_cb;
+    config.flush_cb = my_log_print_cb;
+    lv_profiler_builtin_init(&config);
+
+    tick_start = lv_tick_get();
+}
+#endif
+
 static void lvgl_thread_entry(void *parameter)
 {
     lv_wait_fs_mounted();
@@ -67,12 +135,13 @@ static void lvgl_thread_entry(void *parameter)
     lv_log_register_print_cb(lv_rt_log);
 #endif /* LV_USE_LOG */
     lv_init();
+    lv_tick_set_cb(&rt_tick_get_millisecond);
     lv_port_disp_init();
     lv_port_indev_init();
     lv_user_gui_init();
-
-    lv_tick_set_cb(&rt_tick_get_millisecond);
-
+#if LV_USE_PROFILER
+    my_profiler_init();
+#endif
     /* handle the tasks of LVGL */
     while(1)
     {

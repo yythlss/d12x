@@ -13,6 +13,11 @@ if GetDepend('AIC_QSPI_DRV_TEST') and GetDepend('RT_USING_FINSH'):
     if GetDepend('AIC_QSPI_DRV_V11') and GetDepend('AIC_CHIP_D13X'):
         src += Glob('test_spislave*.c')
 
+if GetDepend('AIC_EXAMPLE') and GetDepend('RT_USING_FINSH'):
+    src += Glob('test_spiflash_dev_example.c')
+    src += Glob('spi_dev_example.c')
+    src += Glob('qspi_dev_example.c')
+
 group = DefineGroup('test-qspi', src, depend = [''], CPPPATH = CPPPATH)
 
 Return('group')

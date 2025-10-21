@@ -28,8 +28,8 @@
 #include "mbedtls/cmac.h"
 #include "mbedtls/des.h"
 #include "mbedtls/ccm.h"
-//#include "mbedtls/bn_mul.h"
-#include "bn_mul.h"
+#include "mbedtls/bn_mul.h"
+//#include "bn_mul.h"
 
 #define MBEDTLS_ALLOW_PRIVATE_ACCESS
 

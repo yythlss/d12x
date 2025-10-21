@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -18,16 +18,16 @@ extern "C" {
 #define IMG_NAME_MAX_SIZ 128
 #define PROTECTION_PARTITION_LEN 128
 
-int boot_cfg_parse_file(char *cfgtxt, u32 clen, char *key, char *fname,
-                        u32 nsiz, ulong *offset, ulong *flen);
-int boot_cfg_get_boot0(char *cfgtxt, u32 clen, char *name, u32 nsiz,
-                       ulong *offset, ulong *boot1len);
-int boot_cfg_get_boot1(char *cfgtxt, u32 clen, char *name, u32 nsiz,
-                       ulong *offset, ulong *boot1len);
-int boot_cfg_get_image(char *cfgtxt, u32 clen, char *name, u32 nsiz);
-int boot_cfg_get_protection(char *cfgtxt, u32 clen, char *name, u32 nsiz);
-u32 boot_cfg_get_key_val(char *cfgtxt, u32 len, const char *key, u32 klen,
-                         char *val, u32 vlen);
+int boot_cfg_parse_file(char *cfgtxt, int clen, char *key, char *fname,
+                        int nsiz, int *offset, int *flen);
+int boot_cfg_get_boot0(char *cfgtxt, int clen, char *name, int nsiz,
+                       int *offset, int *boot1len);
+int boot_cfg_get_boot1(char *cfgtxt, int clen, char *name, int nsiz,
+                       int *offset, int *boot1len);
+int boot_cfg_get_image(char *cfgtxt, int clen, char *name, int nsiz);
+int boot_cfg_get_protection(char *cfgtxt, int clen, char *name, int nsiz);
+int boot_cfg_get_key_val(char *cfgtxt, int len, const char *key, int klen,
+                         char *val, int vlen);
 
 #ifdef __cplusplus
 }

@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+* Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
 *
 *  SPDX-License-Identifier: Apache-2.0
 *  author: <qi.xu@artinchip.com>
@@ -64,11 +64,21 @@ static int set_bitstream_and_wait(struct png_dec_ctx *s, unsigned char *data, in
 	u32 val;
 
 	logd("config bit stream");
-
-	val = s->idat_mpp_buf->phy_addr;
+	if (s->decode_next_dat) {
+		val = s->curr_packet->phy_base + s->curr_packet->phy_offset;
+		logd("apng: start_addr:%08x, offset:%d", val, offset);
+	} else {
+		val = s->idat_mpp_buf->phy_addr;
+	}
 	write_reg_u32(s->regs_base + INPUT_BS_START_ADDR_REG, val);
 
-	val = s->idat_mpp_buf->phy_addr + s->idat_mpp_buf->size - 1;
+	if (s->decode_next_dat) {
+		val = s->curr_packet->phy_base + s->curr_packet->phy_offset + s->curr_packet->size - 1;
+		logd("apng: end_addr:%08x", val);
+	} else {
+		val = s->idat_mpp_buf->phy_addr + s->idat_mpp_buf->size - 1;
+	}
+
 	write_reg_u32(s->regs_base + INPUT_BS_END_ADDR_REG, val);
 
 	write_reg_u32(s->regs_base + INPUT_BS_OFFSET_REG, offset * 8);
@@ -111,7 +121,10 @@ static void png_set_clip_info(struct png_dec_ctx *s)
 
 #ifndef AIC_VE_DRV_V10
     write_reg_u32(s->regs_base + PNG_CLIP_BASE_REG, s->decoder.crop_x << 16 | s->decoder.crop_y);
-    write_reg_u32(s->regs_base + PNG_CLIP_SIZE_REG, (1U << 31) | (s->decoder.crop_width << 16) | s->decoder.crop_height);
+    if (s->decoder.crop_width > 0 && s->decoder.crop_height > 0) {
+        write_reg_u32(s->regs_base + PNG_CLIP_SIZE_REG,
+                      (1U << 31) | (s->decoder.crop_width << 16) | s->decoder.crop_height);
+    }
 #endif
 }
 
@@ -139,8 +152,13 @@ int png_hardware_decode(struct png_dec_ctx *s, unsigned char *buf, int length)
 
     // 3. set picture size
     pval = (u32 *)&reg_list->_14_png_size;
-    reg_list->_14_png_size.width = s->width;
-    reg_list->_14_png_size.height = s->height;
+    if (s->decode_next_dat) {
+        reg_list->_14_png_size.width = s->cur_w;
+        reg_list->_14_png_size.height = s->cur_h;
+    } else {
+        reg_list->_14_png_size.width = s->width;
+        reg_list->_14_png_size.height = s->height;
+    }
     write_reg_u32(s->regs_base + PNG_SIZE_REG, *pval);
 
     write_reg_u32(s->regs_base + PNG_STRIDE_REG, s->curr_frame->mpp_frame.buf.stride[0]);
@@ -168,14 +186,29 @@ int png_hardware_decode(struct png_dec_ctx *s, unsigned char *buf, int length)
     // 4. set output buffer
     int channel = (s->pix_fmt == MPP_FMT_BGR_888 || s->pix_fmt == MPP_FMT_RGB_888) ? 3 : 4;
     int stride = s->curr_frame->mpp_frame.buf.stride[0];
-    int out_offset = s->decoder.output_y * stride + s->decoder.output_x * channel;
+    int out_offset = 0;
+
+    logd("decode_next_dat %d, x_offset %d, y_offset %d\n",
+        s->decode_next_dat, s->x_offset, s->y_offset);
+
+    if (s->decode_next_dat) {
+        out_offset = s->y_offset * stride + s->x_offset * channel;
+    } else {
+        out_offset = s->decoder.output_y * stride + s->decoder.output_x * channel;
+    }
+
     val = s->curr_frame->phy_addr[0] + out_offset;
     write_reg_u32(s->regs_base + OUTPUT_BUFFER_ADDR_REG, val);
 
 #ifdef AIC_VE_DRV_V10
     write_reg_u32(s->regs_base + OUTPUT_BUFFER_LENGTH_REG, s->height * stride);
 #else
-    write_reg_u32(s->regs_base + OUTPUT_BUFFER_LENGTH_REG, s->curr_frame->phy_addr[0] + s->height * stride);
+    if (s->decode_next_dat) {
+        val = s->curr_frame->phy_addr[0] + (s->y_offset + s->cur_h) * stride;
+    } else {
+        val = s->curr_frame->phy_addr[0] + (s->decoder.output_y + s->height) * stride;
+    }
+    write_reg_u32(s->regs_base + OUTPUT_BUFFER_LENGTH_REG, val);
 #endif
 
     // 5. set LZ77 buffer 32K

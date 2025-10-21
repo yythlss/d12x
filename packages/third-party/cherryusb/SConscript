@@ -65,6 +65,8 @@ if GetDepend(['LPKG_CHERRYUSB_DEVICE']) and GetDepend(['AIC_USB_DEVICE_DRV']):
         src += Glob('class/midi/usbd_midi.c')
     if GetDepend(['LPKG_CHERRYUSB_DEVICE_VENDER']):
         src += Glob('class/vender/usbd_vender.c')
+    if GetDepend(['LPKG_CHERRYUSB_DEVICE_ECM']):
+        src += Glob('class/cdc/usbd_cdc_ecm.c')
 
     if GetDepend(['LPKG_CHERRYUSB_DEVICE_AICUPG_FOR_USB']):
         src += Glob('demo/aicupg_for_usb.c')
@@ -106,6 +108,8 @@ if GetDepend(['LPKG_CHERRYUSB_DEVICE']) and GetDepend(['AIC_USB_DEVICE_DRV']):
         src += Glob('demo/video_dvp_template.c')
     if GetDepend(['LPKG_CHERRYUSB_DEVICE_RNDIS_TEMPLATE']):
         src += Glob('demo/cdc_rndis_template.c')
+    if GetDepend(['LPKG_CHERRYUSB_DEVICE_ECM_TEMPLATE']):
+        src += Glob('demo/cdc_ecm_template.c')
     if GetDepend(['LPKG_CHERRYUSB_DEVICE_MIDI_TEMPLATE']):
         src += Glob('demo/midi_template.c')
     if GetDepend(['LPKG_CHERRYUSB_DEVICE_WINUSB10_TEMPLATE']):
@@ -173,14 +177,20 @@ if GetDepend(['LPKG_CHERRYUSB_HOST']) and GetDepend(['AIC_USB_HOST_EHCI_DRV']):
 
     if GetDepend(['LPKG_CHERRYUSB_HOST_CDC']):
         src += Glob('class/cdc/usbh_cdc_acm.c')
+    if GetDepend(['LPKG_CHERRYUSB_HOST_SERIAL']):
+        src += Glob('class/vender/usbh_serial.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_HID']):
         src += Glob('class/hid/usbh_hid.c')
+    if GetDepend(['LPKG_CHERRYUSB_HOST_HID_DRV_RTT']):
+        src += Glob('port/aic/rtt_driver_port/rtt_usbh_hid.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_MSC']):
         src += Glob('class/msc/usbh_msc.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_RNDIS']):
         src += Glob('class/wireless/usbh_rndis.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_CDC_ECM']):
         src += Glob('class/cdc/usbh_cdc_ecm.c')
+    if GetDepend(['LPKG_CHERRYUSB_HOST_NCM']):
+        src += Glob('class/cdc/usbh_cdc_ncm.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_BLUETOOTH']):
         src += Glob('class/wireless/usbh_bluetooth.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_UVC']):
@@ -245,12 +255,12 @@ if GetDepend(['LPKG_CHERRYUSB_HOST']) and GetDepend(['AIC_USB_HOST_EHCI_DRV']):
         src += Glob('port/pusb2/fpusb2' + '/*.c')
         src += Glob('port/pusb2/usb_hc_pusb2.c')
 
-    if GetDepend(['LPKG_CHERRYUSB_HOST_AICUPG_FOR_UDISK']):
-        src += Glob('demo/aicupg_for_udisk.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_TEMPLATE']):
         src += Glob('demo/usb_host.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_HID_TEMPLATE']):
         src += Glob('demo/usbh_hid_template.c')
+    if GetDepend(['LPKG_CHERRYUSB_HOST_HID_DRV_RTT_TEST_COMMAND']):
+        src += Glob('demo/aicusbh_rtt_driver_test.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_MSC_TEMPLATE']):
         src += Glob('demo/usbh_msc_template.c')
     if GetDepend(['LPKG_CHERRYUSB_HOST_UVC_TEMPLATE']):

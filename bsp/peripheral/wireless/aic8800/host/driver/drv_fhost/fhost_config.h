@@ -92,6 +92,7 @@ void fhost_config_prepare(struct me_config_req *me_config, struct mm_start_req *
  ****************************************************************************************
  */
 struct mac_chan_def *fhost_chan_get(int freq);
+uint16_t fhost_chan_bw_flags_get_by_freq(uint16_t ch_freq);
 void fhost_chan_clean(void);
 int fhost_chan_update(const char * country_code);
 int aicwf_channel_set(aicwf_config_scan_chan *config_scan_chan);

@@ -32,7 +32,7 @@
  */
 /// Debug module environment definition.
 struct debug_env_tag dbg_env = {
-    .filter_module = DBG_MOD_ALL & ~(CO_BIT(DBG_MOD_IDX_MACIF) | CO_BIT(DBG_MOD_IDX_SDIO)),
+    .filter_module = DBG_MOD_ALL,// & ~(CO_BIT(DBG_MOD_IDX_MACIF) | CO_BIT(DBG_MOD_IDX_SDIO)),
 #ifdef AIC_DEV_AIC8800_DEBUG_LOG
     .filter_severity = DBG_SEV_IDX_INF,//DBG_SEV_IDX_INF,//
 #else

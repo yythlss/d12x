@@ -44,6 +44,74 @@ static void aic_dsi_release_drvdata(void)
 
 }
 
+struct dsi_irq_info {
+    u32 bit_mask;
+    char *err_str;
+};
+
+static struct dsi_irq_info irq1_info[] = {
+    { DSI_IRQ_STA1_PHY_ERR_STA_DATA0_ERRCONTENTION_LP1, "PHY ERROR: Data0 ErrContention LP1" },
+    { DSI_IRQ_STA1_PHY_ERR_STA_DATA0_ERRCONTENTION_LP0, "PHY ERROR: Data0 ErrContention LP0" },
+    { DSI_IRQ_STA1_PHY_ERR_STA_DATA0_ERRCONTROL, "PHY ERROR:DSI Data0 ErrControl" },
+    { DSI_IRQ_STA1_PHY_ERR_STA_DATA0_ERRSYNCESC_LPDT, "PHY ERROR: Data0 ErrSyncEsc LPDT" },
+    { DSI_IRQ_STA1_PHY_ERR_STA_DATA0_ERRESC_ESCAPE_ENTRY, "PHY ERROR: Data0 ErrEsc escape entry" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_DSI_PROTOCOL_VIOLATION, "ACK ERROR: DSI Protocol Violation" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_INVALID_TRANSMISSION_LENGTH, "ACK ERROR: Invalid Transmission Length" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_DSI_VC_ID_INVALID, "ACK ERROR: DSI VC ID Invalid" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_DSI_DATA_TYPE_NOT_RECOGNIZED, "ACK ERROR: DSI Data Type Not Recognized" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_LONG_PACKET_CHECKSUM_ERROR, "ACK ERROR: Long Packet Checksum Error" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_ECC_ERROR_MULTI_BIT, "ACK ERROR: ECC Error multi-bit" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_ECC_ERROR_SINGLE_BIT, "ACK ERROR: ECC Error single-bit" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_CONTENTION_DETECTED, "ACK ERROR: Contention Detected" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_FALSE_CONTROL_ERROR, "ACK ERROR: False Control Error" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_PERIPHERAL_TIMEOUT_ERROR, "ACK ERROR: Peripheral Timeout Error" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_LOW_POWER_TRANSMIT_SYNC_ERROR, "ACK ERROR: Low Power Transmit Sync Error" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_ESCAPE_MODE_ENTRY_COMMAND_ERROR, "ACK ERROR: Escape Mode Entry Command Error" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_EOT_SYNC_ERROR, "ACK ERROR: EoT Sync Error" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_SOT_SYNC_ERROR, "ACK ERROR: SoT Sync Error" },
+    { DSI_IRQ_STA1_ACK_ERR_STA_SOT_ERROR, "ACK ERROR: SoT Error" },
+};
+
+static struct dsi_irq_info irq2_info[] = {
+    { DSI_IRQ_STA2_GEN_PLDRD_OV_STA,   "GEN PLD READ FIFO OVERFLOW" },
+    { DSI_IRQ_STA2_GEN_PLDRD_UD_STA,   "GEN PLD READ FIFO UNDERFLOW" },
+    { DSI_IRQ_STA2_GEN_PLDSEND_UD_STA, "GEN PLD SEND FIFO UNDERFLOW" },
+    { DSI_IRQ_STA2_GEN_PLD_OV_STA,     "GEN PLD FIFO UNDERFLOW" },
+    { DSI_IRQ_STA2_GEN_CMD_OV_STA,     "GEN CMD FIFO OVERFLOW" },
+    { DSI_IRQ_STA2_DPI_FIFO_OV_STA,    "DPI FIFO OVERFLOW" },
+    { DSI_IRQ_STA2_EOPT_ERR_STA,       "NOT RECEIVED EOPT" },
+    { DSI_IRQ_STA2_PSIZE_ERR_STA,      "RECEIVE PACKET SIZE ERROR" },
+    { DSI_IRQ_STA2_CRC_ERR_STA,        "RECEIVE PACKET CRC ERROR" },
+    { DSI_IRQ_STA2_ECC_MERR_STA,       "RECEIVE PACKET CRC MULTT BIT ERROR" },
+    { DSI_IRQ_STA2_ECC_SERR_STA,       "RECEIVE PACKET CRC SINGLE BIT ERROR" },
+    { DSI_IRQ_STA2_TO_LPRX_STA,        "TO LP RX TIMEOUT" },
+    { DSI_IRQ_STA2_TO_HSTX_STA,        "TO HS TX TIMEOUT" },
+};
+
+static irqreturn_t aic_dsi_handler(int irq, void *ctx)
+{
+    struct aic_dsi_comp *comp = aic_dsi_request_drvdata();
+    u32 irq1_status, irq2_status;
+    u32 i;
+
+    irq1_status = reg_read(comp->regs + DSI_IRQ_STA1);
+    reg_write(comp->regs + DSI_IRQ_STA1, irq1_status);
+
+    irq2_status = reg_read(comp->regs + DSI_IRQ_STA2);
+    reg_write(comp->regs + DSI_IRQ_STA2, irq2_status);
+
+    for (i = 0; i < ARRAY_SIZE(irq1_info); i++)
+        if (irq1_info[i].bit_mask & irq1_status)
+            pr_err("%s\n",irq1_info[i].err_str);
+
+    for (i = 0; i < ARRAY_SIZE(irq2_info); i++)
+        if (irq2_info[i].bit_mask & irq2_status)
+            pr_err("%s\n",irq2_info[i].err_str);
+
+    aic_dsi_release_drvdata();
+    return IRQ_HANDLED;
+}
+
 static int aic_dsi_clk_enable(void)
 {
     struct aic_dsi_comp *comp = aic_dsi_request_drvdata();
@@ -93,6 +161,8 @@ static int aic_dsi_enable(void)
     dsi_pkg_init(comp->regs, dsi->mode);
     dsi_phy_init(comp->regs, comp->sclk_rate, dsi->lane_num, dsi->mode);
     dsi_hs_clk(comp->regs, 1);
+
+    dsi_interrupt_init(comp->regs, DSI_IRQ_EN1_ALL, DSI_IRQ_EN2_ALL);
 
     aic_dsi_release_drvdata();
     return 0;
@@ -289,6 +359,8 @@ static int aic_dsi_probe(void)
 #ifdef AIC_DISP_PQ_TOOL
     AIC_PQ_SET_DSIP_PINMUX;
 #endif
+
+    aicos_request_irq(MIPI_DSI_IRQn, aic_dsi_handler, 0, "mipi-dsi", NULL);
 
     return 0;
 }

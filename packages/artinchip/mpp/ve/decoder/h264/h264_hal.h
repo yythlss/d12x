@@ -1,9 +1,11 @@
 /*
-* Copyright (C) 2020-2022 Artinchip Technology Co. Ltd
-*
-*  author: <qi.xu@artinchip.com>
-*  Desc:  avc register
-*/
+ * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *  author: <qi.xu@artinchip.com>
+ *  Desc:  avc register
+ */
 
 #ifndef __H264_HAL_H__
 #define __H264_HAL_H__
@@ -239,7 +241,7 @@ struct reg_avc_buf_info
 
 #define MBINFO_BUF_ADDR_REG	0x154
 
-//* store the last line data of last mb line for intra-pred
+// store the last line data of last mb line for intra-pred
 #define MB_INTRAP_ADDR_REG	0x1D4
 
 #define CYCLES_REG		0x1F8

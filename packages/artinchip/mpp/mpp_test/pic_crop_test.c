@@ -88,7 +88,6 @@ static struct frame_allocator* open_allocator()
 
 static void print_help(char *program)
 {
-    printf("Compile time: %s\n", __TIME__);
     printf("Usage: %s [options]", program);
     printf("\t -i, --input: \t\t input stream file name\n");
     printf("\t -h, --help: \t\t print help info\n");

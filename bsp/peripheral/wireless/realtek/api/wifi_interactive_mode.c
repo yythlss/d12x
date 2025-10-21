@@ -294,8 +294,8 @@ static void cmd_wifi_ap(int argc, char **argv)
 	struct ip_addr ipaddr;
 	struct ip_addr netmask;
 	struct ip_addr gw;
-	struct netif * pnetif = &xnetif[0];
 #endif
+	struct netif * pnetif = &xnetif[0];
 #endif
 	int channel;
 
@@ -368,11 +368,7 @@ static void cmd_wifi_ap(int argc, char **argv)
 #endif
 #if defined(CONFIG_ENABLE_WPS_AP) && CONFIG_ENABLE_WPS_AP
 #if CONFIG_LWIP_LAYER
-#if !defined(CONFIG_PLATFOMR_CUSTOMER_RTOS)
 	wpas_wps_dev_config(pnetif->hwaddr, 1);
-#else
-	//TODO
-#endif
 #endif
 #endif
 

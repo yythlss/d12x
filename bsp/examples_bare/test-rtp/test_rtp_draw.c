@@ -54,7 +54,6 @@ static calibration g_cal = {
 
 static void cmd_rtp_usage(void)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: test_rtp_draw [options]\n");
     printf("test_rtp_draw calibrate            : Platform the screen calibration\n");
     printf("test_rtp_draw set <points_number>  : Set the points for drawing, defalut is 1000\n");

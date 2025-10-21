@@ -11,23 +11,37 @@
 #define to_clk_auth(_hw)                     \
     container_of(_hw, struct aic_clk_auth_cfg, comm)
 
+int cmu_auth_lock(u32 auth, u32 key, u32 shift, u32 lock, u32 status, u32 who)
+{
+    u32 val = (key << shift) | who;
+
+    writel(val, cmu_reg(auth));
+    aicos_udelay(100);
+
+    val = readl(cmu_reg(lock));
+    if (!(val & status)) {
+        hal_log_err("Failed to request authorize %X for 0x%x!\n", key >> 8, who);
+        return -EIO;
+    }
+    return 0;
+}
+
+int cmu_auth_request(u32 auth, u32 key, u32 shift, u32 status, u32 who)
+{
+    return cmu_auth_lock(auth, key, shift, auth, status, who);
+}
+
 static int clk_auth_write(struct aic_clk_auth_cfg *mod, u32 val)
 {
-    u32 reg_val;
-
     if (!mod->offset_wr_auth_reg || (mod->wr_auth_bit < 0) || mod->key_bit < 0) {
         hal_log_err("%s params error!\n", mod->comm.name);
         return -EINVAL;
     }
 
-    reg_val = (mod->key_code << mod->key_bit) | mod->offset_reg;
-    writel(reg_val, cmu_reg(mod->offset_wr_auth_reg));
-    aic_udelay(100);
-    reg_val = readl(cmu_reg(mod->offset_wr_auth_reg));
-    if (!(reg_val & (1 << mod->wr_auth_bit))) {
-        hal_log_err("%s request cmu write authorize failed!\n", mod->comm.name);
+    if (cmu_auth_request(mod->offset_wr_auth_reg,
+                         mod->key_code, mod->key_bit, BIT(mod->wr_auth_bit),
+                         mod->offset_reg))
         return -EIO;
-    }
 
     writel(val, cmu_reg(mod->offset_reg));
 
@@ -60,7 +74,8 @@ static int clk_auth_enable(struct aic_clk_comm_cfg *comm_cfg)
 static void clk_auth_disable(struct aic_clk_comm_cfg *comm_cfg)
 {
     struct aic_clk_auth_cfg *mod = to_clk_auth(comm_cfg);
-    u32 i, val;
+    u32 val = 0;
+    s32 i;
 
     if (!mod->table_gates) {
         hal_log_err("%s does not have valid table_gates\n", comm_cfg->name);
@@ -248,7 +263,7 @@ static int clk_auth_mod_set_rate(struct aic_clk_comm_cfg *comm_cfg,
     u32 val, parent_index;
     u32 div = 0, div_max, div_mask;
 
-    if (!mod->table_div){
+    if (!mod->table_div) {
         hal_log_err("%s does not have valid table_div\n", comm_cfg->name);
         return -EINVAL;
     }

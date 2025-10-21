@@ -55,6 +55,20 @@ uint8_t usbdisp_jpeg_quality_lowthresh = AIC_USB_DISP_JPEG_QUALITY_LOWTHRESH;
 uint8_t usbdisp_jpeg_quality_lowthresh = 0;
 #endif
 
+#ifdef AIC_USB_DISP_INIT_MIRROR_MOD_EN
+uint8_t usbdisp_init_extension_mode = 1;
+#else
+uint8_t usbdisp_init_extension_mode = 0;
+#endif
+
+#ifdef AIC_USB_DISP_HOST_SCALE_MOD_EN
+uint16_t usbdisp_host_scale_width = AIC_USB_DISP_HOST_SCALE_WIDTH;
+uint16_t usbdisp_host_scale_height = AIC_USB_DISP_HOST_SCALE_HEIGHT;
+#else
+uint16_t usbdisp_host_scale_width = 0;
+uint16_t usbdisp_host_scale_height = 0;
+#endif
+
 #ifdef LPKG_CHERRYUSB_DEVICE_DISPLAY_FPS
 uint8_t fps_print = 1;
 #else
@@ -122,6 +136,19 @@ uint8_t usb_large_transfer = 0;
 uint8_t usb_large_transfer = 1;
 #endif
 uint8_t usb_disp_debug_en = 0;
+
+uint8_t usb_disp_host_power_state = 0;
+uint8_t usb_disp_get_host_power_state(void)
+{
+    /*0 = power off,1= power on */
+    return usb_disp_host_power_state;
+}
+
+#ifdef AIC_USB_DISP_MONITOR_NAME
+char *usb_disp_monitor_name = AIC_USB_DISP_MONITOR_NAME;
+#else
+char *usb_disp_monitor_name = "USB Display";
+#endif
 
 #if defined(RT_USING_PM) && defined(AIC_USING_PM) && defined(AIC_USB_DISP_PM_SUSPEND)
 uint8_t usb_pm_suspend_en = 1;
@@ -360,12 +387,11 @@ extern int usbd_usb_display_init(void);
 extern int usbd_usb_display_deinit(void);
 int usbd_display_deinit(void)
 {
-    return 0;
-
 #ifdef LPKG_CHERRYUSB_DEVICE_COMPOSITE
     extern uint8_t graphic_vendor_descriptor[];
     usbd_comp_func_release(graphic_vendor_descriptor, "disp");
 #endif
+    return 0;
     usbd_usb_display_deinit();
 
     return 0;
@@ -375,8 +401,10 @@ int usbd_display_init(void)
 {
     static int init_flg = 0;
 
-    if (init_flg)
+    if (init_flg) {
+        usb_display_init();
         return 0;
+    }
     init_flg = 1;
 
     usbd_usb_display_init();

@@ -17,10 +17,14 @@
 #define RTC_REG_INIT                    (0x0004)
 #define RTC_REG_IRQ_EN                  (0x0008)
 #define RTC_REG_IRQ_STA                 (0x000C)
+#if defined(AIC_RTC_DRV_V10) || defined(AIC_RTC_DRV_V11)
 #define RTC_REG_TIME0                   (0x0020)
 #define RTC_REG_TIME1                   (0x0024)
 #define RTC_REG_TIME2                   (0x0028)
 #define RTC_REG_TIME3                   (0x002C)
+#elif defined(AIC_RTC_DRV_V12)
+#define RTC_REG_TIME                    (0x0820)
+#endif
 #define RTC_REG_ALARM0                  (0x0030)
 #define RTC_REG_ALARM1                  (0x0034)
 #define RTC_REG_ALARM2                  (0x0038)
@@ -190,7 +194,11 @@ void hal_rtc_read_time(u32 *sec)
 void hal_rtc_set_time(u32 sec)
 {
     hal_rtc_enable(0);
+#if defined(AIC_RTC_DRV_V10) || defined(AIC_RTC_DRV_V11)
     RTC_WRITEL(sec, RTC_REG_TIME0);
+#elif defined(AIC_RTC_DRV_V12)
+    writel(sec, RTC_BASE + RTC_REG_TIME);
+#endif
     RTC_WRITEB(1, RTC_REG_INIT);
     hal_rtc_enable(1);
 }
@@ -262,7 +270,7 @@ static void hal_rtc_low_power(void)
     val |= RTC_ANA1_LDO11_LPEN;
     RTC_WRITEB(val, RTC_REG_ANALOG1);
 
-#ifdef AIC_RTC_DRV_V11
+#if defined(AIC_RTC_DRV_V11) || defined(AIC_RTC_DRV_V12)
     val = RTC_ANA3_LDO12_XTAL32K_SW | RTC_ANA3_XTAL32K_EN;
     RTC_WRITEB(val, RTC_REG_ANALOG3);
 

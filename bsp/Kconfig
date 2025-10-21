@@ -245,11 +245,6 @@ config AIC_SPINAND_DRV_TEST
     default n
     depends on AIC_SPINAND_DRV && DRIVER_BARE_DRV_EN
 
-config AIC_SDMC_DRV_TEST
-    bool "Enable SDMC driver test command"
-    default n
-    depends on AIC_SDMC_DRV
-
 config AIC_MMC_TEST
     bool "Enable MMC test command"
     default n
@@ -264,6 +259,7 @@ config AIC_MTD_BARE_TEST
     bool "Enable MTD driver test command"
     default n
     select AIC_MTD_BARE_DRV
+    depends on DRIVER_BARE_DRV_EN
 
 config AIC_FILE_CRC32_TEST
     bool "Enable file CRC32 test command"
@@ -388,7 +384,7 @@ config AIC_RTP_TEST
 config AIC_PWM_TEST
     bool "Enable PWM driver test command"
     default n
-    depends on AIC_PWM_DRV
+    depends on RT_USING_PWM
 
 config AIC_CAP_DRV_TEST
     bool "Enable CAP driver test command"
@@ -409,6 +405,35 @@ config AIC_MONKEY_TEST
     bool "Enable Monkey test command"
     default n
     depends on AIC_USING_TOUCH
+
+config AIC_WIFI_TEST
+    bool "Enable Wi-Fi test command"
+    default n
+    depends on AIC_WIRELESS_LAN && !DRIVER_BARE_DRV_EN
+
+if AIC_WIFI_TEST
+    menu "wifi test configuration"
+        config OPEN_NETWORK_SSID
+            string "Open network ssid used for STA testing"
+            default "nopassword"
+
+        config WPA2_AES_PSK_NETWORK_SSID
+            string "WPA2 AES PSK network ssid used for STA testing"
+            default "my-test"
+
+        config WPA2_AES_PSK_NETWORK_PASSWORD
+            string "WPA2 AES PSK network password used for STA testing"
+            default "12345678"
+
+        config AP_TEST_SSID
+            string "network ssid for AP testing"
+            default "WiFi-test"
+
+        config AP_TEST_PASSWORD
+            string "network password for AP testing"
+            default "12345678"
+      endmenu
+endif
 
 if LPKG_USING_LWIP
 
@@ -463,6 +488,10 @@ config AIC_SID_BURN_SPIENC_KEY_TEST
 
 if AIC_SID_BURN_SPIENC_KEY_TEST
 
+    config AIC_SID_BURN_DEBUG_MODE
+        bool "Enable SID debug mode"
+        default n
+
     config AIC_SID_BURN_SIMULATED
         bool "Enable SID simulated burning"
         default n
@@ -494,7 +523,16 @@ config AIC_MEM_API_TEST
 config AIC_FILE_SYSTEM_TEST
     bool "Enable filesystem test command"
     default n
-    depends on RT_USING_POSIX_FS && RT_USING_FINSH
+    depends on RT_USING_FINSH
+
+config AIC_PBUS_DRV_TEST
+    bool "Enable PBUS driver test command"
+    default n
+    depends on AIC_PBUS_DRV
+
+config AIC_EXAMPLE
+    bool "Enable example command"
+    default n
 
 menu "Power Management examples"
     depends on AIC_PM_DRV

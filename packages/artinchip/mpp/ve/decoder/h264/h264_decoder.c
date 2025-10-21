@@ -375,8 +375,21 @@ int __h264_decode_destroy(struct mpp_decoder *ctx)
 
 int __h264_decode_control(struct mpp_decoder *ctx, int cmd, void *param)
 {
-	// TODO
-	return 0;
+    struct h264_dec_ctx *s = (struct h264_dec_ctx *)ctx;
+    struct mpp_size *max_resolution = NULL;
+
+    switch (cmd) {
+        case MPP_DEC_SET_MAX_RESOLUTION:
+            max_resolution = (struct mpp_size*)param;
+            s->max_width = max_resolution->width;
+            s->max_height = max_resolution->height;
+            return 0;
+
+        default:
+            break;
+    }
+
+    return 0;
 }
 
 int __h264_decode_reset(struct mpp_decoder *ctx)

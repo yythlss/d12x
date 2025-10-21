@@ -17,7 +17,7 @@ config REALTEK_WLAN_INTF_USB
     default n
 
 choice
-    prompt "Select realtek wlan0 modul"
+    prompt "Select realtek wlan0 module"
     default AIC_USING_RTL8733_WLAN0
     config AIC_USING_RTL8733_WLAN0
         bool "rtl8733"
@@ -50,7 +50,7 @@ menu "realtek wlan Parameter"
         default y
 
     config REALTEK_FULL_FNC_MODE
-        bool "Enabl Realtek driver full function"
+        bool "Enable Realtek driver full function"
         default n
 
 endmenu

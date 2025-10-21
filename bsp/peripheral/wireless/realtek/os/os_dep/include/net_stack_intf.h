@@ -28,14 +28,7 @@ struct netif;
 //----- ------------------------------------------------------------------
 // Ethernet Buffer
 //----- ------------------------------------------------------------------
-#if (CONFIG_LWIP_LAYER == 1)
 #include "ethernetif_wlan.h"
-#else
-struct eth_drv_sg {
-    unsigned int	buf;
-    unsigned int 	len;
-};
-#endif
 
 //----- ------------------------------------------------------------------
 // Wlan Interface Provided

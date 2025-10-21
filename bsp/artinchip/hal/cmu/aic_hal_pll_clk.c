@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -44,12 +44,14 @@ static void clk_vco_select(struct aic_clk_pll_cfg *pll,
 
 static inline void clk_pll_bypass(struct aic_clk_pll_cfg *pll, unsigned int bypass)
 {
+#ifndef AIC_CMU_DRV_V30
     u32 val;
 
     val = readl(cmu_reg(pll->offset_gen));
     val &= ~(1 << PLL_OUT_MUX);
     val |= (!bypass << PLL_OUT_MUX);
     writel(val, cmu_reg(pll->offset_gen));
+#endif
 }
 
 static int clk_pll_enable(struct aic_clk_comm_cfg *comm_cfg)
@@ -129,9 +131,11 @@ static unsigned long clk_pll_recalc_rate(struct aic_clk_comm_cfg *comm_cfg,
     u8 fra_en = 0;
     u32 reg_val, sdm_en, sdm_bot;
 
+#ifndef AIC_CMU_DRV_V30
     /* PLL output mux is CLK_24M */
     if (!((readl(cmu_reg(pll->offset_gen)) >> PLL_OUT_MUX) & 0x1))
         return CLOCK_24M;
+#endif
 
     factor_n = (readl(cmu_reg(pll->offset_gen)) >> PLL_FACTORN_BIT) &
                PLL_FACTORN_MASK;
@@ -232,12 +236,14 @@ static int clk_pll_set_rate(struct aic_clk_comm_cfg *comm_cfg,
 
     clk_vco_select(pll, &pll_vco_min, &pll_vco_max);
 
+#ifndef AIC_CMU_DRV_V30
     if (rate == CLOCK_24M) {
         val = readl(cmu_reg(pll->offset_gen));
         val &= ~(1 << PLL_OUT_MUX);
         writel(val, cmu_reg(pll->offset_gen));
         return 0;
     }
+#endif
 
     /* Switch the output of PLL to 24MHz */
     clk_pll_bypass(pll, 1);

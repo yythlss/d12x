@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Artinchip Technology Co., Ltd
+ * Copyright (c) 2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -145,8 +145,13 @@ static int write_userid(struct rt_mtd_nand_device *mtd, size_t offset, u8 *buf, 
         }
 
         page_id = offset / mtd->page_size;
-        if (rt_mtd_nand_write(mtd, page_id, ptr, mtd->page_size, RT_NULL, 0))
+        if (rt_mtd_nand_write(mtd, page_id, ptr, mtd->page_size, RT_NULL, 0)) {
+            if (rt_mtd_nand_mark_badblock(mtd, page_id / mtd->pages_per_block)) {
+                pr_err("Failed to mark block bad.\n");
+                return -1;
+            }
             return 1;
+        }
 
         offset += mtd->page_size;
         remain -= mtd->page_size;
@@ -160,6 +165,8 @@ static int spinand_userid_save(void)
 {
     struct rt_mtd_nand_device *mtd;
     rt_device_t dev_id;
+    size_t offset = 0;
+    u32 blk_num = 0;
     int ret = -1;
     u32 len;
     u8 *buf;
@@ -194,25 +201,45 @@ static int spinand_userid_save(void)
     len = ret;
 
     pr_info("Erasing ...\n");
-    /* Aleast 1 block */
-    if (rt_mtd_nand_erase_block(mtd, 0)) {
-        pr_err("SPINAND: erase failed.\n");
-        ret = 1;
+erase_start:
+    if (blk_num >= mtd->block_total) {
+        pr_err("All blocks in the part is bad!\n");
+        ret = -RT_ERROR;
         goto err;
     }
 
+    if (rt_mtd_nand_check_block(mtd, blk_num) != RT_EOK) {
+        pr_err("Block is bad, skip it.\n");
+        blk_num++;
+        goto erase_start;
+    } else {
+        /* Aleast 1 block */
+        if (rt_mtd_nand_erase_block(mtd, blk_num)) {
+            pr_err("SPINAND: erase failed.\n");
+            ret = rt_mtd_nand_mark_badblock(mtd, blk_num);
+            if (ret) {
+                pr_err("Failed to mark block %u bad.\n", blk_num);
+                ret = -RT_ERROR;
+                goto err;
+            }
+            blk_num++;
+            goto erase_start;
+        }
+    }
+
     pr_info("Writing ...\n");
-    ret = write_userid(mtd, 0, buf, len);
-    if (ret) {
-        pr_err("SPINAND: save userid failed.\n");
-        ret = 2;
-        goto err;
+    offset = blk_num * mtd->pages_per_block * mtd->page_size;
+    ret = write_userid(mtd, offset, buf, len);
+    if (ret > 0) {
+        pr_err("SPINAND: save userid error, try again.\n");
+        blk_num++;
+        goto erase_start;
     }
 
 err:
     if (buf)
         aicos_free_align(0, buf);
-    return 0;
+    return ret;
 }
 
 struct userid_driver userid_spinand = {

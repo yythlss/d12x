@@ -20,6 +20,8 @@
 #ifndef H_OS_UTIL_
 #define H_OS_UTIL_
 
+#include <aic_core.h>
+
 /* Helpers to pass integers as pointers and vice-versa */
 #define POINTER_TO_UINT(p) ((unsigned int) ((uintptr_t) (p)))
 #define UINT_TO_POINTER(u) ((void *) ((uintptr_t) (u)))
@@ -34,5 +36,25 @@
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(array) \
         (sizeof(array) / sizeof((array)[0]))
+#endif
+
+#ifdef max
+#undef max
+#define max(x, y) ({				\
+	typeof(x) _max1 = (x);			\
+	typeof(y) _max2 = (y);			\
+	(void) (&_max1);                \
+    (void) (&_max2);    		    \
+	_max1 > _max2 ? _max1 : _max2; })
+#endif
+
+#ifdef min
+#undef min
+#define min(x, y) ({				\
+	typeof(x) _min1 = (x);			\
+	typeof(y) _min2 = (y);			\
+	(void) (&_min1);                \
+    (void) (&_min2);		        \
+	_min1 < _min2 ? _min1 : _min2; })
 #endif
 #endif

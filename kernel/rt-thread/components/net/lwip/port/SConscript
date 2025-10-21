@@ -6,6 +6,6 @@ path  = [cwd]
 src  = Glob('*.c')
 
 mycflags = ' -w'
-group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP'], CPPPATH = path,  CFLAGS = mycflags)
+group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP'], CPPPATH = path,  LOCAL_CFLAGS = mycflags)
 
 Return('group')

@@ -32,7 +32,6 @@ static const struct option lopts[] = {
 
 static void test_gpio_usage(char *program)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: %s [options]\n", program);
     printf("\t -i, --input\t\tConfigure PIN as input-pin, and print pressed count. Default as PD.15\n");
     printf("\t -o, --output\t\tConfigure PIN as output-pin .\n");

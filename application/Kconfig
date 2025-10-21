@@ -174,6 +174,11 @@ if LPKG_USING_LVGL
         int "Display refresh period (ms)"
         default 5 # official suggestion
 
+    config AIC_USE_LV_USB_MOUSE
+        depends on LVGL_V_9
+        bool "Use hotplug usb mouse"
+        default n
+
     config LPKG_USING_LVGL_SQUARELINE
         bool "Support SquareLine Studio"
         default n
@@ -217,6 +222,9 @@ if AIC_WIDGETS_DEMO
         config AIC_PLAYER_DEMO
            bool "LVGL aic player demo"
 
+        config AIC_APNG_DEMO
+            bool "LVGL aic apng demo"
+
         config AIC_IMAGE_USAGE_DEMO
            bool "LVGL image usage demo"
 
@@ -230,6 +238,9 @@ endif
 
 config AIC_LVGL_BASE_DEMO
     bool "LVGL demo with basic function"
+
+config AIC_LVGL_DM_DAEMON
+    bool "LVGL demo with dm daemon function"
 
 config AIC_LVGL_METER_DEMO
     bool "LVGL demo of meter"
@@ -294,6 +305,10 @@ config AIC_LVGL_USB_OSD_DEMO
 
 config AIC_LVGL_IMAGE_DEMO
     bool "LVGL image demo"
+
+config AIC_LVGL_SPI_EXTEND_DEMO
+    bool "LVGL spi extend demo"
+    select AIC_LVGL_SPI_WIDGET
 
 endchoice
 
@@ -380,6 +395,14 @@ config LV_USE_CMA_HEAP_LOW_LIMIT
     int "LVGL use cmp heap low limit(Bytes)"
     default 50000
     depends on LV_MEM_HEAP_ADAPTIVE_SUPPORT
+
+config LV_USE_SPI_REPLACE_MIPI_DBI
+    bool "LVGL replaces MIPI-DBI-SPI Driver with SPI Controller"
+    default n
+    depends on AIC_DISP_MIPI_DBI
+    depends on LVGL_V_9
+    depends on !AIC_LVGL_SPI_EXTEND_DEMO
+    select AIC_LVGL_SPI_WIDGET
 
 # Parameters for LVGL meter demo
 if AIC_LVGL_METER_DEMO
@@ -486,6 +509,28 @@ if AIC_LVGL_USB_OSD_DEMO
         default y if AIC_SPINAND_DRV && !LV_USB_OSD_LOGO_TYPE_VIDEO
 
 endif # AIC_LVGL_USB_OSD_DEMO
+
+# Parameters for LVGL spi
+
+config AIC_LVGL_SPI_WIDGET
+    bool
+    default n
+
+if AIC_LVGL_SPI_WIDGET
+    choice
+        prompt "extend spi controller driver"
+            default LV_SPI_ST77916
+
+        config LV_SPI_ST77912
+            bool "ST77912"
+        config LV_SPI_ST77916
+            bool "ST77916"
+        config LV_SPI_ST7789
+            bool "ST7789"
+        config LV_SPI_GC9D01N
+            bool "GC9D01N"
+    endchoice
+endif # AIC_LVGL_SPI_EXTEND_DEMO
 
 endif # AIC_LVGL_DEMO
 

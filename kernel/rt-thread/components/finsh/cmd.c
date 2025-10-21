@@ -436,14 +436,18 @@ long list_mutex(void)
                 rt_hw_interrupt_enable(level);
 
                 m = (struct rt_mutex *)obj;
-                rt_kprintf("%-*.*s %-8.*s %04d %d\n",
+                rt_kprintf("%-*.*s %-8.*s %04d %d",
                            maxlen, RT_NAME_MAX,
                            m->parent.parent.name,
                            RT_NAME_MAX,
                            m->owner->name,
                            m->hold,
                            rt_list_len(&m->parent.suspend_thread));
-
+                if (!rt_list_isempty(&m->parent.suspend_thread)) {
+                    rt_kprintf(":");
+                    show_wait_queue(&(m->parent.suspend_thread));
+                }
+                rt_kprintf("\n");
             }
         }
     }

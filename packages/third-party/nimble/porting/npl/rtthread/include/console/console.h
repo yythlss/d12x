@@ -9,7 +9,6 @@
 #ifndef __CONSOLE_H__
 #define __CONSOLE_H__
 
-// TODO:
 #include <rtthread.h>
 
 #define console_printf rt_kprintf

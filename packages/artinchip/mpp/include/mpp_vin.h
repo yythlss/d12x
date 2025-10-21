@@ -121,6 +121,8 @@ struct dvp_plane_pix_format {
 struct dvp_out_fmt {
     u32 width;
     u32 height;
+    u32 crop_x;
+    u32 crop_y;
     u32 pixelformat;
     u32 field;
     u32 colorspace;

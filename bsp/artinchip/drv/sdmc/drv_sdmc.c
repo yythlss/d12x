@@ -86,29 +86,13 @@ static inline int resp_crc_type(struct rt_mmcsd_cmd *cmd)
         return 0;
 }
 
-static u32 aic_sdmc_buswidth(u32 type)
-{
-    switch (type) {
-    case SDMC_CTYPE_8BIT:
-        return 8;
-    case SDMC_CTYPE_4BIT:
-        return 4;
-    case SDMC_CTYPE_1BIT:
-        return 1;
-    default:
-    case SDMC_CTYPE_RESERVED:
-        pr_warn("Invalid Card type %d\n", type);
-        return 1;
-    }
-}
-
 #ifndef AIC_SDMC_IRQ_MODE
 static u32 aic_sdmc_get_timeout(struct aic_sdmc *host, const u32 size)
 {
     unsigned int timeout;
 
     timeout = size * 8;
-    timeout /= aic_sdmc_buswidth(host->buswidth);
+    timeout /= (host->buswidth == 0) ? 1 : (host->buswidth == 1) ? 4 : (host->buswidth == 2) ? 8 : 1;
     timeout *= 10;      /* wait 10 times as long */
     timeout /= (host->clock / MSEC_PER_SEC);
     timeout /= host->ddr_mode ? 2 : 1;
@@ -380,9 +364,8 @@ static int aic_sdmc_setup_bus(struct aic_sdmc *host, u32 freq)
     }
 
     aic_sdmc_set_ext_clk_mux(&host->host, mux);
-    LOG_I("SDMC%d BW %d, sclk %d KHz, clk expt %d KHz(act %d KHz), div %d-%d\n",
-            host->index, aic_sdmc_buswidth(host->buswidth),
-            sclk / 1000, freq / 1000,
+    LOG_I("SDMC%d, sclk %d KHz, clk expt %d KHz(act %d KHz), div %d-%d\n",
+            host->index, sclk / 1000, freq / 1000,
             div ? sclk / mux / div / 2 / 1000 : sclk / mux / 1000,
             mux, div * 2);
 
@@ -449,7 +432,8 @@ static void aic_sdmc_set_iocfg(struct rt_mmcsd_host *rthost,
     }
     pr_debug("SDMC%d Buswidth %d, DDR mode %d, Clock: %d KHz\n",
         host->index,
-        aic_sdmc_buswidth(host->buswidth), host->ddr_mode,
+        (host->buswidth == 0) ? 1 : (host->buswidth == 1) ? 4 : (host->buswidth == 2) ? 8 : 1,
+        host->ddr_mode,
         io_cfg->clock / 1000);
 
     hal_sdmc_set_buswidth(&host->host, host->buswidth);

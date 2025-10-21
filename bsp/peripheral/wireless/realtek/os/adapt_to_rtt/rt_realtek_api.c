@@ -36,23 +36,30 @@ rt_err_t aic_realtek_init(struct rt_wlan_device *wlan)
     return realtek_init();
 }
 
+#if defined(CONFIG_ENABLE_WPS_AP) && CONFIG_ENABLE_WPS_AP
+extern int wpas_wps_dev_config(u8 *dev_addr, u8 bregistrar);
+extern struct netif xnetif[NET_IF_NUM];
+#endif
+
 rt_err_t aic_realtek_set_mode(struct rt_wlan_device *wlan, rt_wlan_mode_t mode)
 {
     if(mode == RT_WLAN_AP) {
         if (!wifi_is_up(RTW_AP_INTERFACE)) {
             wifi_off();
-            msleep(20);
             aicos_msleep(100);
             if (wifi_on(RTW_MODE_AP) < 0) {
                 pr_err("WIFI mode AP start Failed\n");
                 return -EIO;
             }
+#if defined(CONFIG_ENABLE_WPS_AP) && CONFIG_ENABLE_WPS_AP
+            wpas_wps_dev_config(xnetif[0].hwaddr, 1);
+#endif
             s_current_dev = s_ap_dev;
         }
     } else if (mode == RT_WLAN_STATION) {
         if (!wifi_is_up(RTW_STA_INTERFACE)) {
             wifi_off();
-            msleep(20);
+            aicos_msleep(100);
             if (wifi_on(RTW_MODE_STA) < 0)
                 return -EIO;
         }
@@ -120,19 +127,32 @@ rt_err_t aic_realtek_scan(struct rt_wlan_device *wlan, struct rt_scan_info *scan
     return wifi_scan_networks(_scan_result_handler, scan_info);
 }
 
+static void wifi_disconn_cb(char* buf, int buf_len, int flags, void* userdata)
+{
+    rt_wlan_dev_indicate_event_handle(s_wlan_dev, RT_WLAN_DEV_EVT_DISCONNECT, NULL);
+    wifi_unreg_event_handler(WIFI_EVENT_DISCONNECT, wifi_disconn_cb);
+}
+
 rt_err_t aic_realtek_join(struct rt_wlan_device *wlan, struct rt_sta_info *sta_info)
 {
     int ret = RTW_ERROR;
 
+    if (sta_info->key.len == 0)
+        sta_info->security = SECURITY_OPEN;
+    else
+        sta_info->security = SECURITY_WPA_AES_PSK;
+
     ret = wifi_connect(sta_info->ssid.val,
-                        RTW_SECURITY_WPA2_AES_PSK,
+                        sta_info->security,
                         sta_info->key.val,
                         sta_info->ssid.len,
                         sta_info->key.len,
                         0, NULL);
 
-    if (!ret)
+    if (!ret) {
+        wifi_reg_event_handler(WIFI_EVENT_DISCONNECT, wifi_disconn_cb, NULL);
         rt_wlan_dev_indicate_event_handle(s_wlan_dev, RT_WLAN_DEV_EVT_CONNECT, NULL); // todo: is block?
+    }
     else
         rt_wlan_dev_indicate_event_handle(s_wlan_dev, RT_WLAN_DEV_EVT_CONNECT_FAIL, NULL);
 
@@ -247,7 +267,7 @@ rt_err_t aic_realtek_ap_stop(struct rt_wlan_device *wlan)
 
 rt_err_t aic_realtek_ap_deauth(struct rt_wlan_device *wlan, unsigned char mac[])
 {
-    return -1;
+    return wext_del_station(WLAN0_NAME, mac);
 }
 
 rt_err_t aic_realtek_scan_stop(struct rt_wlan_device *wlan)

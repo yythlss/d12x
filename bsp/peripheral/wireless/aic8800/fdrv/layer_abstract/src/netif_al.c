@@ -50,3 +50,31 @@ void aic_tx_start(net_if_t *net_if, net_buf_tx_t *net_buf, aic_tx_cb cfm_cb, voi
     fhost_tx_start(net_if, net_buf, (cb_fhost_tx)cfm_cb, cfm_cb_arg);
 }
 
+int aic_monitor_tx(net_if_t *net_if, uint8_t *pkt, uint32_t len)
+{
+    int ret = 0;
+    do {
+        struct fhost_vif_tag *vif;
+        int fvif_idx;
+        if (pkt == NULL) {
+            DBG_NETAL_ERR("null pkt\n");
+            ret = -1;
+            break;
+        }
+        if (!len) {
+            DBG_NETAL_ERR("zero len\n");
+            ret = -2;
+            break;
+        }
+        // Get the private information about the VIF
+        vif = net_if_vif_info(net_if);
+        fvif_idx = fhost_vif_idx_from_vif_tag(vif);
+        if ((fvif_idx < 0) || (fvif_idx >= NX_VIRT_DEV_MAX)) {
+            DBG_NETAL_ERR("invalid fvif=%p, idx=%d\n", vif, fvif_idx);
+            ret = -2;
+            break;
+        }
+        fhost_send_80211_frame(fvif_idx, pkt, len, NULL, NULL);
+    } while (0);
+    return ret;
+}

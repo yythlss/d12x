@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -80,6 +80,7 @@ typedef struct mm_audio_render_data {
     s64 pre_frame_pts;
     s64 first_frame_pts;
     s64 pre_correct_media_time;
+    s64 cur_correct_media_time;
 
 #ifdef AUDIO_RENDRE_DUMP_ENABLE
     s32 dump_audio_fd;
@@ -190,10 +191,29 @@ static s32 mm_audio_render_set_parameter(mm_handle h_component,
 }
 
 static s32 mm_audio_render_get_config(mm_handle h_component,
-                                      MM_INDEX_TYPE index, void *p_config)
+                                      MM_INDEX_TYPE index,
+                                      void *p_config)
 {
     s32 error = MM_ERROR_NONE;
+    mm_audio_render_data *p_audio_render_data;
 
+    if (!h_component || !p_config) {
+        loge("h_component or p_config is null.\n");
+        return MM_ERROR_NULL_POINTER;
+    }
+
+    p_audio_render_data =
+        (mm_audio_render_data *)(((mm_component *)h_component)->p_comp_private);
+
+    switch (index) {
+        case MM_INDEX_CONFIG_TIME_CUR_MEDIA_TIME:
+            ((mm_time_config_timestamp*)p_config)->timestamp =
+                p_audio_render_data->cur_correct_media_time;
+            break;
+
+        default:
+            break;
+    }
     return error;
 }
 
@@ -627,6 +647,7 @@ static int mm_process_audio_sync(mm_audio_render_data *p_audio_render_data,
                       MM_INDEX_CONFIG_TIME_CUR_MEDIA_TIME, &timestamp);
         diff_time =
             timestamp.timestamp - p_audio_render_data->pre_correct_media_time;
+        p_audio_render_data->cur_correct_media_time = real_audio_time;
         // correct ref clock per 10s
         if (diff_time > CORRECT_REF_CLOCK_TIME) { //correct ref time
             p_audio_render_data->pre_correct_media_time = timestamp.timestamp;

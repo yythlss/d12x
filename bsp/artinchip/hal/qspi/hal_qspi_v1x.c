@@ -286,8 +286,10 @@ int qspi_wait_transfer_done(u32 base, u32 tmo)
     while (qspi_hw_check_transfer_done(base) == false) {
         aic_udelay(HAL_QSPI_WAIT_DELAY_US);
         cnt++;
-        if (cnt > tmo)
+        if (cnt > tmo) {
+            qspi_reg_dump(base);
             return -ETIMEDOUT;
+        }
     }
     return 0;
 }
@@ -386,10 +388,32 @@ int qspi_fifo_read_data(u32 base, u8 *data, u32 len, u32 tmo)
     return 0;
 }
 
+static void qspi_check_status(u32 base)
+{
+    u32 sts, tx_fifo_cnt, rx_fifo_cnt;
+
+    qspi_hw_get_interrupt_status(base, &sts);
+    if (sts & ISTS_BIT_ERRS) {
+        hal_log_err("Error, status: 0x%x.\n", sts);
+        qspi_reg_dump(base);
+    }
+
+    tx_fifo_cnt = qspi_hw_get_tx_fifo_cnt(base);
+    rx_fifo_cnt = qspi_hw_get_rx_fifo_cnt(base);
+
+    if (tx_fifo_cnt || rx_fifo_cnt) {
+        hal_log_err("Error, TX FIFO: %u, RX FIFO: %u.\n", tx_fifo_cnt, rx_fifo_cnt);
+        qspi_reg_dump(base);
+        qspi_hw_reset_fifo(base);
+    }
+
+    qspi_hw_clear_interrupt_status(base, sts);
+}
+
 static int qspi_master_transfer_cpu_sync(qspi_master_handle *h,
                                          struct qspi_transfer *t)
 {
-    u32 base, tmo_cnt, txlen, tx_1line_cnt, rxlen, sts;
+    u32 base, tmo_cnt, txlen, tx_1line_cnt, rxlen;
     struct qspi_master_state *qspi;
     int ret = 0;
 
@@ -455,8 +479,8 @@ static int qspi_master_transfer_cpu_sync(qspi_master_handle *h,
     }
 out:
     qspi_hw_drop_invalid_data(base, QSPI_DROP_INVALID_DATA);
-    qspi_hw_get_interrupt_status(base, &sts);
-    qspi_hw_clear_interrupt_status(base, sts);
+    qspi_check_status(base);
+
     return ret;
 }
 
@@ -572,6 +596,7 @@ static int qspi_master_wait_dma_done(struct aic_dma_chan *ch, u32 tmo)
         aic_udelay(HAL_QSPI_WAIT_DELAY_US);
         cnt++;
         if (cnt > tmo) {
+            hal_dma_chan_dump(ch->ch_nr);
             return -ETIMEDOUT;
         }
     }
@@ -693,7 +718,7 @@ static int qspi_txrx_dma_sync(qspi_master_handle *h,
 static int qspi_master_transfer_dma_sync(qspi_master_handle *h,
                                          struct qspi_transfer *t)
 {
-    u32 base, tmo_cnt, txlen, tx_1line_cnt, rxlen, sts;
+    u32 base, tmo_cnt, txlen, tx_1line_cnt, rxlen;
     struct qspi_master_state *qspi;
     struct aic_dma_chan *dma_rx, *dma_tx;
     struct dma_slave_config dmacfg;
@@ -827,8 +852,8 @@ static int qspi_master_transfer_dma_sync(qspi_master_handle *h,
             hal_release_dma_chan(dma_rx);
     }
 out:
-    qspi_hw_get_interrupt_status(base, &sts);
-    qspi_hw_clear_interrupt_status(base, sts);
+    qspi_check_status(base);
+
     return ret;
 }
 #endif

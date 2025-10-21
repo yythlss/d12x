@@ -1033,12 +1033,18 @@ static void usbd_class_event_notify_handler(uint8_t event, void *arg)
 
 void usbd_event_connect_handler(void)
 {
+    if(g_usbd_core.connected == true) {
+        return;
+    }
     g_usbd_core.connected = true;
     usbd_event_handler(USBD_EVENT_CONNECTED);
 }
 
 void usbd_event_disconnect_handler(void)
 {
+    if(g_usbd_core.connected == false) {
+        return;
+    }
     g_usbd_core.connected = false;
     usbd_event_handler(USBD_EVENT_DISCONNECTED);
 }

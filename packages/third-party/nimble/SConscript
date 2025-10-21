@@ -23,9 +23,11 @@ path += [
     cwd + '/nimble/host/services/lls/include',
     cwd + '/nimble/host/services/tps/include',
     cwd + '/nimble/host/store/ram/include',
+    cwd + '/nimble/host/store/config/include',
     cwd + '/nimble/host/util/include',
     cwd + '/nimble/transport/include',
     cwd + '/nimble/transport/common/hci_h4/include',
+    cwd + '/nimble/transport/common/hci_h5/include',
     cwd + '/porting/npl/rtthread/include',
     cwd + '/porting/nimble/include']
 
@@ -88,6 +90,7 @@ src += Split('''
     nimble/host/services/lls/src/ble_svc_lls.c
     nimble/host/services/tps/src/ble_svc_tps.c
     nimble/host/store/ram/src/ble_store_ram.c
+    nimble/host/store/config/src/ble_store_config.c
     nimble/host/util/src/addr.c
     ''')
 
@@ -96,6 +99,7 @@ src += Split('''
     nimble/transport/src/monitor.c
     nimble/transport/src/transport.c
     nimble/transport/common/hci_h4/src/hci_h4.c
+    nimble/transport/common/hci_h5/src/hci_h5.c
     ''')
 
 if GetDepend(['LPKG_NIMBLE_HCI_USING_RTT_UART']):
@@ -230,6 +234,24 @@ if GetDepend(['LPKG_NIMBLE_CTLR']):
         porting/nimble/src/hal_timer.c
         porting/npl/rtthread/src/nrf5x_isr.c
         """)
+
+# blufi sample
+if GetDepend(['LPKG_NIMBLE_SAMPLE_BLUFI']):
+    src += Split("""
+        apps/blufi/src/blufi_prf.c
+        apps/blufi/src/blufi_protocol.c
+        apps/blufi/src/blufi_api.c
+        apps/blufi/src/blufi.c
+        apps/blufi/src/gatt_svr.c
+    """)
+
+# selfie sample
+if GetDepend(['LPKG_NIMBLE_SAMPLE_SELFIE']):
+    src += Split("""
+        apps/selfie/src/selfie.c
+        apps/selfie/src/shutter_button.c
+        apps/selfie/src/gatt_svr.c
+    """)
 
 # advertiser sample
 if GetDepend(['LPKG_NIMBLE_SAMPLE_ADVERTISER']):

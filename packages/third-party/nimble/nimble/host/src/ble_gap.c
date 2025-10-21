@@ -318,9 +318,9 @@ static void
 ble_gap_log_duration(int32_t duration_ms)
 {
     if (duration_ms == BLE_HS_FOREVER) {
-        BLE_HS_LOG(INFO, "duration=forever");
+        BLE_HS_LOG(INFO, "duration=forever\n");
     } else {
-        BLE_HS_LOG(INFO, "duration=%dms", duration_ms);
+        BLE_HS_LOG(INFO, "duration=%dms\n", (int)duration_ms);
     }
 }
 #endif
@@ -392,14 +392,14 @@ static void
 ble_gap_log_adv(uint8_t own_addr_type, const ble_addr_t *direct_addr,
                 const struct ble_gap_adv_params *adv_params)
 {
-    BLE_HS_LOG(INFO, "disc_mode=%d", adv_params->disc_mode);
+    BLE_HS_LOG(INFO, "disc_mode=%d\n", adv_params->disc_mode);
     if (direct_addr) {
         BLE_HS_LOG(INFO, " direct_addr_type=%d direct_addr=",
                    direct_addr->type);
         BLE_HS_LOG_ADDR(INFO, direct_addr->val);
     }
     BLE_HS_LOG(INFO, " adv_channel_map=%d own_addr_type=%d "
-                     "adv_filter_policy=%d adv_itvl_min=%d adv_itvl_max=%d",
+                     "adv_filter_policy=%d adv_itvl_min=%d adv_itvl_max=%d\n",
                adv_params->channel_map,
                own_addr_type,
                adv_params->filter_policy,

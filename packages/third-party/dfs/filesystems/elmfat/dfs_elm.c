@@ -131,6 +131,7 @@ int dfs_elm_mount(struct dfs_filesystem *fs, unsigned long rwflag, const void *d
     result = f_mount(fat, (const TCHAR *)logic_nbr, 1);
     if (result == FR_OK)
     {
+#if FF_FS_MINIMIZE <= 1
         char drive[8];
         DIR *dir;
 
@@ -152,13 +153,16 @@ int dfs_elm_mount(struct dfs_filesystem *fs, unsigned long rwflag, const void *d
             pr_err("Try to open the fatfs failure.\n");;
             goto __err;
         }
+#endif
 
         /* mount succeed! */
         fs->data = fat;
         return 0;
     }
 
+#if FF_FS_MINIMIZE <= 1
 __err:
+#endif
     f_mount(RT_NULL, (const TCHAR *)logic_nbr, 1);
     disk[index].dev_name = RT_NULL;
     rt_free_align(fat);
@@ -193,6 +197,7 @@ int dfs_elm_unmount(struct dfs_filesystem *fs)
     return RT_EOK;
 }
 
+#if !FF_FS_READONLY && FF_USE_MKFS
 int dfs_elm_mkfs(rt_device_t dev_id)
 {
 #define FSM_STATUS_INIT            0
@@ -286,7 +291,9 @@ int dfs_elm_mkfs(rt_device_t dev_id)
 
     return RT_EOK;
 }
+#endif
 
+#if !FF_FS_READONLY
 int dfs_elm_statfs(struct dfs_filesystem *fs, struct statfs *buf)
 {
     FATFS *f;
@@ -318,6 +325,7 @@ int dfs_elm_statfs(struct dfs_filesystem *fs, struct statfs *buf)
 
     return 0;
 }
+#endif
 
 int dfs_elm_open(struct dfs_fd *file)
 {
@@ -349,8 +357,10 @@ int dfs_elm_open(struct dfs_fd *file)
 
     if (file->flags & O_DIRECTORY)
     {
+#if FF_FS_MINIMIZE <= 1
         DIR *dir;
 
+#if !FF_FS_READONLY
         if (file->flags & O_CREAT)
         {
             result = f_mkdir(drivers_fn);
@@ -362,6 +372,7 @@ int dfs_elm_open(struct dfs_fd *file)
                 return elm_result_to_dfs(result);
             }
         }
+#endif
 
         /* open directory */
         dir = (DIR *)rt_malloc(sizeof(DIR));
@@ -385,6 +396,7 @@ int dfs_elm_open(struct dfs_fd *file)
 
         file->data = dir;
         return RT_EOK;
+#endif
     }
     else
     {
@@ -496,8 +508,10 @@ int dfs_elm_ioctl(struct dfs_fd *file, int cmd, void *args)
             length = *(off_t*)args;
             if (length <= fd->obj.objsize)
             {
+#if !FF_FS_READONLY
                 fd->fptr = length;
                 result = f_truncate(fd);
+#endif
             }
             else
             {
@@ -534,6 +548,7 @@ int dfs_elm_read(struct dfs_fd *file, void *buf, size_t len)
     return elm_result_to_dfs(result);
 }
 
+#if !FF_FS_READONLY
 int dfs_elm_write(struct dfs_fd *file, const void *buf, size_t len)
 {
     FIL *fd;
@@ -569,6 +584,7 @@ int dfs_elm_flush(struct dfs_fd *file)
     result = f_sync(fd);
     return elm_result_to_dfs(result);
 }
+#endif
 
 int dfs_elm_lseek(struct dfs_fd *file, off_t offset)
 {
@@ -591,6 +607,7 @@ int dfs_elm_lseek(struct dfs_fd *file, off_t offset)
     }
     else if (file->type == FT_DIRECTORY)
     {
+#if FF_FS_MINIMIZE <= 1
         /* which is a directory */
         DIR *dir;
 
@@ -604,11 +621,13 @@ int dfs_elm_lseek(struct dfs_fd *file, off_t offset)
             file->pos = offset;
             return file->pos;
         }
+#endif
     }
 
     return elm_result_to_dfs(result);
 }
 
+#if FF_FS_MINIMIZE <= 1
 int dfs_elm_getdents(struct dfs_fd *file, struct dirent *dirp, uint32_t count)
 {
     DIR *dir;
@@ -664,7 +683,9 @@ int dfs_elm_getdents(struct dfs_fd *file, struct dirent *dirp, uint32_t count)
 
     return index * sizeof(struct dirent);
 }
+#endif
 
+#if !FF_FS_READONLY
 int dfs_elm_unlink(struct dfs_filesystem *fs, const char *path)
 {
     FRESULT result;
@@ -729,7 +750,9 @@ int dfs_elm_rename(struct dfs_filesystem *fs, const char *oldpath, const char *n
 #endif
     return elm_result_to_dfs(result);
 }
+#endif
 
+#if FF_FS_MINIMIZE == 0
 int dfs_elm_stat(struct dfs_filesystem *fs, const char *path, struct stat *st)
 {
     FILINFO file_info;
@@ -810,18 +833,23 @@ int dfs_elm_stat(struct dfs_filesystem *fs, const char *path, struct stat *st)
 
     return elm_result_to_dfs(result);
 }
+#endif
 
 static const struct dfs_file_ops dfs_elm_fops =
 {
-    dfs_elm_open,
-    dfs_elm_close,
-    dfs_elm_ioctl,
-    dfs_elm_read,
-    dfs_elm_write,
-    dfs_elm_flush,
-    dfs_elm_lseek,
-    dfs_elm_getdents,
-    RT_NULL, /* poll interface */
+    .open = dfs_elm_open,
+    .close = dfs_elm_close,
+    .ioctl = dfs_elm_ioctl,
+    .read = dfs_elm_read,
+#if !FF_FS_READONLY
+    .write = dfs_elm_write,
+    .flush = dfs_elm_flush,
+#endif
+    .lseek = dfs_elm_lseek,
+#if FF_FS_MINIMIZE <= 1
+    .getdents = dfs_elm_getdents,
+#endif
+    .poll = RT_NULL, /* poll interface */
 };
 
 static const struct dfs_filesystem_ops dfs_elm =
@@ -830,14 +858,24 @@ static const struct dfs_filesystem_ops dfs_elm =
     DFS_FS_FLAG_DEFAULT,
     &dfs_elm_fops,
 
-    dfs_elm_mount,
-    dfs_elm_unmount,
-    dfs_elm_mkfs,
-    dfs_elm_statfs,
+    .mount = dfs_elm_mount,
+    .unmount = dfs_elm_unmount,
+#if !FF_FS_READONLY && FF_USE_MKFS
+    .mkfs = dfs_elm_mkfs,
+#endif
+#if !FF_FS_READONLY
+    .statfs = dfs_elm_statfs,
+#endif
 
-    dfs_elm_unlink,
-    dfs_elm_stat,
-    dfs_elm_rename,
+#if !FF_FS_READONLY
+    .unlink = dfs_elm_unlink,
+#endif
+#if FF_FS_MINIMIZE == 0
+    .stat = dfs_elm_stat,
+#endif
+#if !FF_FS_READONLY
+    .rename = dfs_elm_rename,
+#endif
 };
 
 int elm_init(void)
@@ -851,23 +889,23 @@ INIT_COMPONENT_EXPORT(elm_init);
 /* Disk Device Interface for ELM FatFs  */
 #include "diskio.h"
 
-#ifdef RAM_DISK_ENABLE
+#if defined(RAM_DISK_ENABLE)
 #include "ram_disk/ram_disk.h"
 #endif
 
-#ifdef AIC_USB_HOST_EHCI_DRV
+#if defined(AIC_USB_HOST_EHCI_DRV)
 #include "usb_disk/usb_disk.h"
 #endif
 
-#ifdef AIC_SDMC_DRV
+#if defined(AIC_SDMC_DRV)
 #include "sdmc_disk/sdmc_disk.h"
 #endif
 
-#ifdef AIC_SPINAND_DRV
+#if defined(AIC_SPINAND_DRV) && !defined(AIC_BOOTLOADER)
 #include "spinand_disk/spinand_disk.h"
 #endif
 
-#ifdef AIC_SPINOR_DRV
+#if defined(AIC_SPINOR_DRV) && !defined(AIC_BOOTLOADER)
 #include "spinor_disk/spinor_disk.h"
 #endif
 
@@ -881,29 +919,29 @@ DSTATUS disk_initialize(BYTE pdrv)
 
     (void)handle;
     switch (dev_type) {
-#ifdef RAM_DISK_ENABLE
+#if defined(RAM_DISK_ENABLE)
         case DTL(DEVICE_TYPE_RAM_DISK):
             stat = ram_disk_initialize(pdrv);
             return stat;
 #endif
-#ifdef AIC_USB_HOST_EHCI_DRV
+#if defined(AIC_USB_HOST_EHCI_DRV)
         case DTL(DEVICE_TYPE_USB_DISK):
             stat = usb_disk_initialize(pdrv);
             return stat;
 #endif
-#ifdef AIC_SDMC_DRV
+#if defined(AIC_SDMC_DRV)
         case DTL(DEVICE_TYPE_SDMC_DISK):
             handle = sdmc_disk_initialize(device_name);
             stat = 0;
             break;
 #endif
-#ifdef AIC_SPINAND_DRV
+#if defined(AIC_SPINAND_DRV) && !defined(AIC_BOOTLOADER)
         case DTL(DEVICE_TYPE_SPINAND_DISK):
             handle = spinand_disk_initialize(device_name);
             stat = 0;
             break;
 #endif
-#ifdef AIC_SPINOR_DRV
+#if defined(AIC_SPINOR_DRV) && !defined(AIC_BOOTLOADER)
         case DTL(DEVICE_TYPE_SPINOR_DISK):
             handle = spinor_disk_initialize(device_name);
             stat = 0;
@@ -924,34 +962,34 @@ DSTATUS disk_status(BYTE pdrv)
 }
 
 /* Read Sector(s) */
-DRESULT disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count)
+DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
 {
     DRESULT res = RES_PARERR;
     long dev_type = disk[pdrv].dev_type;
     void *handle = disk[pdrv].priv;
 
     switch (dev_type) {
-#ifdef RAM_DISK_ENABLE
+#if defined(RAM_DISK_ENABLE)
         case DTL(DEVICE_TYPE_RAM_DISK):
             res = ram_disk_read(pdrv, buff, sector, count);
             return res;
 #endif
-#ifdef AIC_USB_HOST_EHCI_DRV
+#if defined(AIC_USB_HOST_EHCI_DRV)
         case DTL(DEVICE_TYPE_USB_DISK):
             res = usb_disk_read(pdrv, buff, sector, count);
             return res;
 #endif
-#ifdef AIC_SDMC_DRV
+#if defined(AIC_SDMC_DRV)
         case DTL(DEVICE_TYPE_SDMC_DISK):
             res = sdmc_disk_read(handle, buff, sector, count);
             return res;
 #endif
-#ifdef AIC_SPINAND_DRV
+#if defined(AIC_SPINAND_DRV) && !defined(AIC_BOOTLOADER)
         case DTL(DEVICE_TYPE_SPINAND_DISK):
             res = spinand_disk_read(handle, buff, sector, count);
             return res;
 #endif
-#ifdef AIC_SPINOR_DRV
+#if defined(AIC_SPINOR_DRV) && !defined(AIC_BOOTLOADER)
         case DTL(DEVICE_TYPE_SPINOR_DISK):
             res = spinor_disk_read(handle, buff, sector, count);
             return res;
@@ -964,34 +1002,34 @@ DRESULT disk_read(BYTE pdrv, BYTE *buff, DWORD sector, UINT count)
 }
 
 /* Write Sector(s) */
-DRESULT disk_write(BYTE pdrv, const BYTE *buff, DWORD sector, UINT count)
+DRESULT disk_write(BYTE pdrv, const BYTE *buff, LBA_t sector, UINT count)
 {
     DRESULT res = RES_PARERR;
     long dev_type = disk[pdrv].dev_type;
     void *handle = disk[pdrv].priv;
 
     switch (dev_type) {
-#ifdef RAM_DISK_ENABLE
+#if defined(RAM_DISK_ENABLE)
         case DTL(DEVICE_TYPE_RAM_DISK):
             res = ram_disk_write(pdrv, buff, sector, count);
             return res;
 #endif
-#ifdef AIC_USB_HOST_EHCI_DRV
+#if defined(AIC_USB_HOST_EHCI_DRV)
         case DTL(DEVICE_TYPE_USB_DISK):
             res = usb_disk_write(pdrv, buff, sector, count);
             return res;
 #endif
-#ifdef AIC_SDMC_DRV
+#if defined(AIC_SDMC_DRV)
         case DTL(DEVICE_TYPE_SDMC_DISK):
             res = sdmc_disk_write(handle, buff, sector, count);
             return res;
 #endif
-#ifdef AIC_SPINAND_DRV
+#if defined(AIC_SPINAND_DRV) && !defined(AIC_BOOTLOADER)
         case DTL(DEVICE_TYPE_SPINAND_DISK):
             res = spinand_disk_write(handle, buff, sector, count);
             return res;
 #endif
-#ifdef AIC_SPINOR_DRV
+#if defined(AIC_SPINOR_DRV) && !defined(AIC_BOOTLOADER)
         case DTL(DEVICE_TYPE_SPINOR_DISK):
             res = spinor_disk_write(handle, buff, sector, count);
             return res;
@@ -1020,27 +1058,27 @@ DRESULT disk_ioctl(BYTE pdrv, BYTE cmd, void *buff)
     }
 
     switch (dev_type) {
-#ifdef RAM_DISK_ENABLE
+#if defined(RAM_DISK_ENABLE)
         case DTL(DEVICE_TYPE_RAM_DISK):
             res = ram_disk_ioctl(pdrv, cmd, buff);
             return res;
 #endif
-#ifdef AIC_USB_HOST_EHCI_DRV
+#if defined(AIC_USB_HOST_EHCI_DRV)
         case DTL(DEVICE_TYPE_USB_DISK):
             res = usb_disk_ioctl(pdrv, cmd, buff);
             return res;
 #endif
-#ifdef AIC_SDMC_DRV
+#if defined(AIC_SDMC_DRV)
         case DTL(DEVICE_TYPE_SDMC_DISK):
             res = sdmc_disk_ioctl(handle, cmd, buff);
             return res;
 #endif
-#ifdef AIC_SPINAND_DRV
+#if defined(AIC_SPINAND_DRV) && !defined(AIC_BOOTLOADER)
         case DTL(DEVICE_TYPE_SPINAND_DISK):
             res = spinand_disk_ioctl(handle, cmd, buff);
             return res;
 #endif
-#ifdef AIC_SPINOR_DRV
+#if defined(AIC_SPINOR_DRV) && !defined(AIC_BOOTLOADER)
         case DTL(DEVICE_TYPE_SPINOR_DISK):
             res = spinor_disk_ioctl(handle, cmd, buff);
             return res;

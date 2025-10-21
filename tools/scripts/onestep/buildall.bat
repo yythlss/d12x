@@ -55,16 +55,22 @@ for /f %%i in ('dir /b "%SDK_PRJ_TOP_DIR%\target\configs\*_defconfig"') do (
 	find "Luban-Lite is built successfully" %LOG_DIR%\!SOLUTION!.log > nul
 	if !errorlevel! equ 0 (
 		rem Scan the warning information in log
-		find "warning: " %LOG_DIR%\!SOLUTION!.log | find "warning: " /i | find "is shorter than expected" /v /c > %LOG_DIR%\warning.tmp
-		find "pinmux conflicts" %LOG_DIR%\!SOLUTION!.log >> %LOG_DIR%\warning.tmp
+		set war_cnt=0
 
-		for /F %%j in ('type %LOG_DIR%\warning.tmp') do set war_cnt=%%j
+		rem get the normal warning count
+		for /f %%a in ('find "warning: " %LOG_DIR%\!SOLUTION!.log ^| find "warning: " /i ^| find "is shorter than expected" /v ^| findstr /v /c:"not set correctly" ^| find /c /v ""') do ( set /a war_cnt+=%%a )
+
+		rem get pinmux conflics acount
+		for /f %%b in ('findstr /i /c:"pinmux conflicts" %LOG_DIR%\!SOLUTION!.log 2^>nul ^| find /c /v ""') do ( set /a war_cnt+=%%b )
 
 		echo !CNT_FMT!. !SOLUTION_FMT! is OK. Warning: !war_cnt!
-		if not "!war_cnt!" == "0" (
+		if not !war_cnt! == 0 (
 			echo. >> %LOG_DIR%\warning.log
 			echo [!SOLUTION!]: >> %LOG_DIR%\warning.log
-			find "warning: " %LOG_DIR%\!SOLUTION!.log | find "warning: " /i | find "is shorter than expected" /v >> %LOG_DIR%\warning.log
+			find "warning: " %LOG_DIR%\!SOLUTION!.log | find "warning: " /i | find "is shorter than expected" /v | findstr /v /c:"not set correctly"  >> %LOG_DIR%\warning.log
+
+			rem even normal warcnt=0 pinmux conflics need print
+			findstr /i /c:"pinmux conflicts" %LOG_DIR%\!SOLUTION!.log >> %LOG_DIR%\warning.log 2>nul
 		)
 	) else (
 		echo !CNT_FMT!. !SOLUTION_FMT! is failed!

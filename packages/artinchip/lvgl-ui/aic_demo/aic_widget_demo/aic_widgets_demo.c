@@ -21,6 +21,10 @@ void aic_img_roller(void);
 extern void aic_player_demo(void);
 #endif
 
+#ifdef AIC_APNG_DEMO
+extern void aic_png_demo(void);
+#endif
+
 #ifdef AIC_IMAGE_USAGE_DEMO
 extern void aic_img_usage(void);
 #endif
@@ -36,6 +40,10 @@ void ui_init(void)
 #endif
 #ifdef AIC_PLAYER_DEMO
     aic_player_demo();
+#endif
+
+#ifdef AIC_APNG_DEMO
+    aic_png_demo();
 #endif
 
 #ifdef AIC_IMAGE_USAGE_DEMO

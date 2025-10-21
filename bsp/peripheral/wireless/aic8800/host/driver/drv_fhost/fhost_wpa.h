@@ -339,6 +339,9 @@ int fhost_wpa_stop_ap(int fhost_vif_idx);
 int fhost_wpa_disassociate_sta(int fhost_vif_idx, struct mac_addr *macaddr);
 int fhost_wpa_wps(int fhost_vif_idx, bool enable, int timeout_ms);
 int fhost_wpa_switch_channel(int fhost_vif_idx, uint32_t frequency);
+#if NX_P2P
+int fhost_wpa_set_wps_pbc(int fhost_vif_idx);
+#endif
 int fhost_ap_add_blacklist(int fhost_vif_idx, struct mac_addr *macaddr);
 int fhost_ap_del_blacklist(int fhost_vif_idx, struct mac_addr *macaddr);
 int fhost_ap_add_whitelist(int fhost_vif_idx, struct mac_addr *macaddr);

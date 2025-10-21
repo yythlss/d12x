@@ -15,15 +15,15 @@
 * 函数返回: TRUE: 合法; FALSE: 非法
 * 其它说明: 无
 ******************************************************************************/
-bool_t service_2E_check_len(const uint8_t* msg_buf, uint16_t msg_dlc)
+bool_t service_2E_check_len(const uint8_t *msg_buf, uint16_t msg_dlc)
 {
-	bool_t ret = FALSE;
-	
-	(void)msg_buf;
-	if(msg_dlc > 4)
-		ret = TRUE;
+    bool_t ret = FALSE;
 
-	return ret;
+    (void)msg_buf;
+    if (msg_dlc > 4)
+        ret = TRUE;
+
+    return ret;
 }
 
 /******************************************************************************
@@ -35,35 +35,31 @@ bool_t service_2E_check_len(const uint8_t* msg_buf, uint16_t msg_dlc)
 * 函数返回: 无
 * 其它说明: 无
 ******************************************************************************/
-void service_2E_WriteDataByIdentifier(const uint8_t* msg_buf, uint16_t msg_dlc)
+void service_2E_WriteDataByIdentifier(const uint8_t *msg_buf, uint16_t msg_dlc)
 {
     uint8_t rsp_buf[8];
-	uint16_t did;
-	bool_t write_ret = 0;
+    uint16_t did;
+    bool_t write_ret = 0;
 
-	did = ((uint16_t)msg_buf[1]) << 8;
-	did |= msg_buf[2];
+    did = ((uint16_t)msg_buf[1]) << 8;
+    did |= msg_buf[2];
 
-	switch(did)
-	{
-		case 0x1234:
-			// write_ret = eeprom_write(xxx, xxx);
-			if(write_ret)
-			{
-				rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_2E);
-				rsp_buf[1] = msg_buf[1];
-				rsp_buf[2] = msg_buf[2];
-				uds_positive_rsp(rsp_buf, 3);
-			}
-			else
-			{
-				uds_negative_rsp(SID_2E, NRC_GENERAL_PROGRAMMING_FAILURE);
-			}
-			break;
-		
-		default:
-			uds_negative_rsp(SID_2E, NRC_REQUEST_OUT_OF_RANGE);
-			break;
-	}
+    switch (did) {
+        case 0x1234:
+            // write_ret = eeprom_write(xxx, xxx);
+            if (write_ret) {
+                rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_2E);
+                rsp_buf[1] = msg_buf[1];
+                rsp_buf[2] = msg_buf[2];
+                uds_positive_rsp(rsp_buf, 3);
+            } else {
+                uds_negative_rsp(SID_2E, NRC_GENERAL_PROGRAMMING_FAILURE);
+            }
+            break;
+
+        default:
+            uds_negative_rsp(SID_2E, NRC_REQUEST_OUT_OF_RANGE);
+            break;
+    }
 }
 /****************EOF****************/

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <getopt.h>
+#include <dirent.h>
 #include <inttypes.h>
 #include "aic_osal.h"
 #include "mpp_fb.h"
@@ -30,6 +31,13 @@ static struct aicfb_screeninfo g_screen_info = {0};
 #ifdef AIC_CHIP_D13X
 #define USE_VE_FILL_FB
 #endif
+
+#define FILE_MAX_NUM 128
+struct file_list {
+    char *file_path[FILE_MAX_NUM];
+    int file_num;
+};
+
 
 #ifdef USE_VE_FILL_FB
 struct ext_frame_allocator {
@@ -113,7 +121,6 @@ static struct frame_allocator *allocator_open(u8 *buf, u32 x, u32 y)
 
 static void print_help(char *program)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: %s [options]\n", program);
     printf("\t -i, --input: \t\t input stream file name\n");
     printf("\t -r, --rotate: \t\t enable clockwise rotate(0/90/180/270)\n");
@@ -765,4 +772,181 @@ out:
         close(input_fd);
 }
 
+static int read_dir(char* path, struct file_list *files)
+{
+    char* ptr = NULL;
+    int file_path_len = 0;
+    struct dirent* dir_file = NULL;
+
+    DIR* dir = opendir(path);
+    if (dir == NULL) {
+        loge("read dir failed");
+        return -1;
+    }
+    printf("path: %s\n", path);
+    while((dir_file = readdir(dir))) {
+        ptr = strrchr(dir_file->d_name, '.');
+        if (ptr == NULL)
+            continue;
+        if (strcmp(ptr, ".png") != 0)
+            continue;
+
+        file_path_len = 0;
+        file_path_len += strlen(path);
+        file_path_len += 1;
+        file_path_len += strlen(dir_file->d_name);
+        logd("file_path_len:%d\n",file_path_len);
+        if (file_path_len > FILE_MAX_NUM-1) {
+            loge("%s too long \n",dir_file->d_name);
+            continue;
+        }
+        files->file_path[files->file_num] = (char *)mpp_alloc(file_path_len+1);
+        files->file_path[files->file_num][file_path_len] = '\0';
+        strcpy(files->file_path[files->file_num], path);
+        strcat(files->file_path[files->file_num], "/");
+        strcat(files->file_path[files->file_num], dir_file->d_name);
+        logd("i: %d, filename: %s", files->file_num, files->file_path[files->file_num]);
+        files->file_num ++;
+    }
+    closedir(dir);
+    return 0;
+}
+
+static void apng_print_help(char *program)
+{
+    printf("Usage: %s [options]\n", program);
+    printf("\t -t, --input: \t\t input stream path name\n");
+}
+
+void apng_test(int argc, char **argv)
+{
+    int ret = 0, i = 0;
+    int file_len = 0, r_len = 0;
+    int input_fd = 0;
+    int type = MPP_CODEC_VIDEO_DECODER_PNG;
+    struct mpp_fb *fb = NULL;
+    struct mpp_decoder* dec = NULL;
+    struct decode_config config;
+    struct mpp_packet packet;
+    struct file_list files = {0};
+
+    if(argc < 2) {
+        apng_print_help(argv[0]);
+        return;
+    }
+
+    optind = 0;
+    int c;
+    while ((c = getopt(argc, argv, "t:h")) != -1) {
+        switch (c) {
+        case 't':
+            read_dir(optarg, &files);
+            continue;
+
+        case 'h':
+        default:
+            return apng_print_help(argv[0]);
+        }
+    }
+
+    if (files.file_num <= 0) {
+        loge("file_num %d!!!!\n", files.file_num);
+        return;
+    }
+
+    fb = mpp_fb_open();
+    if (!fb) {
+        loge("mpp_fb_open error!!!!\n");
+        goto out;
+    }
+
+    struct aicfb_screeninfo *info = get_screen_info();
+    if (!info) {
+        loge("mpp_fb_open error!!!!\n");
+        goto out;
+    }
+
+    file_len = get_file_size(0, files.file_path[0]);
+    config.bitstream_buffer_size = ((file_len + 1023) & (~1023)) * 2;
+    config.extra_frame_num = 0;
+    config.packet_count = 1;
+    config.pix_fmt = info->format;
+
+    // 1. create mpp_decoder
+    dec = mpp_decoder_create(type);
+    if (!dec) {
+        loge("mpp_decoder_create error!!!!\n");
+        goto out;
+    }
+
+    // 2. init mpp_decoder
+    mpp_decoder_init(dec, &config);
+
+    while (i < files.file_num) {
+        printf("cur file:%s\n", files.file_path[i]);
+        input_fd = open(files.file_path[i], O_RDONLY);
+        if(input_fd < 0) {
+            logd("open file(%s) failed, %d", files.file_path[i], input_fd);
+            break;
+        }
+        file_len = get_file_size(input_fd, files.file_path[i]);
+
+        // 3. get an empty packet from mpp_decoder
+        memset(&packet, 0, sizeof(struct mpp_packet));
+        ret = mpp_decoder_get_packet(dec, &packet, ALIGN_UP(file_len, 32));
+        if (ret != DEC_OK) {
+            loge("get packet len %d failed, %d", file_len, ret);
+            close(input_fd);
+            break;
+        }
+
+        // 4. copy data to packet
+        r_len = read(input_fd, packet.data, file_len);
+        close(input_fd);
+
+        packet.size = r_len;
+        packet.flag = PACKET_FLAG_EOS;
+        logi("read len: %d, file_len: %d\n", r_len, file_len);
+
+        // 5. put the packet to mpp_decoder
+        mpp_decoder_put_packet(dec, &packet);
+
+        // 6. decode
+        ret = mpp_decoder_decode(dec);
+        if(ret < 0) {
+            loge("decode error, %d", ret);
+            goto out;
+        }
+
+        // 7. get a decoded frame
+        struct mpp_frame frame;
+        memset(&frame, 0, sizeof(struct mpp_frame));
+        mpp_decoder_get_frame(dec, &frame);
+
+        // 8. Render the data to Framebuffer
+        render_frame(fb, &frame, 0, 0, 0, 0, AICFB_LAYER_TYPE_UI);
+        sleep(1);
+        // 9. return this frame
+        mpp_decoder_put_frame(dec, &frame);
+
+        i++;
+    }
+
+
+out:
+    // 10. destroy mpp_decoder
+    if (dec)
+        mpp_decoder_destory(dec);
+
+    if (fb)
+        mpp_fb_close(fb);
+
+    for (i = 0; i < files.file_num; i++) {
+        if (files.file_path[i])
+            mpp_free(files.file_path[i]);
+        files.file_path[i] = NULL;
+    }
+}
+
 MSH_CMD_EXPORT_ALIAS(pic_test, pic_test, picture decode test);
+MSH_CMD_EXPORT_ALIAS(apng_test, apng_test, apng decode test);

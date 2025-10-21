@@ -114,6 +114,7 @@ static void display_cal_frame_rate(aic_disp_t *aic_disp)
     return;
 }
 
+#ifndef LV_USE_SPI_REPLACE_MIPI_DBI
 static inline void *get_fb_buf_by_id(aic_disp_t *aic_disp, int id)
 {
     if (id == 1)
@@ -237,6 +238,41 @@ static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_ma
 
     lv_display_flush_ready(disp);
 }
+#else
+#include <lv_aic_spi.h>
+static inline void display_power_on(aic_disp_t *aic_disp)
+{
+    (void)aic_disp;
+
+    static bool first_frame = true;
+    if (first_frame) {
+        lv_spi_screen_enable();
+        first_frame = false;
+    }
+}
+
+static void disp_flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px_map)
+{
+    aic_disp_t *aic_disp = (aic_disp_t *)lv_display_get_user_data(disp);
+
+    lv_draw_buf_t *disp_buf = lv_display_get_buf_active(disp);
+    (void)px_map;
+
+    if (lv_disp_flush_is_last(disp)) {
+#if LV_DISP_FB_DUMP
+        // dump frame buffer
+        lv_disp_buf_dump(disp);
+#endif
+        aicos_dcache_clean_invalid_range((ulong *)disp_buf->data, (ulong)ALIGN_UP(aic_disp->fb_size, CACHE_LINE_SIZE));
+        display_power_on(aic_disp);
+        lv_spi_flush(disp_buf->data, aic_disp->fb_size);
+
+        display_cal_frame_rate(aic_disp);
+    }
+
+    lv_display_flush_ready(disp);
+}
+#endif
 
 static lv_color_format_t lv_display_fmt(enum mpp_pixel_format cf)
 {
@@ -389,6 +425,11 @@ void lv_port_disp_init(void)
     lv_thread_sync_init(&aic_disp->sync);
     lv_thread_sync_init(&aic_disp->sync_notify);
     lv_thread_init(&aic_disp->thread, LV_THREAD_PRIO_HIGH, aic_display_thread, 4 * 1024, aic_disp);
+#endif
+
+#ifdef AIC_LVGL_SPI_EXTEND_DEMO
+    extern void lv_spi_display_init();
+    lv_spi_display_init();
 #endif
 
 #ifndef AIC_MONKEY_TEST

@@ -85,9 +85,11 @@ Default_IRQHandler:
 #endif
 
 #if defined(KERNEL_RTTHREAD)
-    jal     rt_interrupt_enter
+    la      t0, rt_interrupt_enter
+    jalr    t0
 #elif defined(KERNEL_FREERTOS)
-    jal     aicos_irq_enter
+    la      t0, aicos_irq_enter
+    jalr    t0
 #endif
 
     /* call isr */
@@ -117,9 +119,11 @@ Default_IRQHandler:
     jalr    t2
 
 #if defined(KERNEL_RTTHREAD)
-    jal     rt_interrupt_leave
+    la      t2, rt_interrupt_leave
+    jalr    t2
 #elif defined(KERNEL_FREERTOS)
-    jal     aicos_irq_exit
+    la      t2, aicos_irq_exit
+    jalr    t2
 #endif
 
 #ifdef ARCH_RISCV_FPU

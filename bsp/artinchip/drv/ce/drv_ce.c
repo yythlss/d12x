@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -8,6 +8,7 @@
 
 #include <string.h>
 #include <aic_core.h>
+#include <aic_utils.h>
 #include <aic_hal.h>
 #include <aic_log.h>
 #include <hwcrypto.h>
@@ -24,7 +25,6 @@
 #define AES_MAX_KEY_LEN  32
 #define CE_WORK_BUF_LEN  1024
 #define RSA_CHECK_OPSIZE(x) (((x) == 64) || ((x) == 128) || ((x) == 256) ? 0 : 1)
-#define RSA_SELECT_OPSIZE(x) ((x) / 16)
 struct aic_hwcrypto_device
 {
     struct rt_hwcrypto_device dev;
@@ -607,15 +607,30 @@ void drv_rsa_uninit(struct rt_hwcrypto_ctx *ctx)
     hal_crypto_deinit();
 }
 
-static s32 rsa_calc(void *mod, void *prime, void *src, u32 src_size, void *out)
+static u32 rsa_select_opsize(u32 opsize)
+{
+    switch (opsize) {
+    case 64:
+        return 0x4;
+    case 128:
+        return 0x5;
+    case 256:
+        return 0x6;
+    default:
+        pr_err("not support opsize %d\n", opsize);
+        return 0x0;
+    }
+}
+
+static s32 rsa_calc(void *mod, void *prime, void *src, u32 mod_size, u32 prime_size, u32 src_size, void *out)
 {
     struct crypto_task task __attribute__((aligned(CACHE_LINE_SIZE)));
     u8 *pn, *pp, *data, *pout;
     u32 opsize;
     int ret = 0;
 
-    if (RSA_CHECK_OPSIZE(src_size)) {
-        pr_err("opsize %d error\n", src_size);
+    if (RSA_CHECK_OPSIZE(mod_size)) {
+        pr_err("opsize %d error\n", mod_size);
         return -1;
     }
 
@@ -626,19 +641,19 @@ static s32 rsa_calc(void *mod, void *prime, void *src, u32 src_size, void *out)
         return -1;
     }
     memset(pp, 0, CE_WORK_BUF_LEN);
-    opsize = src_size;
+    opsize = mod_size;
     pn = pp + opsize;
     data = pn + opsize;
     pout = data + opsize;
 
-    hal_crypto_bignum_be2le(src, opsize, data, opsize);
-    hal_crypto_bignum_be2le(mod, opsize, pn, opsize);
-    hal_crypto_bignum_be2le(prime, opsize, pp, opsize);
+    memcpy(data, src, src_size);
+    memcpy(pn, mod, mod_size);
+    memcpy(pp, prime, prime_size);
 
     memset(&task, 0, sizeof(task));
     task.alg.rsa.alg_tag = ALG_RSA;
 
-    task.alg.rsa.op_siz = RSA_SELECT_OPSIZE(opsize);
+    task.alg.rsa.op_siz = rsa_select_opsize(opsize);
     task.alg.rsa.m_addr = (u32)(uintptr_t)pn;
     task.alg.rsa.d_e_addr = (u32)(uintptr_t)pp;
     task.data.in_addr = (u32)(uintptr_t)data;
@@ -656,15 +671,15 @@ static s32 rsa_calc(void *mod, void *prime, void *src, u32 src_size, void *out)
     }
     hal_crypto_pending_clear(ALG_AK_ACCELERATOR);
 
-    if (hal_crypto_get_err(ALG_AK_ACCELERATOR)) {
-        pr_err("RSA run error.\n");
-        ret = RT_ERROR;
+    ret = hal_crypto_get_err(ALG_AK_ACCELERATOR);
+    if (ret) {
+        pr_err("RSA run error, ret=0x%x.\n", ret);
         goto out;
     }
 
     aicos_dma_sync();
     aicos_dcache_invalid_range((void *)(unsigned long)pout, opsize);
-    hal_crypto_bignum_le2be(pout, opsize, out, opsize);
+    memcpy(out, pout, opsize);
 
 out:
     if (pp)
@@ -680,7 +695,13 @@ static rt_err_t drv_exptmod(struct hwcrypto_bignum *ctx,
                         const struct hw_bignum_mpi *b,
                         const struct hw_bignum_mpi *c)
 {
-    return rsa_calc(c->p, b->p, a->p, a->total, x->p);
+    if ((x->total == 0) || (x->p = NULL)) {
+        x->total = a->total;
+        x->sign = a->sign;
+        x->p = rt_malloc(x->total);
+        memset(x->p, 0, x->total);
+    }
+    return rsa_calc(c->p, b->p, a->p, c->total, b->total, a->total, x->p);
 }
 
 static const struct hwcrypto_bignum_ops rsa_ops = {

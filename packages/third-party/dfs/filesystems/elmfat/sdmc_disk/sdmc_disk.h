@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -67,7 +67,7 @@ DSTATUS sdmc_disk_status(void *hdisk);
  * @retval RES_PARERR Failed.
  * @retval RES_OK Success.
  */
-DRESULT sdmc_disk_read(void *hdisk, uint8_t *buf, uint32_t sector, uint8_t cnt);
+DRESULT sdmc_disk_read(void *hdisk, uint8_t *buf, uint32_t sector, rt_size_t cnt);
 
 /*!
  * @brief Writes SDMC disk.
@@ -79,7 +79,7 @@ DRESULT sdmc_disk_read(void *hdisk, uint8_t *buf, uint32_t sector, uint8_t cnt);
  * @retval RES_PARERR Failed.
  * @retval RES_OK Success.
  */
-DRESULT sdmc_disk_write(void *hdisk, const uint8_t *buf, uint32_t sector, uint8_t cnt);
+DRESULT sdmc_disk_write(void *hdisk, const uint8_t *buf, uint32_t sector, rt_size_t cnt);
 
 /*!
  * @brief SDMC disk IO operation.

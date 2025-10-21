@@ -1107,6 +1107,7 @@ def chk_prepare_toolchain(aic_root, prj_chip, prj_board, prj_kernel, prj_app, pr
                 shutil.rmtree(toolchain_bpath)
             else:
                 if old_toolchain_name != toolchain_name:
+                    print('Switch toolchain: {} -> {}'.format(old_toolchain_name, toolchain_name))
                     shutil.rmtree(toolchain_bpath)
                 else:
                     return

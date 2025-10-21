@@ -78,6 +78,7 @@ int check_brom_spienc_bit(void)
     return 0;
 }
 
+#if !defined(AIC_SID_BURN_DEBUG_MODE)
 int burn_jtag_lock_bit(void)
 {
     u32 offset = 0xFFFF, val;
@@ -100,6 +101,7 @@ int burn_jtag_lock_bit(void)
 
     return 0;
 }
+#endif
 
 int check_jtag_lock_bit(void)
 {
@@ -139,6 +141,12 @@ int burn_spienc_key(void)
 #elif defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0xA0;
 #endif
+
+    if (spi_aes_key_len != 16) {
+        printf("SPI ENC AES key length is not equal 16 bytes.\n ");
+        return -1;
+    }
+
     ret = write_efuse("spi_aes.key", offset, (const void *)spi_aes_key, spi_aes_key_len);
     if (ret <= 0) {
         printf("Write SPI ENC AES key error.\n");
@@ -177,6 +185,11 @@ int burn_spienc_nonce(void)
     int ret;
 
     offset = 0xB0;
+    if (spi_nonce_key_len != 8) {
+        printf("SPI ENC NONCE key length is not equal 8 bytes.\n ");
+        return -1;
+    }
+
     ret = write_efuse("spi_nonce.key", offset, (const void *)spi_nonce_key, spi_nonce_key_len);
     if (ret <= 0) {
         printf("Write SPI ENC NONCE key error.\n");
@@ -215,6 +228,11 @@ int burn_spienc_rotpk(void)
 #if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
     offset = 0x40;
 #endif
+    if (rotpk_bin_len != 16) {
+        printf("ROTPK bin length is not equal 16 bytes.\n ");
+        return -1;
+    }
+
     ret = write_efuse("rotpk.bin", offset, (const void *)rotpk_bin, rotpk_bin_len);
     if (ret <= 0) {
         printf("Write SPI ENC ROTPK error.\n");
@@ -245,6 +263,7 @@ int check_spienc_rotpk(void)
 }
 #endif
 
+#if !defined(AIC_SID_BURN_DEBUG_MODE)
 int burn_spienc_key_read_write_disable_bits(void)
 {
 #if defined(AIC_CHIP_D12X)
@@ -295,7 +314,7 @@ int burn_spienc_key_read_write_disable_bits(void)
 
     return 0;
 }
-
+#endif
 
 int check_spienc_key_read_write_disable_bits(void)
 {
@@ -405,6 +424,7 @@ int cmd_efuse_do_spienc(int argc, char **argv)
     }
 #endif
 
+#if !defined(AIC_SID_BURN_DEBUG_MODE)
     ret = burn_spienc_key_read_write_disable_bits();
     if (ret) {
         efuse_write_disable();
@@ -418,6 +438,7 @@ int cmd_efuse_do_spienc(int argc, char **argv)
         printf("Error\n");
         return -1;
     }
+#endif
 #endif
 
     ret = check_brom_spienc_bit();
@@ -466,6 +487,9 @@ int cmd_efuse_do_spienc(int argc, char **argv)
     efuse_write_disable();
     printf("\n");
     printf("Write SPI ENC eFuse done.\n");
+#if defined(AIC_SID_BURN_DEBUG_MODE)
+    printf("WARNING: The debug mode, the key is visible to the CPU.\n");
+#endif
 #if defined(AIC_SID_BURN_SIMULATED)
     printf("WARNING: This is a dry run to check the eFuse content, key is not burn to eFuse yet.\n");
 #endif

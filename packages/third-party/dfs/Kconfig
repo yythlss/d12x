@@ -42,6 +42,36 @@ if LPKG_USING_DFS
 
     if LPKG_USING_DFS_ELMFAT
         menu "elm-chan's FatFs, Generic FAT Filesystem Module"
+        config RT_DFS_ELM_READONLY
+            bool "Enable Read-only FAT Filesystem"
+            default n
+            help
+                Read-only configuration removes writing API functions, f_write(), f_sync(), f_unlink(), f_mkdir(), f_chmod(), f_rename(), f_truncate(), f_getfree() and optional writing functions as well.
+
+        choice
+            prompt "Defines minimization level"
+            default LPKG_DFS_ELM_MINIMIZE_0
+
+            config LPKG_DFS_ELM_MINIMIZE_0
+                bool "0: Basic functions are fully enabled"
+
+            config LPKG_DFS_ELM_MINIMIZE_1
+                bool "1: f_stat(), f_getfree(), f_unlink(), f_mkdir(), f_truncate() and f_rename()"
+
+            config LPKG_DFS_ELM_MINIMIZE_2
+                bool "2: f_opendir(), f_readdir() and f_closedir() are removed in addition to 1"
+
+            config LPKG_DFS_ELM_MINIMIZE_3
+                bool "3: f_lseek() function is removed in addition to 2."
+        endchoice
+
+        config RT_DFS_ELM_MINIMIZE
+            int
+            default 0 if LPKG_DFS_ELM_MINIMIZE_0
+            default 1 if LPKG_DFS_ELM_MINIMIZE_1
+            default 2 if LPKG_DFS_ELM_MINIMIZE_2
+            default 3 if LPKG_DFS_ELM_MINIMIZE_3
+
         config RT_DFS_ELM_CODE_PAGE
             int "OEM code page"
             default 437

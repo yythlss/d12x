@@ -108,7 +108,7 @@ int vin_vb_q_buf(struct vb_queue *q, u32 index)
     list_add_tail(&vb->queued_entry, &q->queued_list);
     q->queued_count++;
     vb->state = VB_BUF_STATE_QUEUED;
-    vb->timestamp = 0;
+    vb->timestamp = rt_tick_get_millisecond() - vb->timestamp;
 
     /*
      * If already streaming, give the buffer to driver for processing.
@@ -121,7 +121,7 @@ int vin_vb_q_buf(struct vb_queue *q, u32 index)
     if (q->streaming)
         vin_vb_stream_on(q);
 
-    pr_debug("Qbuf buffer %d [%d]\n", vb->index, q->queued_count);
+    pr_debug("[%d] Qbuf buffer %d [%d]\n", vb->timestamp, vb->index, q->queued_count);
     return 0;
 }
 
@@ -209,13 +209,8 @@ void vin_vb_buffer_done(struct vb_buffer *vb, enum vb_buffer_state state)
 
     pr_debug("Buffer %d done, state: %s\n\n", vb->index, vb_state_name(state));
 
-    if (state == VB_BUF_STATE_ERROR) {
-        /* The active vb just happened some error, so ignore the data in buf.
-           The DVP driver should reuse it */
-        vb->state = VB_BUF_STATE_QUEUED;
-        __enqueue_in_driver(vb);
-        return;
-    }
+    if (state == VB_BUF_STATE_ERROR)
+        pr_warn("Buffer %d has error!\n", vb->index);
 
     if (state == VB_BUF_STATE_QUEUED) {
         /* Reclaim the buf from DVP driver to queued_list */

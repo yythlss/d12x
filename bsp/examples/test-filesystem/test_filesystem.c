@@ -9,6 +9,8 @@
 #include <string.h>
 #include <finsh.h>
 #include <aic_core.h>
+#include <dfs_posix.h>
+#include <aic_utils.h>
 
 #define     DATA_LEN_64K    64*1024
 #define     DATA_LEN_16K    16*1024
@@ -33,8 +35,9 @@ u32 ENUM_DATA_LEN[] = {
 
 #define USAGE \
     "fs help : Get this information.\n" \
-    "fs read <filename> : Test filesystem write speed.\n" \
     "fs write <filename> : Test filesystem write speed.\n" \
+    "fs read <filename> : Test filesystem read speed with read() func.\n" \
+    "fs fread <filename> : Test filesystem read speed with fread() func.\n" \
     "fs open <filename> : Test filesystem open speed.\n" \
     "fs close : Test filesystem close speed.\n" \
     "example:\n" \
@@ -42,7 +45,7 @@ u32 ENUM_DATA_LEN[] = {
     "fs read data auto\n" \
     "fs write data/testfile.txt 2048\n" \
     "fs read data/testfile.txt\n" \
-    "fs read rodata/testfile.txt\n" \
+    "fs fread rodata/testfile.txt\n" \
     "fs open /data/testfile.txt\n" \
     "fs close \n" \
     "fs write\n"
@@ -50,19 +53,6 @@ u32 ENUM_DATA_LEN[] = {
 static void fs_usage(void)
 {
     printf("%s", USAGE);
-}
-
-static void show_speed(char *msg, u32 len, u32 us)
-{
-    u32 tmp, speed;
-
-    /* Split to serval step to avoid overflow */
-    tmp = 1000 * len;
-    tmp = tmp / us;
-    tmp = 1000 * tmp;
-    speed = tmp / 1024;
-
-    printf("Filesystem %s speed: %d byte, %d us -> %d KB/s\n", msg, len, us, speed);
 }
 
 static int write_read_auto(char *file_path, char *dir, char *data, bool read_en)
@@ -115,7 +105,7 @@ static int write_read_auto(char *file_path, char *dir, char *data, bool read_en)
     return 0;
 }
 
-static void test_fs_read(int argc, char **argv)
+static void test_fs_fread(int argc, char **argv)
 {
     uint32_t start_us;
     char *data;
@@ -160,10 +150,63 @@ static void test_fs_read(int argc, char **argv)
         }
         todo_len -= read_len;
     }
-    show_speed("read", f_len, aic_get_time_us() - start_us);
+    show_speed("fread", f_len, aic_get_time_us() - start_us);
 
 read_err:
     fclose(fp);
+    aicos_free_align(0, data);
+    return;
+}
+
+static void test_fs_read(int argc, char **argv)
+{
+    uint32_t start_us;
+    char *data;
+    int fd;
+    char file_path[128] = { 0 };
+    uint32_t f_len = 0, todo_len, read_len;
+
+    data = aicos_malloc_align(0, DATA_LEN_64K, CACHE_LINE_SIZE);
+    if (data == NULL) {
+        printf("Low memory");
+        return;
+    }
+
+    if (argc > 2 && !rt_strcmp(argv[2], "auto")) {
+        write_read_auto(file_path, argv[1], data, 1);
+        return;
+    }
+
+    if (argc > 1)
+        rt_sprintf(file_path, "%s", argv[1]);
+    else
+        rt_sprintf(file_path, "%s", "data/testfile.txt");
+
+    fd = open(file_path, O_RDONLY);
+    if (fd < 0) {
+        printf("Open file %s failed!\n", file_path);
+        aicos_free_align(0, data);
+        return;
+    }
+
+    lseek(fd, 0, SEEK_SET);
+    f_len = lseek(fd, 0, SEEK_END);
+    lseek(fd, 0, SEEK_SET);
+    todo_len = f_len;
+
+    start_us = aic_get_time_us();
+    while (todo_len) {
+        read_len = todo_len < DATA_LEN_64K ? todo_len : DATA_LEN_64K;
+        if (read_len != read(fd, data, read_len)) {
+            printf("Fs read data error \n");
+            goto read_err;
+        }
+        todo_len -= read_len;
+    }
+    show_speed("read", f_len, aic_get_time_us() - start_us);
+
+read_err:
+    close(fd);
     aicos_free_align(0, data);
     return;
 }
@@ -264,6 +307,9 @@ static void cmd_test_fs(int argc, char **argv)
         goto help;
     } else if (!rt_strcmp(argv[1], "read")) {
         test_fs_read(argc - 1, &argv[1]);
+        return;
+    } else if (!rt_strcmp(argv[1], "fread")) {
+        test_fs_fread(argc - 1, &argv[1]);
         return;
     } else if (!rt_strcmp(argv[1], "write")) {
         test_fs_write(argc - 1, &argv[1]);

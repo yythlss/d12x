@@ -359,14 +359,35 @@ static const struct rt_wlan_dev_ops wlan_ops = {
     .wlan_send = aic8800_send,
 };
 
+void wifi_p2p_go_started(void)
+{
+    if (s_ap_dev) {
+        rt_wlan_dev_indicate_event_handle(s_ap_dev, RT_WLAN_DEV_EVT_AP_START, NULL);
+    }
+}
+
+void wifi_p2p_go_stopped(void)
+{
+    if (s_ap_dev) {
+        rt_wlan_dev_indicate_event_handle(s_ap_dev, RT_WLAN_DEV_EVT_AP_STOP, NULL);
+    }
+}
 
 int wifi_device_reg(void)
 {
     AIC_LOG_PRINTF("%s ctrl pwrkey\n", __func__);
+    platform_rst_wifi_pin_init();
+    platform_rst_wifi_pin_enable();
+    rtos_task_suspend(10);
     platform_pwr_wifi_pin_init();
     platform_pwr_wifi_pin_disable();
     rtos_task_suspend(10);
     platform_pwr_wifi_pin_enable();
+    rtos_task_suspend(10);
+    platform_rst_bt_pin_init();
+    platform_rst_bt_pin_disable();
+    rtos_task_suspend(10);
+    platform_rst_bt_pin_enable();
 
     s_wlan_dev = rt_malloc(sizeof(struct rt_wlan_device));
     if (!s_wlan_dev){

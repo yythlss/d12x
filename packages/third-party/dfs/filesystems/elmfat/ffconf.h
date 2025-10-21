@@ -1,6 +1,7 @@
 /*---------------------------------------------------------------------------/
 /  FatFs Functional Configurations
 /---------------------------------------------------------------------------*/
+#include "rtconfig.h"
 
 #define FFCONF_DEF	86631	/* Revision ID */
 
@@ -8,14 +9,22 @@
 / Function Configurations
 /---------------------------------------------------------------------------*/
 
-#define FF_FS_READONLY	0
+#ifdef RT_DFS_ELM_READONLY
+#define FF_FS_READONLY 1
+#else
+#define FF_FS_READONLY 0
+#endif
 /* This option switches read-only configuration. (0:Read/Write or 1:Read-only)
 /  Read-only configuration removes writing API functions, f_write(), f_sync(),
 /  f_unlink(), f_mkdir(), f_chmod(), f_rename(), f_truncate(), f_getfree()
 /  and optional writing functions as well. */
 
 
+#ifdef RT_DFS_ELM_MINIMIZE
+#define FF_FS_MINIMIZE	RT_DFS_ELM_MINIMIZE
+#else
 #define FF_FS_MINIMIZE	0
+#endif
 /* This option defines minimization level to remove some basic API functions.
 /
 /   0: Basic functions are fully enabled.
@@ -83,7 +92,6 @@
 /*---------------------------------------------------------------------------/
 / Locale and Namespace Configurations
 /---------------------------------------------------------------------------*/
-#include "rtconfig.h"
 
 #ifdef RT_DFS_ELM_CODE_PAGE
 #    define FF_CODE_PAGE	RT_DFS_ELM_CODE_PAGE
@@ -234,7 +242,11 @@
 /  GET_SECTOR_SIZE command. */
 
 
+#ifdef RT_DFS_ELM_USE_EXFAT
+#define FF_LBA64		1
+#else
 #define FF_LBA64		0
+#endif
 /* This option switches support for 64-bit LBA. (0:Disable or 1:Enable)
 /  To enable the 64-bit LBA, also exFAT needs to be enabled. (FF_FS_EXFAT == 1) */
 

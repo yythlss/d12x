@@ -12,7 +12,7 @@
 #include "string.h"
 
 #include "./view/simple_screen.h"
-#include "./module/simple_msg_queen.h"
+#include "./module/ui_msg_queen.h"
 #include "./module/simple_serial.h"
 
 #define LOAD_SCREEN_0_CMD "load simple_screen_0"
@@ -20,15 +20,15 @@
 #define SCREEN_0_PREFIX "simple_screen_0"
 #define SCREEN_1_PREFIX "simple_screen_1"
 
-static void send_ui_msg_thread_entry(void *parameter);
-static int send_ui_msg_thread_init(void);
-static void recv_ui_msg_timer_cb(lv_timer_t *timer);
-static int recv_ui_msg_timer_init(void);
+static void serial_recv_entry(void *parameter);
+static int serial_recv_thread_init(void);
+static void process_ui_msg_cb(lv_timer_t *timer);
+static int process_ui_msg_timer_init(void);
 
 static lv_obj_t *g_simple_screen0;
 static lv_obj_t *g_simple_screen1;
 
-char g_cureent_screen[128];
+char g_current_screen[128];
 
 void ui_init(void)
 {
@@ -39,7 +39,7 @@ void ui_init(void)
 
     lv_screen_load_anim(g_simple_screen0, LV_SCR_LOAD_ANIM_FADE_ON, 2000, 0, 0);
 
-    ret = simple_msg_queen_init();
+    ret = ui_msg_queen_init();
     if (ret < 0)
         return;
 
@@ -47,47 +47,44 @@ void ui_init(void)
     if (ret < 0)
         return;
 
-    ret = send_ui_msg_thread_init();
+    ret = serial_recv_thread_init();
     if (ret < 0)
         return;
 
-    recv_ui_msg_timer_init();
+    process_ui_msg_timer_init();
 }
 
 char *get_current_active_screen_str(void)
 {
-    return g_cureent_screen;
+    return g_current_screen;
 }
 
-void set_current_acvtive_screen_str(const char *name)
+void set_current_active_screen_str(const char *name)
 {
-    memset(g_cureent_screen, 0, sizeof(g_cureent_screen));
-    strncpy(g_cureent_screen, name, sizeof(g_cureent_screen) - 1);
+    memset(g_current_screen, 0, sizeof(g_current_screen));
+    strncpy(g_current_screen, name, sizeof(g_current_screen) - 1);
 }
 
-static void send_ui_msg_thread_entry(void *parameter)
+static void serial_recv_entry(void *parameter)
 {
     ui_message_t ui_msg = {0};
-    uint8_t buffer[128] = {0};
     int len = 0;
 
     while (1) {
-        memset(buffer, 0, sizeof(buffer));
         memset(&ui_msg, 0, sizeof(ui_message_t));
 
-        len = simple_serial_recv(buffer, sizeof(buffer));
+        len = simple_serial_recv((unsigned char *)ui_msg.msg, SIMPLE_MSQ_SIZE);
         if (len <= 0)
             continue;
 
-        ui_msg.msg = lv_strdup((char *)buffer);
         ui_msg.msg_len = len;
-        simple_msg_queen_send(&ui_msg);
+        ui_msg_queen_send(&ui_msg);
     }
 }
 
-static int send_ui_msg_thread_init(void)
+static int serial_recv_thread_init(void)
 {
-    rt_thread_t thread = rt_thread_create("ui_msg_send", send_ui_msg_thread_entry, RT_NULL, 1024*4, 25, 10);
+    rt_thread_t thread = rt_thread_create("ui_msg_send", serial_recv_entry, RT_NULL, 1024*4, 20, 10);
     if (thread == RT_NULL) {
         printf("create ui msg thread failed!\n");
         return -1;
@@ -97,11 +94,11 @@ static int send_ui_msg_thread_init(void)
     return 0;
 }
 
-static void recv_ui_msg_timer_cb(lv_timer_t *timer)
+static void process_ui_msg_cb(lv_timer_t *timer)
 {
     ui_message_t msg;
 
-    if (simple_msg_queen_recv(&msg) == -1)
+    if (ui_msg_queen_recv(&msg) == -1)
         return;
 
     /* handle msg */
@@ -118,13 +115,11 @@ static void recv_ui_msg_timer_cb(lv_timer_t *timer)
         lv_obj_t *label = simple_screen_get_label(g_simple_screen1);
         lv_label_set_text_fmt(label, "msg1:%s", msg.msg);
     }
-
-    lv_free(msg.msg);
 }
 
-static int recv_ui_msg_timer_init(void)
+static int process_ui_msg_timer_init(void)
 {
-    if (lv_timer_create(recv_ui_msg_timer_cb, 5, NULL) == NULL) {
+    if (lv_timer_create(process_ui_msg_cb, 5, NULL) == NULL) {
         printf("create recv_ui_msg_timer failed\n");
         return -1;
     }

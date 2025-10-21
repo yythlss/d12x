@@ -14,7 +14,6 @@
 
 static void print_help(char *program)
 {
-    printf("Compile time: %s\n", __TIME__);
     printf("usage:%s input_file out_file out_put_buffer_len \n", program);
     printf("note:out_put_buffer_len >= out_file_size \n");
     printf("exsample:%s readme.zlib  readme.txt 204800\n",program);

@@ -13,8 +13,9 @@
 #include <rtthread.h>
 #include <rtdevice.h>
 
-#define CAN_LOCK(can)   rt_mutex_take(&(can->lock), RT_WAITING_FOREVER)
-#define CAN_UNLOCK(can) rt_mutex_release(&(can->lock))
+#define CAN_LOCK(can)       rt_mutex_take(&(can->lock), RT_WAITING_FOREVER)
+#define CAN_UNLOCK(can)     rt_mutex_release(&(can->lock))
+#define RT_COMPLETED_CAN    1
 
 static rt_err_t rt_can_init(struct rt_device *dev)
 {
@@ -165,7 +166,10 @@ rt_inline int _can_int_tx(struct rt_can_device *can, const struct rt_can_msg *da
         }
 
         can->status.sndchange = 1;
-        rt_completion_wait(&(tx_tosnd->completion), RT_WAITING_FOREVER);
+
+        if ((tx_tosnd->result == RT_CAN_SND_RESULT_WAIT) && (tx_tosnd->completion.flag == RT_COMPLETED_CAN))
+            rt_completion_init(&(tx_tosnd->completion));
+        rt_completion_wait(&(tx_tosnd->completion), RT_WAITING_TIMEOUT);
 
         level = rt_hw_interrupt_disable();
         result = tx_tosnd->result;
@@ -692,7 +696,7 @@ static void cantimeout(void *arg)
 }
 
 #ifdef RT_USING_DEVICE_OPS
-const static struct rt_device_ops can_device_ops =
+static const struct rt_device_ops can_device_ops =
 {
     rt_can_init,
     rt_can_open,

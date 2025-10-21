@@ -21,7 +21,7 @@
     *LV_LOG_LEVEL_ERROR       Only critical issue, when the system may fail
     *LV_LOG_LEVEL_USER        Only logs added by the user
     *LV_LOG_LEVEL_NONE        Do not log anything*/
-    #define LV_LOG_LEVEL LV_LOG_LEVEL_ERROR
+    #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
 
     /*1: Print the log with 'printf';
     *0: User need to register a callback with `lv_log_register_print_cb()`*/
@@ -45,6 +45,9 @@
 
 #define LV_USE_MEM_MONITOR 0
 #define LV_USE_PERF_MONITOR 0
+#if LV_USE_PERF_MONITOR
+#define LV_USE_PERF_MONITOR_POS LV_ALIGN_BOTTOM_RIGHT
+#endif
 #define LV_USE_SYSMON   1
 #define LV_INDEV_DEF_READ_PERIOD 10
 
@@ -141,6 +144,15 @@
 
 #define LV_USE_MONKEY 1
 
+#define LV_USE_PROFILER 0
+#if LV_USE_PROFILER
+#define LV_USE_PROFILER_BUILTIN 1
+#define LV_PROFILER_BUILTIN_BUF_SIZE (256 * 1024)
+#define LV_PROFILE_INIT_SLEEP_MS 3000
+#define LV_PROFILE_START_TIME_MS 0
+#define LV_PROFILE_END_TIME_MS   20000
+#define LV_PROFILE_FILE "/udisk/profiler.log"
+#endif
 // should at the end of lv_conf.h
 #if defined(LV_USE_CONF_CUSTOM)
 #include "lv_conf_custom.h"

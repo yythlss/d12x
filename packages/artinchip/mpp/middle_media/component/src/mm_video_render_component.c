@@ -1268,6 +1268,7 @@ mm_vdieo_render_process_video_sync(mm_video_render_data *p_video_render_data,
                                    struct mpp_frame *p_frame_info, s64 *delay)
 {
     s64 delay_time = 0;
+    s64 video_delay_time = 0;
     mm_time_config_timestamp timestamp = { 0 };
     MM_VIDEO_SYNC_TYPE sync_type = MM_VIDEO_SYNC_INVAILD;
     mm_bind_info *p_bind_clock =
@@ -1285,26 +1286,24 @@ mm_vdieo_render_process_video_sync(mm_video_render_data *p_video_render_data,
                          mm_vdieo_render_get_media_time(p_video_render_data);
             if (delay_time > 10 * 1000 * 1000 ||
                 delay_time < -10 * 1000 * 1000) {
-                loge(
-                    "tunneld clock ,but audio do not come ,vidoe pts jump event!!!\n");
+                loge("tunneld clock ,but audio do not come ,vidoe pts jump event!!!\n");
                 delay_time = 40 * 1000;
                 mm_vdieo_render_set_media_clock(p_video_render_data,
                                                 p_frame_info);
             }
         } else {
             delay_time = p_frame_info->pts - timestamp.timestamp;
-
-            if (delay_time > 10 * 1000 * 1000 ||
-                delay_time < -10 * 1000 * 1000) {
-                if (p_frame_info->pts - p_video_render_data->pre_frame_pts >
-                        10 * 1000 * 1000 ||
-                    p_frame_info->pts - p_video_render_data->pre_frame_pts <
-                        -10 * 1000 * 1000) { // case by video pts jump event
-
-                    loge("video pts jump event!!!\n");
+            video_delay_time = p_frame_info->pts - p_video_render_data->pre_frame_pts;
+            if (delay_time > 10 * 1000 * 1000 || delay_time < -10 * 1000 * 1000) {
+                if (video_delay_time > 10 * 1000 * 1000 || video_delay_time < -10 * 1000 * 1000) {
+                    printf("video pts jump event, video:pts"FMT_d64", pre_pts:"FMT_d64"!!!\n",
+                        p_frame_info->pts, p_video_render_data->pre_frame_pts);
+                    mm_vdieo_render_set_media_clock(p_video_render_data, p_frame_info);
                 } else {
-                    loge("audio pts jump event!!!\n");
+                    printf("audio pts jump event, video:pts"FMT_d64", basetime:"FMT_d64"!!!\n",
+                        p_frame_info->pts, timestamp.timestamp);
                 }
+                mm_set_config(p_bind_clock->p_bind_comp, MM_INDEX_CONFIG_TIME_FORCE_SYNC_AUDIO_REFERENCE, NULL);
             }
         }
     } else {
@@ -1329,6 +1328,8 @@ mm_vdieo_render_process_video_sync(mm_video_render_data *p_video_render_data,
         sync_type = MM_VIDEO_SYNC_SHOW;
     } else {
         sync_type = MM_VIDEO_SYNC_DROP;
+        if (!p_bind_clock->flag)
+            mm_vdieo_render_set_media_clock(p_video_render_data, p_frame_info);
     }
 
     *delay = delay_time;
@@ -1502,6 +1503,27 @@ void mm_video_render_calc_fps(mm_video_render_data *p_video_render_data)
     }
 }
 
+void mm_video_render_calc_drop_fps(mm_video_render_data *p_video_render_data)
+{
+    static struct timespec pev = { 0 }, cur = { 0 };
+
+    if (pev.tv_sec == 0) {
+        clock_gettime(CLOCK_REALTIME, &pev);
+    } else {
+        long diff = 0;
+        clock_gettime(CLOCK_REALTIME, &cur);
+        diff = (cur.tv_sec - pev.tv_sec) * 1000 * 1000 +
+               (cur.tv_nsec - pev.tv_nsec) / 1000;
+
+        if (diff > 1000 * 1000) {
+            printf("drop_frame_num:%d in time %ld ms\n",
+                p_video_render_data->drop_frame_num, diff / 1000);
+            p_video_render_data->drop_frame_num = 0;
+            pev = cur;
+        }
+    }
+}
+
 static void mm_video_render_set_dis_rect(mm_video_render_data *p_video_render_data)
 {
     struct mpp_size size;
@@ -1612,18 +1634,11 @@ _AIC_SHOW_DIRECT_:
             p_video_render_data, MM_EVENT_VIDEO_RENDER_PTS, data1, data2, NULL);
 
     } else if (sync_type == MM_VIDEO_SYNC_DROP) {
-        static int drop_num = 0;
         if (p_video_render_data->disp_frames[cur_frame_id].flags & FRAME_FLAG_EOS)
             p_video_render_data->flags |= VIDEO_RENDER_INPORT_SEND_ALL_FRAME_FLAG;
 
         p_video_render_data->drop_frame_num++;
-        drop_num++;
-        if (drop_num > 50) {
-            drop_num = 0;
-            printf("MM_VIDEO_SYNC_DROP:drop_frame_num:%u"
-                   ",delay_time:" FMT_d64 "\n",
-                   p_video_render_data->drop_frame_num, delay_time);
-        }
+        mm_video_render_calc_drop_fps(p_video_render_data);
     } else if (sync_type == MM_VIDEO_SYNC_DELAY) {
         struct timespec delay_before = {0}, delay_after = {0};
         long  delay = 0;

@@ -28,7 +28,6 @@ volatile u32 falling_flg = 0;
 
 static void cmd_gpio_usage(void)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: test_gpio [options]\n");
     printf("test_gpio input <PIN>      : Configure PIN as input-pin, and print pressed count. Default as PD.15\n");
     printf("test_gpio output <PIN>     : Configure PIN as output-pin\n");

@@ -87,3 +87,52 @@ void aic_touch_dynamic_rotate(struct rt_touch_device *touch, int16_t *x_coordina
         return;
     }
 }
+
+rt_int8_t aic_touch_dynamic_crop(struct rt_touch_device *touch, int16_t *input_x, int16_t *input_y)
+{
+    struct rt_touch_crop_info crop_info = {0};
+    int16_t div_x, div_y;
+
+    rt_device_control((rt_device_t)touch, RT_TOUCH_CTRL_GET_DYNAMIC_CROP, &crop_info);
+
+    if (crop_info.enable == 0)
+        return RT_EOK;
+
+    if (crop_info.width > AIC_SCREEN_REAL_X_RESOLUTION ||
+            crop_info.height > AIC_SCREEN_REAL_Y_RESOLUTION) {
+        rt_kprintf("Crop width or height out of screen bound!\n");
+        return RT_EINVAL;
+    }
+
+    div_x = (AIC_SCREEN_REAL_X_RESOLUTION - (int16_t)crop_info.width) / 2;
+    div_y = (AIC_SCREEN_REAL_Y_RESOLUTION - (int16_t)crop_info.height) / 2;
+
+    if (crop_info.width >= crop_info.height) {
+        *input_x -= div_y;
+        if (*input_x <= 0)
+            return RT_EINVAL;
+
+        *input_y -= div_x;
+        if (*input_y <= 0)
+            return RT_EINVAL;
+
+        *input_x = (*input_x * AIC_SCREEN_REAL_Y_RESOLUTION * 100 / (int16_t)crop_info.height / 100);
+        if (*input_x >= AIC_SCREEN_REAL_Y_RESOLUTION)
+            return RT_EINVAL;
+    } else {
+        *input_x -= div_x;
+        if (*input_x <= 0)
+            return RT_EINVAL;
+
+        *input_y -= div_y;
+        if (*input_y <= 0)
+            return RT_EINVAL;
+
+        *input_x = (*input_x * AIC_SCREEN_REAL_X_RESOLUTION * 100 / (int16_t)crop_info.width / 100);
+        if (*input_x >= AIC_SCREEN_REAL_X_RESOLUTION)
+            return RT_EINVAL;
+    }
+
+    return RT_EOK;
+}
+

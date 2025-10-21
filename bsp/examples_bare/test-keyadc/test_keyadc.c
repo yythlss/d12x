@@ -32,7 +32,6 @@ static int g_adc_scale = AIC_KEYADC_DEFAULT_SCALE;
 
 static void cmd_kayadc_usage(void)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: test_keyadc [options]\n");
     printf("\ttest_keyadc read <channel_id>\t\tSelect one channel in [0, %d], default is 2\n",
            AIC_GPAI_CH_NUM - 1);

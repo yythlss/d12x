@@ -63,13 +63,13 @@ int wlan_sta_connect(uint8_t *ssid, uint8_t *pw, int timeout_ms);
 
 int wlan_start_ap(struct aic_ap_cfg *user_cfg);
 
-int wlan_start_p2p(struct aic_p2p_cfg *user_cfg);
+int wlan_start_p2p(int fvif_idx,  struct fhost_vif_p2p_cfg *p2p_cfg_in);
 
 int wlan_disconnect_sta(uint8_t idx);
 
 int wlan_stop_ap(void);
 
-int wlan_stop_p2p(void);
+int wlan_stop_p2p(int fvif_idx);
 
 int wlan_start_wps(void);
 

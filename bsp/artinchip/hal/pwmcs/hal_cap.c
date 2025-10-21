@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -37,8 +37,7 @@
 #if defined (AIC_HRTIMER_DRV_V10) || defined (AIC_CAP_DRV_V10)
 #define GLB_CLK_CTL             (GLB_BASE + 0x00)
 #define GLB_CLK_CTL_CAP_EN(n)   (BIT(16) << (n))
-#endif
-#if defined (AIC_HRTIMER_DRV_V11) || defined (AIC_CAP_DRV_V11)
+#else
 #define GLB_CLK_CTL             (GLB_BASE + 0x24)
 #define GLB_CLK_CTL_CAP_EN(n)   BIT(n)
 #endif
@@ -304,7 +303,6 @@ int hal_cap_get(u32 ch)
 int hal_cap_init(void)
 {
     int i, ret = 0;
-    u32 clk_id = 0;
 
     if (g_cap_inited) {
         hal_log_debug("PWMCS was already inited\n");
@@ -312,16 +310,20 @@ int hal_cap_init(void)
     }
 
 #if defined (AIC_HRTIMER_DRV_V10) || defined (AIC_CAP_DRV_V10)
-    clk_id = CLK_PWMCS;
+    u32 clk_id = CLK_PWMCS;
+#elif defined (AIC_HRTIMER_DRV_V11) || defined (AIC_CAP_DRV_V11)
+    u32 clk_id = CLK_PWMCS_SDFM;
 #endif
-#if defined (AIC_HRTIMER_DRV_V11) || defined (AIC_CAP_DRV_V11)
-    clk_id = CLK_PWMCS_SDFM;
-#endif
+
+#if defined (AIC_HRTIMER_DRV_V10) || defined (AIC_CAP_DRV_V10) \
+    || defined (AIC_HRTIMER_DRV_V11) || defined (AIC_CAP_DRV_V11)
+
     ret = hal_clk_set_freq(clk_id, PWMCS_CLK_RATE);
     if (ret < 0) {
         hal_log_err("Failed to set PWMCS clk %d\n", PWMCS_CLK_RATE);
         return -1;
     }
+#endif
     ret = hal_clk_enable(CLK_PWMCS);
     if (ret < 0) {
         hal_log_err("Failed to enable PWMCS clk\n");

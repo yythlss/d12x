@@ -12,6 +12,11 @@
 #include <rtthread.h>
 #endif
 
+#if defined(KERNEL_RTTHREAD) && defined(LPKG_CHERRYUSB_DEVICE_PLUG_CHECK)
+#include <rtdevice.h>
+#include "aic_hal.h"
+#endif
+
 // clang-format off
 #ifndef   __UNALIGNED_UINT32_WRITE
   #pragma GCC diagnostic push
@@ -712,7 +717,9 @@ int usb_dc_init(void)
     tmpreg = readl(&AIC_UDC_REG->usbdevfunc);
     tmpreg &= ~USBDEVFUNC_SFTDISCON;
     writel(tmpreg, &AIC_UDC_REG->usbdevfunc);
-
+#if defined(KERNEL_RTTHREAD) && defined(LPKG_CHERRYUSB_DEVICE_PLUG_CHECK)
+    ret = usbd_plug_irq_init();
+#endif
     return ret;
 }
 
@@ -1739,3 +1746,40 @@ void USBD_IRQHandler(void)
         writel(INT_RESUME, &AIC_UDC_REG->usbintsts);
     }
 }
+
+/*add usb plug/unplug check function*/
+#if defined(KERNEL_RTTHREAD) && defined(LPKG_CHERRYUSB_DEVICE_PLUG_CHECK)
+void usb_plug_irq(void *args)
+{
+    unsigned int ret;
+    int pin = *((int *)(args));
+
+    hal_gpio_get_value(GPIO_GROUP(pin), GPIO_GROUP_PIN(pin), &ret);
+    if (ret) {
+        usbd_event_connect_handler();
+    } else {
+        usbd_event_disconnect_handler();
+    }
+}
+int usbd_plug_irq_init(void)
+{
+    static rt_base_t pin = 0;
+    unsigned int g, p;
+
+    pin = rt_pin_get(LPKG_PLUG_CHECK_GPIO);
+    if (pin < 0) {
+        USB_LOG_ERR("get id gpio err.\n");
+        return -1;
+    }
+
+    g = GPIO_GROUP(pin);
+    p = GPIO_GROUP_PIN(pin);
+    hal_gpio_set_debounce(g, p, 0xFFF);
+    rt_pin_mode(pin, PIN_MODE_INPUT);
+
+    rt_pin_attach_irq(pin, PIN_IRQ_MODE_RISING_FALLING, usb_plug_irq, &pin);
+    rt_pin_irq_enable(pin, 1);
+    return 0;
+}
+#endif
+

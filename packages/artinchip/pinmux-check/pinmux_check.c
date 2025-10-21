@@ -25,7 +25,6 @@ static const struct option lopts[] = {
 
 static void usage(char *program)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: %s [options]\n", program);
     printf("\t -s, --start\t\tprint PIN start from PXn . Default as start from PA0\n");
     printf("\t -c, --count\t\tprint PIN count.\n");

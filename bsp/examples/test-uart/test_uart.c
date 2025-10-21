@@ -47,7 +47,6 @@ static const struct option lopts[] = {
 
 static void test_uart_usage(char *program)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: %s [options]\n", program);
     printf("\t -p, --port\t\tSelect a serial port. Default as uart4\n");
     printf("\t -h, --help \n");
@@ -80,14 +79,21 @@ static rt_err_t serial_input_mq(rt_device_t dev, rt_size_t size)
 static int serial_config_uart(rt_device_t serial)
 {
 #if TEST_UART_CONFIG
-    rt_serial_t *uart = container_of(serial, rt_serial_t, parent);
-    uart->config.baud_rate = BAUD_RATE_115200;
-    uart->config.data_bits = 8;
-    uart->config.stop_bits = 1;
-    uart->config.parity = PARITY_NONE;
+    struct serial_configure config = RT_SERIAL_CONFIG_DEFAULT;
 
-    if (rt_device_control(serial, RT_DEVICE_CTRL_CONFIG, &uart->config) != RT_EOK) {
-        rt_kprintf("uart set baudrate fail!\n");
+    /* Get current config */
+    if (rt_device_control(serial, RT_SERIAL_GET_CONFIG, &config) != RT_EOK) {
+        rt_kprintf("uart get configure parameter fail!\n");
+        return -1;
+    }
+    /* Change config */
+    config.baud_rate = BAUD_RATE_115200;
+    config.data_bits = 8;
+    config.stop_bits = 1;
+    config.parity = PARITY_NONE;
+
+    if (rt_device_control(serial, RT_DEVICE_CTRL_CONFIG, &config) != RT_EOK) {
+        rt_kprintf("uart configure parameter fail!\n");
         return -1;
     }
 #endif

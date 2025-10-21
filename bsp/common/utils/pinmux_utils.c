@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -30,7 +30,7 @@ int list_pinmux(int argc, char *argv[])
 
     for (i = 0, j = 0; i < GPIO_GROUP_MAX && j < aic_gpio_group_size; i++) {
         if (i == aic_gpio_groups_list[j]) {
-            pin_name = PA_BASE + i * GPIO_GROUP_SIZE;
+            pin_name = i * GPIO_GROUP_SIZE;
             pin_name_max = pin_name + GPIO_GROUP_SIZE;
 
             while (pin_name < pin_name_max) {

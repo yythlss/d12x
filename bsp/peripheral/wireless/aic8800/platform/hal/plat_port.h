@@ -14,6 +14,12 @@
 void platform_pwr_wifi_pin_init(void);
 void platform_pwr_wifi_pin_enable(void);
 void platform_pwr_wifi_pin_disable(void);
+void platform_rst_wifi_pin_init(void);
+void platform_rst_wifi_pin_enable(void);
+void platform_rst_wifi_pin_disable(void);
+void platform_rst_bt_pin_init(void);
+void platform_rst_bt_pin_enable(void);
+void platform_rst_bt_pin_disable(void);
 
 #endif /* _PLAT_PORT_H_ */
 

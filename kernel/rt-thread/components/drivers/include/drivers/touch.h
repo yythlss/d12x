@@ -57,6 +57,8 @@ extern "C" {
 #define  RT_TOUCH_CTRL_GET_DYNAMIC_FLAG   (RT_DEVICE_CTRL_BASE(Touch) + 15)  /* Get Touch Dynamic Rotation Enable Flag */
 #define  RT_TOUCH_CTRL_SET_OSD_FLAG       (RT_DEVICE_CTRL_BASE(Touch) + 16)  /* Set Touch OSD Flag */
 #define  RT_TOUCH_CTRL_GET_OSD_FLAG       (RT_DEVICE_CTRL_BASE(Touch) + 17)  /* Get Touch OSD Flag */
+#define  RT_TOUCH_CTRL_SET_DYNAMIC_CROP   (RT_DEVICE_CTRL_BASE(Touch) + 18)  /* Set Touch Dynamic Crop */
+#define  RT_TOUCH_CTRL_GET_DYNAMIC_CROP   (RT_DEVICE_CTRL_BASE(Touch) + 19)  /* Get Touch Dynamic Crop */
 
 /* Touch event */
 #define RT_TOUCH_EVENT_NONE              (0)   /* Touch none */
@@ -74,6 +76,13 @@ struct rt_touch_info
     rt_uint8_t     point_num;                  /* Support point num */
     rt_int32_t     range_x;                    /* X coordinate range */
     rt_int32_t     range_y;                    /* Y coordinate range */
+};
+
+struct rt_touch_crop_info
+{
+    rt_int32_t     width;
+    rt_int32_t     height;
+    rt_uint8_t     enable;
 };
 
 struct rt_touch_config

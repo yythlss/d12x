@@ -14,19 +14,21 @@
 
 #define AICWF_RX_REORDER    1
 #define AICWF_RWNX_TIMER_EN 1
-#define	REORDER_DEBUG		0
+#define REORDER_DEBUG       0
 
-#if	!REORDER_DEBUG
+#if !REORDER_DEBUG
 #define DBG_REORD(...)  do {} while (0)
 #define WRN_REORD(...)  do {} while (0)
 #define DBG_TIMER(...)  do {} while (0)
 #define WRN_TIMER(...)  do {} while (0)
 #else
-#define DBG_REORD(...)  AIC_LOG_PRINTF(__VA_ARGS__)
-#define WRN_REORD(...)  AIC_LOG_PRINTF(__VA_ARGS__)
-#define DBG_TIMER(...)  AIC_LOG_PRINTF(__VA_ARGS__)
-#define WRN_TIMER(...)  AIC_LOG_PRINTF(__VA_ARGS__)
+#define DBG_REORD(...)  DBG_MACIF_VRB(__VA_ARGS__)
+#define WRN_REORD(...)  DBG_MACIF_WRN(__VA_ARGS__)
+#define DBG_TIMER(...)  DBG_MACIF_VRB(__VA_ARGS__)
+#define WRN_TIMER(...)  DBG_MACIF_WRN(__VA_ARGS__)
 #endif
+#define ERR_REORD(...)  DBG_MACIF_ERR(__VA_ARGS__)
+#define ERR_TIMER(...)  DBG_MACIF_ERR(__VA_ARGS__)
 
 #ifdef CONFIG_RWNX_DBG
 #define RWNX_DBG        AIC_LOG_PRINTF
@@ -86,6 +88,7 @@ enum rwnx_timer_action_e {
     RWNX_TIMER_ACTION_RESTART   = 2,
     RWNX_TIMER_ACTION_STOP      = 3,
     RWNX_TIMER_ACTION_DELETE    = 4,
+    RWNX_TIMER_ACTION_NONE      = 5,
 };
 
 struct rwnx_timer_node_s {
@@ -95,6 +98,7 @@ struct rwnx_timer_node_s {
 	void *arg1;
     uint32_t expired_ms; // remained
     enum rwnx_timer_state_e state;
+    enum rwnx_timer_action_e action;
     bool periodic;
     bool auto_load;
 };

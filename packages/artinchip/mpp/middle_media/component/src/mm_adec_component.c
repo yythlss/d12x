@@ -25,12 +25,16 @@
 #include "mpp_decoder.h"
 #include "mpp_dec_type.h"
 #include "aic_audio_decoder.h"
-
+#include "aic_middle_media_common.h"
 
 #define ADEC_INPORT_STREAM_END_FLAG 0x01 //inprot stream end
 #define ADEC_OUTPORT_SEND_ALL_FRAME_FLAG 0x08
 #define ADEC_BITSTREAM_BUFFER_SIZE (4 * 1024)
 
+struct mm_adec_tbl {
+    MM_AUDIO_CODING_TYPE type;
+    char  type_str[16];
+};
 
 typedef struct mm_adec_data {
     MM_STATE_TYPE state;
@@ -67,6 +71,16 @@ typedef struct mm_adec_data {
     MM_BOOL pkt_end_flag;
     MM_BOOL flags;
 } mm_adec_data;
+
+
+struct mm_adec_tbl adec_tbl[] =
+{
+    {MM_AUDIO_CODING_MP3, "mp3"},
+    {MM_AUDIO_CODING_AAC, "aac"},
+    {MM_AUDIO_CODING_APE, "ape"},
+    {MM_AUDIO_CODING_FLAC, "flac"},
+    {MM_AUDIO_CODING_WMA, "wma"}
+};
 
 static void mm_adec_event_notify(mm_adec_data *p_adec_data, MM_EVENT_TYPE event,
                                  u32 data1, u32 data2, void *p_event_data);
@@ -152,7 +166,7 @@ static s32 mm_adec_get_parameter(mm_handle h_component, MM_INDEX_TYPE index,
 static s32 mm_adec_audio_format_trans(enum aic_audio_codec_type *p_desType,
                                       MM_AUDIO_CODING_TYPE *p_srcType)
 {
-    s32 ret = 0;
+    s32 ret = 0, i = 0;
     if (p_desType == NULL || p_srcType == NULL) {
         loge("bad params!!!!\n");
         return MM_ERROR_BAD_PARAMETER;
@@ -176,7 +190,14 @@ static s32 mm_adec_audio_format_trans(enum aic_audio_codec_type *p_desType,
         *p_desType = MPP_CODEC_AUDIO_DECODER_WMA;
 #endif
     } else {
-        loge("unsupport codec %d!!!!\n", *p_srcType);
+        for (i = 0; i < MPP_ARRAY_ELEMS(adec_tbl); i++) {
+            if (adec_tbl[i].type == *p_srcType) {
+                loge("Not configured audio decoder: %s.\n", adec_tbl[i].type_str);
+                break;
+            }
+        }
+        if (i >=  MPP_ARRAY_ELEMS(adec_tbl))
+            loge("Not support audio decoder: %d.\n", *p_srcType);
         ret = MM_ERROR_UNSUPPORT;
     }
     return ret;

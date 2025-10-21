@@ -95,15 +95,8 @@ static void lv_bg_dark_set(lv_obj_t * parent)
 
 static void lv_get_hv_timing(unsigned int *hdisplay, unsigned int *vdisplay)
 {
-    struct mpp_fb * fb = mpp_fb_open();
-    struct aicfb_screeninfo info;
-
-    mpp_fb_ioctl(fb, AICFB_GET_SCREENINFO, &info);
-
-    *hdisplay = info.width;
-    *vdisplay = info.height;
-
-    mpp_fb_close(fb);
+    *hdisplay = LV_HOR_RES;
+    *vdisplay = LV_VER_RES;
 }
 
 static bool long_press_end = 0;

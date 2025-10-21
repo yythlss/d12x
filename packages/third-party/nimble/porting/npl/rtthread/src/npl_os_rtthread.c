@@ -30,7 +30,7 @@ int ble_npl_task_init(struct ble_npl_task *t, const char *name,
 {
     rt_thread_t tid;
 
-    tid = rt_thread_create(name, func, arg, stack_size, prio, 10);
+    tid = rt_thread_create(name, func, arg, stack_size, prio, 50);
     if(tid)
     {
         t->t = tid;

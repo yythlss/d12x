@@ -58,6 +58,7 @@ ble_hs_hci_cmd_send(uint16_t opcode, uint8_t len, const void *cmddata)
         memcpy(cmd->data, cmddata, len);
     }
 
+    BLE_HS_LOG(DEBUG, "opcode:0x%x, len:0x%x\n", cmd->opcode, cmd->length);
     rc = ble_hs_hci_cmd_transport(cmd);
 
     if (rc == 0) {

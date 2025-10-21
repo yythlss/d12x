@@ -33,6 +33,7 @@ enum aic_task_id {
     CLI_CMD_TASK          = 8,
     RWNX_TIMER_TASK       = 9,
     RWNX_APM_STALOSS_TASK = 10,
+    WIFI_API_TASK         = 11,
 };
 
 /**

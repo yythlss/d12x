@@ -116,11 +116,11 @@ static rt_err_t gt911_get_info(struct rt_i2c_client *dev, struct rt_touch_device
 
     rt_device_control((rt_device_t)touch, RT_TOUCH_CTRL_GET_DYNAMIC_ROTATE, &angle);
     if (angle == 90 || angle == 270) {
-        info->range_x = (rt_int16_t)AIC_TOUCH_Y_COORDINATE_RANGE;
-        info->range_y = (rt_int16_t)AIC_TOUCH_X_COORDINATE_RANGE;
+        info->range_x = (rt_int16_t)AIC_TOUCH_REPORT_Y_COORDINATE;
+        info->range_y = (rt_int16_t)AIC_TOUCH_REPORT_X_COORDINATE;
     } else {
-        info->range_x = (rt_int16_t)AIC_TOUCH_X_COORDINATE_RANGE;
-        info->range_y = (rt_int16_t)AIC_TOUCH_Y_COORDINATE_RANGE;
+        info->range_x = (rt_int16_t)AIC_TOUCH_REPORT_X_COORDINATE;
+        info->range_y = (rt_int16_t)AIC_TOUCH_REPORT_Y_COORDINATE;
     }
 
     info->point_num = out_info[5] & 0x0f;
@@ -347,17 +347,26 @@ static rt_size_t gt911_read_point(struct rt_touch_device *touch, void *buf,
             input_w =
                 read_buf[off_set + 5] | (read_buf[off_set + 6] << 8); /* size */
 
-            if (!dynamic_flag) {    // static rotate(osd || video)
-                if (!osd_flag) {    // if osd flag enabled we should do nothing
-                    aic_touch_flip(&input_x, &input_y);
-                    aic_touch_rotate(&input_x, &input_y);
-                    aic_touch_scale(&input_x, &input_y);
+            // Step 1: Perform coordinate transformations only when osd mode is disabled
+            if (!osd_flag) {
+                aic_touch_flip(&input_x, &input_y);
+                aic_touch_rotate(&input_x, &input_y);
+                aic_touch_scale(&input_x, &input_y);
+
+                if (dynamic_flag) {
+                    // Apply dynamic rotation for dynamic mode
+                    aic_touch_dynamic_rotate(touch, &input_x, &input_y);
+                } else {
+                    // Apply static cropping; skip further processing if out of bounds
                     if (!aic_touch_crop(&input_x, &input_y))
                         continue;
                 }
-            } else {    // dynamic rotata (osd || video)
-                if (!osd_flag)  // if osd flag enabled we should do nothing
-                    aic_touch_dynamic_rotate(touch, &input_x, &input_y);
+            }
+            // Step 2: Apply dynamic cropping check for dynamic mode
+            if (dynamic_flag) {
+                // Skip further processing if out of bounds
+                if (aic_touch_dynamic_crop(touch, &input_x, &input_y) == RT_EINVAL)
+                        continue;
             }
 
             gt911_touch_down(buf, read_id, input_x, input_y, input_w);

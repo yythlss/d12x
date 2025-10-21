@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025, sakumisu
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+*/
+
 #include "usbd_core.h"
 #include "usbd_cdc_ecm.h"
 
@@ -26,7 +33,7 @@
 #define CDC_ECM_MAC_STRING_INDEX      4
 
 /*!< global descriptor */
-static const uint8_t cdc_ecm_descriptor[] = {
+static const uint8_t cdc_eth_descriptor[] = {
     USB_DEVICE_DESCRIPTOR_INIT(USB_2_0, 0xEF, 0x02, 0x01, USBD_VID, USBD_PID, 0x0100, 0x01),
     USB_CONFIG_DESCRIPTOR_INIT(USB_CONFIG_SIZE, 0x02, 0x01, USB_CONFIG_BUS_POWERED, USBD_MAX_POWER),
     CDC_ECM_DESCRIPTOR_INIT(0x00, CDC_INT_EP, CDC_OUT_EP, CDC_IN_EP, CDC_MAX_MPS, CDC_ECM_ETH_STATISTICS_BITMAP, CONFIG_CDC_ECM_ETH_MAX_SEGSZE, 0, 0, CDC_ECM_MAC_STRING_INDEX),
@@ -126,7 +133,102 @@ static const uint8_t cdc_ecm_descriptor[] = {
 };
 
 const uint8_t mac[6] = { 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff };
+volatile bool cdc_ecm_tx_done = false;
 
+void usbd_cdc_ecm_data_send_done(uint32_t len)
+{
+    cdc_ecm_tx_done = true;
+}
+
+#ifdef RT_USING_LWIP
+
+#ifndef RT_LWIP_DHCP
+#error cdc_ecm must enable RT_LWIP_DHCP
+#endif
+
+#ifndef LWIP_USING_DHCPD
+#error cdc_ecm must enable LWIP_USING_DHCPD
+#endif
+
+#include <rtthread.h>
+#include <rtdevice.h>
+#include <netif/ethernetif.h>
+#include <dhcp_server.h>
+
+struct eth_device cdc_ecm_dev;
+
+static rt_err_t rt_usbd_cdc_ecm_control(rt_device_t dev, int cmd, void *args)
+{
+    switch (cmd) {
+        case NIOCTL_GADDR:
+
+            /* get mac address */
+            if (args) {
+                uint8_t *mac_dev = (uint8_t *)args;
+                rt_memcpy(mac_dev, mac, 6);
+                mac_dev[5] = ~mac_dev[5]; /* device mac can't same as host. */
+            } else {
+                return -RT_ERROR;
+            }
+
+            break;
+
+        default:
+            break;
+    }
+
+    return RT_EOK;
+}
+
+struct pbuf *rt_usbd_cdc_ecm_eth_rx(rt_device_t dev)
+{
+    return usbd_cdc_ecm_eth_rx();
+}
+
+rt_err_t rt_usbd_cdc_ecm_eth_tx(rt_device_t dev, struct pbuf *p)
+{
+    int ret;
+
+    cdc_ecm_tx_done = false;
+    ret = usbd_cdc_ecm_eth_tx(p);
+    if (ret == 0) {
+        while (!cdc_ecm_tx_done) {
+        }
+        return RT_EOK;
+    } else {
+        return -RT_ERROR;
+    }
+}
+
+#ifdef RT_USING_DEVICE_OPS
+static const struct rt_device_ops aicusb_device_ecm_ops = {
+    .control = rt_usbd_cdc_ecm_control,
+};
+#endif
+
+void cdc_ecm_lwip_init(void)
+{
+#ifdef RT_USING_DEVICE_OPS
+    cdc_ecm_dev.parent.ops = &aicusb_device_ecm_ops;
+#else
+    cdc_ecm_dev.parent.control = rt_usbd_cdc_ecm_control;
+#endif
+
+    cdc_ecm_dev.eth_rx = rt_usbd_cdc_ecm_eth_rx;
+    cdc_ecm_dev.eth_tx = rt_usbd_cdc_ecm_eth_tx;
+
+    eth_device_init(&cdc_ecm_dev, "u0");
+
+    eth_device_linkchange(&cdc_ecm_dev, RT_TRUE);
+    dhcpd_start("u0");
+}
+
+void usbd_cdc_ecm_data_recv_done(void)
+{
+    eth_device_ready(&cdc_ecm_dev);
+}
+
+#else
 /*Static IP ADDRESS: IP_ADDR0.IP_ADDR1.IP_ADDR2.IP_ADDR3 */
 #define IP_ADDR0 (uint8_t)192
 #define IP_ADDR1 (uint8_t)168
@@ -221,7 +323,7 @@ void cdc_ecm_lwip_init(void)
     // while (dnserv_init(&ipaddr, PORT_DNS, dns_query_proc)) {}
 }
 
-void usbd_cdc_ecm_data_recv_done(uint8_t *buf, uint32_t len)
+void usbd_cdc_ecm_data_recv_done(void)
 {
 }
 
@@ -229,6 +331,7 @@ void cdc_ecm_input_poll(void)
 {
     cdc_ecm_if_input(&cdc_ecm_netif);
 }
+#endif
 
 void usbd_event_handler(uint8_t event)
 {
@@ -259,16 +362,19 @@ struct usbd_interface intf0;
 struct usbd_interface intf1;
 
 /* ecm only supports in linux, and you should input the following command
- * 
+ *
  * sudo ifconfig enxaabbccddeeff up
  * sudo dhcpclient enxaabbccddeeff
 */
-void cdc_ecm_init(void)
+static int cdc_ecm_init(void)
 {
     cdc_ecm_lwip_init();
-    
-    usbd_desc_register(cdc_ecm_descriptor);
+
+    usbd_desc_register(cdc_eth_descriptor);
     usbd_add_interface(usbd_cdc_ecm_init_intf(&intf0, CDC_INT_EP, CDC_OUT_EP, CDC_IN_EP));
     usbd_add_interface(usbd_cdc_ecm_init_intf(&intf1, CDC_INT_EP, CDC_OUT_EP, CDC_IN_EP));
     usbd_initialize();
+    return 0;
 }
+
+INIT_DEVICE_EXPORT(cdc_ecm_init);

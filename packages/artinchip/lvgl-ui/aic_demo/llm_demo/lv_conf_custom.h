@@ -13,7 +13,11 @@
 #define LV_CONF_CUSTOM_H
 
 /* code  begin */
+#undef LV_USE_FREETYPE
+#undef LV_USE_IME_PINYIN
 
+#define LV_USE_FREETYPE 1
+#define LV_USE_IME_PINYIN 1
 /* code end */
 
 #endif  /* LV_CONF_CUSTOM_H */

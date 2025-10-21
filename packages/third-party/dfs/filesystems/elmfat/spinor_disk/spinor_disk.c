@@ -22,7 +22,7 @@
 UINT  aic_lx_nor_flash_driver_initialize(LX_NOR_FLASH *nor_flash);
 
 static DRESULT spinor_disk_levelx_read(void *hdisk, uint8_t *buf, uint32_t sector,
-                         uint8_t cnt)
+                                        rt_size_t cnt)
 {
     struct spinor_blk_device *dev = hdisk;
     LX_NOR_FLASH *lx_dev;
@@ -52,7 +52,7 @@ static DRESULT spinor_disk_levelx_read(void *hdisk, uint8_t *buf, uint32_t secto
 }
 
 DRESULT spinor_disk_levelx_write(void *hdisk, const uint8_t *buf, uint32_t sector,
-                          uint8_t cnt)
+                                    rt_size_t cnt)
 {
     struct spinor_blk_device *dev = hdisk;
     LX_NOR_FLASH *lx_dev;
@@ -81,16 +81,28 @@ DRESULT spinor_disk_levelx_write(void *hdisk, const uint8_t *buf, uint32_t secto
 }
 #else
 #ifdef AIC_FATFS_ENABLE_WRITE_IN_SPINOR
+static rt_size_t blk_dev_cal_phy_len(struct spinor_blk_device *dev,
+                                        uint32_t pos, rt_size_t size, rt_size_t cluster_size)
+{
+    rt_size_t phy_len = 0;
+    uint32_t phy_sector_num = 0;
+
+    phy_sector_num = roundup(pos % cluster_size + size, cluster_size);
+    phy_len = phy_sector_num * dev->info.bytes_per_sector;
+
+    return phy_len;
+}
+
 DRESULT spinor_disk_mtd_write(void *hdisk, const uint8_t *buf, uint32_t sector,
-                          uint8_t cnt)
+                                rt_size_t cnt)
 {
     struct spinor_blk_device *dev = hdisk;
     struct mtd_dev *mtd;
-    rt_size_t phy_pos, pos;
-    rt_size_t phy_size, size;
-    rt_size_t ret = 0;
-    uint32_t align_sector = 0;
-    uint8_t align_cnt = 0;
+
+    rt_size_t total_phy_len, total_copy_len;
+    rt_size_t do_phy_len, do_copy_len;
+    uint32_t phy_pos, buf_pos;
+    int ret = 0;
 
     if (!dev)
         return RES_NOTRDY;
@@ -99,34 +111,40 @@ DRESULT spinor_disk_mtd_write(void *hdisk, const uint8_t *buf, uint32_t sector,
     if (!mtd)
         return RES_NOTRDY;
 
-    align_sector = sector - sector % 8;
-    align_cnt = sector % 8 + cnt;
-    align_cnt = (align_cnt + 7) / 8 * 8;
+    total_phy_len = blk_dev_cal_phy_len(dev, sector, cnt, 8);
+    buf_pos = sector % 8 * dev->info.bytes_per_sector;
+    phy_pos = (sector - sector % 8) * dev->info.bytes_per_sector;
+    total_copy_len = cnt * dev->info.bytes_per_sector;
 
-    pr_debug("sector = %ld cnt = %d!\n", sector, cnt);
-    pr_debug("align_sector = %ld align_cnt = %d!\n", align_sector, align_cnt);
+    while (total_copy_len != 0) {
+        if (total_phy_len > dev->length) {
+            do_phy_len = dev->length;
+            do_copy_len = dev->length - sector % 8 * dev->info.bytes_per_sector;
+        } else {
+            do_phy_len = total_phy_len;
+            do_copy_len = total_copy_len;
+        }
+        memset(dev->buf, 0xFF, dev->length);
+        ret = mtd_read(mtd, phy_pos, dev->buf, do_phy_len);
+        if (ret) {
+            pr_err("mtd_read read data failed!\n");
+            return -RT_ERROR;
+        }
+        memcpy(dev->buf + buf_pos, buf, do_copy_len);
+        mtd_erase(mtd, phy_pos, do_phy_len);
 
-    phy_pos = align_sector * dev->info.bytes_per_sector;
-    phy_size = align_cnt * dev->info.bytes_per_sector;
+        ret = mtd_write(mtd, phy_pos, dev->buf, do_phy_len);
+        if (ret) {
+            pr_err("Mtd write data failed!\n");
+            return -RT_ERROR;
+        }
 
-    memset(dev->buf, 0xFF, dev->length);
-    ret = mtd_read(mtd, phy_pos, dev->buf, phy_size);
-    if (ret) {
-        pr_err("Mtd read data failed!\n");
-        return -RT_ERROR;
-    }
-
-    pos = sector % 8 * dev->info.bytes_per_sector;
-    size = cnt * dev->info.bytes_per_sector;
-
-    memcpy(dev->buf + pos, buf, size);
-
-    mtd_erase(mtd, phy_pos, phy_size);
-
-    ret = mtd_write(mtd, phy_pos, dev->buf, phy_size);
-    if (ret) {
-        pr_err("Mtd write data failed!\n");
-        return -RT_ERROR;
+        phy_pos += do_phy_len;
+        buf += do_phy_len - buf_pos;
+        sector += do_copy_len / dev->info.bytes_per_sector;
+        buf_pos = 0;
+        total_copy_len -= do_copy_len;
+        total_phy_len -= do_phy_len;
     }
 
     return RES_OK;
@@ -134,7 +152,7 @@ DRESULT spinor_disk_mtd_write(void *hdisk, const uint8_t *buf, uint32_t sector,
 #endif
 
 static DRESULT spinor_disk_mtd_read(void *hdisk, uint8_t *buf, uint32_t sector,
-                         uint8_t cnt)
+                                        rt_size_t cnt)
 {
     struct spinor_blk_device *dev = hdisk;
     struct mtd_dev *mtd;
@@ -165,7 +183,7 @@ static DRESULT spinor_disk_mtd_read(void *hdisk, uint8_t *buf, uint32_t sector,
 #endif
 
 DRESULT spinor_disk_write(void *hdisk, const uint8_t *buf, uint32_t sector,
-                          uint8_t cnt)
+                            rt_size_t cnt)
 {
 #ifndef AIC_FATFS_ENABLE_WRITE_IN_SPINOR
     pr_warn("This config only supports read!\n");
@@ -180,7 +198,7 @@ DRESULT spinor_disk_write(void *hdisk, const uint8_t *buf, uint32_t sector,
 }
 
 DRESULT spinor_disk_read(void *hdisk, uint8_t *buf, uint32_t sector,
-                         uint8_t cnt)
+                            rt_size_t cnt)
 {
 #ifdef LPKG_USING_LEVELX
     return spinor_disk_levelx_read(hdisk, buf, sector, cnt);

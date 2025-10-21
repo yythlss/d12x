@@ -50,6 +50,9 @@ if GetDepend('AIC_USING_CAMERA_TP2825') or GetDepend('AIC_USING_CAMERA_TP9950'):
 if GetDepend('AIC_USING_CAMERA_TP9951'):
     src += Glob('tp9951/tp9951.c')
 
+if GetDepend('AIC_USING_CAMERA_N5'):
+    src += Glob('N5/*.c')
+
 LOCAL_CCFLAGS = ''
 # LOCAL_CCFLAGS += ' -O0'
 

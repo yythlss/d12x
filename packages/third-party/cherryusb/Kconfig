@@ -173,6 +173,16 @@ if LPKG_USING_CHERRYUSB
             endchoice
         endif
 
+        menuconfig LPKG_CHERRYUSB_DEVICE_PLUG_CHECK
+            bool
+            prompt "Enable USB device plug check"
+            default n
+            if LPKG_CHERRYUSB_DEVICE_PLUG_CHECK
+                config LPKG_PLUG_CHECK_GPIO
+                    string "plug irq gpio name"
+                    default "PD.6"
+            endif
+
         choice
             prompt "Select aic device type"
             config LPKG_CHERRYUSB_DEVICE_SINGLE
@@ -225,6 +235,9 @@ if LPKG_USING_CHERRYUSB
                 config LPKG_CHERRYUSB_DEVICE_VENDER_SINGLE
                     select LPKG_CHERRYUSB_DEVICE_VENDER
                     bool "vender device"
+                config LPKG_CHERRYUSB_DEVICE_ECM_SINGLE
+                    select LPKG_CHERRYUSB_DEVICE_ECM
+                    bool "ECM device"
             endchoice
         endif
 
@@ -618,6 +631,20 @@ if LPKG_USING_CHERRYUSB
             endif
         endif
 
+        if LPKG_CHERRYUSB_DEVICE_ECM_SINGLE
+            menuconfig LPKG_CHERRYUSB_DEVICE_ECM
+                bool
+                prompt "Enable usb ecm device"
+                default n
+
+            if LPKG_CHERRYUSB_DEVICE_ECM
+                config LPKG_CHERRYUSB_DEVICE_ECM_TEMPLATE
+                    bool
+                    prompt "Use ecm template"
+                    default n
+            endif
+        endif
+
         if LPKG_CHERRYUSB_DEVICE_DFU_SINGLE
             menuconfig LPKG_CHERRYUSB_DEVICE_DFU
                 bool
@@ -681,6 +708,10 @@ if LPKG_USING_CHERRYUSB
                             bool "ARGB8888"
                     endchoice
 
+                    config AIC_USB_DISP_MONITOR_NAME
+                        string "Monitor name (Max 12 characters)"
+                        default "USB Display"
+
                     if !LPKG_USING_LVGL
                         choice
                             prompt "select USB Display rotation mode"
@@ -709,6 +740,24 @@ if LPKG_USING_CHERRYUSB
                             range 0 100
                             default 0
                             depends on LPKG_CHERRYUSB_USB_TRANSFER_JPEG || LPKG_CHERRYUSB_USB_TRANSFER_AUTO
+                    endif
+
+                    config AIC_USB_DISP_INIT_MIRROR_MOD_EN
+                        bool "Init mirror mode"
+                        default n
+
+                    config AIC_USB_DISP_HOST_SCALE_MOD_EN
+                        bool "Host scale mode"
+                        default n
+
+                    if AIC_USB_DISP_HOST_SCALE_MOD_EN
+                        config AIC_USB_DISP_HOST_SCALE_WIDTH
+                            int "Host scale width"
+                            default 0
+
+                        config AIC_USB_DISP_HOST_SCALE_HEIGHT
+                            int "Host scale height"
+                            default 0
                     endif
 
                     config AIC_USB_DISP_SW_GPIO_EN
@@ -832,6 +881,11 @@ if LPKG_USING_CHERRYUSB
             prompt "Enable usb cdc acm driver"
             default n
 
+        config LPKG_CHERRYUSB_HOST_SERIAL
+            bool
+            prompt "Enable usb serial driver"
+            default n
+
         menuconfig LPKG_CHERRYUSB_HOST_HID
             bool
             prompt "Enable usb hid driver"
@@ -842,6 +896,18 @@ if LPKG_USING_CHERRYUSB
                 bool
                 prompt "Use hid template"
                 default n
+
+            config LPKG_CHERRYUSB_HOST_HID_DRV_RTT
+                bool
+                prompt "Use rt-thread types hid drviver"
+                default n
+
+            if LPKG_CHERRYUSB_HOST_HID_DRV_RTT
+                config LPKG_CHERRYUSB_HOST_HID_DRV_RTT_TEST_COMMAND
+                    bool
+                    prompt "Use rt-thread types hid drviver test command"
+                    default n
+            endif
         endif
 
         menuconfig LPKG_CHERRYUSB_HOST_MSC
@@ -854,18 +920,22 @@ if LPKG_USING_CHERRYUSB
                 bool
                 prompt "Use msc template"
                 default n
-
-            if AIC_BOOTLOADER
-                config LPKG_CHERRYUSB_HOST_AICUPG_FOR_UDISK
-                    bool
-                    prompt "Use aicupg for udisk"
-                    default n
-            endif
+                depends on LPKG_USING_DFS_ELMFAT || RT_USING_DFS_ELMFAT
         endif
 
         config LPKG_CHERRYUSB_HOST_RNDIS
             bool
             prompt "Enable usb rndis driver"
+            default n
+
+        config LPKG_CHERRYUSB_HOST_NCM
+            bool
+            prompt "Enable usb ncm driver"
+            default n
+
+        config LPKG_CHERRYUSB_HOST_CDC_ECM
+            bool
+            prompt "Enable usb ecm driver"
             default n
 
         menuconfig LPKG_CHERRYUSB_HOST_UVC

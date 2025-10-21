@@ -202,7 +202,7 @@ static void usbd_hid_notify_handler(uint8_t event, void *arg)
                 }
             }
             trans_info.stage = AICUPG_READ_CBW;
-            trans_info.recv((uint8_t *)trans_info.csw, USB_SIZEOF_AIC_CBW);
+            trans_info.recv((uint8_t *)trans_info.cbw, USB_SIZEOF_AIC_CBW);
             break;
 
         default:

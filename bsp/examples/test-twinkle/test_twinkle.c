@@ -27,7 +27,6 @@ static const struct option lopts[] = {
 
 static void test_gpio_usage(char *program)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: %s [options]\n", program);
     printf("\t -p, --pin\t\tSet the PIN as light-pin\n");
     printf("\t -n, --number\t\tSet the number of twinkle\n");

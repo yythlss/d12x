@@ -32,7 +32,6 @@ static const struct option lopts[] = {
 
 static void test_eth_loopback_usage(char *program)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: %s [options]\n", program);
     printf("\t -d, --delay\t\tDelay time\n");
     printf("\t -n, --number\t\tNumber of tests\n");

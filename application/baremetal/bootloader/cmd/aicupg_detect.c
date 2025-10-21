@@ -21,7 +21,6 @@
 #include <uart.h>
 #include <config_parse.h>
 #include <aicupg.h>
-#include <fatfs.h>
 #include <mmc.h>
 #include <hal_syscfg.h>
 #include <aicupg_for_uart.h>
@@ -73,7 +72,6 @@ static bool uart_keywords_detect(char *keywords, int klen)
 {
     u64 start, cur;
     bool ret = false;
-    char c;
 
     if (AIC_BOOTLOADER_CONSOLE_UART != 0)
         uart_init(0);
@@ -82,9 +80,8 @@ static bool uart_keywords_detect(char *keywords, int klen)
 
     start = aic_get_time_us();
     while (1) {
-        c = uart_getchar(0);
         cur = aic_get_time_us();
-        if (c == ACK) {
+        if (uart_getchar(0) == ACK) {
             ret = true;
             break;
         }

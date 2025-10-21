@@ -39,7 +39,7 @@ menu "Drivers"
     config AIC_BOOTLOADER_MMC_SUPPORT
         bool "MMC boot support"
         default n
-        select AIC_SDMC_DRV_TEST
+        select AIC_SDMC_DRV
 
     config AIC_BOOTLOADER_SPINOR_SUPPORT
         bool "SPI NOR boot support"
@@ -64,13 +64,6 @@ menu "Drivers"
         source "bsp/artinchip/hal/axicfg/Kconfig.dev"
 
 endmenu # "Drivers"
-
-menu "Components"
-    config AIC_BOOTLOADER_FATFS_SUPPORT
-        bool "Fatfs for bootloader"
-        default n
-
-endmenu # "Components"
 
 menuconfig AICUPG_SUPPORT
     bool "Upgrading"
@@ -118,8 +111,9 @@ if AICUPG_SUPPORT
     config AICUPG_SDCARD_ENABLE
         bool "Upgrading by SD Card"
         default n
+        select LPKG_USING_DFS
+        select LPKG_USING_DFS_ELMFAT
         select AIC_BOOTLOADER_MMC_SUPPORT
-        select AIC_BOOTLOADER_FATFS_SUPPORT
 
     config AICUPG_SDCARD_CONTROLLER_ID
         int  "SDMC controller id for SD Card"
@@ -133,9 +127,10 @@ if AICUPG_SUPPORT
         select LPKG_CHERRYUSB_OTG
         select LPKG_CHERRYUSB_HOST
         select LPKG_CHERRYUSB_HOST_MSC
-        select LPKG_CHERRYUSB_HOST_AICUPG_FOR_UDISK
+        select LPKG_CHERRYUSB_HOST_MSC_TEMPLATE
+        select LPKG_USING_DFS
+        select LPKG_USING_DFS_ELMFAT
         select AIC_USING_USB0
-        select AIC_BOOTLOADER_FATFS_SUPPORT
 
     config AICUPG_USB_USE_CONTROLLER_ID_1
         bool  "USB ID 1 to be used for udisk"
@@ -198,15 +193,23 @@ menu "Commands"
         bool "spinor"
         default n
         select AIC_BOOTLOADER_SPINOR_SUPPORT
+        select AIC_SPINOR_DRV_TEST
 
     config AIC_BOOTLOADER_CMD_SPI_NAND
         bool "spinand"
         default n
         select AIC_BOOTLOADER_SPINAND_SUPPORT
+        select AIC_SPINAND_DRV_TEST
+
+    config AIC_BOOTLOADER_CMD_MMC
+        bool "mmc"
+        default n
+        select AIC_MMC_BARE_TEST
 
     config AIC_BOOTLOADER_CMD_MTD
         bool "mtd read/write"
         default n
+        select AIC_MTD_BARE_TEST
         depends on AIC_BOOTLOADER_SPINAND_SUPPORT || AIC_BOOTLOADER_SPINOR_SUPPORT
 
     config AIC_BOOTLOADER_CMD_MEM

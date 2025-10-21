@@ -120,6 +120,9 @@ typedef void *usart_handle_t;
 
 #define AIC_UART_XOFF               19
 #define AIC_UART_XON                17
+
+#define AIC_UART_MAX_BAUDRATE       8000000
+
 /*----- USART Function Codes: -------*/
 typedef enum
 {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Artinchip Technology Co., Ltd
+ * Copyright (c) 2024-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -43,6 +43,7 @@ int block_del_device(struct block_dev *dev);
 u32 block_get_device_count(void);
 struct block_dev *block_get_device_by_id(u32 id);
 struct block_dev *block_get_device(const char *name);
+char *block_get_name_by_id(u32 id);
 u32 block_read(struct block_dev *dev, u32 start_blk, u32 blkcnt, u8 *data);
 u32 block_write(struct block_dev *dev, u32 start_blk, u32 blkcnt, u8 *data);
 

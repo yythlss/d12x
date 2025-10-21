@@ -339,6 +339,7 @@ static lv_res_t fake_decoder_info(const void *src, lv_image_header_t *header)
     FAKE_IMAGE_PARSE((char *)src, &width, &height, &alpha_en, &color);
     header->w = width;
     header->h = height;
+    header->stride = mpp_get_rgb_stride(header->w, MPP_FMT_ARGB_8888);
     header->cf = LV_COLOR_FORMAT_RAW;
     return LV_RES_OK;
 }

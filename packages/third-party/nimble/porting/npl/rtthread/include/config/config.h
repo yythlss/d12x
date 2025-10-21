@@ -6,8 +6,8 @@
  * 2022-05-20     Jackistang   add ble host auto start
  */
 
-#ifndef __NUMBLE_CONFIG_H__
-#define __NUMBLE_CONFIG_H__
+#ifndef __NIMBLE_CONFIG_H__
+#define __NIMBLE_CONFIG_H__
 
 #include <rtconfig.h>
 #include "os/util.h"

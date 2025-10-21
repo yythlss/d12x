@@ -392,6 +392,11 @@ void lv_port_disp_init(void)
     lv_disp_set_rotation(lv_disp_get_default(), LV_ROTATE_DEGREE / 90);
 #endif
 
+#ifdef AIC_LVGL_SPI_EXTEND_DEMO
+    extern void lv_spi_display_init();
+    lv_spi_display_init();
+#endif
+
 #ifndef AIC_MONKEY_TEST
 #if defined(KERNEL_RTTHREAD) && defined(AIC_USING_TOUCH)
     result = tpc_run(AIC_TOUCH_PANEL_NAME, info.width, info.height);

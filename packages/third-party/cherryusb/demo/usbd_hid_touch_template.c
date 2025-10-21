@@ -37,6 +37,10 @@
 #define HID_TOUCHSCREEN_REPORT_DESC_OFFSET  8
 #define HID_TOUCHSCREEN_PHYSICAL_MAX_OFFSET 44
 #define HID_TOUCHSCREEN_PHYSICAL_MIN_OFFSET 51
+#define HID_TOUCHPAD_REPORT_DESC_SIZE1      92
+#define HID_TOUCHPAD_REPORT_DESC_OFFSET     8
+#define HID_TOUCHPAD_PHYSICAL_MAX_OFFSET    46
+#define HID_TOUCHPAD_PHYSICAL_MIN_OFFSET    53
 
 /*!< config descriptor size offset*/
 #define HID_TOUCH_REPORT_DESC_SIZE_OFFSET   43
@@ -263,7 +267,7 @@ uint8_t hid_descriptor[] = {
 #define REPORTID_MOUSE      0x06
 
 #ifdef HID_TOUCHPAD_MODE
-static const uint8_t hid_touchpad_report_desc[] = {
+static uint8_t hid_touchpad_report_desc[] = {
 //TOUCH PAD input TLC
     0x05, 0x0d,                         //  USAGE_PAGE (Digitizers)
     0x09, 0x05,                         //  USAGE (Touch Pad)
@@ -1139,42 +1143,100 @@ static int _update_touchscreen_physical_maxnum(uint16_t x_max, uint16_t y_max)
     return 0;
 }
 #endif
+
+#ifdef HID_TOUCHPAD_MODE
+static int _update_touchpad_physical_maxnum(uint16_t x_max, uint16_t y_max)
+{
+    int offset = 0;
+    for (int i = 0; i < TOUCH_MAX_POINT_NUM; i++) {
+        offset = HID_TOUCHPAD_REPORT_DESC_OFFSET + i * HID_TOUCHPAD_REPORT_DESC_SIZE1 +
+            HID_TOUCHPAD_PHYSICAL_MAX_OFFSET;
+        hid_touchpad_report_desc[offset] = (uint8_t)(x_max & 0xFF);
+        hid_touchpad_report_desc[offset + 1] = (uint8_t)((x_max >> 8) & 0xFF);
+
+        offset = HID_TOUCHPAD_REPORT_DESC_OFFSET + i * HID_TOUCHPAD_REPORT_DESC_SIZE1 +
+            HID_TOUCHPAD_PHYSICAL_MIN_OFFSET;
+        hid_touchpad_report_desc[offset] = (uint8_t)(y_max & 0xFF);
+        hid_touchpad_report_desc[offset + 1] = (uint8_t)((y_max >> 8) & 0xFF);
+    }
+
+    return 0;
+}
+#endif
+
 void usbd_hid_touch_rotate(unsigned int rotate_angle)
 {
-#ifdef HID_TOUCHSCREEN_MODE
     struct hid_touch_t *hid_touch = get_hid_touch();
     rt_uint16_t angle = rotate_angle;
+
+    if (!hid_touch || !hid_touch->dev) {
+        USB_LOG_ERR("hid_touch or touch dev is null.\n");
+        return;
+    }
 
     rt_device_control(hid_touch->dev, RT_TOUCH_CTRL_SET_DYNAMIC_ROTATE, &angle);
     rt_device_control(hid_touch->dev, RT_TOUCH_CTRL_GET_INFO, &hid_touch->info);
     hid_touch->x_physical_maxnum = hid_touch->info.range_x;
     hid_touch->y_physical_maxnum = hid_touch->info.range_y;
-
+#ifdef HID_TOUCHSCREEN_MODE
     _update_touchscreen_physical_maxnum(hid_touch->info.range_x, hid_touch->info.range_y);
+#endif
+#ifdef HID_TOUCHPAD_MODE
+    _update_touchpad_physical_maxnum(hid_touch->info.range_x, hid_touch->info.range_y);
+#endif
 
 #ifdef HID_TOUCH_DEBUG
     USB_LOG_INFO("usbd_hid_touch_rotate:x_physical_maxnum: %d, y_physical_maxnum: %d.\n",
         hid_touch->x_physical_maxnum, hid_touch->y_physical_maxnum);
 #endif
-#endif
 }
 
 void usbd_hid_touch_set_params(int params)
 {
-#ifdef HID_TOUCHSCREEN_MODE
     struct hid_touch_t *hid_touch = get_hid_touch();
     bool enable = params & 0x1;
     int rotate = (params >> 1)& 0x3;
+
+    if (!hid_touch) {
+        USB_LOG_ERR("hid_touch is null.\n");
+        return;
+    }
     if (enable) {
         hid_touch->drop_hid_data = 0;
-        USB_LOG_INFO("HID_TOUCHSCREEN_MODE rotate %d\n", rotate);
         usbd_hid_touch_rotate((rotate % 4) * 90);
     } else {
         hid_touch->drop_hid_data = 1;
     }
 
-    rt_sem_release(hid_touch->sem);
-#endif
+    if (hid_touch->sem)
+        rt_sem_release(hid_touch->sem);
+}
+
+void usbd_hid_touch_set_crop(int width, int height)
+{
+    struct hid_touch_t *hid_touch = get_hid_touch();
+    struct rt_touch_crop_info crop_info = {0};
+
+    if (!hid_touch || !hid_touch->dev) {
+        USB_LOG_ERR("hid_touch or touch dev is null.\n");
+        return;
+    }
+
+    if (rt_device_control(hid_touch->dev, RT_TOUCH_CTRL_GET_DYNAMIC_CROP, &crop_info) != 0) {
+        USB_LOG_ERR("get touch dymcmic rop failed.\n");
+        return;
+    }
+
+    if (crop_info.width == width && crop_info.height == height)
+        return;
+
+    USB_LOG_INFO("set hid_touch crop:%dx%d->%dx%d.\n",
+        crop_info.width, crop_info.height, width, height);
+
+    crop_info.enable = true;
+    crop_info.width = width;
+    crop_info.height = height;
+    rt_device_control(hid_touch->dev, RT_TOUCH_CTRL_SET_DYNAMIC_CROP, &crop_info);
 }
 
 #if defined(KERNEL_RTTHREAD)

@@ -1,3 +1,109 @@
+# V1.2.2 #
+## 新增 ##
+- USB副屏：
+  - 支持在Host端完成Scale
+  - Monitor名称可定制
+  - 支持物理按键操作
+  - Windows Driver V1.1.0：优化多处异常处理
+  - MacOS Driver V0.9.7: 优化容错处理，支持和Host电源状态的同步
+- LVGL：
+  - 新增SPI扩展屏的显示Demo，支持双屏异显
+  - 新增两种歌词特效
+  - 播放器控件：支持在背景播放视频；适配到模拟器
+  - 播放器Demo：支持APNG格式解码
+  - 增加APNG Demo
+  - 支持热插拔的鼠标设备
+- MPP：
+  - 支持两路音频的混音播放
+  - 增加APNG解码支持
+- USB：
+  - Host支持CDC NCM、USB serial、HID
+  - Device支持CDC ECM
+- Display：
+  - 增加开机时黑屏的选项
+  - UI层增加blending的使能接口
+- DVP：支持对输入的视频进行裁剪
+- aic8800：新增P2P、monitor功能
+- realtek8733bs：新增P2P功能
+- AiPQ：连接时打印当前的显示接口类型
+- LwIP：兼容IPv6
+- OTA：支持单独升级data或rodata分区
+- aicupg：增加SPIENC的调试模式
+- SPI：D13x SPI2支持Quad模式
+- Touch：支持动态的区域裁剪
+- RTP：支持自动获取X、Y方向的板级电阻值
+- 新增软件组件zipfs，支持从zip文件挂载文件系统
+- 新增PBus驱动，以及示例test-pbus
+- 新增封装型号：G730BEU
+- 新增器件：
+  - Panel：ST77916、ST77912、LT8911EXB
+  - WiFi：txw901
+  - Camera：N5
+  - CTP：jd9366
+  - NOR：EFM25F128A
+  - NAND：ZB35Q02B、ZB35Q04B
+- 示例：增加SPI、NAND、NOR访问相关的多个示例、mbedtls示例
+- OneStep：增加cs|csys命令，可快捷进入sys目录
+- list_mutex命令：增加等待线程的名称显示
+- 第三方包：BT协议栈nimble、UDS协议、CPU_load、miniz
+- 示例：
+  - test-filesystem：增加读文件的压力测试
+  - test-mmc：增加读写速度的展示
+
+## 优化 ##
+- USB副屏：
+  - 优化旋转时的触屏事件处理
+  - 优化播放视频时的模式切换处理
+  - 连接PC不同USB端口会识别为不同的设备
+  - 优化USB热插拔的处理
+- USB：
+  - Host：优化UVC在高码率时的处理，以及异常处理
+  - Host：优化MSC的挂载处理
+  - Host：增加U盘的兼容性
+  - Device：优化复合设备的处理逻辑
+- LVGL：
+  - 优化FreeType在多任务并发时的处理
+  - 优化播放器的分辨率动态调整处理
+  - 优化歌词特效快速切换的处理
+  - 优化tick callback的使用方法
+  - V8：优化大图的显示处理
+  - 优化播放器在个别场景下的帧同步处理
+- MPP：优化播放器的性能、稳定性
+- DVP：优化在Buf资源不够用的异常处理
+- Display：完善MIPI DSI异常情况的log
+- rtt：优化tick计数的溢出处理
+- SPI：
+- NOR：优化写保护的处理；优化异常掉电时的保护处理
+- NAND：优化坏块的标记处理
+- Slave：支持Master的非对齐访问
+- 优化通信异常的保护机制
+- realtek：优化多个异常情况的处理；完善auth相关的接口
+- OTA：完善SPINAND的坏块处理
+- aicupg：兼容block是128的情况
+- BootLoader：优化FATFS的兼容性；优化U盘升级的异常处理
+- 编译：完善BootLoader的检查和报错
+- Scons：支持固定的链接次序
+
+## 修改 ##
+- D13x：打开Cache的预取功能，提升性能
+- LVGL：修正播放器在旋转显示时的处理
+- UART：完善参数配置的流程，先获取再设置
+- D21x QFN88/100：修正RGB888模式的pinmux配置
+- G73：barcode：修正内存的申请参数
+- SPI：
+  - 解决打开SFUD_USING_QSPI后的编译问题
+  - 修正数据块超过8K的写处理
+- LwIP：
+  - 调整框架中的默认参数，更方便使用
+  - 完善模式动态切换时的处理
+  - 分离DNS服务的处理逻辑
+- WiFi：完善关闭WiFi后的SDIO状态处理
+- mbedtls：关闭RSA CRT算法
+- env：删除不再使用的Python27_32目录
+- OneStep：Windows环境：修正buildall命令的warning统计处理
+
+
+
 # V1.2.1 #
 ## 新增 ##
 - USB 副屏：

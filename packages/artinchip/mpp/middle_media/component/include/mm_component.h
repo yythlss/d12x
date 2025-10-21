@@ -21,7 +21,7 @@ extern "C" {
 #define MM_CLOCK_PORT0 0x00000001
 #define MM_CLOCK_PORT1 0x00000002
 #define MM_CLOCK_PORT2 0x00000004
-#define MM_VIDEO_SYNC_DIFF_TIME (10 * 1000)
+#define MM_VIDEO_SYNC_DIFF_TIME (20 * 1000)
 
 typedef void *mm_handle;
 

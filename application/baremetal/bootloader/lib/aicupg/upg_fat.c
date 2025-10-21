@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -13,7 +13,7 @@
 #include <upg_internal.h>
 #include <aic_core.h>
 #include <aicupg.h>
-#include <fatfs.h>
+#include <dfs_file.h>
 
 extern size_t config_ram_size;
 
@@ -61,13 +61,13 @@ static void upg_fat_free_align(void *mem)
 }
 
 #define FRAME_LIST_SIZE 4096
-static s32 media_device_write(char *image_name, struct fwc_meta *pmeta)
+static s32 media_device_write(struct dfs_fd *fd, struct fwc_meta *pmeta)
 {
     struct fwc_info *fwc;
     u32 offset, write_once_size, len, remaining_size;
     u8 *buf;
     s32 ret;
-    ulong actread, total_len = 0;
+    ulong actread, off, total_len = 0;
     u64 start_us;
     u32 percent;
 
@@ -113,12 +113,18 @@ static s32 media_device_write(char *image_name, struct fwc_meta *pmeta)
         if (len % fwc->block_size)
             len = ((len / fwc->block_size) + 1) * fwc->block_size;
 
-        ret = aic_fat_read_file(image_name, (void *)buf,
-                                pmeta->offset + offset, len, &actread);
-        if (actread != len && actread != remaining_size) {
-            pr_err("Error:read file failed!\n");
+        off = dfs_file_lseek(fd, pmeta->offset + offset);
+        if (off != (pmeta->offset + offset)) {
+            printf("Error:seek file %s failed!\n", pmeta->name);
             goto err;
         }
+
+        actread = dfs_file_read(fd, buf, len);
+        if (actread != len && actread != remaining_size) {
+            pr_err("Error:read file %s failed!\n", pmeta->name);
+            goto err;
+        }
+
         /* write data to media */
         ret = media_data_write(fwc, buf, len);
         if (ret == 0) {
@@ -169,9 +175,10 @@ s32 aicupg_fat_write(char *image_name, char *protection,
 {
     struct fwc_meta *p;
     struct fwc_meta *pmeta;
+    struct dfs_fd fd;
     int i, cnt, ret;
     u32 start_us;
-    ulong actread, write_len = 0;
+    ulong actread, offset, write_len = 0;
     u64 total_len = 0;
 
     pmeta = NULL;
@@ -185,10 +192,22 @@ s32 aicupg_fat_write(char *image_name, char *protection,
 
     start_us = aic_get_time_us();
     /*read meta info*/
-    ret = aic_fat_read_file(image_name, (void *)pmeta,
-                            header->meta_offset, header->meta_size, &actread);
+    if (dfs_file_open(&fd, image_name, O_RDONLY) < 0) {
+        printf("Open %s failed.\n", image_name);
+        ret = -1;
+        goto err;
+    }
+
+    offset = dfs_file_lseek(&fd, header->meta_offset);
+    if (offset != header->meta_offset) {
+        printf("Error:seek file %s failed!\n", image_name);
+        ret = -1;
+        goto err;
+    }
+
+    actread = dfs_file_read(&fd, pmeta, header->meta_size);
     if (actread != header->meta_size) {
-        pr_err("Error:read file failed!\n");
+        pr_err("Error:read file %s failed!\n", image_name);
         goto err;
     }
 
@@ -211,7 +230,7 @@ s32 aicupg_fat_write(char *image_name, char *protection,
             continue;
         }
 
-        ret = media_device_write(image_name, p);
+        ret = media_device_write(&fd, p);
         if (ret == 0) {
             pr_err("media device write data failed!\n");
             goto err;
@@ -232,9 +251,11 @@ s32 aicupg_fat_write(char *image_name, char *protection,
            (ulong)((total_len * 1000000 / start_us) / 1024 % 1024));
 
     aicupg_free_align(pmeta);
+    dfs_file_close(&fd);
     return write_len;
 err:
     if (pmeta)
         aicupg_free_align(pmeta);
+    dfs_file_close(&fd);
     return 0;
 }

@@ -28,5 +28,4 @@
 #include <logcfg/logcfg.h>
 #endif
 
-
 #endif  /* _NIMBLE_NPL_OS_LOG_H_ */

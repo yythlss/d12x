@@ -37,7 +37,8 @@ static int clk_multi_parent_enable(struct aic_clk_comm_cfg *comm_cfg)
 static void clk_multi_parent_disable(struct aic_clk_comm_cfg *comm_cfg)
 {
     struct aic_clk_multi_parent_cfg *mod = to_clk_multi_parent(comm_cfg);
-    u32 i, val;
+    u32 val = 0;
+    s32 i;
 
     if (!mod->table_gates) {
         hal_log_err("%s does not have valid table_gates\n", comm_cfg->name);
@@ -225,7 +226,7 @@ static int clk_multi_parent_mod_set_rate(struct aic_clk_comm_cfg *comm_cfg,
     u32 val, parent_index;
     u32 div = 0, div_max, div_mask;
 
-    if (!mod->table_div){
+    if (!mod->table_div) {
         hal_log_err("%s does not have valid table_div\n", comm_cfg->name);
         return -EINVAL;
     }

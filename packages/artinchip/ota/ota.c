@@ -30,6 +30,10 @@
 #include <ctype.h>
 #include <rtdbg.h>
 
+#if defined(OTA_DATA_DIRECT) || defined(OTA_RODATA_DIRECT)
+#include <dfs_fs.h>
+#endif
+
 #define ALIGN_xB_UP(x, y) (((x) + (y - 1)) & ~(y - 1))
 
 #define MAX_CPIO_FILE_NAME 18
@@ -335,6 +339,10 @@ char *ota_upgrade_get_partname(char *file_name)
     }
 
     if (strncmp("rodata.fatfs", file_name, 12) == 0) {
+#ifdef OTA_RODATA_DIRECT
+        LOG_I("Upgrade rodatafs direct.");
+        ret = finfo.device[i];
+#else
         now = fw_getenv("rodataAB_now");
         LOG_I("rodataAB_now = %s", now);
         if (strncmp(now, "A", 1) == 0) {
@@ -353,7 +361,12 @@ char *ota_upgrade_get_partname(char *file_name)
             ret = NULL;
             LOG_E("invalid rodataAB_now");
         }
+#endif
     } else if (strncmp("data.fatfs", file_name, 10) == 0) {
+#ifdef OTA_DATA_DIRECT
+        LOG_I("Upgrade datafs direct.");
+        ret = finfo.device[i];
+#else
         now = fw_getenv("dataAB_now");
         LOG_I("dataAB_now = %s", now);
         if (strncmp(now, "A", 1) == 0) {
@@ -372,6 +385,7 @@ char *ota_upgrade_get_partname(char *file_name)
             ret = NULL;
             LOG_E("invalid dataAB_now");
         }
+#endif
     } else if (strstr(file_name, ".itb") != NULL) {
         now = fw_getenv("osAB_now");
         LOG_I("osAB_now = %s", now);
@@ -762,6 +776,18 @@ int ota_shard_download_fun(char *buffer, int length)
             if (ret)
                 goto __download_exit;
 
+#ifdef OTA_DATA_DIRECT
+            if (rt_strncmp(fhdr.filename, "data", 4) == 0) {
+                LOG_I("uomunt the /data");
+                dfs_unmount("/data");
+            }
+#endif
+#ifdef OTA_RODATA_DIRECT
+            if (rt_strncmp(fhdr.filename, "rodata", 6) == 0) {
+                LOG_I("uomunt the /rodata");
+                dfs_unmount("/rodata");
+            }
+#endif
             ret = aic_ota_erase_part();
             if (ret)
                 goto __download_exit;

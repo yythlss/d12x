@@ -22,7 +22,7 @@
 #define GLB_CLK_CTL                 (GLB_BASE_Q + 0x00)
 #define GLB_CLK_CTL_QEP_EN(n)       (BIT(24) << (n))
 #endif
-#if defined (AIC_QEP_DRV_V11)
+#if defined (AIC_QEP_DRV_V11) || defined (AIC_QEP_DRV_V12)
 #define GLB_CLK_CTL                 (GLB_BASE_Q + 0x28)
 #define GLB_CLK_CTL_QEP_EN(n)       BIT(n)
 #endif
@@ -143,7 +143,6 @@ void hal_qep_enable(u32 ch, u32 enable)
 int hal_qep_init(void)
 {
     int i, ret = 0;
-    u32 clk_id = 0;
 
     if (g_qep_inited) {
         hal_log_debug("PWMCS was already inited\n");
@@ -151,16 +150,18 @@ int hal_qep_init(void)
     }
 
 #if defined (AIC_QEP_DRV_V10)
-    clk_id = CLK_PWMCS;
+    u32 clk_id = CLK_PWMCS;
 #endif
 #if defined (AIC_QEP_DRV_V11)
-    clk_id = CLK_PWMCS_SDFM;
+    u32 clk_id = CLK_PWMCS_SDFM;
 #endif
+#if defined (AIC_QEP_DRV_V10) || defined (AIC_QEP_DRV_V11)
     ret = hal_clk_set_freq(clk_id, QEP_CLK_RATE);
     if (ret < 0) {
         hal_log_err("Failed to set QEP clk %d\n", QEP_CLK_RATE);
         return -1;
     }
+#endif
     ret = hal_clk_enable(CLK_PWMCS);
     if (ret < 0) {
         hal_log_err("Failed to enable QEP clk\n");

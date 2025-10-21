@@ -56,6 +56,7 @@ static int do_mmc_read(int argc, char **argv)
     rt_device_t mmc_dev = RT_NULL;
     char *name, *pe;
     void *p;
+    u64 start_us = 0, stop_us = 0;
 
     if (argc != 5) {
         printf("Input error, reference: mmc read mmc0p0 0 1 0x100000\n");
@@ -75,7 +76,11 @@ static int do_mmc_read(int argc, char **argv)
     }
     rt_device_open(mmc_dev, RT_DEVICE_FLAG_RDWR);
 
+
+    start_us = aic_get_time_us();
     rt_device_read(mmc_dev, blkoffset, p, blkcnt);
+    stop_us = aic_get_time_us();
+    printf("read speed: %lld KB/s\n", (((u64)blkcnt * 512 * 1000 * 1000) / (stop_us - start_us)) / 1024);
 
     rt_device_close(mmc_dev);
     return 0;
@@ -87,6 +92,7 @@ static int do_mmc_write(int argc, char **argv)
     rt_device_t mmc_dev = RT_NULL;
     char *name, *pe;
     void *p;
+    u64 start_us = 0, stop_us = 0;
 
     if (argc != 5) {
         printf("Input error, reference: mmc write mmc0p0 0 1 0x100000\n");
@@ -106,7 +112,10 @@ static int do_mmc_write(int argc, char **argv)
     }
     rt_device_open(mmc_dev, RT_DEVICE_FLAG_RDWR);
 
+    start_us = aic_get_time_us();
     rt_device_write(mmc_dev, blkoffset, p, blkcnt);
+    stop_us = aic_get_time_us();
+    printf("write speed: %lld KBs/s\n", (((u64)blkcnt * 512 * 1000 * 1000) / (stop_us - start_us)) / 1024);
 
     rt_device_close(mmc_dev);
     return 0;

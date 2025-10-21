@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -22,6 +22,7 @@ struct aic_can
     struct can_handle canHandle;
     char *name;
     uint32_t can_idx;
+    bool disableRetransmission;
 };
 
 struct aic_can aic_can_arr[] =
@@ -185,12 +186,13 @@ static rt_err_t aic_can_control(struct rt_can_device *can, int cmd, void *arg)
         break;
     case RT_CAN_CMD_SET_MODE:
         phandle->mode = (unsigned long)arg;
-        if (phandle->mode == CAN_MODE_NORMAL) {
-            hal_can_ioctl(phandle, CAN_IOCTL_RELEASE_MODE,
-                          (void *)phandle->mode);
-        } else {
-            hal_can_ioctl(phandle, CAN_IOCTL_SET_MODE, (void *)phandle->mode);
-        }
+        hal_can_ioctl(phandle, CAN_IOCTL_SET_MODE, (void *)phandle->mode);
+        break;
+    case RT_CAN_CMD_DISABLE_RETRANS:
+        p_aic_can->disableRetransmission = (bool)arg;
+        break;
+    case RT_CAN_CMD_SET_AUTOBUSOFF:
+        hal_can_ioctl(phandle, CAN_IOCTL_SET_AUTOBUSOFF, arg);
         break;
     default:
         rt_kprintf("cmd not support\n");
@@ -210,6 +212,7 @@ static int aic_can_send(struct rt_can_device *can, const void *buf,
     struct rt_can_msg *pmsg = (struct rt_can_msg *)buf;
     can_handle *phandle = &p_aic_can->canHandle;
     can_msg_t msg;
+    can_op_req_t req = TX_REQ;
     int i;
 
     msg.id = pmsg->id;
@@ -222,15 +225,22 @@ static int aic_can_send(struct rt_can_device *can, const void *buf,
 
     switch (phandle->mode)
     {
-    case CAN_SELFTEST_MODE:
-        hal_can_send_frame(&p_aic_can->canHandle, &msg, SELF_REQ);
+    case RT_CAN_MODE_LOOPBACK:
+        req = SELF_REQ;
         break;
+    case RT_CAN_MODE_NORMAL:
+        if (p_aic_can->disableRetransmission)
+            req = SINGLE_TX_REQ;
+        else
+            req = TX_REQ;
+        break;
+    case RT_CAN_MODE_LISTEN:
+    case RT_CAN_MODE_LOOPBACKANLISTEN:
     default:
-         hal_can_send_frame(&p_aic_can->canHandle, &msg, TX_REQ);
-         break;
+        return -CAN_SEND_STATUS_MODE_ERROR;
     }
 
-    return 0;
+    return hal_can_send_frame(&p_aic_can->canHandle, &msg, req);
 }
 
 static int aic_can_recv(struct rt_can_device *can, void *buf, rt_uint32_t boxno)
@@ -359,6 +369,8 @@ int rt_hw_aic_can_init(void)
                                 aic_can_callback, NULL);
 
         aic_can_arr[i].can.config = config;
+        aic_can_arr[i].disableRetransmission = 0;
+        aic_can_arr[i].canHandle.autoBusoff = 1;
         ret = rt_hw_can_register(&aic_can_arr[i].can, aic_can_arr[i].name,
                                  &aic_can_ops, NULL);
 #ifdef RT_USING_PM

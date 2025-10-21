@@ -324,6 +324,7 @@ static int mini_audio_player_open(struct mini_audio_player *player)
     }
 
     create_params.dev_id = 0;
+    create_params.mix_enable = 1;
     create_params.scene_type = AUDIO_RENDER_SCENE_DEFAULT;
     aic_audio_render_create(&player->render, &create_params);
     if (player->render == NULL) {

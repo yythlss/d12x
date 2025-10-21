@@ -188,6 +188,12 @@ void usbd_event_ep_in_complete_handler(uint8_t ep, uint32_t nbytes);
 void usbd_event_ep_out_complete_handler(uint8_t ep, uint32_t nbytes);
 
 void usbd_req_test_mode(uint8_t test_mode);
+
+void usb_plug_irq(void *args);
+
+int usbd_plug_irq_init(void);
+
+
 #ifdef __cplusplus
 }
 #endif

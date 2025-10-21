@@ -82,6 +82,6 @@ if GetDepend(['RT_LWIP_USING_PING']):
     src += Glob('src/apps/ping/ping.c')
 
 mycflags = ' -w'
-group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP', 'RT_USING_LWIP203'], CPPPATH = path, CFLAGS = mycflags)
+group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP', 'RT_USING_LWIP203'], CPPPATH = path, LOCAL_CFLAGS = mycflags)
 
 Return('group')

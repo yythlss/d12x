@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -126,6 +126,12 @@
 #define CAN_BUS_ERRCODE_CRCERRCNT          13
 #define CAN_BUS_ERRCODE_ACKERRCNT          15
 
+#define CAN_SEND_STATUS_SUCCESS            0
+#define CAN_SEND_STATUS_HR_REFUSE          1
+#define CAN_SEND_STATUS_REQ_ERROR          2
+#define CAN_SEND_STATUS_PAR_ERROR          3
+#define CAN_SEND_STATUS_MODE_ERROR         4
+
 typedef enum {
     ACTIVE_STATUS,
     WARNING_STATUS,
@@ -147,10 +153,9 @@ struct can_bittiming_const {
 
 typedef enum {
     CAN_NORMAL_MODE     = 0,
-    CAN_RESET_MODE      = BIT(0),
-    CAN_LISTEN_MODE     = BIT(1),
-    CAN_SELFTEST_MODE   = BIT(2),
-    CAN_SLEEP_MODE      = BIT(4),
+    CAN_LISTEN_MODE     = 1,
+    CAN_SELFTEST_MODE   = 2,
+    CAN_SLEEP_MODE      = 4,
 } can_mode_t;
 
 enum {
@@ -161,6 +166,7 @@ enum {
 typedef enum {
     TX_REQ          = BIT(0),
     ABORT_REQ       = BIT(1),
+    SINGLE_TX_REQ   = ABORT_REQ | TX_REQ,
     RXB_REL_REQ     = BIT(2),
     CLR_OF_REQ      = BIT(3),
     SELF_REQ        = BIT(4),
@@ -209,6 +215,7 @@ struct can_handle {
     can_msg_t msg;
     can_status_t status;
     unsigned long mode;
+    unsigned long autoBusoff;
 };
 
 typedef enum {
@@ -266,7 +273,7 @@ static inline void hal_can_disable_interrupt(can_handle *phandle)
 #define CAN_IOCTL_SET_FILTER        2
 #define CAN_IOCTL_SET_BAUDRATE      4
 #define CAN_IOCTL_GET_BAUDRATE      8
-#define CAN_IOCTL_RELEASE_MODE      0x10
+#define CAN_IOCTL_SET_AUTOBUSOFF    0x10
 
 #define CAN_EVENT_RX_IND         0x01    /* Rx indication */
 #define CAN_EVENT_TX_DONE        0x02    /* Tx complete   */
@@ -275,7 +282,7 @@ static inline void hal_can_disable_interrupt(can_handle *phandle)
 
 int hal_can_init(can_handle *phandle, u32 can_idx);
 void hal_can_uninit(can_handle *phandle);
-void hal_can_send_frame(can_handle *phandle, can_msg_t * msg, can_op_req_t req);
+int hal_can_send_frame(can_handle *phandle, can_msg_t * msg, can_op_req_t req);
 void hal_can_receive_frame(can_handle *phandle, can_msg_t * msg);
 int hal_can_ioctl(can_handle *phandle, int cmd, void *arg);
 int hal_can_attach_callback(can_handle *phandle, void *callback, void *arg);

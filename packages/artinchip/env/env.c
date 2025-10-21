@@ -485,7 +485,7 @@ static int rtt_spinand_load_env_simple(void *buf, size_t size)
 
         if (mtd_is_block_aligned(page_id, mtd->pages_per_block) &&
             rt_mtd_nand_check_block(mtd, blk) != RT_EOK) {
-            pr_err("Block is bad, skip it.\n");
+            pr_err("Block %u is bad, skip it.\n", blk);
             offset += mtd->pages_per_block * mtd->page_size;
             continue;
         }
@@ -516,8 +516,9 @@ static int rtt_spinand_save_env_simple(void *buf, size_t size)
     struct rt_mtd_nand_device *mtd;
     rt_device_t dev;
     rt_err_t ret = 0;
-    rt_off_t offset = 0;
-    rt_uint32_t page_id = 0, blk = 0, remain = 0, goodblk = 0;
+    rt_off_t offset = 0, bad_blk_offset = 0;
+    rt_uint32_t page_id = 0, blk = 0, remain = 0, good_blk = 0;
+    rt_uint8_t *buf_ptr = NULL;
 
     if (dev_current == 0) {
         dev = rt_device_find(AIC_ENV_REDUNDAND_PART_NAME);
@@ -540,9 +541,13 @@ static int rtt_spinand_save_env_simple(void *buf, size_t size)
     }
 
     mtd = (struct rt_mtd_nand_device *)dev;
-    remain = size;
 
-    while (!goodblk) {
+write_start:
+    offset = 0;
+    remain = size;
+    buf_ptr = buf;
+
+    while (!good_blk) {
         page_id = offset / mtd->page_size;
 
         if (page_id > (mtd->block_total * mtd->pages_per_block)) {
@@ -555,25 +560,42 @@ static int rtt_spinand_save_env_simple(void *buf, size_t size)
 
         if (rt_mtd_nand_check_block(mtd, blk) != RT_EOK) {
             pr_err("Block is bad, skip it.\n");
+            bad_blk_offset += mtd->pages_per_block * mtd->page_size;
             offset += mtd->pages_per_block * mtd->page_size;
             continue;
         } else {
-            rt_mtd_nand_erase_block(mtd, blk);
-            goodblk = true;
+            if (rt_mtd_nand_erase_block(mtd, blk)) {
+                /* write to next good block */
+                ret = rt_mtd_nand_mark_badblock(mtd, blk);
+                if (ret) {
+                    pr_err("Failed to mark block %u bad.\n", blk);
+                    ret = -RT_ERROR;
+                    goto rtt_spinand_save_env_simple;
+                }
+                good_blk = false;
+                goto write_start;
+            }
+            good_blk = true;
         }
     }
 
     while (remain) {
         page_id = offset / mtd->page_size;
 
-        ret = rt_mtd_nand_write(mtd, page_id, buf, mtd->page_size, RT_NULL, 0);
+        ret = rt_mtd_nand_write(mtd, page_id, buf_ptr, mtd->page_size, RT_NULL, 0);
         if (ret) {
-            pr_err("Failed to write page data to NAND.\n");
-            ret = -RT_ERROR;
-            goto rtt_spinand_save_env_simple;
+            /* write to next good block */
+            ret = rt_mtd_nand_mark_badblock(mtd, blk);
+            if (ret) {
+                pr_err("Failed to mark block %u bad.\n", blk);
+                ret = -RT_ERROR;
+                goto rtt_spinand_save_env_simple;
+            }
+            good_blk = false;
+            goto write_start;
         }
 
-        buf += mtd->page_size;
+        buf_ptr += mtd->page_size;
         offset += mtd->page_size;
         if (remain >= mtd->page_size)
             remain -= mtd->page_size;

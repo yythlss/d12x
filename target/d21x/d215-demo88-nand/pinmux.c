@@ -93,12 +93,12 @@ struct aic_pinmux aic_pinmux_config[] = {
 #endif
 #endif
 #ifdef AIC_PRGB_24BIT
-    {2, PIN_PULL_DIS, 3, "PD.0"},
-    {2, PIN_PULL_DIS, 3, "PD.1"},
-    {2, PIN_PULL_DIS, 3, "PD.2"},
-    {2, PIN_PULL_DIS, 3, "PD.3"},
-    {2, PIN_PULL_DIS, 3, "PD.4"},
-    {2, PIN_PULL_DIS, 3, "PD.5"},
+    {3, PIN_PULL_DIS, 3, "PC.0"},
+    {3, PIN_PULL_DIS, 3, "PC.1"},
+    {3, PIN_PULL_DIS, 3, "PC.2"},
+    {3, PIN_PULL_DIS, 3, "PC.3"},
+    {3, PIN_PULL_DIS, 3, "PC.4"},
+    {3, PIN_PULL_DIS, 3, "PC.5"},
     {2, PIN_PULL_DIS, 3, "PD.6"},
     {2, PIN_PULL_DIS, 3, "PD.7"},
     {2, PIN_PULL_DIS, 3, "PD.8"},

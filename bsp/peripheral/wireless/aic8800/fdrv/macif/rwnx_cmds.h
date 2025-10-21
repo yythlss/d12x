@@ -12,7 +12,7 @@
 #define _RWNX_CMDS_H_
 
 #include "lmac_msg.h"
-#include "aic_list.h"
+#include "aic8800_list.h"
 #include "dbg_assert.h"
 #include "compiler.h"
 #include "co_list.h"

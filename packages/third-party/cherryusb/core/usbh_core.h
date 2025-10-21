@@ -30,6 +30,7 @@ extern "C" {
 #define USB_CLASS_MATCH_INTF_CLASS    0x0004
 #define USB_CLASS_MATCH_INTF_SUBCLASS 0x0008
 #define USB_CLASS_MATCH_INTF_PROTOCOL 0x0010
+#define USB_CLASS_MATCH_VID_PID       (USB_CLASS_MATCH_VENDOR | USB_CLASS_MATCH_PRODUCT)
 
 #define CLASS_CONNECT(hport, i)    ((hport)->config.intf[i].class_driver->connect(hport, i))
 #define CLASS_DISCONNECT(hport, i) ((hport)->config.intf[i].class_driver->disconnect(hport, i))
@@ -44,6 +45,8 @@ extern "C" {
 #pragma section = "usbh_class_info"
 #define CLASS_INFO_DEFINE __attribute__((section("usbh_class_info"))) __USED __ALIGNED(1)
 #endif
+
+#define USBH_GET_URB_INTERVAL(interval, speed) (speed < USB_SPEED_HIGH ? interval : (1 << (interval - 1)))
 
 #define USBH_EP_INIT(ep, ep_desc)                                            \
     do {                                                                     \

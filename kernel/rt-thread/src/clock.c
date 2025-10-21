@@ -23,7 +23,7 @@
 #ifdef RT_USING_SMP
 #define rt_tick rt_cpu_index(0)->tick
 #else
-static volatile rt_tick_t rt_tick = 0;
+static volatile rt_tick_t rt_tick = 0xffff0000;
 #endif /* RT_USING_SMP */
 
 #ifndef __on_rt_tick_hook

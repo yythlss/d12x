@@ -203,6 +203,12 @@ do {                                                                        \
 #define DBG_VNET_INF(fmt, ...)      __DBG_MOD_SEV_TEMPLATE(VNET, INF, fmt, ## __VA_ARGS__)
 #define DBG_VNET_VRB(fmt, ...)      __DBG_MOD_SEV_TEMPLATE(VNET, VRB, fmt, ## __VA_ARGS__)
 
+#define DBG_FHOST_CRT(fmt, ...)     __DBG_MOD_SEV_TEMPLATE(FHOST, CRT, fmt, ## __VA_ARGS__)
+#define DBG_FHOST_ERR(fmt, ...)     __DBG_MOD_SEV_TEMPLATE(FHOST, ERR, fmt, ## __VA_ARGS__)
+#define DBG_FHOST_WRN(fmt, ...)     __DBG_MOD_SEV_TEMPLATE(FHOST, WRN, fmt, ## __VA_ARGS__)
+#define DBG_FHOST_INF(fmt, ...)     __DBG_MOD_SEV_TEMPLATE(FHOST, INF, fmt, ## __VA_ARGS__)
+#define DBG_FHOST_VRB(fmt, ...)     __DBG_MOD_SEV_TEMPLATE(FHOST, VRB, fmt, ## __VA_ARGS__)
+
 #define DBG_APP_CRT(fmt, ...)       __DBG_MOD_SEV_TEMPLATE(APP, CRT, fmt, ## __VA_ARGS__)
 #define DBG_APP_ERR(fmt, ...)       __DBG_MOD_SEV_TEMPLATE(APP, ERR, fmt, ## __VA_ARGS__)
 #define DBG_APP_WRN(fmt, ...)       __DBG_MOD_SEV_TEMPLATE(APP, WRN, fmt, ## __VA_ARGS__)

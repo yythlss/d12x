@@ -5,6 +5,7 @@
  */
 #include "usbh_core.h"
 #include "usbh_cdc_ecm.h"
+#include <string.h>
 
 #define DEV_FORMAT "/dev/cdc_ether"
 
@@ -91,7 +92,7 @@ static int usbh_cdc_ecm_connect(struct usbh_hubport *hport, uint8_t intf)
                 break;
             case CDC_CS_INTERFACE:
                 if ((cur_iface == cdc_ecm_class->ctrl_intf) && p[DESC_bDescriptorSubType] == CDC_FUNC_DESC_ETHERNET_NETWORKING) {
-                    struct cdc_ecm_descriptor *desc = (struct cdc_ecm_descriptor *)p;
+                    struct cdc_eth_descriptor *desc = (struct cdc_eth_descriptor *)p;
                     mac_str_idx = desc->iMACAddress;
                     cdc_ecm_class->max_segment_size = desc->wMaxSegmentSize;
                     goto get_mac;
@@ -172,7 +173,7 @@ get_mac:
         }
     }
 
-    /* bit0 Promiscuous 
+    /* bit0 Promiscuous
     * bit1 ALL Multicast
     * bit2 Directed
     * bit3 Broadcast
@@ -184,7 +185,7 @@ get_mac:
     }
     USB_LOG_INFO("Set CDC ECM packet filter:%04x\r\n", CONFIG_USBHOST_CDC_ECM_PKT_FILTER);
 
-    memcpy(hport->config.intf[intf].devname, DEV_FORMAT, CONFIG_USBHOST_DEV_NAMELEN);
+    strncpy(hport->config.intf[intf].devname, DEV_FORMAT, CONFIG_USBHOST_DEV_NAMELEN);
 
     USB_LOG_INFO("Register CDC ECM Class:%s\r\n", hport->config.intf[intf].devname);
 

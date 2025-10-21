@@ -22,6 +22,7 @@
  * will be set to standard values. Override anything you dont like!
  */
 #include "rtwlan_config.h"
+#include "rtconfig.h"
 
 /*
  * Public General Config ******************************************************
@@ -118,6 +119,10 @@
 
 #ifndef CONFIG_MELLOC_SKB
 	#define CONFIG_MELLOC_SKB					0
+#endif
+
+#ifdef AIC_USING_RTL8733_WLAN0
+#define CONFIG_HARDWARE_8723F
 #endif
 
 // remove function to reduce code

@@ -36,7 +36,6 @@ static struct aicfb_screeninfo g_info = {0};
 
 static void print_help(char *program)
 {
-    printf("Compile time: %s\n", __TIME__);
     printf("Usage: %s [options]", program);
     printf("\t -o, --output: \t\t output stream file name\n");
     printf("\t -h, --help: \t\t print help info\n");

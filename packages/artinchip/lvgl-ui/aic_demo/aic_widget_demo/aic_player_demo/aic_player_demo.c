@@ -10,6 +10,10 @@
 #include "lvgl.h"
 #include "lv_aic_player.h"
 
+#define VIDEO_INDEX_0 0
+#define VIDEO_INDEX_1 1
+#define VIDEO_NUM     2
+
 #define CHECK_CONDITION_RETURN_VOID(confition, ...) \
     if (confition)  { __VA_ARGS__; return; }
 
@@ -128,13 +132,16 @@ static void next_button_handler(lv_event_t *e)
 
     if (code == LV_EVENT_CLICKED) {
         CHECK_CONDITION_RETURN_VOID(g_del_player, print_del());
-        if (cur_video == 0)
+        cur_video++;
+        cur_video = cur_video > VIDEO_NUM ? VIDEO_INDEX_0 : cur_video;
+        if (cur_video == VIDEO_INDEX_0)
+            lv_aic_player_set_src(player, LVGL_PATH(elevator_mjpeg.mp4));
+        else if (cur_video == VIDEO_INDEX_1)
             lv_aic_player_set_src(player, LVGL_PATH(cartoon_mjpeg.mp4));
         else
-            lv_aic_player_set_src(player, LVGL_PATH(elevator_mjpeg.mp4));
+            lv_aic_player_set_src(player, LVGL_PATH(world-cup.png)); // private apng format
         if (g_playing)
             lv_aic_player_set_cmd(player, LV_AIC_PLAYER_CMD_START, NULL);
-        cur_video = cur_video == 0 ? 1 :0;
     }
 }
 

@@ -188,9 +188,14 @@ static int drv_qep_init(void)
         ret = aic_qep_probe(&g_qep_info[i]);
         if (ret)
             return ret;
+#ifdef AIC_QEP_DRV_V12
+        aicos_request_irq(QEP0_IRQn + g_qep_info[i].id, aic_qep_irq, 0, NULL, NULL);
+#endif
     }
 
+#if defined (AIC_QEP_DRV_V10) || defined (AIC_QEP_DRV_V11)
     aicos_request_irq(PWMCS_QEP_IRQn, aic_qep_irq, 0, NULL, NULL);
+#endif
 
     hal_qep_init();
 

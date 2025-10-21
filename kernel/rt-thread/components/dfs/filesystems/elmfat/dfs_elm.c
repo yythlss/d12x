@@ -876,7 +876,7 @@ DSTATUS disk_status(BYTE drv)
 }
 
 /* Read Sector(s) */
-DRESULT disk_read(BYTE drv, BYTE *buff, DWORD sector, UINT count)
+DRESULT disk_read(BYTE drv, BYTE *buff, LBA_t sector, UINT count)
 {
     rt_size_t result;
     rt_device_t device = disk[drv];
@@ -891,7 +891,7 @@ DRESULT disk_read(BYTE drv, BYTE *buff, DWORD sector, UINT count)
 }
 
 /* Write Sector(s) */
-DRESULT disk_write(BYTE drv, const BYTE *buff, DWORD sector, UINT count)
+DRESULT disk_write(BYTE drv, const BYTE *buff, LBA_t sector, UINT count)
 {
     rt_size_t result;
     rt_device_t device = disk[drv];

@@ -80,10 +80,9 @@ struct gpio_cfg {
                         AIC_PINMUX_BASE(port, pin, func, PIN_PULL_DOWN, 3)
 
 int hal_gpio_name2pin(const char *name);
-int hal_gpio_get_value(unsigned int group, unsigned int pin,
-                       unsigned int *pvalue);
-int hal_gpio_set_value(unsigned int group, unsigned int pin,
-                       unsigned int value);
+int hal_gpio_get_value(unsigned int group, unsigned int pin, unsigned int *pvalue);
+int hal_gpio_set_value(unsigned int group, unsigned int pin, unsigned int value);
+int hal_gpio_set_pin_value(unsigned int pin, unsigned int value);
 int hal_gpio_clr_output(unsigned int group, unsigned int pin);
 int hal_gpio_set_output(unsigned int group, unsigned int pin);
 int hal_gpio_toggle_output(unsigned int group, unsigned int pin);
@@ -94,27 +93,20 @@ int hal_gpio_group_get_irq_en(unsigned int group, unsigned int *pen);
 int hal_gpio_group_set_irq_en(unsigned int group, unsigned int en);
 int hal_gpio_group_get_irq_stat(unsigned int group, unsigned int *pstat);
 int hal_gpio_group_set_irq_stat(unsigned int group, unsigned int stat);
-int hal_gpio_get_irq_stat(unsigned int group, unsigned int pin,
-                          unsigned int *pstat);
+int hal_gpio_get_irq_stat(unsigned int group, unsigned int pin, unsigned int *pstat);
 int hal_gpio_clr_irq_stat(unsigned int group, unsigned int pin);
 int hal_gpio_set_func(unsigned int group, unsigned int pin, unsigned int func);
-int hal_gpio_get_func(unsigned int group, unsigned int pin,
-                      unsigned int *pfunc);
-int hal_gpio_set_drive_strength(unsigned int group, unsigned int pin,
-                                unsigned int strength);
-int hal_gpio_set_bias_pull(unsigned int group, unsigned int pin,
-                           unsigned int pull);
-int hal_gpio_set_irq_mode(unsigned int group, unsigned int pin,
-                          unsigned int irq_mode);
+int hal_gpio_get_func(unsigned int group, unsigned int pin, unsigned int *pfunc);
+int hal_gpio_set_drive_strength(unsigned int group, unsigned int pin, unsigned int strength);
+int hal_gpio_set_bias_pull(unsigned int group, unsigned int pin, unsigned int pull);
+int hal_gpio_set_irq_mode(unsigned int group, unsigned int pin, unsigned int irq_mode);
 int hal_gpio_direction_input(unsigned int group, unsigned int pin);
 int hal_gpio_direction_output(unsigned int group, unsigned int pin);
-int hal_gpio_set_debounce(unsigned int group, unsigned int pin,
-                          unsigned int debounce);
+int hal_gpio_set_debounce(unsigned int group, unsigned int pin, unsigned int debounce);
 
 int hal_gpio_cfg(struct gpio_cfg *cfg, u32 cnt);
 int hal_gpio_get_pincfg(unsigned int group, unsigned int pin, int check_type);
-int hal_gpio_get_outcfg(unsigned int group, unsigned int pin,
-                        unsigned int *pvalue);
+int hal_gpio_get_outcfg(unsigned int group, unsigned int pin, unsigned int *pvalue);
 
 #ifdef __cplusplus
 }

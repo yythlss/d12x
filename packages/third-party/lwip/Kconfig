@@ -44,11 +44,11 @@ if LPKG_USING_LWIP
 
     config LPKG_LWIP_EXAMPLES
         bool "LwIP Examples"
-        default n
+        default y
 
     config LPKG_USING_NETTOOLS
         bool "Using net tools"
-        default n
+        default y
 #    if LPKG_LWIP_EXAMPLES
 #        config LPKG_LWIP_EXAMPLES_TEST
 #            bool "example test"
@@ -71,12 +71,12 @@ if LPKG_USING_LWIP
     config LPKG_LWIP_DNS
         bool "Enble DNS for name resolution"
         select LPKG_LWIP_UDP
-        default n
+        default y
 
     config LPKG_LWIP_DHCP
         bool "Enable alloc ip address through DHCP"
         select LPKG_LWIP_UDP
-        default n
+        default y
 
         if LPKG_LWIP_DHCP
             config LPKG_IP_SOF_BROADCAST
@@ -116,7 +116,7 @@ if LPKG_USING_LWIP
 
     config LPKG_LWIP_PBUF_NUM
         int "the number of PBUF"
-        default 16
+        default 64
 
     config LPKG_LWIP_MEM_SIZE
         int "the size of LwIP's dynamic memory"
@@ -124,19 +124,19 @@ if LPKG_USING_LWIP
 
     config LPKG_LWIP_RAW_PCB_NUM
         int "the number of raw connection"
-        default 4
+        default 64
 
     config LPKG_LWIP_TCP_SEG_NUM
         int "the number of TCP segment"
-        default 40
+        default 512
 
     config LPKG_LWIP_TCP_SND_BUF
         int "the size of send buffer"
-        default 8192
+        default 65535
 
     config LPKG_LWIP_TCP_WND
         int "the size of TCP send window"
-        default 8192
+        default 65535
 
     config LPKG_LWIP_REASSEMBLY_FRAG
         bool "Enable IP reassembly and frag"
@@ -158,17 +158,16 @@ if LPKG_USING_LWIP
 
         config LPKG_MEMP_NUM_NETCONN
             int "the number of struct netconns"
-            default 8
+            default 64
 
         config LPKG_LWIP_UDP_PCB_NUM
             int "the number of UDP socket"
-            default 8 if RT_USING_DFS_NFS
-            default 4
+            default 64
 
         if LPKG_LWIP_TCP
         config LPKG_LWIP_TCP_PCB_NUM
             int "the number of TCP socket"
-            default 4
+            default 64
 
         config LPKG_LWIP_TCPTHREAD_PRIORITY
             int "the priority level value of lwIP thread"
@@ -176,16 +175,15 @@ if LPKG_USING_LWIP
 
         config LPKG_LWIP_TCPTHREAD_MBOX_SIZE
             int "the number of mail in the lwIP thread mailbox"
-            default 8
+            default 128
 
         config LPKG_LWIP_TCPTHREAD_STACKSIZE
             int "the stack size of lwIP thread"
-            default 3072 if ARCH_CPU_64BIT
-            default 2048
+            default 4096
 
         menuconfig LPKG_LWIP_USING_PING
             bool "Enable ping features"
-            default n
+            default y
             depends on !LPKG_USING_LWIP_IPV6
             select LPKG_LWIP_ICMP
             select LPKG_LWIP_RAW
@@ -226,7 +224,7 @@ if LPKG_USING_LWIP
 
     config LPKG_LWIP_USING_DHCPD
         bool "Using dhcp server"
-        default n
+        default y
         select LPKG_LWIP_UDP
 
     if LPKG_LWIP_USING_DHCPD

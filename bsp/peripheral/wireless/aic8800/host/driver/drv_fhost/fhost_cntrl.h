@@ -256,6 +256,9 @@ int fhost_cntrl_mm_set_filter(uint32_t value);
 int fhost_cntrl_me_set_lp_level(uint8_t lp_level);
 void set_deepsleep_param(unsigned int listen_interval, unsigned int dont_wait_bcmc);
 
+int fhost_cntrl_scan_cancel_req(void);
+int fhost_cntrl_mm_set_monitor_channel(int fvif_idx, int chan_num, int band_width);
+
 void fhost_cntrl_deinit(void);
 
 /**

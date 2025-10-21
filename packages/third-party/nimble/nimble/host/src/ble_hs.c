@@ -145,8 +145,7 @@ ble_hs_locked_by_cur_task(void)
 int
 ble_hs_is_parent_task(void)
 {
-    return !ble_npl_os_started() ||
-           ble_npl_get_current_task_id() == ble_hs_parent_task;
+    return !ble_npl_os_started() || ble_npl_get_current_task_id() == ble_hs_parent_task;
 }
 
 /**

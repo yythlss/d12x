@@ -118,7 +118,7 @@ void sdio_buf_init(void)
         node->pad_len = 0;
         co_list_push_back(&sdio_list->list, &node->hdr);
         rtos_semaphore_signal(sdio_list->sdio_rx_node_sema, 0);
-        DBG_SDIO_INF("InitN=%p\n", node);
+        DBG_SDIO_VRB("InitN=%p\n", node);
     }
 	sdio_list->alloc_fail_cnt = 0;
     AIC_LOG_PRINTF("sdio_rx_node_sema initial count:%d\n", rtos_semaphore_get_count(sdio_list->sdio_rx_node_sema));
@@ -169,7 +169,7 @@ static struct sdio_buf_node_s *sdio_buf_alloc(uint16_t buf_len)
 
         rtos_mutex_unlock(sdio_list->mutex);
     }
-    DBG_SDIO_INF("AlocN=%p\n", node);
+    DBG_SDIO_VRB("AlocN=%p\n", node);
     return node;
 }
 
@@ -177,7 +177,7 @@ void sdio_buf_free(struct sdio_buf_node_s *node)
 {
     struct sdio_buf_list_s *sdio_list = &sdio_rx_buf_list;
 
-    DBG_SDIO_INF("FreeN=%p\n", node);
+    DBG_SDIO_VRB("FreeN=%p\n", node);
     rtos_mutex_lock(sdio_list->mutex, -1);
 
     if (node->buf_len == 0) {

@@ -17,9 +17,9 @@ extern "C" {
 #include <aic_arch.h>
 
 /* Luban-Lite version information */
-#define LL_VERSION      1               /**< major version number */
-#define LL_SUBVERSION   2               /**< minor version number */
-#define LL_REVISION     1               /**< revise version number */
+#define LL_VERSION      1
+#define LL_SUBVERSION   2
+#define LL_REVISION     2
 
 typedef __signed__ char     s8;
 typedef unsigned char       u8;
@@ -241,6 +241,20 @@ typedef unsigned long ptr_t;
     __x - (__x % (y));              \
 }                           \
 )
+
+/* NOT thread-safe */
+#define EXPAND_BCD_VER(v)    ({ \
+    static char ver[8]; \
+    int i = 0; \
+    memset(ver, 0, 8); \
+    if (v & 0xF000) \
+        ver[i++] = ((v >> 12) & 0xF) + 0x30; \
+    ver[i++] = (((v) >> 8) & 0xF) + 0x30; \
+    ver[i++] = '.'; \
+    ver[i++] = (((v) >> 4) & 0xF) + 0x30; \
+    ver[i]   = ((v) & 0xF) + 0x30; \
+    ver; \
+})
 
 #ifdef ALIGN
 #undef ALIGN

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,11 +11,9 @@
 int drv_wri_init(void)
 {
     /* From WRI V1.2, the follow API is defined in WRI instead of RTC */
-#if defined(AIC_WRI_DRV_V12) || defined(AIC_RTC_DRV_V10) || defined(AIC_RTC_DRV_V11)
     aic_get_reboot_reason();
     aic_clr_reboot_reason();
     aic_show_startup_time();
-#endif
     return 0;
 }
 INIT_ENV_EXPORT(drv_wri_init);

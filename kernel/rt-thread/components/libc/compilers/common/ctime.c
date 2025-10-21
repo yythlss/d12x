@@ -642,7 +642,7 @@ int clock_gettime(clockid_t clockid, struct timespec *tp)
     {
     case CLOCK_REALTIME:
         {
-            int tick;
+            unsigned int tick;
             rt_base_t level;
 
             level = rt_hw_interrupt_disable();

@@ -221,11 +221,6 @@ extern void sfud_log_info(const char *format, ...);
 /* maximum number of erase type support on JESD216 (V1.0) */
 #define SFUD_SFDP_ERASE_TYPE_MAX_NUM                      4
 
-/* write protection state mask */
-#ifndef SFUD_WRITE_PROTECTION_MASK
-#define SFUD_WRITE_PROTECTION_MASK                      0xFC
-#endif
-
 /* time limit in wait_busy                           100us   ms     s    margin */
 #define SFUD_CHIP_ERASE_TIMEOUT                        (10 * 1000 * 40 * 10)
 #define SFUD_SECTOR_ERASE_TIMEOUT                      (10 * 400       * 10)
@@ -376,6 +371,7 @@ typedef struct {
     uint32_t bus_hz;                             /** Working bus frequency */
 #endif
     void *get_uid;
+    uint8_t bp_mask;
 } sfud_flash, *sfud_flash_t;
 
 typedef void (*quad_enable_func)(sfud_flash *flash);

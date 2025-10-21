@@ -35,6 +35,8 @@ extern struct aic_panel dsi_axs15231b;
 extern struct aic_panel dsi_nv3051;
 extern struct aic_panel dsi_fl7707;
 extern struct aic_panel dsi_ft8201;
+extern struct aic_panel dsi_st7701s;
+extern struct aic_panel dsi_edp_lt9811exb;
 
 /*
  * MIPI-DBI Type B I8080 Panel
@@ -52,6 +54,9 @@ extern struct aic_panel dbi_st7789t3;
 extern struct aic_panel dbi_st7789v;
 extern struct aic_panel dbi_ili9327;
 extern struct aic_panel dbi_co5300;
+extern struct aic_panel dbi_st77916;
+extern struct aic_panel dbi_gc9d01n;
+extern struct aic_panel dbi_st77912;
 
 /*
  * RGB Panel SPI Init

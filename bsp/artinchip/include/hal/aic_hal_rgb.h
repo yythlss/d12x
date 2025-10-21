@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2022 ArtInChip Technology Co., Ltd.
+ * Copyright (C) 2020-2025 ArtInChip Technology Co., Ltd.
  * Authors:  matteo <duanmt@artinchip.com>
  *
  * SPDX-License-Identifier: Apache-2.0

@@ -185,6 +185,8 @@ struct rt_can_ops;
 #define RT_CAN_STOP_DMA             0x1E
 #define RT_CAN_CONFIG_DMA_TX        0x20
 #define RT_CAN_CONFIG_DMA_RX        0x21
+#define RT_CAN_CMD_DISABLE_RETRANS  0x22
+#define RT_CAN_CMD_SET_AUTOBUSOFF   0x23
 
 #define RT_DEVICE_CAN_INT_ERR       0x1000
 

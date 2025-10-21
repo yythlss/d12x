@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -59,7 +59,7 @@ static int mmc_block_add(struct aic_sdmc *host, struct aic_partition *parts)
         snprintf(devname, 32, "sd%d", host->index);
     else
         snprintf(devname, 32, "mmc%d", host->index);
-    card->name = strdup(devname);;
+    card->name = strdup(devname);
     card->blk_size = 512;
     card->blk_cnt = host->dev->card_capacity * 2;
     card->priv = host;

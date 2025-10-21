@@ -551,6 +551,10 @@ menuconfig RT_USING_WIFI
             default y
 
         if RT_WLAN_MANAGE_ENABLE
+            config RT_WLAN_JOIN_SCAN_BY_MGNT
+                bool "Scan the ap before connecting"
+                default n
+
             config RT_WLAN_SCAN_WAIT_MS
                 int "Set scan timeout time(ms)"
                 default 10000

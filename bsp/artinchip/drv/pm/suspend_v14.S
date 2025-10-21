@@ -63,7 +63,8 @@ port_close_loop:
 #ifndef FPGA_BOARD_ARTINCHIP
     //Setting AP_GPIO_PAD_HOLD
     li      t0, RTC_GPIO_CFG
-    sw      0xFF, (t0)
+    li      t1, 0xFF
+    sw      t1, (t0)
     //Setting AP_CORE_ISO
     li      t0, PRCM_AP_CORE_CFG
     lw      t1, (t0)
@@ -93,7 +94,8 @@ port_close_loop:
     sw      t1, (t0)
     //disable AP_GPIO_PAD_HOLD
     li      t0, RTC_GPIO_CFG
-    sw      0,  (t0)
+    li      t1, 0
+    sw      t1, (t0)
     //TODO: verified on IC
 
 #endif

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -24,8 +24,6 @@ struct aic_psadc_dev {
     struct aic_psadc_ch *chan;
     struct aic_psadc_queue *queue;
 };
-
-static u32 g_psadc_pclk_rate = 0;
 
 #ifdef AIC_PSADC_DRV_V11
 #define AIC_PSADC_CLK_RATE    40000000   /* 40MHz */
@@ -162,18 +160,28 @@ struct aic_psadc_ch aic_psadc_chs[] = {
 #endif
 };
 
+/* As to now, just only support QC type */
 struct aic_psadc_queue aic_psadc_queues[] = {
     {
         .id = 0,
         .type = AIC_PSADC_QC,
     },
 };
+#define CHECK_QUEUE_VALID(q, ret)    \
+    do { \
+        if (q != AIC_PSADC_QC) { \
+            pr_err("Invalid queue type: %d\n", q); \
+            return ret; \
+        } \
+    } while (0)
 
 static rt_err_t drv_psadc_enabled(struct rt_adc_device *dev,
                                   rt_uint32_t queue_type, rt_bool_t enabled)
 {
+    struct aic_psadc_queue *queue = NULL;
 
-    struct aic_psadc_queue *queue = &aic_psadc_queues[queue_type];
+    CHECK_QUEUE_VALID(queue_type, -EINVAL);
+    queue = &aic_psadc_queues[queue_type];
 
     if (enabled) {
         int cnt = 0;
@@ -193,35 +201,47 @@ static rt_err_t drv_psadc_enabled(struct rt_adc_device *dev,
                 continue;
             }
         }
+        if (!cnt) {
+            pr_err("Forget to enable PSADC channel?\n");
+            return -RT_EINVAL;
+        }
+
         queue->nodes_num = cnt;
         queue->complete = aicos_sem_create(0);
+        if (!queue->complete) {
+            pr_err("Failed to create complete\n");
+            return -RT_ENOMEM;
+        }
+
         hal_psadc_ch_init();
     } else {
-        hal_psadc_qc_irq_enable(0);
-        aicos_sem_delete(queue->complete);
-        queue->complete = NULL;
+        hal_psadc_qc_irq_enable(false);
+        if (queue->complete) {
+            aicos_sem_delete(queue->complete);
+            queue->complete = NULL;
+        }
     }
 
     return RT_EOK;
 }
 
+#ifdef AIC_PSADC_DRV_POLL
 static rt_err_t drv_psadc_get_adc_values_poll(struct rt_adc_device *dev,
                                               void *values)
 {
     return hal_psadc_read_poll(values, AIC_PSADC_POLL_READ_TIMEOUT);
 }
-
+#else
 static rt_err_t drv_psadc_get_adc_values(struct rt_adc_device *dev,
                                          void *values)
 {
     return hal_psadc_read(values, AIC_PSADC_TIMEOUT);
 }
+#endif
 
 static rt_uint32_t drv_psadc_get_chan_count(struct rt_adc_device *dev)
 {
-    struct aic_psadc_queue *queue = &aic_psadc_queues[AIC_PSADC_QC];
-
-    return queue->nodes_num;
+    return aic_psadc_queues[AIC_PSADC_QC].nodes_num;
 }
 
 static rt_uint8_t drv_psadc_resolution(struct rt_adc_device *dev)
@@ -232,7 +252,8 @@ static rt_uint8_t drv_psadc_resolution(struct rt_adc_device *dev)
 static rt_err_t drv_psadc_convert(struct rt_adc_device *dev, rt_uint32_t ch,
                                  rt_uint32_t *value)
 {
-    return RT_EOK;
+    pr_warn("Please call ioctl API to get ADC data\n");
+    return -RT_EINVAL;
 }
 
 static const struct rt_adc_ops aic_adc_ops =
@@ -240,8 +261,11 @@ static const struct rt_adc_ops aic_adc_ops =
     .enabled = drv_psadc_enabled,
     .convert = drv_psadc_convert,
     .get_resolution = drv_psadc_resolution,
+#ifdef AIC_PSADC_DRV_POLL
     .get_adc_values_poll = drv_psadc_get_adc_values_poll,
+#else
     .get_adc_values = drv_psadc_get_adc_values,
+#endif
     .get_chan_count = drv_psadc_get_chan_count,
 };
 
@@ -258,12 +282,6 @@ static int drv_psadc_init(void)
     }
 #endif
 
-    ret = hal_clk_enable(CLK_PSADC);
-    if (ret < 0) {
-        LOG_E("PSADC clk enable failed!");
-        return -RT_ERROR;
-    }
-
     ret = hal_clk_enable_deassertrst(CLK_PSADC);
     if (ret < 0) {
         LOG_E("PSADC reset deassert failed!");
@@ -272,31 +290,37 @@ static int drv_psadc_init(void)
 
     hal_psadc_single_queue_mode(1);
 
-#ifdef AIC_PSADC_OBTAIN_DATA_BY_CPU
+#ifndef AIC_PSADC_DRV_POLL
     ret = aicos_request_irq(PSADC_IRQn, hal_psadc_isr, 0, NULL, NULL);
       if (ret < 0) {
         LOG_E("PSADC irq enable failed!");
-        return -RT_ERROR;
+        goto err_irq;
     }
 #endif
 
     hal_psadc_enable(1);
     hal_psadc_set_ch_num(ARRAY_SIZE(aic_psadc_chs));
-    g_psadc_pclk_rate = hal_clk_get_freq(hal_clk_get_parent(CLK_PSADC));
 
     dev = aicos_malloc(0, sizeof(struct rt_adc_device));
     if (!dev) {
         LOG_E("Failed to malloc(%d)", sizeof(struct rt_adc_device));
-        return -RT_ERROR;
+        ret = -RT_ERROR;
+        goto err_irq;
     }
     memset(dev, 0, sizeof(struct rt_adc_device));
 
     ret = rt_hw_adc_register(dev, AIC_PSADC_NAME, &aic_adc_ops, NULL);
     if (ret) {
         LOG_E("Failed to register ADC. ret %d", ret);
-        return ret;
+        aicos_free(0, dev);
+        goto err_irq;
     }
     LOG_I("ArtInChip PSADC loaded");
     return 0;
+
+err_irq:
+    hal_clk_disable_assertrst(CLK_PSADC);
+
+    return ret;
 }
 INIT_DEVICE_EXPORT(drv_psadc_init);

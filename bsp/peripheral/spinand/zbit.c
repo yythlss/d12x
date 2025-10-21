@@ -29,6 +29,23 @@ static int zb35q01a_ecc_get_status(struct aic_spinand *flash, u8 status)
     return -SPINAND_ERR;
 }
 
+static int zb35q0xb_ecc_get_status(struct aic_spinand *flash, u8 status)
+{
+    switch (status & STATUS_ECC_MASK) {
+        case STATUS_ECC_NO_BITFLIPS:
+            return 0;
+        case STATUS_ECC_HAS_1_4_BITFLIPS:
+            return 4;
+        case STATUS_ECC_UNCOR_ERROR:
+            return -SPINAND_ERR_ECC;
+
+        default:
+            break;
+    }
+
+    return -SPINAND_ERR;
+}
+
 static int zb35q01a_ooblayout_user(struct aic_spinand *flash, int section,
                             struct aic_oob_region *region)
 {
@@ -48,9 +65,16 @@ static int zb35q01b_ooblayout_user(struct aic_spinand *flash, int section,
       return -SPINAND_ERR;
 
     region->offset = (16 * section) + 0;
-    region->length = 3;
+    region->length = 16;
 
     return 0;
+}
+
+static int zb35q04b_ooblayout_user(struct aic_spinand *flash, int section,
+                            struct aic_oob_region *region)
+{
+    /* The ZB35Q04B lacks ECC protection for user metadata. */
+    return -SPINAND_ERR;
 }
 
 const struct aic_spinand_info zbit_spinand_table[] = {
@@ -63,7 +87,15 @@ const struct aic_spinand_info zbit_spinand_table[] = {
     /*ZB35Q01B*/
     { DEVID(0xa1), PAGESIZE(2048), OOBSIZE(64), BPL(1024), PPB(64), PLANENUM(1),
       DIE(0), "zbit 128MB: 2048+64@64@1024", cmd_cfg_table,
-      zb35q01a_ecc_get_status, zb35q01b_ooblayout_user },
+      zb35q0xb_ecc_get_status, zb35q01b_ooblayout_user },
+    /*ZB35Q02B*/
+    { DEVID(0xa2), PAGESIZE(2048), OOBSIZE(64), BPL(2048), PPB(64), PLANENUM(1),
+     DIE(0), "zbit 256MB: 2048+64@64@2048", cmd_cfg_table,
+     zb35q0xb_ecc_get_status, zb35q01b_ooblayout_user },
+    /*ZB35Q04B*/
+    { DEVID(0xa3), PAGESIZE(2048), OOBSIZE(128), BPL(2048), PPB(128), PLANENUM(1),
+     DIE(0), "zbit 512MB: 2048+128@128@2048", cmd_cfg_table,
+     zb35q0xb_ecc_get_status, zb35q04b_ooblayout_user },
 };
 
 const struct aic_spinand_info *zbit_spinand_detect(struct aic_spinand *flash)

@@ -46,11 +46,14 @@ USB_NOCACHE_RAM_SECTION struct usbd_msc_priv {
     USB_MEM_ALIGNX uint8_t block_buffer[CONFIG_USBDEV_MSC_MAX_BUFSIZE];
 
 #if defined(CONFIG_USBDEV_MSC_THREAD)
-    usb_osal_mq_t usbd_msc_mq;
-    usb_osal_thread_t usbd_msc_thread;
     uint32_t nbytes;
 #endif
 } g_usbd_msc;
+
+#if defined(CONFIG_USBDEV_MSC_THREAD)
+static usb_osal_mq_t g_usbd_msc_mq = NULL;
+static usb_osal_thread_t g_usbd_msc_thread = NULL;
+#endif
 
 static void usbd_msc_reset(void)
 {
@@ -536,8 +539,8 @@ static bool SCSI_read10(uint8_t **data, uint32_t *len)
     }
     g_usbd_msc.stage = MSC_DATA_IN;
 #ifdef CONFIG_USBDEV_MSC_THREAD
-    if (g_usbd_msc.usbd_msc_mq != NULL) {
-        usb_osal_mq_send(g_usbd_msc.usbd_msc_mq, MSC_DATA_IN);
+    if (g_usbd_msc_mq != NULL) {
+        usb_osal_mq_send(g_usbd_msc_mq, MSC_DATA_IN);
     } else {
         SCSI_SetSenseData(SCSI_KCQNR_MEDIANOTPRESENT);
         usb_msc_set_stall();
@@ -579,8 +582,8 @@ static bool SCSI_read12(uint8_t **data, uint32_t *len)
     }
     g_usbd_msc.stage = MSC_DATA_IN;
 #ifdef CONFIG_USBDEV_MSC_THREAD
-    if (g_usbd_msc.usbd_msc_mq != NULL) {
-        usb_osal_mq_send(g_usbd_msc.usbd_msc_mq, MSC_DATA_IN);
+    if (g_usbd_msc_mq != NULL) {
+        usb_osal_mq_send(g_usbd_msc_mq, MSC_DATA_IN);
     } else {
         SCSI_SetSenseData(SCSI_KCQNR_MEDIANOTPRESENT);
         usb_msc_set_stall();
@@ -847,8 +850,8 @@ void mass_storage_bulk_out(uint8_t ep, uint32_t nbytes)
                 case SCSI_CMD_WRITE12:
 #ifdef CONFIG_USBDEV_MSC_THREAD
                     g_usbd_msc.nbytes = nbytes;
-                    if (g_usbd_msc.usbd_msc_mq != NULL) {
-                        usb_osal_mq_send(g_usbd_msc.usbd_msc_mq, MSC_DATA_OUT);
+                    if (g_usbd_msc_mq != NULL) {
+                        usb_osal_mq_send(g_usbd_msc_mq, MSC_DATA_OUT);
                     } else {
                         SCSI_SetSenseData(SCSI_KCQNR_MEDIANOTPRESENT);
                         usb_msc_set_stall();
@@ -879,8 +882,8 @@ void mass_storage_bulk_in(uint8_t ep, uint32_t nbytes)
                 case SCSI_CMD_READ12:
 #ifdef CONFIG_USBDEV_MSC_THREAD
                     g_usbd_msc.nbytes = nbytes;
-                    if (g_usbd_msc.usbd_msc_mq != NULL) {
-                        usb_osal_mq_send(g_usbd_msc.usbd_msc_mq, MSC_DATA_IN);
+                    if (g_usbd_msc_mq != NULL) {
+                        usb_osal_mq_send(g_usbd_msc_mq, MSC_DATA_IN);
                     } else {
                         SCSI_SetSenseData(SCSI_KCQNR_MEDIANOTPRESENT);
                         usb_msc_set_stall();
@@ -921,8 +924,12 @@ static void usbdev_msc_thread(void *argument)
     uintptr_t event;
     int ret;
 
+    while (g_usbd_msc_mq == NULL) {
+        usb_osal_msleep(100);
+    }
+
     while (1) {
-        ret = usb_osal_mq_recv(g_usbd_msc.usbd_msc_mq, (uintptr_t *)&event, USB_OSAL_WAITING_FOREVER);
+        ret = usb_osal_mq_recv(g_usbd_msc_mq, (uintptr_t *)&event, USB_OSAL_WAITING_FOREVER);
         if (ret < 0) {
             continue;
         }
@@ -946,18 +953,18 @@ static void usbdev_msc_thread(void *argument)
 void usbd_msc_thread_deinit(void)
 {
     #ifdef CONFIG_USBDEV_MSC_THREAD
-    if (g_usbd_msc.usbd_msc_thread) {
-        usb_osal_thread_delete(g_usbd_msc.usbd_msc_thread);
+    if (g_usbd_msc_thread) {
+        usb_osal_thread_delete(g_usbd_msc_thread);
     }
-    g_usbd_msc.usbd_msc_thread = NULL;
+    g_usbd_msc_thread = NULL;
     #endif
 }
 
 void usbd_msc_thread_init(void)
 {
     #ifdef CONFIG_USBDEV_MSC_THREAD
-    g_usbd_msc.usbd_msc_thread = usb_osal_thread_create("usbd_msc", CONFIG_USBDEV_MSC_STACKSIZE, CONFIG_USBDEV_MSC_PRIO, usbdev_msc_thread, NULL);
-    if (g_usbd_msc.usbd_msc_thread == NULL) {
+    g_usbd_msc_thread = usb_osal_thread_create("usbd_msc", CONFIG_USBDEV_MSC_STACKSIZE, CONFIG_USBDEV_MSC_PRIO, usbdev_msc_thread, NULL);
+    if (g_usbd_msc_thread == NULL) {
         return;
     }
     #endif
@@ -979,8 +986,8 @@ struct usbd_interface *usbd_msc_init_intf(struct usbd_interface *intf, const uin
     usbd_add_endpoint(&mass_ep_data[MSD_IN_EP_IDX]);
 
     #ifdef CONFIG_USBDEV_MSC_THREAD
-    if (g_usbd_msc.usbd_msc_mq != NULL)
-        usb_osal_mq_delete(g_usbd_msc.usbd_msc_mq);
+    if (g_usbd_msc_mq != NULL)
+        usb_osal_mq_delete(g_usbd_msc_mq);
     #endif
 
     memset((uint8_t *)&g_usbd_msc, 0, sizeof(struct usbd_msc_priv));
@@ -993,7 +1000,7 @@ struct usbd_interface *usbd_msc_init_intf(struct usbd_interface *intf, const uin
     }
 
     #ifdef CONFIG_USBDEV_MSC_THREAD
-    g_usbd_msc.usbd_msc_mq = usb_osal_mq_create(1);
+    g_usbd_msc_mq = usb_osal_mq_create(1);
     #endif
 
     return intf;

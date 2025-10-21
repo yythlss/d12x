@@ -42,7 +42,6 @@ static rt_sem_t g_gpai_sem = RT_NULL;
 
 static void cmd_gpai_usage(char *program)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: %s [options]\n", program);
     printf("\t -c, --channel\t\tSelect one channel in [0, %d], default is 0\n",
            AIC_GPAI_CH_NUM - 1);

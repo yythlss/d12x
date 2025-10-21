@@ -230,6 +230,31 @@ static void qspi_irq_rx_remain_handle(struct qspi_slave_state *qspi, u32 sts)
     }
 }
 
+static void qspi_irq_dma_rx_mantissa_handle(struct qspi_slave_state *qspi)
+{
+    u32 base, dolen;
+
+    base = qspi_hw_index_to_base(qspi->idx);
+
+    qspi->async_rx_count = qspi->async_rx_remain - qspi_hw_get_idma_rx_len(base);
+    qspi->async_rx_remain = qspi_hw_get_idma_rx_len(base);
+    aicos_dcache_invalid_range(qspi->async_rx, qspi->async_rx_count);
+    qspi_hw_set_idma_rx_en(base, 0);
+
+    dolen = qspi_hw_get_rx_fifo_cnt(base);
+    if (dolen == 0)
+        return;
+
+    if (dolen > qspi->async_rx_remain)
+        dolen = qspi->async_rx_remain;
+
+    qspi_hw_read_fifo(base, qspi->async_rx + qspi->async_rx_count, dolen);
+
+    qspi->async_rx += dolen;
+    qspi->async_rx_count += dolen;
+    qspi->async_rx_remain -= dolen;
+}
+
 void hal_qspi_slave_irq_handler(qspi_slave_handle *h)
 {
     struct qspi_slave_state *qspi;
@@ -272,8 +297,7 @@ void hal_qspi_slave_irq_handler(qspi_slave_handle *h)
         qspi->status |= HAL_QSPI_STATUS_ASYNC_TDONE;
         if (QSPI_IS_ASYNC_ALL_DONE(qspi->status, qspi->done_mask)) {
             if (qspi->work_mode == QSPI_WORK_MODE_ASYNC_RX_DMA || qspi->work_mode == QSPI_WORK_MODE_ASYNC_DUPLEX_DMA) {
-                qspi->async_rx_count = qspi->async_rx_remain - qspi_hw_get_idma_rx_len(base);
-                aicos_dcache_invalid_range(qspi->async_rx, qspi->async_rx_count);
+                qspi_irq_dma_rx_mantissa_handle(qspi);
             }
             if (qspi->work_mode == QSPI_WORK_MODE_ASYNC_TX_DMA || qspi->work_mode == QSPI_WORK_MODE_ASYNC_DUPLEX_DMA) {
                 qspi->async_tx_count = qspi->async_tx_remain - qspi_hw_get_idma_tx_len(base);

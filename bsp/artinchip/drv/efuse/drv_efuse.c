@@ -40,7 +40,7 @@ int drv_efuse_read(u32 addr, void *data, u32 size)
 {
     u32 wid, wval, rest, cnt;
     u8 *pd, *pw;
-    int ret;
+    int ret = 0;
 
     if (hal_efuse_clk_enable()) {
         return RT_FALSE;
@@ -57,8 +57,10 @@ int drv_efuse_read(u32 addr, void *data, u32 size)
     while (rest > 0) {
         wid = addr >> 2;
         ret = hal_efuse_read(wid, &wval);
-        if (ret)
-            break;
+        if (ret) {
+            hal_efuse_clk_disable();
+            return ret;
+        }
         pw = (u8 *)&wval;
         cnt = rest;
         if (addr % 4) {

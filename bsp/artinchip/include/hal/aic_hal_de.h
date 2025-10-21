@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 ArtInChip Technology Co., Ltd.
+ * Copyright (C) 2020-2025 ArtInChip Technology Co., Ltd.
  * Authors:  Ning Fang <ning.fang@artinchip.com>
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -102,6 +102,7 @@ enum de_qos_plane {
 
 #define UI_LAYER_CTRL_INPUT_FORMAT_MASK       GENMASK(14, 8)
 #define UI_LAYER_CTRL_INPUT_FORMAT(x)         (((x) & 0x07f) << 8)
+#define UI_LAYER_CTRL_BG_BLEND_EN             BIT(21)
 #define UI_LAYER_CTRL_ALPHA_EN                BIT(2)
 #define UI_LAYER_CTRL_COLOR_KEY_EN            BIT(1)
 #define UI_LAYER_CTRL_EN                      BIT(0)
@@ -416,6 +417,8 @@ int get_rgb_hsbc_csc_coefs(int bright, int contrast, int saturation, int hue,
 
 void de_set_ui_layer_size(void *base_addr, u32 w, u32 h,
               u32 x_offset, u32 y_offset);
+
+void de_ui_bg_blending_enable(void *base_addr, u32 enable);
 
 /**
  *@ g_alpha (0~255)

@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
  *   author: <qi.xu@artinchip.com>
- *  Desc: h264 decoder contxet
+ *  Desc: h264 decoder context
  *
  */
 #ifndef _H264_DECODER_H_
@@ -324,6 +324,8 @@ struct h264_dec_ctx
     FILE* fp_reg;
 
     int error;
+    int max_width;
+    int max_height;
 };
 
 

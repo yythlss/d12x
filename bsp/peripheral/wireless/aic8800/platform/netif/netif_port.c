@@ -615,6 +615,14 @@ end:
     return 0;
 }
 
+int tx_mon_data_process(uint8_t *pkt, uint32_t len)
+{
+    int ret = 0;
+    net_if_t *net_if = aic_get_vif_net_if();
+    ret = aic_monitor_tx(net_if, pkt, len);
+    return ret;
+}
+
 //-------------------------------------------------------------------
 // Driver other API define
 //-------------------------------------------------------------------

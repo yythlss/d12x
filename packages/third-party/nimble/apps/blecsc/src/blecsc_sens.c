@@ -22,13 +22,14 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include "os/mynewt.h"
-#include "console/console.h"
+#include <rtthread.h>
+
 #include "config/config.h"
 #include "nimble/ble.h"
 #include "host/ble_hs.h"
 #include "services/gap/ble_svc_gap.h"
 #include "blecsc_sens.h"
+#include "nimble/host/util/include/host/util/util.h"
 
 /* Wheel size for simulation calculations */
 #define CSC_SIM_WHEEL_CIRCUMFERENCE_MM            2000
@@ -53,7 +54,7 @@ static uint8_t blecsc_addr_type;
 static const char *device_name = "blecsc_sensor";
 
 /* Measurement and notification timer */
-static struct os_callout blecsc_measure_timer;
+static struct ble_npl_callout blecsc_measure_timer;
 
 /* Variable holds current CSC measurement state */
 static struct ble_csc_measurement_state csc_measurement_state;
@@ -183,11 +184,11 @@ blecsc_simulate_speed_and_cadence(void)
 
 /* Run CSC measurement simulation and notify it to the client */
 static void
-blecsc_measurement(struct os_event *ev)
+blecsc_measurement(struct ble_npl_event *ev)
 {
     int rc;
 
-    rc = os_callout_reset(&blecsc_measure_timer, OS_TICKS_PER_SEC);
+    rc = ble_npl_callout_reset(&blecsc_measure_timer, RT_TICK_PER_SECOND);
     assert(rc == 0);
 
     blecsc_simulate_speed_and_cadence();
@@ -262,6 +263,9 @@ blecsc_on_sync(void)
     int rc;
 
     /* Figure out address to use while advertising (no privacy) */
+    rc = ble_hs_util_ensure_addr(0);
+    assert(rc == 0);
+
     rc = ble_hs_id_infer_auto(0, &blecsc_addr_type);
     assert(rc == 0);
 
@@ -269,6 +273,7 @@ blecsc_on_sync(void)
     blecsc_advertise();
 }
 
+extern struct ble_npl_eventq *nimble_port_get_dflt_eventq(void);
 /*
  * main
  *
@@ -277,21 +282,17 @@ blecsc_on_sync(void)
  *
  * @return int NOTE: this function should never return!
  */
-int
-mynewt_main(int argc, char **argv)
+static int blecsc_sens_entry(void)
 {
     int rc;
-
-    /* Initialize OS */
-    sysinit();
 
     /* Initialize the NimBLE host configuration */
     ble_hs_cfg.sync_cb = blecsc_on_sync;
 
     /* Initialize measurement and notification timer */
-    os_callout_init(&blecsc_measure_timer, os_eventq_dflt_get(),
+    ble_npl_callout_init(&blecsc_measure_timer, nimble_port_get_dflt_eventq(),
                     blecsc_measurement, NULL);
-    rc = os_callout_reset(&blecsc_measure_timer, OS_TICKS_PER_SEC);
+    rc = ble_npl_callout_reset(&blecsc_measure_timer, RT_TICK_PER_SECOND);
     assert(rc == 0);
 
     rc = gatt_svr_init(&csc_measurement_state);
@@ -301,10 +302,10 @@ mynewt_main(int argc, char **argv)
     rc = ble_svc_gap_device_name_set(device_name);
     assert(rc == 0);
 
-    /* As the last thing, process events from default event queue */
-    while (1) {
-        os_eventq_run(os_eventq_dflt_get());
-    }
+    /* startup bluetooth host stack*/
+    ble_hs_thread_startup();
+
     return 0;
 }
 
+MSH_CMD_EXPORT_ALIAS(blecsc_sens_entry, blecsc_sens, "bluetooth cycle sensor sample");

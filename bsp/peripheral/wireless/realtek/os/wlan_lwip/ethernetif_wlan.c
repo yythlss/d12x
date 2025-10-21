@@ -124,6 +124,7 @@ int init_wlan_netif(void)
 int init_wlan_netif(ip4_addr_t *ipaddr, ip4_addr_t *mask, ip4_addr_t *gw)
 #endif
 {
+#ifdef LPKG_USING_LWIP
     struct netif *netif = &xnetif[0];
 
 #ifdef LWIP_IPV4
@@ -137,7 +138,7 @@ int init_wlan_netif(ip4_addr_t *ipaddr, ip4_addr_t *mask, ip4_addr_t *gw)
 #endif /* LWIP_NETIF_LINK_CALLBACK */
 
     netif_set_up(netif);
-
+#endif
     return 0;
 }
 

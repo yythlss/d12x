@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include "uds_def.h"
 
-
 /******************************************************************************
 * 函数名称: bool_t service_34_check_len(const uint8_t* msg_buf, uint16_t msg_dlc)
 * 功能说明: 检查 34 服务数据长度是否合法
@@ -19,8 +18,7 @@
 * 函数返回: TRUE: 合法; FALSE: 非法
 * 其它说明: 无
 ******************************************************************************/
-bool_t service_34_check_len(const uint8_t* msg_buf, uint16_t msg_dlc);
-
+bool_t service_34_check_len(const uint8_t *msg_buf, uint16_t msg_dlc);
 
 /******************************************************************************
 * 函数名称: void service_34_RequestDownload(const uint8_t* msg_buf, uint16_t msg_dlc)
@@ -31,8 +29,7 @@ bool_t service_34_check_len(const uint8_t* msg_buf, uint16_t msg_dlc);
 * 函数返回: 无
 * 其它说明: 无
 ******************************************************************************/
-void service_34_RequestDownload(const uint8_t* msg_buf, uint16_t msg_dlc);
-
+void service_34_RequestDownload(const uint8_t *msg_buf, uint16_t msg_dlc);
 
 #endif
 

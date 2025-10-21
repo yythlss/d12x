@@ -12,6 +12,9 @@
 #include <rthw.h>
 #include "syscfg/syscfg.h"
 #include "nimble/nimble_port.h"
+#ifdef AIC_BT_REALTEK
+#include <realtek_bt_drv.h>
+#endif
 
 #if NIMBLE_CFG_CONTROLLER
 static rt_thread_t ll_task_h;
@@ -28,8 +31,9 @@ RT_WEAK void __aeabi_assert(const char *expr, const char *file, int line)
 
 int nimble_port_rtthread_init(void)
 {
-    extern int realtek_bt_init(void);
-    realtek_bt_init();
+#ifdef AIC_BT_REALTEK
+    realtek_bt_pin_init();
+#endif
     nimble_port_init();
 
 #if NIMBLE_CFG_CONTROLLER
@@ -61,9 +65,9 @@ void ble_hs_thread_startup(void)
 
     tid = rt_thread_create("host", ble_hs_thread_entry, NULL,
                            MYNEWT_VAL(BLE_HOST_THREAD_STACK_SIZE),
-                           MYNEWT_VAL(BLE_HOST_THREAD_PRIORITY), 10);
+                           MYNEWT_VAL(BLE_HOST_THREAD_PRIORITY), 50);
     if (tid != RT_NULL)
         rt_thread_startup(tid);
 }
 
-INIT_COMPONENT_EXPORT(nimble_port_rtthread_init);
+INIT_ENV_EXPORT(nimble_port_rtthread_init);

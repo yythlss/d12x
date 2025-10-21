@@ -8,6 +8,8 @@ src = []
 if GetDepend('RT_USING_FINSH'):
     if GetDepend('FINSH_USING_MSH') and GetDepend('RT_USING_FAL'):
         src = Glob('test_fal.c')
+        if GetDepend('AIC_EXAMPLE'):
+            src += Glob('fal_power_loss_protection.c')
     if GetDepend('RT_USING_SFUD') and GetDepend('RT_USING_SPI'):
         src += Glob('test_sfud.c')
 

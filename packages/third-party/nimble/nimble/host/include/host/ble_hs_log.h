@@ -47,18 +47,6 @@ extern "C" {
 struct os_mbuf;
 
 /**
- * @brief Macro for logging messages at a specified log level.
- *
- * The BLE_HS_LOG macro allows logging messages with different severity levels,
- * such as DEBUG, INFO, WARN, ERROR or CRITICAL.
- *
- * @param lvl           The log level of the message.
- * @param ...           The format string and additional arguments for the log message.
- */
-#define BLE_HS_LOG(lvl, ...) \
-    BLE_NPL_LOG(lvl, __VA_ARGS__)
-
-/**
  * @brief Macro for logging a Bluetooth address at a specified log level.
  *
  * The BLE_HS_LOG_ADDR macro allows logging Bluetooth addresses in the format
@@ -68,7 +56,7 @@ struct os_mbuf;
  *  @param addr         The Bluetooth address to be logged.
  */
 #define BLE_HS_LOG_ADDR(lvl, addr)                      \
-    BLE_NPL_LOG(lvl, "%02x:%02x:%02x:%02x:%02x:%02x", \
+    BLE_HS_LOG(lvl, "%02x:%02x:%02x:%02x:%02x:%02x", \
                 (addr)[5], (addr)[4], (addr)[3], \
                 (addr)[2], (addr)[1], (addr)[0])
 

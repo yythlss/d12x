@@ -22,6 +22,9 @@
 #if RT_DEBUG_INIT
 #include <aic_time.h>
 #endif
+#ifdef LPKG_USING_CPU_LOAD
+#include "cpu_load.h"
+#endif
 
 #ifdef RT_USING_USER_MAIN
 #ifndef RT_MAIN_THREAD_STACK_SIZE
@@ -247,6 +250,11 @@ int rtthread_startup(void)
      * NOTE: please initialize heap inside board initialization.
      */
     rt_hw_board_init();
+
+#ifdef LPKG_USING_CPU_LOAD
+    rt_thread_inited_sethook(thread_init_hook);
+    rt_scheduler_sethook(sched_hook);
+#endif
 
     /* show RT-Thread version */
     rt_show_banner();

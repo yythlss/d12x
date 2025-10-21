@@ -37,7 +37,7 @@ src += Glob('os/customer_rtos/customer_rtt_service.c')
 src += Glob('os/os_dep/*.c')
 
 # Third-party packages LwIP using wlan_lwip/*
-if GetDepend('LPKG_USING_LWIP'):
+if GetDepend('LPKG_USING_LWIP') or GetDepend('RT_USING_LWIP'):
     src += Glob('os/wlan_lwip/*.c')
     CPPPATH.append(cwd + '/os/wlan_lwip/')
 

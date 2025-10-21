@@ -263,10 +263,13 @@ struct {								\
 /*
  * List declarations.
  */
+#ifdef LIST_HEAD
+#undef LIST_HEAD
 #define	LIST_HEAD(name, type)						\
 struct name {								\
 	struct type *lh_first;	/* first element */			\
 }
+#endif
 
 #define	LIST_HEAD_INITIALIZER(head)					\
 	{ NULL }

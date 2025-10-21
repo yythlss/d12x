@@ -210,7 +210,8 @@ e907_tcm_init:
     addi    a1, a1, 4
     bltu    a1, a2, 1b
 2:
-    jal     dcache_clean
+    la      t0, dcache_clean
+    jalr    t0
 #endif
 
     /* Clear bss section */
@@ -233,9 +234,11 @@ e907_tcm_init:
 #endif
 
 #if (defined(KERNEL_RTTHREAD) || defined(KERNEL_FREERTOS))
-    jal     entry
+    la      a5, entry
+    jalr    a5
 #else
-    jal     main
+    la      a5, main
+    jalr    a5
 #endif
 
     .size   Reset_Handler, . - Reset_Handler

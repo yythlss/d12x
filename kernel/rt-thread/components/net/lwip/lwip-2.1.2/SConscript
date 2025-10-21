@@ -256,6 +256,6 @@ if GetDepend(['RT_LWIP_USING_PING']):
     src += lwipping_SRCS
 
 mycflags = ' -w'
-group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP', 'RT_USING_LWIP212'], CPPPATH = path, CFLAGS = mycflags)
+group = DefineGroup('lwIP', src, depend = ['RT_USING_LWIP', 'RT_USING_LWIP212'], CPPPATH = path, LOCAL_CFLAGS = mycflags)
 
 Return('group')

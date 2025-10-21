@@ -78,8 +78,11 @@
 #define DVP_IN_HOR_SIZE_XY_CODE_F           BIT(6)
 
 #define DVP_OUT_HOR_NUM_RAW(w)          (((w) - 1) << 16)
+#define DVP_OUT_HOR_BEG_RAW(x)          (ALIGN_DOWN((x), 2))
 #define DVP_OUT_HOR_NUM(w)              (((w) * 2 - 1) << 16)
+#define DVP_OUT_HOR_BEG(x)              (ALIGN_DOWN((x), 2) * 2)
 #define DVP_OUT_VER_NUM(h)              (((h) - 1) << 16)
+#define DVP_OUT_VER_BEG(y)              (y)
 
 #define DVP_OUT_ADDR_BUF(plane) (plane ? DVP_OUT_ADDR_BUF1 : DVP_OUT_ADDR_BUF0)
 
@@ -139,6 +142,8 @@ struct aic_dvp_config {
     enum dvp_output output;
     u32             width;
     u32             height;
+    u32             crop_x;
+    u32             crop_y;
     u32             stride[DVP_PLANE_NUM];
     u32             sizeimage[DVP_PLANE_NUM];
 };

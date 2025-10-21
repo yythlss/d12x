@@ -1074,7 +1074,6 @@ __STATIC_INLINE void csi_dcache_enable (void)
         __set_MHCR(cache);
     }
     mhint = __get_MHINT();
-    mhint &= ~(MHINT_DPLD_Msk | MHINT_AMR_Msk | MHINT_PREF_N_Msk);
     #ifdef CPU_DCACHE_PREFETCH_EN
     mhint |= (1<<MHINT_DPLD_Pos) | (1<<MHINT_AMR_Pos) | (3<<MHINT_PREF_N_Pos);
     #else

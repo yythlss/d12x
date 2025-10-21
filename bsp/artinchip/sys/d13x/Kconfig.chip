@@ -793,6 +793,22 @@ config AIC_PSADC_CH_NUM
     default 16 if AIC_PSADC_DRV_V11
 
 #--------------------------------------------
+# PBUS driver global option
+#--------------------------------------------
+
+config AIC_PBUS_DRV
+    bool
+    default n
+
+config AIC_PBUS_DRV_V10
+    bool
+    default y if AIC_PBUS_DRV
+
+config AIC_PBUS_DRV_VER
+    string
+    default "10" if AIC_PBUS_DRV_V10
+
+#--------------------------------------------
 # xxx driver global option
 #--------------------------------------------
 

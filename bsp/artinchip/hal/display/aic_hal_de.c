@@ -1,6 +1,8 @@
 /*
- * Copyright (C) 2020-2024, ArtInChip Technology Co., Ltd
- * Authors:  Ning Fang <ning.fang@artinchip.com>
+ * Copyright (C) 2020-2025, ArtInChip Technology Co., Ltd
+ * Authors:
+ *      Ning Fang <ning.fang@artinchip.com>
+ *      Huahui Mai <huahui.mai@artinchip.com>
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -524,6 +526,14 @@ void de_set_ui_layer_size(void *base_addr, u32 w, u32 h,
     reg_write(base_addr + UI_LAYER_SIZE, UI_LAYER_SIZE_SET(w, h));
     reg_write(base_addr + UI_LAYER_OFFSET,
           UI_LAYER_OFFSET_SET(x_offset, y_offset));
+}
+
+void de_ui_bg_blending_enable(void *base_addr, u32 enable)
+{
+    if (enable)
+        reg_set_bit(base_addr + UI_LAYER_CTRL, UI_LAYER_CTRL_BG_BLEND_EN);
+    else
+        reg_clr_bit(base_addr + UI_LAYER_CTRL, UI_LAYER_CTRL_BG_BLEND_EN);
 }
 
 void de_ui_alpha_blending_enable(void *base_addr, u32 g_alpha,

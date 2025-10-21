@@ -169,7 +169,6 @@ struct dec_ctx {
 static void print_help(const char* prog)
 {
     printf("name: %s\n", prog);
-    printf("Compile time: %s\n", __TIME__);
     printf("Usage: mpp_test [options]:\n"
         "\t-i                             input stream file name\n"
         "\t-t                             directory of test files\n"

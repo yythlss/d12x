@@ -10,10 +10,6 @@
 #include "aic_ui.h"
 #include "aic_osal.h"
 #include "lvgl/demos/lv_demos.h"
-#if defined(KERNEL_RTTHREAD)
-#include <rtthread.h>
-#include <dfs_posix.h>
-#endif
 
 #ifdef AIC_USE_TOUCH_MONKEY_TEST
 #if LV_USE_MONKEY
@@ -40,31 +36,9 @@ static void use_touch_monkey_test(void)
 #endif
 #endif
 
-static void lvgl_data_check(void)
-{
-#if defined(KERNEL_RTTHREAD)
-    DIR *dirp = NULL;
-    int loops = 0;
-
-    while ((dirp = opendir(LVGL_STORAGE_PATH)) == NULL)
-    {
-        loops++;
-        aicos_msleep(1*10);
-        if (loops > 20)
-            break;
-    }
-    if (dirp)
-        closedir(dirp);
-    if (loops > 20)
-        LV_LOG_ERROR(LVGL_STORAGE_PATH" is not ready yet!\n");
-#endif
-}
-
-
 #ifdef AIC_LVGL_DEMO
 void aic_ui_init()
 {
-    lvgl_data_check();
     extern void ui_init(void);
     ui_init();
 

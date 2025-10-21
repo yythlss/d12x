@@ -109,7 +109,6 @@ struct rt_mmcsd_host {
     rt_uint32_t       sdio_irq_num;
 
     struct rt_event        *sdio_irq_event;
-    struct rt_semaphore    *sdio_irq_delete_sem;
 
     struct rt_thread     *sdio_irq_thread;
 #ifdef AIC_SDMC_DRV

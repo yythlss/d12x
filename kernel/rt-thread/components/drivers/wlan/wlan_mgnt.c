@@ -656,6 +656,9 @@ static void rt_wlan_complete_delete(struct rt_wlan_complete_des *complete)
     rt_free(complete);
 }
 
+#if defined(RT_WLAN_PROT_ENABLE) && defined(RT_WLAN_DEFAULT_PROT)
+static struct rt_wlan_device *g_wlan_device = NULL;
+#endif
 rt_err_t rt_wlan_set_mode(const char *dev_name, rt_wlan_mode_t mode)
 {
     rt_device_t device = RT_NULL;
@@ -686,10 +689,30 @@ rt_err_t rt_wlan_set_mode(const char *dev_name, rt_wlan_mode_t mode)
     MGNT_LOCK();
     if (RT_WLAN_DEVICE(device)->mode == mode)
     {
-        RT_WLAN_LOG_D("L:%d this device mode is set");
+        err = rt_device_control(device, RT_WLAN_CMD_MODE, (void *)&mode);
+        if (err != RT_EOK)
+        {
+            LOG_E("L:%d wlan config mode failed", __LINE__);
+            return -RT_ERROR;
+        }
+#if defined(RT_WLAN_PROT_ENABLE) && defined(RT_WLAN_DEFAULT_PROT)
+        if ((g_wlan_device != NULL) && (g_wlan_device != device)) {
+            rt_wlan_prot_detach_dev(g_wlan_device);
+            g_wlan_device = device;
+            rt_wlan_prot_attach_dev(device, RT_WLAN_DEFAULT_PROT);
+        }
+#endif
+        RT_WLAN_LOG_D("L:%d this device mode is set", mode);
         MGNT_UNLOCK();
         return RT_EOK;
     }
+
+#if defined(RT_WLAN_PROT_ENABLE) && defined(RT_WLAN_DEFAULT_PROT)
+    if (g_wlan_device != NULL)
+        rt_wlan_prot_detach_dev(g_wlan_device);
+
+    g_wlan_device = device;
+#endif
 
     if ((mode == RT_WLAN_STATION) &&
             (RT_WLAN_DEVICE(device)->flags & RT_WLAN_FLAG_AP_ONLY))
@@ -913,7 +936,7 @@ rt_err_t rt_wlan_connect(const char *ssid, const char *password)
     rt_memcpy(&info.ssid.val[0],ssid,rt_strlen(ssid));
     info.ssid.len = rt_strlen(ssid);
 
-#if 1 //def RT_WLAN_JOIN_SCAN_BY_MGNT
+#ifdef RT_WLAN_JOIN_SCAN_BY_MGNT
     info.rssi = -100;
     err = rt_wlan_register_event_handler(RT_WLAN_EVT_SCAN_REPORT,rt_wlan_join_scan_callback,&info);
     if(err != RT_EOK)

@@ -404,7 +404,7 @@ s32 aic_player_start_video(struct aic_player *player)
         }
 
 #endif
-        video_port_format.color_format = MM_COLOR_FORMAT_YUV420P;
+        video_port_format.color_format = MM_COLOR_FORMAT_NV12;
         if (video_port_format.compression_format == MM_VIDEO_CODING_MJPEG) {
 #ifdef AIC_MPP_PLAYER_VE_USE_FILL_FB
             if (strcmp(PRJ_CHIP, "d12x") == 0 || strcmp(PRJ_CHIP, "d13x") == 0) {
@@ -534,7 +534,6 @@ s32 aic_player_start_audio(struct aic_player *player)
                                               MM_INDEX_PARAM_AUDIO_PORT_FORMAT,
                                               &audio_port_format)) {
             mm_param_skip_track skip_track;
-            loge("MM_INDEX_PARAM_AUDIO_PORT_FORMAT Error!!!!.\n");
             skip_track.port_index = DEMUX_PORT_AUDIO_INDEX;
             mm_set_parameter(player->demuxer_handle,
                              MM_INDEX_VENDOR_DEMUXER_SKIP_TRACK, &skip_track);

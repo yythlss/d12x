@@ -31,7 +31,7 @@ static long long int str2int(char *_str)
 
 static void usage(char *app)
 {
-    printf("Usage: %s [Options], built on %s %s\n", app, __DATE__, __TIME__);
+    printf("Usage: %s [Options]\n", app);
     printf("\tread a mipi-dsi screen register \n");
     printf("\t-r, --register \n");
     printf("\t-u, --usage \n");

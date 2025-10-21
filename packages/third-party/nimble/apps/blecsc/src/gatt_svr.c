@@ -20,7 +20,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include "os/mynewt.h"
+#include <rtthread.h>
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
 #include "blecsc_sens.h"

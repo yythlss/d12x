@@ -6,13 +6,13 @@ src = Split('''
 src/dfs.c
 src/dfs_file.c
 src/dfs_fs.c
-src/dfs_cli.c
 ''')
 cwd = GetCurrentDir()
 CPPPATH = [cwd + "/include"]
 
 if GetDepend('LPKG_USING_DFS') and GetDepend('DFS_USING_POSIX'):
     src += ['src/dfs_posix.c']
+    src += ['src/dfs_cli.c']
 
 group = DefineGroup('Filesystem', src, depend = ['LPKG_USING_DFS'], CPPPATH = CPPPATH)
 

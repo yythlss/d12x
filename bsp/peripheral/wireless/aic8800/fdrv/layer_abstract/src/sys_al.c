@@ -20,6 +20,7 @@ uint32_t cli_cmd_priority          = CLI_CMD_PRIORITY;
 uint32_t rwnx_timer_priority       = RWNX_TIMER_PRIORITY;
 uint32_t rwnx_apm_staloss_priority = RWNX_APM_STALOSS_PRIORITY;
 uint32_t tcpip_priority            = TCPIP_PRIORITY;
+uint32_t wifi_api_priority         = WIFI_API_PRIORITY;
 uint32_t task_end_prio             = TASK_END_PRIO;
 
 /* Task Stack Size */
@@ -33,6 +34,7 @@ uint32_t fhost_rx_stack_size         = FHOST_RX_STACK_SIZE;
 uint32_t cli_cmd_stack_size          = CLI_CMD_STACK_SIZE*2;
 uint32_t rwnx_timer_stack_size       = RWNX_TIMER_STACK_SIZE;
 uint32_t rwnx_apm_staloss_stack_size = RWNX_APM_STALOSS_STACK_SIZE;
+uint32_t wifi_api_stack_size         = WIFI_API_STACK_SIZE;
 
 static uint8_t chip_online = 0;
 

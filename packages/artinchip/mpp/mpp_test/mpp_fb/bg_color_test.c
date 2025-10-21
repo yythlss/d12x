@@ -67,7 +67,6 @@ static long long int str2int(char *_str)
 
 static void usage(char *app)
 {
-    printf("Usage: %s [Options], built on %s %s\n", app, __DATE__, __TIME__);
     printf("\t-m, --mode, ");
     printf("\t0(default): disable background color, 1: enable background color");
     printf("\t-r, --red \n");

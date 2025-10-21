@@ -31,6 +31,7 @@
 
 #include <stdint.h>
 #include <sfud_cfg.h>
+#include "sfud_def.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -97,6 +98,7 @@ typedef struct {
     uint8_t byte3;                               /**< the 3rd byte was sent to device immediately following the instruction */
     uint8_t byte4;                               /**< the 4th byte was sent to device immediately following the instruction */
     uint8_t id_len;                              /**< the length of Unique ID number, in bytes */
+    uint32_t bp_mask;                           /**< the bit mask of block protect in status register */
 } sfud_qspi_flash_private_info;
 
 /* SFUD support manufacturer JEDEC ID */
@@ -116,48 +118,67 @@ typedef struct {
 #define SFUD_MF_ID_SST                                 0xBF
 #define SFUD_MF_ID_MACRONIX                            0xC2
 #define SFUD_MF_ID_GIGADEVICE                          0xC8
-#define SFUD_MF_ID_ISSI                                0xD5
+#define SFUD_MF_ID_ISSI                                0x9D
 #define SFUD_MF_ID_WINBOND                             0xEF
 #define SFUD_MF_ID_ZETTA                               0xBA
 #define SFUD_MF_ID_BOYA                                0x68
 #define SFUD_MF_ID_XTX                                 0x0B
 #define SFUD_MF_ID_PUYA                                0x85
+#define SFUD_MF_ID_FUDANMICRO                          0x20
 
 /*  | name | mf_id | type_id | read—_uid_cmd | addr0 | addr1 | addr2 | addr3 | id_len | */
 #define SFUD_FLASH_PRIVATE_INFO_TABLE                                                              \
 {                                                                                                  \
     /* BOYA128B */                                                                                 \
-    {SFUD_MF_ID_BOYA, 0x40, 0x18, 0x48, 0x0, 0x0, 0x0, 0x0, 16},                                   \
+    {SFUD_MF_ID_BOYA, 0x40, 0x18, 0x48, 0x0, 0x0, 0x0, 0x0, 16,                                    \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* BOYA32B */                                                                                  \
-    {SFUD_MF_ID_BOYA, 0x49, 0x19, 0x48, 0x0, 0x0, 0x0, 0x0, 16},                                   \
+    {SFUD_MF_ID_BOYA, 0x49, 0x19, 0x48, 0x0, 0x0, 0x0, 0x0, 16,                                    \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* XTX128B */                                                                                  \
-    {SFUD_MF_ID_XTX, 0x40, 0x18, 0x5A, 0x0, 0x0, 0x94, 0xff, 16},                                  \
+    {SFUD_MF_ID_XTX, 0x40, 0x18, 0x5A, 0x0, 0x0, 0x94, 0xff, 16,                                   \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* "GD25Q256B", */                                                                             \
-    {SFUD_MF_ID_GIGADEVICE, 0x40, 0x19, 0x4B, 0xff, 0xff, 0xff, 0xff, 16},                         \
+    {SFUD_MF_ID_GIGADEVICE, 0x40, 0x19, 0x4B, 0xff, 0xff, 0xff, 0xff, 16,                          \
+        SNOR_F_HAS_4BIT_BP},                                                                       \
     /* "GD25Q128B", */                                                                             \
-    {SFUD_MF_ID_GIGADEVICE, 0x40, 0x18, 0x4B, 0x0, 0x0, 0x0, 0xff, 16},                            \
+    {SFUD_MF_ID_GIGADEVICE, 0x40, 0x18, 0x4B, 0x0, 0x0, 0x0, 0xff, 16,                             \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* "GD25Q64B" */                                                                               \
-    {SFUD_MF_ID_GIGADEVICE, 0x40, 0x17, 0x4B, 0x0, 0x0, 0x0, 0xff, 16},                            \
+    {SFUD_MF_ID_GIGADEVICE, 0x40, 0x17, 0x4B, 0x0, 0x0, 0x0, 0xff, 16,                             \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* "GD25Q32B" */                                                                               \
-    {SFUD_MF_ID_GIGADEVICE, 0x40, 0x16, 0x4B, 0x0, 0x0, 0x0, 0xff, 16},                            \
+    {SFUD_MF_ID_GIGADEVICE, 0x40, 0x16, 0x4B, 0x0, 0x0, 0x0, 0xff, 16,                             \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* PUYA256B */                                                                                 \
-    {SFUD_MF_ID_PUYA, 0x20, 0x19, 0x4B, 0xff, 0xff, 0xff, 0xff, 16},                               \
+    {SFUD_MF_ID_PUYA, 0x20, 0x19, 0x4B, 0xff, 0xff, 0xff, 0xff, 16,                                \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* PUYA128B */                                                                                 \
-    {SFUD_MF_ID_PUYA, 0x20, 0x18, 0x4B, 0xff, 0xff, 0xff, 0xff, 16},                               \
+    {SFUD_MF_ID_PUYA, 0x20, 0x18, 0x4B, 0xff, 0xff, 0xff, 0xff, 16,                                \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* PUYA64B */                                                                                  \
-    {SFUD_MF_ID_PUYA, 0x20, 0x17, 0x4B, 0xff, 0xff, 0xff, 0xff, 16},                               \
+    {SFUD_MF_ID_PUYA, 0x20, 0x17, 0x4B, 0xff, 0xff, 0xff, 0xff, 16,                                \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* PUYA32B */                                                                                  \
-    {SFUD_MF_ID_PUYA, 0x20, 0x16, 0x4B, 0xff, 0xff, 0xff, 0xff, 16},                               \
+    {SFUD_MF_ID_PUYA, 0x20, 0x16, 0x4B, 0xff, 0xff, 0xff, 0xff, 16,                                \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* PUYA16B */                                                                                  \
-    {SFUD_MF_ID_PUYA, 0x20, 0x15, 0x4B, 0xff, 0xff, 0xff, 0xff, 16},                               \
+    {SFUD_MF_ID_PUYA, 0x20, 0x15, 0x4B, 0xff, 0xff, 0xff, 0xff, 16,                                \
+        SNOR_F_HAS_4BIT_BP | SNOR_F_HAS_SR_BP3_BIT6},                                              \
     /* ZB25VQ128 */                                                                                \
-    {SFUD_MF_ID_ZBIT, 0x40, 0x18, 0x4B, 0x0, 0x0, 0x0, 0xff, 16},                                  \
+    {SFUD_MF_ID_ZBIT, 0x40, 0x18, 0x4B, 0x0, 0x0, 0x0, 0xff, 16, 0},                               \
     /* ZB25VQ164 */                                                                                \
-    {SFUD_MF_ID_ZBIT, 0x40, 0x17, 0x4B, 0x0, 0x0, 0x0, 0xff, 16},                                  \
+    {SFUD_MF_ID_ZBIT, 0x40, 0x17, 0x4B, 0x0, 0x0, 0x0, 0xff, 16, 0},                               \
     /* ZB25VQ132 */                                                                                \
-    {SFUD_MF_ID_ZBIT, 0x40, 0x16, 0x4B, 0x0, 0x0, 0x0, 0xff, 16},                                  \
+    {SFUD_MF_ID_ZBIT, 0x40, 0x16, 0x4B, 0x0, 0x0, 0x0, 0xff, 16, 0},                               \
     /* ZB25VQ116 */                                                                                \
-    {SFUD_MF_ID_ZBIT, 0x40, 0x15, 0x4B, 0x0, 0x0, 0x0, 0xff, 16},                                  \
+    {SFUD_MF_ID_ZBIT, 0x40, 0x15, 0x4B, 0x0, 0x0, 0x0, 0xff, 16, 0},                               \
+    {SFUD_MF_ID_MACRONIX, 0x20, 0x18, 0x4B, 0x0, 0x0, 0x94, 0xff, 16,                              \
+        SNOR_F_HAS_4BIT_BP},                                                                       \
+    {SFUD_MF_ID_MACRONIX, 0x20, 0x17, 0x4B, 0x0, 0x0, 0x94, 0xff, 16,                              \
+        SNOR_F_HAS_4BIT_BP},                                                                       \
+    {SFUD_MF_ID_ISSI, 0x60, 0x18, 0x4B, 0x0, 0x0, 0x94, 0xff, 16,                                  \
+        SNOR_F_HAS_4BIT_BP},                                                                       \
 }
 
 /* SFUD supported manufacturer information table */
@@ -182,6 +203,7 @@ typedef struct {
     {"NOR-MEM",    SFUD_MF_ID_NOR_MEM},                   \
     {"ZBIT",       SFUD_MF_ID_ZBIT},                      \
     {"ZETTA",      SFUD_MF_ID_ZETTA},                     \
+    {"FUDANMICRO", SFUD_MF_ID_FUDANMICRO},                \
 }
 
 #ifdef SFUD_USING_FLASH_INFO_TABLE
@@ -221,6 +243,7 @@ typedef struct {
     {"PCT25VF016B", SFUD_MF_ID_SST, 0x25, 0x41, 2L*1024L*1024L, SFUD_WM_BYTE|SFUD_WM_AAI, 4096, 0x20},              \
     {"NM25Q128EVB", SFUD_MF_ID_NOR_MEM, 0x21, 0x18, 16L*1024L*1024L, SFUD_WM_PAGE_256B, 4096, 0x20},                \
     {"ZD25Q64B", SFUD_MF_ID_ZETTA, 0x32, 0x17, 8L*1024L*1024L, SFUD_WM_PAGE_256B, 4096, 0x20},                      \
+    {"EFM25F128A", SFUD_MF_ID_FUDANMICRO, 0xBA, 0x18, 16L*1024L*1024L, SFUD_WM_PAGE_256B, 4096, 0x20},              \
 }
 #endif /* SFUD_USING_FLASH_INFO_TABLE */
 
@@ -269,6 +292,8 @@ typedef struct {
     {SFUD_MF_ID_ZBIT, 0x40, 0x15, NORMAL_SPI_READ|DUAL_OUTPUT|DUAL_IO|QUAD_OUTPUT},                \
     /* ZD25Q64B */                                                                                 \
     {SFUD_MF_ID_ZETTA, 0x32, 0x17, NORMAL_SPI_READ|DUAL_OUTPUT|DUAL_IO|QUAD_OUTPUT},               \
+    /* EFM25F128A */                                                                               \
+    {SFUD_MF_ID_FUDANMICRO, 0xBA, 0x18, NORMAL_SPI_READ|DUAL_OUTPUT|DUAL_IO|QUAD_OUTPUT},          \
 }
 
 /* those flash SFDP basic_len < 15, and the QE at SR1-BIT6, or specially SFDP (ZB25VQ16C QE info at Dword-14), the sfud can not recognition */
@@ -281,7 +306,9 @@ typedef struct {
     /* MX25L25635E */                                                                                                             \
     {SFUD_MF_ID_MACRONIX, 0x20, 0x19, SFUD_CMD_WRITE_STATUS_REGISTER, SFUD_CMD_READ_STATUS_REGISTER, 6},                          \
     /* ZB25VQ16C */                                                                                                               \
-    {SFUD_MF_ID_ZBIT, 0x40, 0x15, SFUD_CMD_WRITE_STATUS2_REGISTER, SFUD_CMD_READ_CONFIG_REGISTER, 1},                              \
+    {SFUD_MF_ID_ZBIT, 0x40, 0x15, SFUD_CMD_WRITE_STATUS2_REGISTER, SFUD_CMD_READ_CONFIG_REGISTER, 1},                             \
+    /* EFM25F128A */                                                                                                              \
+    {SFUD_MF_ID_FUDANMICRO, 0xBA, 0x18, SFUD_CMD_WRITE_STATUS2_REGISTER, SFUD_CMD_READ_CONFIG_REGISTER, 1},                       \
 }
 
 #endif /* SFUD_USING_QSPI */

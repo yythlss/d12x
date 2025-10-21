@@ -14,6 +14,7 @@ extern "C" {
 #endif
 
 int spi_nor_get_unique_id(sfud_flash *flash, uint8_t *data);
+int spi_nor_sr_unlock_all(sfud_flash *flash);
 
 #ifdef __cplusplus
 }

@@ -22,7 +22,7 @@ void aicfb_fb_info_setup(struct aicfb_info *fbi);
 
 void aicfb_register_panel_callback(struct aicfb_info *fbi);
 
-void fb_color_block(struct aicfb_info *fbi);
+void fb_color_block(struct aicfb_info *fbi, size_t fb_size);
 
 #ifdef AIC_DISPLAY_TEST
 void aicfb_pq_get_config(struct aicfb_info *fbi, struct aicfb_pq_config *config);

@@ -19,8 +19,8 @@
 
 #include <assert.h>
 #include <string.h>
-#include "os/mynewt.h"
-#include "bsp/bsp.h"
+
+#include <rtthread.h>
 
 /* BLE */
 #include "nimble/ble.h"
@@ -495,13 +495,9 @@ blecent_on_sync(void)
  *
  * @return int NOTE: this function should never return!
  */
-int
-mynewt_main(int argc, char **argv)
+static int blecent_entry(void)
 {
     int rc;
-
-    /* Initialize OS */
-    sysinit();
 
     /* Configure the host. */
     ble_hs_cfg.reset_cb = blecent_on_reset;
@@ -516,10 +512,10 @@ mynewt_main(int argc, char **argv)
     rc = ble_svc_gap_device_name_set("nimble-blecent");
     assert(rc == 0);
 
-    /* os start should never return. If it does, this should be an error */
-    while (1) {
-        os_eventq_run(os_eventq_dflt_get());
-    }
+    /* startup bluetooth host stack*/
+    ble_hs_thread_startup();
 
     return 0;
 }
+
+MSH_CMD_EXPORT_ALIAS(blecent_entry, blecent, "bluetooth centrol role sample");

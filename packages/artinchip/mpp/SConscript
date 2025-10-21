@@ -127,6 +127,7 @@ if GetDepend(['AIC_MPP_PLAYER_INTERFACE']):
     src += Glob('middle_media/base/parser/mp3/mp3.c')
     src += Glob('middle_media/base/parser/wav/aic_wav_parser.c')
     src += Glob('middle_media/base/parser/wav/wav.c')
+    src += Glob('middle_media/base/mix/aic_mix.c')
 
     #component
     src += Glob('middle_media/component/src/mm_demuxer_component.c')

@@ -257,22 +257,15 @@ static void usb_osd_ui_theme_set(void)
 }
 
 #ifdef LV_USB_OSD_SETTINGS_MENU
+static bool wake_up_key = false;
+
 static void gpio_input_irq_handler(void *args)
 {
-    struct osd_manager *mgr = usb_osd_get_ui_manager();
-
-    if (mgr->current_state & STATE_SETTINGS)
-        mgr->new_state &= ~(STATE_SETTINGS);
-    else
-        mgr->new_state |= STATE_SETTINGS;
-
-    USB_OSD_DEBUG("%s\n", __func__);
+    wake_up_key = true;
 }
-#endif
 
-static void usb_osd_wakeup_key_register(void)
+static void keypad_init(void)
 {
-#ifdef LV_USB_OSD_SETTINGS_MENU
     u32 pin;
 
     /* 1.get pin number */
@@ -287,6 +280,61 @@ static void usb_osd_wakeup_key_register(void)
 
     /* 4.enable pin irq */
     rt_pin_irq_enable(pin, PIN_IRQ_ENABLE);
+}
+
+static uint32_t keypad_get_key(void)
+{
+    if (wake_up_key) {
+        wake_up_key = false;
+        return 1;
+    }
+
+    return 0;
+}
+
+static void keypad_read(lv_indev_t * indev_drv, lv_indev_data_t * data)
+{
+    static uint32_t last_key = 0;
+
+    uint32_t act_key = keypad_get_key();
+    if (act_key != 0) {
+        data->state = LV_INDEV_STATE_PR;
+
+        act_key = LV_KEY_ENTER;
+        last_key = act_key;
+    } else {
+        data->state = LV_INDEV_STATE_REL;
+    }
+
+    data->key = last_key;
+}
+
+static void wakeup_key_event_callback(lv_event_t *e)
+{
+    struct osd_manager *mgr = usb_osd_get_ui_manager();
+
+    if (mgr->current_state & STATE_SETTINGS)
+        mgr->new_state &= ~(STATE_SETTINGS);
+    else
+        mgr->new_state |= STATE_SETTINGS;
+}
+#endif
+
+static void usb_osd_wakeup_key_register(void)
+{
+#ifdef LV_USB_OSD_SETTINGS_MENU
+    keypad_init();
+
+    lv_indev_t * indev_keypad;
+    indev_keypad = lv_indev_create();
+    lv_indev_set_type(indev_keypad, LV_INDEV_TYPE_KEYPAD);
+    lv_indev_set_read_cb(indev_keypad, keypad_read);
+
+    lv_group_t * group = lv_group_create();
+    lv_group_add_obj(group, lv_scr_act());
+    lv_indev_set_group(indev_keypad, group);
+
+    lv_indev_add_event_cb(indev_keypad, wakeup_key_event_callback, LV_EVENT_CLICKED, NULL);
 #endif
 }
 
@@ -364,6 +412,9 @@ int usb_disp_get_suspend_ms(void)
 }
 
 #ifdef LV_USB_OSD_LOGO_VIDEO
+extern uint8_t usb_display_en;
+static uint8_t lv_display_en = 0;
+
 static void ffmpeg_player_update_cb(lv_timer_t * timer)
 {
     bool play_end = false;
@@ -378,6 +429,10 @@ static void ffmpeg_player_update_cb(lv_timer_t * timer)
         lv_timer_pause(play_end_timer);
         lv_timer_del(play_end_timer);
         play_end_timer = NULL;
+
+        extern void usb_display_enable(void);
+        if (lv_display_en)
+            usb_display_enable();
     }
 }
 #endif
@@ -478,6 +533,10 @@ static void usb_osd_ui_display_logo(void)
 #elif defined(AIC_FB_ROTATE_EN)
     rotation = AIC_FB_ROTATE_DEGREE;
 #endif
+
+    lv_display_en = usb_display_en;
+    usb_display_en = 0;
+
     ffmpeg = lv_ffmpeg_player_create(logo_screen);
     lv_obj_set_style_transform_angle(ffmpeg, rotation, LV_PART_MAIN);
     lv_obj_add_flag(ffmpeg, LV_OBJ_FLAG_HIDDEN);

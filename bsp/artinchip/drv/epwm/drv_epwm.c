@@ -17,59 +17,11 @@
 
 static struct rt_device_pwm g_aic_epwm = {0};
 static struct aic_epwm_pulse_para g_pulse_para[AIC_EPWM_CH_NUM] = {0};
-#ifdef AIC_EPWM_DRV_V11
+extern struct aic_epwm_arg epwm_pdata[];
+extern const int epwm_pdata_size;
+#if defined (AIC_EPWM_DRV_V11) || defined (AIC_EPWM_DRV_V12)
 static u8 g_epwm_pul_flag[AIC_EPWM_CH_NUM] = {0};
 #endif
-static void aic_epwm_default_action(void)
-{
-    struct aic_epwm_action action0 = {
-        /*       CBD,          CBU,          CAD, */
-        EPWM_ACT_NONE, EPWM_ACT_NONE, EPWM_ACT_NONE,
-        /*      CAU,           PRD,         ZRO  */
-        EPWM_ACT_LOW, EPWM_ACT_NONE, EPWM_ACT_HIGH};
-    struct aic_epwm_action action1 = {
-        /*       CBD,          CBU,          CAD, */
-        EPWM_ACT_NONE, EPWM_ACT_LOW, EPWM_ACT_NONE,
-        /*      CAU,           PRD,         ZRO  */
-        EPWM_ACT_NONE, EPWM_ACT_NONE,  EPWM_ACT_HIGH};
-
-#ifdef AIC_USING_EPWM0
-    hal_epwm_ch_init(0, AIC_EPWM0_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM1
-    hal_epwm_ch_init(1, AIC_EPWM1_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM2
-    hal_epwm_ch_init(2, AIC_EPWM2_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM3
-    hal_epwm_ch_init(3, AIC_EPWM3_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM4
-    hal_epwm_ch_init(4, AIC_EPWM4_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM5
-    hal_epwm_ch_init(5, AIC_EPWM5_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM6
-    hal_epwm_ch_init(6, AIC_EPWM6_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM7
-    hal_epwm_ch_init(7, AIC_EPWM7_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM8
-    hal_epwm_ch_init(8, AIC_EPWM8_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM9
-    hal_epwm_ch_init(9, AIC_EPWM9_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM10
-    hal_epwm_ch_init(10, AIC_EPWM10_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-#ifdef AIC_USING_EPWM11
-    hal_epwm_ch_init(11, AIC_EPWM11_SYNC, EPWM_MODE_UP_COUNT, 0, &action0, &action1);
-#endif
-}
 
 static rt_bool_t drv_epwm_ch_valid(struct rt_pwm_configuration *cfg)
 {
@@ -128,7 +80,7 @@ static rt_err_t drv_epwm_set_pul(struct rt_device_pwm *device,
     g_pulse_para[cfg->channel].duty_ns = cfg->pulse;
     g_pulse_para[cfg->channel].prd_ns = cfg->period;
 
-#ifdef AIC_EPWM_DRV_V11
+#if defined (AIC_EPWM_DRV_V11) || defined (AIC_EPWM_DRV_V12)
     hal_epwm_pul_config(cfg->channel);
 
     g_epwm_pul_flag[cfg->channel] = 1;
@@ -142,7 +94,8 @@ static rt_err_t drv_epwm_set_pul(struct rt_device_pwm *device,
     hal_epwm_count_ct(cfg->channel, EPWM_MODE_UP_COUNT);
 
     hal_epwm_pul_sw_updt(cfg->channel);
-#else
+
+#elif defined (AIC_EPWM_DRV_V10)
     if (hal_epwm_set(cfg->channel, cfg->pulse, cfg->period, (rt_uint32_t)EPWM_SET_CMPA_CMPB))
         return -RT_ERROR;
 
@@ -224,12 +177,14 @@ static void drv_epwm_resume(const struct rt_device *device, rt_uint8_t mode)
     case PM_SLEEP_MODE_LIGHT:
     case PM_SLEEP_MODE_DEEP:
     case PM_SLEEP_MODE_STANDBY:
-#ifdef AIC_EPWM_DRV_V11
+#if defined (AIC_EPWM_DRV_V11)
         hal_clk_set_freq(CLK_PWMCS_SDFM, EPWM_CLK_RATE);
-#else
+#elif defined (AIC_EPWM_DRV_V10)
         hal_clk_set_freq(CLK_PWMCS, EPWM_CLK_RATE);
 #endif
+#if defined (AIC_EPWM_DRV_V10) || defined (AIC_EPWM_DRV_V11)
         hal_clk_enable(CLK_PWMCS);
+#endif
         break;
     default:
         break;
@@ -245,16 +200,17 @@ static struct rt_device_pm_ops drv_epwm_pm_ops =
 
 irqreturn_t aic_epwm_irq(int irq, void *arg)
 {
-    u32 stat;
-    int i;
-#ifndef AIC_EPWM_DRV_V11
+#if defined AIC_EPWM_DRV_V10
     static u32 isr_cnt[AIC_EPWM_CH_NUM] = {0};
 #endif
 
+#if defined (AIC_EPWM_DRV_V10) || defined (AIC_EPWM_DRV_V11)
+    u32 stat;
+    int i;
     for (i = 0; i < AIC_EPWM_CH_NUM; i++) {
         stat = hal_epwm_int_sts(i);
         if (stat & EPWM_INT_FLG) {
-#ifdef AIC_EPWM_DRV_V11
+#if defined (AIC_EPWM_DRV_V11)
             int level = hal_epwm_get_default_level(i);
             hal_epwm_act_sw_ct(i, EPWM_SET_CMPA_CMPB, level + EPWM_ACT_SW_LOW);
             if (g_epwm_pul_flag[i] == 0) {
@@ -264,7 +220,7 @@ irqreturn_t aic_epwm_irq(int irq, void *arg)
             if (g_epwm_pul_flag[i] == 1) {
                 g_epwm_pul_flag[i] = 0;
             }
-#else
+#elif defined (AIC_EPWM_DRV_V10)
             isr_cnt[i]++;
             if (isr_cnt[i] == g_pulse_para[i].pulse_cnt) {
                 hal_epwm_set(i, g_pulse_para[i].prd_ns, g_pulse_para[i].prd_ns, (rt_uint32_t)EPWM_SET_CMPA_CMPB);
@@ -276,16 +232,45 @@ irqreturn_t aic_epwm_irq(int irq, void *arg)
             hal_epwm_clr_int(stat, i);
         }
     }
+#endif
 
+#ifdef AIC_EPWM_DRV_V12
+    u32 stat;
+    u32 ch = irq - EPWM0_IRQn;
+    stat = hal_epwm_int_sts(ch);
+        if (stat & EPWM_INT_FLG) {
+            if (g_epwm_pul_flag[ch] == 0) {
+                /* enable the EPWM_PUL_OUT_EN will enter the interrupt */
+                hal_epwm_count_ct(ch, (u32)EPWM_MODE_STOP_COUNT);
+            }
+            if (g_epwm_pul_flag[ch] == 1) {
+                g_epwm_pul_flag[ch] = 0;
+            }
+            hal_epwm_clr_int(stat, ch);
+        }
+#endif
     return IRQ_HANDLED;
 }
 
 int drv_epwm_init(void)
 {
-    hal_epwm_init();
-    aic_epwm_default_action();
+    int i, ret;
+    ret = hal_epwm_init();
+    if (ret < 0) {
+        LOG_E("EPWM init failed!");
+        return ret;
+    }
 
+    for (i = 0; i < epwm_pdata_size; i++) {
+        hal_epwm_ch_init(&epwm_pdata[i]);
+#ifdef AIC_EPWM_DRV_V12
+        aicos_request_irq(EPWM0_IRQn + epwm_pdata[i].id, aic_epwm_irq, 0, NULL, NULL);
+#endif
+    }
+
+#if defined (AIC_EPWM_DRV_V10) || defined (AIC_EPWM_DRV_V11)
     aicos_request_irq(PWMCS_PWM_IRQn, aic_epwm_irq, 0, NULL, NULL);
+#endif
 
     if (rt_device_pwm_register(&g_aic_epwm, "epwm", &aic_epwm_ops, NULL))
         return -RT_ERROR;

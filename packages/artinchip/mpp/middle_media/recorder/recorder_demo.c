@@ -40,7 +40,6 @@
 static void print_help(const char* prog)
 {
     printf("name: %s\n", prog);
-    printf("Compile time: %s\n", __TIME__);
     printf("Usage: recoder_demo [options]:\n"
         "\t-i                             video input source\n"
         "\t-t                             recoder time(s)\n"
@@ -53,7 +52,6 @@ static void print_help(const char* prog)
 static void print_cmd_help(const char* prog)
 {
     printf("name: %s\n", prog);
-    printf("Compile time: %s\n", __TIME__);
     printf("Usage: recoder_demo_cmd [options]:\n"
         "\tstop                             stop recorder\n"
         "\tsnap                             snap one frame\n"

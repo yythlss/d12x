@@ -561,6 +561,15 @@ static int rtt_create_task(struct task_struct *ptask, const char *name,
     stack_size = (sizeof(void *) == 8) ? 8192:3072;
     ptask->task_name = name;
 
+    if (strncmp("cmd_thread", name, 10) == 0)
+        priority = 4;
+    if (strncmp("recv_task_thread", name, 16) == 0) {
+        priority = 5;
+        stack_size = 16384;
+    }
+    if (strncmp("xmit_thread", name, 11) == 0)
+        priority = 6;
+
     ptask->task = (_thread_hdl_)aicos_thread_create(
             name, stack_size, priority, func, thctx);
 

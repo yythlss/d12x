@@ -31,7 +31,7 @@ static long long int str2int(char *_str)
 
 static void usage(char *app)
 {
-    printf("Usage: %s [Options], built on %s %s\n", app, __DATE__, __TIME__);
+    printf("Usage: %s [Options]\n", app);
     printf("\t-m, --mode, ");
     printf("\t0(default): disable ccm and gamma, 1: just enable ccm\n");
     printf("\t\t2: just enable gamma, 3: enable ccm and gamma\n");

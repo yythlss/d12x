@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: Apache-2.0
 #
-# Copyright (C) 2023-2024 ArtInChip Technology Co., Ltd
+# Copyright (C) 2023-2025 ArtInChip Technology Co., Ltd
 # Dehuang Wu <dehuang.wu@artinchip.com>
 
 # Notes:
@@ -83,6 +83,7 @@ function hmm()
 	_hline "cout|co" "" "cd to build output directory."
 	_hline "cbuild|cb" "" "cd to build root directory."
 	_hline "ctarget|ct" "" "cd to target board directory."
+	_hline "csys|cs" "" "cd to chip system directory."
 	_hline "godir|gd" "[keyword]" "Go/jump to selected directory."
 	_hline "list" "" "List all SDK defconfig."
 	_hline "list_module" "" "List all enabled modules."
@@ -226,6 +227,33 @@ function get_cur_board_name()
 {
 	board_name=$(cat ${SDK_PRJ_TOP_DIR}/.config | grep CONFIG_PRJ_BOARD | awk -F '"' '{print $2}')
 }
+
+function csys()
+{
+	local build_dir=
+	local sys_dir=
+	local cur_def=
+	local ret=
+
+	ret=$(_lunch_check)
+	if [ "${ret}" == "false" ]; then
+		echo "Not lunch project yet"
+		return
+	fi
+
+	cur_def=$(_get_cur_def)
+	if [ "$cur_def" == "all" ]; then
+		return
+	fi
+
+	get_cur_chip_name
+	get_cur_board_name
+	sys_dir=${SDK_PRJ_TOP_DIR}/bsp/artinchip/sys/${chip_name}
+	if [ -d ${sys_dir} ]; then
+		cd ${sys_dir} || exit 110
+	fi
+}
+alias cs=csys
 
 function ctarget()
 {

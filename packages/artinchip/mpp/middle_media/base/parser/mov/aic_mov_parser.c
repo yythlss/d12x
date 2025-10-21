@@ -31,7 +31,12 @@ s32 mov_read(struct aic_parser * parser, struct aic_parser_packet *pkt)
 	int ret = 0;
 
 	aic_stream_seek(c->stream, c->cur_sample.pos, SEEK_SET);
+
+#ifdef AIC_MPP_PLAYER_FILE_CACHE
+	ret = aic_stream_read_cached(c->stream, pkt->data, c->cur_sample.size);
+#else
 	ret = aic_stream_read(c->stream, pkt->data, c->cur_sample.size);
+#endif
 	if (ret < 0)
 		return PARSER_NODATA;
 

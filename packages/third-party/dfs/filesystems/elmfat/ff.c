@@ -798,7 +798,7 @@ static DWORD tchar2uni (	/* Returns a character in UTF-16 encoding (>=0x10000 on
 
 
 /* Store a Unicode char in defined API encoding */
-static UINT put_utf (	/* Returns number of encoding units written (0:buffer overflow or wrong encoding) */
+static __attribute__((unused)) UINT put_utf (	/* Returns number of encoding units written (0:buffer overflow or wrong encoding) */
 	DWORD chr,	/* UTF-16 encoded character (Surrogate pair if >=0x10000) */
 	TCHAR* buf,	/* Output buffer */
 	UINT szb	/* Size of the buffer */

@@ -58,6 +58,8 @@ void rwnx_platform_deinit(struct rwnx_hw *rwnx_hw);
 int rwnx_platform_on(struct rwnx_hw *rwnx_hw);
 void rwnx_platform_off(struct rwnx_hw *rwnx_hw);
 
+int rwnx_send_reboot(struct rwnx_hw *rwnx_hw);
+
 int aicwf_misc_ram_init_8800dc(struct rwnx_hw *rwnx_hw);
 int aicwf_patch_table_load(struct rwnx_hw *rwnx_hw);
 

@@ -305,7 +305,6 @@ rt_inline int _serial_int_rx(struct rt_serial_device *serial, rt_uint8_t *data, 
         ch = rx_fifo->buffer[rx_fifo->get_index];
         rx_fifo->get_index += 1;
 
-#ifdef RT_SERIAL_USING_FLOWCTRL
         if (serial->config.function == RT_SERIAL_RS232_UNAUTO_FLOW_CTRL ||
             serial->config.function == RT_SERIAL_RS232_SW_FLOW_CTRL ||
             serial->config.function == RT_SERIAL_RS232_SW_HW_FLOW_CTRL )
@@ -315,7 +314,7 @@ rt_inline int _serial_int_rx(struct rt_serial_device *serial, rt_uint8_t *data, 
                 rt_flowctrl_low_detect(serial, 1, RT_SERIAL_INT_FCL_BUFFER);
             }
         }
-#endif
+
         if (rx_fifo->get_index >= serial->config.bufsz) rx_fifo->get_index = 0;
 
         if (rx_fifo->is_full == RT_TRUE)
@@ -410,7 +409,6 @@ static rt_size_t _serial_fifo_calc_recved_len(struct rt_serial_device *serial)
 }
 #endif /* RT_USING_POSIX_STDIO || RT_SERIAL_USING_DMA */
 
-#ifdef RT_SERIAL_USING_FLOWCTRL
 /**
  * Flow control high level detect.
  *
@@ -486,7 +484,7 @@ void rt_flowctrl_low_detect(struct rt_serial_device *serial, rt_size_t len, rt_s
         }
     }
 }
-#endif
+
 
 #ifdef RT_SERIAL_USING_DMA
 /**
@@ -625,7 +623,7 @@ rt_inline int _serial_dma_rx(struct rt_serial_device *serial, rt_uint8_t *data, 
             rt_memcpy(data + serial->config.bufsz - rx_fifo->get_index, rx_fifo->buffer,
                     recv_len + rx_fifo->get_index - serial->config.bufsz);
         }
-#ifdef RT_SERIAL_USING_FLOWCTRL
+
         if (serial->config.function == RT_SERIAL_RS232_UNAUTO_FLOW_CTRL ||
             serial->config.function == RT_SERIAL_RS232_SW_FLOW_CTRL ||
             serial->config.function == RT_SERIAL_RS232_SW_HW_FLOW_CTRL)
@@ -635,7 +633,7 @@ rt_inline int _serial_dma_rx(struct rt_serial_device *serial, rt_uint8_t *data, 
                 rt_flowctrl_low_detect(serial, recv_len, RT_SERIAL_DMA_FCL_BUFFER);
             }
         }
-#endif
+
         rt_dma_recv_update_get_index(serial, recv_len);
         rt_hw_interrupt_enable(level);
         return recv_len;
@@ -1146,6 +1144,15 @@ static rt_err_t rt_serial_control(struct rt_device *dev,
 
             break;
 
+        case RT_SERIAL_GET_CONFIG:
+            if (args)
+            {
+                struct serial_configure *pconfig = (struct serial_configure *) args;
+                *pconfig = serial->config;
+            }
+
+            break;
+
         case RT_SERIAL_RS485_RTS_LOW:
             serial->ops->control(serial, cmd, args);
             break;
@@ -1445,7 +1452,6 @@ void rt_serial_rx_ind(struct rt_serial_device *serial)
         rx_fifo->put_index += 1;
         if (rx_fifo->put_index >= serial->config.bufsz) rx_fifo->put_index = 0;
 
-#ifdef RT_SERIAL_USING_FLOWCTRL
         if ((serial->config.function == RT_SERIAL_RS232_UNAUTO_FLOW_CTRL ||
             serial->config.function == RT_SERIAL_RS232_SW_FLOW_CTRL ||
             serial->config.function == RT_SERIAL_RS232_SW_HW_FLOW_CTRL) &&
@@ -1460,7 +1466,7 @@ void rt_serial_rx_ind(struct rt_serial_device *serial)
         {
             serial->ops->control(serial, RT_SERIAL_SW_RECEIVE_ON_OFF, &ch);
         }
-#endif
+
         /* if the next position is read index, discard this 'read char' */
         if (rx_fifo->put_index == rx_fifo->get_index)
         {
@@ -1564,7 +1570,6 @@ void rt_hw_serial_isr(struct rt_serial_device *serial, int event)
             {
                 /* disable interrupt */
                 level = rt_hw_interrupt_disable();
-#ifdef RT_SERIAL_USING_FLOWCTRL
                 /* flow control high level detect */
                 if ((serial->config.function == RT_SERIAL_RS232_UNAUTO_FLOW_CTRL ||
                     serial->config.function == RT_SERIAL_RS232_SW_FLOW_CTRL  ||
@@ -1573,7 +1578,6 @@ void rt_hw_serial_isr(struct rt_serial_device *serial, int event)
                 {
                     rt_flowctrl_high_detect(serial, length, RT_SERIAL_DMA_FCH_BUFFER);
                 }
-#endif
                 /* update fifo put index */
                 rt_dma_recv_update_put_index(serial, length);
                 /* calculate received total length */

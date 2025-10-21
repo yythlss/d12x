@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2025, Artinchip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -23,7 +23,7 @@ extern "C" {
  * @addr: Address to poll
  * @val: Variable to read the value into
  * @cond: Break condition (usually involving @val)
- * @sleep_us: Maximum time to sleep in us
+ * @sleep_us: Time to sleep in us, 0 means never sleep, Minimum sleep time is 1 ms (1000 us)
  * @timeout_us: Timeout in us, 0 means never timeout
  *
  * Returns 0 on success and -ETIMEDOUT upon a timeout. In either
@@ -44,7 +44,7 @@ extern "C" {
             break; \
         } \
         if (sleep_us) \
-            aic_udelay(sleep_us); \
+            aicos_msleep(sleep_us < 1000 ? 1 : sleep_us / 1000); \
     } \
     (cond) ? 0 : -ETIMEDOUT; \
 })

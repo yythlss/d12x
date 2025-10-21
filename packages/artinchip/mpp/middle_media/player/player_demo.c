@@ -29,6 +29,7 @@
 #include "mpp_fb.h"
 #include "aic_message.h"
 #include "aic_player.h"
+#include "aic_core.h"
 #include "test/player_video_test.h"
 #include "test/player_audio_test.h"
 
@@ -59,7 +60,12 @@ struct video_player_ctx {
     int rotation;
     int alpha_value;
     int player_end;
-    int player_stop;
+    bool player_stop;
+    bool play_next;
+    bool play_prev;
+    rt_device_t render_dev;
+    struct aicfb_layer_data layer;
+    struct aicfb_alpha_config alpha_bak;
     struct av_media_info media_info;
     char audio_file_path[PLAYER_DEMO_FILE_PATH_MAX_LEN];
 };
@@ -67,36 +73,39 @@ struct video_player_ctx {
 char *file_suffix[SUPPORT_FILE_SUFFIX_TYPE_NUM] = {".h264", ".264", ".mp4", ".mp3",
                                                    ".avi", ".mkv", ".ts", ".flv",
                                                    ".wma", ".flac", ".aac"};
-struct video_player_ctx  *g_video_player_ctx = NULL;
+static struct video_player_ctx  *g_video_player_ctx = NULL;
+static bool g_power_on_flag = false;
 
 static void print_help(const char* prog)
 {
     printf("name: %s\n", prog);
-    printf("Compile time: %s\n", __TIME__);
     printf("Usage: player_demo [options]:\n"
-        "\t-i                             input stream file name\n"
-        "\t-t                             directory of test files\n"
-        "\t-l                             loop time\n"
-        "\t-r                             rotation\n"
-        "\t-h                             help\n\n"
+        "\t-i\t\tinput stream file name\n"
+        "\t-t\t\tdirectory of test files\n"
+        "\t-l\t\tloop time\n"
+        "\t-r\t\trotation\n"
+        "\t-h\t\thelp\n\n"
         "Example1(test single file for 1 time): player_demo -i /mnt/video/test.mp4 \n"
         "Example2(test single file for 3 times): player_demo -i /mnt/video/test.mp4 -l 3 \n"
         "Example3(test dir for 1 time ) : player_demo -t /mnt/video \n"
-        "Example4(test dir for 3 times ): player_demo -t /mnt/video -l 3 \n"
-        "---------------------------------------------------------------------------------------\n"
-        "-------------------------------control key while playing-------------------------------\n"
-        "---------------------------------------------------------------------------------------\n"
-        "('d'): play next \n"
-        "('u'): play previous \n"
-        "('p'): pause/play \n"
-        "('+'): volum+5 \n"
-        "('-'): volum-5 \n"
-        "('f'): forward seek +8s \n"
-        "('b'): back seek -8s \n"
-        "('z'): seek to begin pos \n"
-        "('m':  enter/eixt mute \n"
-        "('w':  play audio warning tone \n"
-        "('e'): eixt app \n");
+        "Example4(test dir for 3 times ): player_demo -t /mnt/video -l 3 \n");
+}
+
+static void print_cmd_help(const char* prog)
+{
+    printf("name: %s\n", prog);
+    printf("Usage: player_cmd [options]:\n"
+        "\t-d\t\tplay next\n"
+        "\t-u\t\tplay previous\n"
+        "\t-p\t\tpause/play\n"
+        "\t-v\t\tvolum \n"
+        "\t-m\t\tmute \n"
+        "\t-f\t\tforward seek +n s\n"
+        "\t-b\t\tforward seek -n s\n"
+        "\t-z\t\tseek to begin pos \n"
+        "\t-r\t\trotate 0 ~ 270 \n"
+        "\t-w\t\tplay audio warning tone \n"
+        "\t-e\t\texit app \n");
 }
 
 static int read_file(char* path, struct file_list *files)
@@ -171,8 +180,9 @@ static int read_dir(char* path, struct file_list *files)
 void player_demo_stop(void)
 {
     if (g_video_player_ctx)
-        g_video_player_ctx->player_stop = 1;
+        g_video_player_ctx->player_stop = true;
 }
+
 
 s32 event_handle(void* app_data,s32 event,s32 data1,s32 data2)
 {
@@ -191,21 +201,20 @@ s32 event_handle(void* app_data,s32 event,s32 data1,s32 data2)
     return ret;
 }
 
-static int set_volume(struct video_player_ctx *player_ctx,int volume)
+static int set_volume(struct video_player_ctx *player_ctx, int volume)
 {
     struct video_player_ctx *ctx = player_ctx;
-    if (volume < 0) {
-        volume = 0;
-    } else if (volume < 101) {
 
-    } else {
-        volume = 100;
+    if (volume < 0 || volume > 100) {
+        loge("Invalid volume:%d\n", volume);
+        return -1;
     }
+
     logd("volume:%d\n",volume);
     return aic_player_set_volum(ctx->player,volume);
 }
 
-static int do_seek(struct video_player_ctx *player_ctx,int forward)
+static int do_seek(struct video_player_ctx *player_ctx, int forward)
 {
     s64 pos;
     struct video_player_ctx *ctx = player_ctx;
@@ -214,48 +223,35 @@ static int do_seek(struct video_player_ctx *player_ctx,int forward)
         loge("aic_player_get_play_time error!!!!\n");
         return -1;
     }
-    if (forward == 1) {
-        pos += 8*1000*1000;//+8s
-    } else {
-        pos -= 8*1000*1000;//-8s
-    }
+
+    pos += (forward * 1000 * 1000);
 
     if (pos < 0) {
         pos = 0;
-    } else if (pos < ctx->media_info.duration) {
-
-    } else {
+    } else if (pos > ctx->media_info.duration) {
         pos = ctx->media_info.duration;
     }
 
-    if (aic_player_seek(ctx->player,pos) != 0) {
+    if (aic_player_seek(ctx->player, pos) != 0) {
         loge("aic_player_seek error!!!!\n");
         return -1;
     }
-    logd("aic_player_seek ok\n");
+    logd("aic_player_seek "FMT_d64" ok\n", pos);
     return 0;
 }
 
-static int do_rotation_common(struct video_player_ctx *player_ctx, u32 rotation)
+
+static int do_rotation(struct video_player_ctx *player_ctx, int rotation)
 {
     struct video_player_ctx *ctx = player_ctx;
-    if (rotation > MPP_ROTATION_270) {
+
+    if (rotation % 90 != 0 && rotation > 270) {
         loge("Invalid rotation: %d\n", rotation);
-        rotation = MPP_ROTATION_0;
+        return -1;
     }
 
-    logd("Rotation %d\n", rotation * 90);
-    aic_player_set_rotation(ctx->player, rotation);
-    return 0;
-}
+    aic_player_set_rotation(ctx->player, rotation / 90);
 
-static int do_rotation(struct video_player_ctx *player_ctx)
-{
-    static int index = 0;
-    struct video_player_ctx *ctx = player_ctx;
-
-    do_rotation_common(ctx, index % 4);
-    index++;
     return 0;
 }
 #ifndef PLAYER_DEMO_USE_VE_FILL_FB
@@ -330,7 +326,8 @@ static int start_play(struct video_player_ctx *player_ctx)
         return -1;
     }
     ctx->media_info = media_info;
-    logd("aic_player_get_media_info duration:"FMT_x64",file_size:"FMT_x64"\n",media_info.duration,media_info.file_size);
+    logd("aic_player_get_media_info duration:"FMT_x64",file_size:"FMT_x64"\n",
+        media_info.duration, media_info.file_size);
 
     logd("has_audio:%d, has_video:%d,"
         "width:%d, height:%d,\n"
@@ -360,7 +357,8 @@ static int start_play(struct video_player_ctx *player_ctx)
                 loge("Failed to calculate the size of screen\n");
                 return -1;
             }
-            ret = aic_player_set_disp_rect(ctx->player, &disp_rect);//attention:disp not exceed screen_size
+            //attention:disp not exceed screen_size
+            ret = aic_player_set_disp_rect(ctx->player, &disp_rect);
             if (ret != 0) {
                 loge("aic_player_set_disp_rect error\n");
                 return -1;
@@ -369,7 +367,7 @@ static int start_play(struct video_player_ctx *player_ctx)
         }
 
         if (ctx->rotation)
-            do_rotation_common(ctx, ctx->rotation);
+            do_rotation(ctx, ctx->rotation);
     }
 #endif
 
@@ -414,60 +412,8 @@ static void show_cpu_usage()
 #endif
 }
 
-//#define _THREAD_TRACE_INFO_
 
-#ifdef _THREAD_TRACE_INFO_
-struct thread_trace_info {
-    uint32_t enter_run_tick;
-    uint32_t total_run_tick;
-    char thread_name[8];
-};
-
-static struct  thread_trace_info thread_trace_infos[6];
-
-
-// count the cpu usage time of each thread
-static void hook_of_scheduler(struct rt_thread *from,struct rt_thread *to) {
-    static int show = 0;
-    static uint32_t sys_tick = 0;
-    int i = 0;
-    for(i=0;i<6;i++) {
-        if (!strcmp(thread_trace_infos[i].thread_name,from->name)) {
-            uint32_t run_tick;
-            run_tick = rt_tick_get() -  thread_trace_infos[i].enter_run_tick;
-            thread_trace_infos[i].total_run_tick += run_tick;
-            break;
-        }
-    }
-
-    for(i=0;i<6;i++) {
-        if (!strcmp(thread_trace_infos[i].thread_name,to->name)) {
-                thread_trace_infos[i].enter_run_tick = rt_tick_get();
-            break;
-        }
-    }
-    show++;
-    if (show > 10*1000) {
-        rt_kprintf("[%u:%u:%u:%u:%u:%u:%u]:%u\n"
-            ,thread_trace_infos[0].total_run_tick
-            ,thread_trace_infos[1].total_run_tick
-            ,thread_trace_infos[2].total_run_tick
-            ,thread_trace_infos[3].total_run_tick
-            ,thread_trace_infos[4].total_run_tick
-            ,thread_trace_infos[5].total_run_tick
-            ,thread_trace_infos[5].total_run_tick+thread_trace_infos[4].total_run_tick+thread_trace_infos[3].total_run_tick+thread_trace_infos[2].total_run_tick+thread_trace_infos[1].total_run_tick+thread_trace_infos[0].total_run_tick
-            ,rt_tick_get() - sys_tick);
-
-         for(i=0;i<6;i++) {
-             thread_trace_infos[i].total_run_tick = 0;
-         }
-         show = 0;
-         sys_tick = rt_tick_get();
-    }
-}
-#endif
-
-static int parse_options(struct video_player_ctx *player_ctx,int cnt,char**options)
+static int parse_options(struct video_player_ctx *player_ctx, int cnt, char **options)
 {
     int argc = cnt;
     int len = 0;
@@ -504,7 +450,7 @@ static int parse_options(struct video_player_ctx *player_ctx,int cnt,char**optio
             ctx->alpha_value = atoi(optarg);
             break;
         case 'r':
-            ctx->rotation = (atoi(optarg) % 360) / 90;
+            ctx->rotation = atoi(optarg);
             break;
         case 's':
             ctx->seek_loop = 1;
@@ -531,37 +477,6 @@ static int parse_options(struct video_player_ctx *player_ctx,int cnt,char**optio
     return 0;
 }
 
-static int process_command(struct video_player_ctx *player_ctx,char cmd)
-{
-    struct video_player_ctx *ctx = player_ctx;
-    int ret = 0;
-    if (cmd == 0x20) {// pause
-        ret = aic_player_pause(ctx->player);
-    } else if (cmd == '-') {
-        ctx->volume -= 5;
-        ret = set_volume(ctx,ctx->volume);
-    } else if (cmd == '+') {
-        ctx->volume += 5;
-        ret = set_volume(ctx,ctx->volume);
-    } else if (cmd == 'm') {
-        ret = aic_player_set_mute(ctx->player);
-    } else if (cmd == 'f') {
-        ret = do_seek(ctx,1);//+8s
-    } else if (cmd == 'b') {
-        ret = do_seek(ctx,0);//-8s
-    } else if (cmd == 'z') {
-        ret = aic_player_seek(ctx->player,0);
-    } else if (cmd == 'r') {
-        ret = do_rotation(ctx);
-    } else if (cmd == 'w') {
-#ifdef AIC_MPP_PLAYER_AUDIO_RENDER_SHARE_TEST
-        ret = player_audio_render_share_play(ctx->audio_file_path);
-#endif
-    }
-    return ret;
-}
-
-static int power_on_flag = 0;
 
 static int player_demo_prepare_stop(struct video_player_ctx *ctx, int force_stop,
                                     int loop_time, int file_num)
@@ -590,112 +505,80 @@ static int player_demo_prepare_stop(struct video_player_ctx *ctx, int force_stop
     return 0;
 }
 
-static int player_demo_test(int argc, char **argv)
+static int player_start_render(struct video_player_ctx *ctx)
 {
-    int ret = 0;
-    int i = 0;
-    int j = 0;
-    int enable = 0;
-    char ch;
-    rt_device_t render_dev = RT_NULL;
-    struct aicfb_alpha_config alpha_bak = {0};
     struct aicfb_alpha_config alpha = {0};
-    struct aicfb_layer_data layer = {0};
-
-    rt_device_t uart_dev = RT_NULL;
-    struct video_player_ctx *ctx = NULL;
-
-    ctx = mpp_alloc(sizeof(struct video_player_ctx));
     if (!ctx) {
-        loge("mpp_alloc fail!!!");
-        return -1;
-    }
-    memset(ctx,0x00,sizeof(struct video_player_ctx));
-    g_video_player_ctx = ctx;
-
-    if (parse_options(ctx,argc,argv)) {
-        loge("parse_options fail!!!\n");
-        ret = -1;
         goto _EXIT_;
     }
 
-    render_dev = rt_device_find("aicfb");
-    if (!render_dev) {
+    ctx->render_dev = rt_device_find("aicfb");
+    if (!ctx->render_dev) {
         loge("rt_device_find aicfb failed!");
-        ret = -1;
         goto _EXIT_;
     }
 
-    uart_dev = rt_device_find(RT_CONSOLE_DEVICE_NAME);
-    if (uart_dev == NULL) {
-        loge("Failed to open %s\n", RT_CONSOLE_DEVICE_NAME);
-        ret = -1;
-        goto _EXIT_;
+    if (g_power_on_flag == false) {
+        rt_device_control(ctx->render_dev, AICFB_POWERON, 0);
+        g_power_on_flag = true;
     }
 
-    if (!power_on_flag) {
-        rt_device_control(render_dev,AICFB_POWERON,0);
-        power_on_flag = 1;
-    }
-    //stroe alpha
-    alpha_bak.layer_id = AICFB_LAYER_TYPE_UI;
-    rt_device_control(render_dev, AICFB_GET_ALPHA_CONFIG, &alpha_bak);
+    //store alpha
+    ctx->alpha_bak.layer_id = AICFB_LAYER_TYPE_UI;
+    rt_device_control(ctx->render_dev, AICFB_GET_ALPHA_CONFIG, &ctx->alpha_bak);
+
     //set alpha
     alpha.layer_id = AICFB_LAYER_TYPE_UI;
     alpha.enable = 1;
     alpha.mode = 1;
     alpha.value = ctx->alpha_value;
-    rt_device_control(render_dev, AICFB_UPDATE_ALPHA_CONFIG, &alpha);
+    rt_device_control(ctx->render_dev, AICFB_UPDATE_ALPHA_CONFIG, &alpha);
 
     // store ui layer before playing
     if (strcmp(PRJ_CHIP, "d12x") == 0) {
-        layer.layer_id = AICFB_LAYER_TYPE_UI;
-        if (rt_device_control(render_dev, AICFB_GET_LAYER_CONFIG, &layer) < 0) {
+        ctx->layer.layer_id = AICFB_LAYER_TYPE_UI;
+        if (rt_device_control(ctx->render_dev, AICFB_GET_LAYER_CONFIG, &ctx->layer) < 0) {
             loge("get ui layer config failed\n");
-            ret = -1;
             goto _EXIT_;
         }
     }
 
-#ifdef _THREAD_TRACE_INFO_
-    memset(&thread_trace_infos,0x00,sizeof(struct thread_trace_info));
-    for (i = 0; i < 6 ;i++) {
-        snprintf(thread_trace_infos[i].thread_name,sizeof(thread_trace_infos[i].thread_name),"%s%02d","pth",i);
-        logd("%s\n",thread_trace_infos[i].thread_name);
-    }
-    rt_scheduler_sethook(hook_of_scheduler);
-#endif
+    return 0;
 
-    ctx->player = aic_player_create(NULL);
-    if (ctx->player == NULL) {
-        loge("aic_player_create fail!!!\n");
-        ret = -1;
-        goto _EXIT_;
+_EXIT_:
+    return -1;
+}
+
+static void player_stop_render(struct video_player_ctx *ctx)
+{
+    if (strcmp(PRJ_CHIP, "d12x") == 0 && ctx->render_dev) {
+        // restore ui layer after playing
+        rt_device_control(ctx->render_dev, AICFB_UPDATE_LAYER_CONFIG, &ctx->layer);
     }
 
-#ifdef PLAYER_DEMO_USE_VE_FILL_FB
-    if (player_vdec_share_frame_init(ctx->player) != 0) {
-        loge("player_vdec_share_frame_init fail!!!\n");
-        goto _EXIT_;
+    if (ctx->render_dev) {
+        //restore alpha
+        rt_device_control(ctx->render_dev, AICFB_UPDATE_ALPHA_CONFIG, &ctx->alpha_bak);
     }
-#endif
-    aic_player_set_event_callback(ctx->player,ctx,event_handle);
+}
 
+static int player_loop_play(struct video_player_ctx *ctx)
+{
+    int i, j, enable;
 
     if (ctx->loop_time > 1 || ctx->files.file_num > 1) {
         enable = 1;
         aic_player_control(ctx->player, AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME, &enable);
     }
 
-    for(i = 0;i < ctx->loop_time; i++) {
+    for(i = 0; i < ctx->loop_time; i++) {
         for(j = 0; j < ctx->files.file_num; j++) {
-            logd("loop:%d,index:%d,path:%s\n",i,j,ctx->files.file_path[j]);
+            logd("loop:%d,index:%d,path:%s\n", i, j, ctx->files.file_path[j]);
             ctx->player_end = 0;
-            if (aic_player_set_uri(ctx->player,ctx->files.file_path[j])) {
+            if (aic_player_set_uri(ctx->player, ctx->files.file_path[j])) {
                 loge("aic_player_prepare error!!!!\n");
                 player_demo_prepare_stop(ctx, 0, i, j);
                 aic_player_stop(ctx->player);
-                ret = -1;
                 continue;
             }
 
@@ -703,7 +586,6 @@ static int player_demo_test(int argc, char **argv)
                 player_demo_prepare_stop(ctx, 0, i, j);
                 loge("aic_player_prepare error!!!!\n");
                 aic_player_stop(ctx->player);
-                ret = -1;
                 continue;
             }
 
@@ -711,14 +593,14 @@ static int player_demo_test(int argc, char **argv)
                 loge("start_play error!!!!\n");
                 player_demo_prepare_stop(ctx, 0, i, j);
                 aic_player_stop(ctx->player);
-                ret = -1;
                 continue;
             }
 
             while(1)
             {
-                if (ctx->player_stop == 1) {
+                if (ctx->player_stop == true) {
                     logd("Stop player!\n");
+                    ctx->player_stop = false;
                     player_demo_prepare_stop(ctx, 0, i, j);
                     aic_player_stop(ctx->player);
                     goto _EXIT_;
@@ -734,30 +616,63 @@ static int player_demo_test(int argc, char **argv)
                         ctx->player_end = 0;
                         break;
                     }
-                }
-                if (rt_device_read(uart_dev, -1, &ch, 1) == 1) {
-                    if (ch == 'u') {// up
+                } else {
+                    if (ctx->play_prev == true) {
                         j -= 2;
-                        j = (j < -1)?(-1):(j);
+                        j = (j < -1) ? (-1) : (j);
                         aic_player_stop(ctx->player);
+                        ctx->play_prev = false;
                         break;
-                    } else if (ch == 'd') {// down
+                    } else if (ctx->play_next == true) {
                         player_demo_prepare_stop(ctx, 0, i, j);
                         aic_player_stop(ctx->player);
+                        ctx->play_next = false;
                         break;
-                    } else if (ch == 'e') {// end
-                        player_demo_prepare_stop(ctx, 1, i, j);
-                        aic_player_stop(ctx->player);
-                        goto _EXIT_;
                     }
-                    process_command(ctx,ch);
-                } else {
-                    show_cpu_usage();
-                    usleep(100*1000);
                 }
+
+                show_cpu_usage();
+                usleep(100 * 1000);
             }
         }
     }
+
+_EXIT_:
+
+    for(i = 0; i <ctx->files.file_num ;i++) {
+        if (ctx->files.file_path[i]) {
+            mpp_free(ctx->files.file_path[i]);
+            ctx->files.file_path[i] = NULL;
+        }
+    }
+
+    return 0;
+}
+
+
+static void player_thread_entry(void *arg)
+{
+    struct video_player_ctx *ctx = (struct video_player_ctx *)arg;
+
+    if (player_start_render(ctx) < 0)
+        goto _EXIT_;
+
+    ctx->player = aic_player_create(NULL);
+    if (ctx->player == NULL) {
+        loge("aic_player_create fail!!!\n");
+        goto _EXIT_;
+    }
+
+#ifdef PLAYER_DEMO_USE_VE_FILL_FB
+    if (player_vdec_share_frame_init(ctx->player) != 0) {
+        loge("player_vdec_share_frame_init fail!!!\n");
+        goto _EXIT_;
+    }
+#endif
+    aic_player_set_event_callback(ctx->player, ctx, event_handle);
+
+
+    player_loop_play(ctx);
 
 _EXIT_:
 #ifdef PLAYER_DEMO_USE_VE_FILL_FB
@@ -768,27 +683,121 @@ _EXIT_:
         ctx->player = NULL;
     }
 
-    for(i = 0; i <ctx->files.file_num ;i++) {
-        if (ctx->files.file_path[i]) {
-            mpp_free(ctx->files.file_path[i]);
-            ctx->files.file_path[i] = NULL;
-        }
+    player_stop_render(ctx);
+
+    if (ctx) {
+        mpp_free(ctx);
+        g_video_player_ctx = ctx = NULL;
     }
 
-    if (strcmp(PRJ_CHIP, "d12x") == 0 && render_dev) {
-        // restore ui layer after playing
-        rt_device_control(render_dev,AICFB_UPDATE_LAYER_CONFIG,&layer);
+    return;
+}
+
+
+static int player_demo(int argc, char **argv)
+{
+    int ret = 0;
+    aicos_thread_t player_thid = NULL;
+
+    struct video_player_ctx *ctx = NULL;
+
+    ctx = mpp_alloc(sizeof(struct video_player_ctx));
+    if (!ctx) {
+        loge("mpp_alloc fail!!!");
+        return -1;
+    }
+    memset(ctx, 0x0, sizeof(struct video_player_ctx));
+    g_video_player_ctx = ctx;
+
+    if (parse_options(ctx,argc,argv)) {
+        goto _EXIT_;
+    }
+    player_thid = aicos_thread_create("player_demo", 8192, 30,
+                                      player_thread_entry, ctx);
+    if (!player_thid) {
+        loge("create player_demo failed\n");
+        goto _EXIT_;
     }
 
-    if (render_dev) {
-        //restore alpha
-        rt_device_control(render_dev, AICFB_UPDATE_ALPHA_CONFIG, &alpha_bak);
+    return 0;
+
+_EXIT_:
+    if (ctx) {
+        mpp_free(ctx);
+        g_video_player_ctx = ctx = NULL;
     }
 
-    mpp_free(ctx);
-    g_video_player_ctx = ctx = NULL;
-    logd("player_demo exit\n");
     return ret;
 }
 
-MSH_CMD_EXPORT_ALIAS(player_demo_test, player_demo, player demo);
+MSH_CMD_EXPORT_ALIAS(player_demo, player_demo, player demo);
+
+
+static int player_cmd(int argc, char**argv)
+{
+    struct video_player_ctx *ctx = g_video_player_ctx;
+    int opt;
+
+    if (argc == 0 || !argv) {
+        loge("para error !!!");
+        return -1;
+    }
+    if (!ctx) {
+        loge("player is not start running !!!");
+        return -1;
+    }
+
+    optind = 0;
+    while (1) {
+        opt = getopt(argc, argv, "f:b:v:r:udepmzwh");
+        if (opt == -1) {
+            break;
+        }
+        switch (opt) {
+        case 'u':
+            ctx->play_prev = true;
+            break;
+        case 'd':
+            ctx->play_next = true;
+            break;
+        case 'e':
+            ctx->player_stop = true;
+            break;
+        case 'p':
+            aic_player_pause(ctx->player);
+            break;
+        case 'm':
+            aic_player_set_mute(ctx->player);
+            break;
+        case 'f':
+            do_seek(ctx, atoi(optarg));
+            break;
+        case 'b':
+            do_seek(ctx, -atoi(optarg));
+            break;
+        case 'z':
+            aic_player_seek(ctx->player, 0);
+            break;
+        case 'v':
+            set_volume(ctx, atoi(optarg));
+            break;
+        case 'r':
+            do_rotation(ctx, atoi(optarg));
+            break;
+        case 'w':
+#ifdef AIC_MPP_PLAYER_AUDIO_RENDER_SHARE_TEST
+            player_audio_render_share_play(ctx->audio_file_path);
+#endif
+            break;
+        case 'h':
+            print_cmd_help(argv[0]);
+            return -1;
+        default:
+            break;
+        }
+    }
+
+    return 0;
+}
+
+MSH_CMD_EXPORT_ALIAS(player_cmd, player_cmd, player cmd);

@@ -84,7 +84,7 @@ static void cmd_run_in_thread(int argc, char **argv)
         return;
     }
 
-    thid = aicos_thread_create("test", 8192, 0, test_thread, argv[1]);
+    thid = aicos_thread_create(argv[1], 8192, 0, test_thread, argv[1]);
     if (thid == NULL)
         pr_err("Failed to create test thread\n");
 }
@@ -117,7 +117,7 @@ static void cmd_run_in_loop_thread(int argc, char **argv)
         return;
     }
 
-    thid = aicos_thread_create("test", 8192, 0, test_in_loop_thread, argv[1]);
+    thid = aicos_thread_create(argv[1], 8192, 0, test_in_loop_thread, argv[1]);
     if (thid == NULL)
         pr_err("Failed to create test thread\n");
 }

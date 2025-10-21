@@ -67,7 +67,10 @@ enum {
     SET_SRRC,
     SET_FSS,
     RDWR_EFUSE_HE_OFF,
-
+    SET_USB_OFF,
+    SET_PLL_TEST,
+    SET_ANT_MODE,
+    RDWR_BT_EFUSE_PWROFST,
     #ifdef CONFIG_USB_BT
     BT_CMD_BASE = 0x100,
     BT_RESET,
@@ -348,6 +351,8 @@ unsigned int command_strtoul(const char *cp, char **endp, unsigned int base)
     return result;
 }
 
+#define P2P_GO_SSID_STRING  "DIRECT-AIC-RTT-P2P"
+#define P2P_GO_PASS_STRING  "kkkkkkkk"
 
 int handle_private_cmd(struct rwnx_hw *rwnx_hw, char *command)
 {
@@ -594,8 +599,8 @@ int handle_private_cmd(struct rwnx_hw *rwnx_hw, char *command)
                 //memcpy(command, &cfm.rftest_result[0], 4);
                 bytes_written = 4;
                 CliPrint("done: get_freq_cal: xtal_cap=0x%x (efuse remain:%d), xtal_cap_fine=0x%x (efuse remain:%d)\r\n",
-                    cfm.rftest_result[0] & 0x000000ff, (cfm.rftest_result[0] >> 8) & 0x000000ff,
-                    (cfm.rftest_result[0] >> 16) & 0x000000ff, (cfm.rftest_result[0] >> 24) & 0x000000ff);
+                    cfm.rftest_result[0] & 0x000000ff, (cfm.rftest_result[0] >> 16) & 0x000000ff,
+                    (cfm.rftest_result[0] >> 8) & 0x000000ff, (cfm.rftest_result[0] >> 24) & 0x000000ff);
             } else if (strcasecmp(argv[0], "RDWR_PWRMM") == 0) {
                 CliPrint("read/write txpwr manul mode\r\n");
                 if (argc <= 1) { // read cur
@@ -701,7 +706,7 @@ int handle_private_cmd(struct rwnx_hw *rwnx_hw, char *command)
                 char *buff = (char *)&cfm.rftest_result[0];
                 int grp, idx;
                 CliPrint("done:\r\n"
-                       "txpwr index 2.4g: [0]:11b+11a/g, [1]:11n/11ac, [2]:11ax\r\n");
+                       "txpwr level 2.4g: [0]:11b+11a/g, [1]:11n/11ac, [2]:11ax\r\n");
                 #if 0
                 for (grp = 0; grp < 3; grp++) {
                     int cnt = 12;
@@ -729,6 +734,23 @@ int handle_private_cmd(struct rwnx_hw *rwnx_hw, char *command)
                             buff[12 * grp + 0], buff[12 * grp + 1], buff[12 * grp + 2], buff[12 * grp + 3],
                             buff[12 * grp + 4], buff[12 * grp + 5], buff[12 * grp + 6], buff[12 * grp + 7],
                             buff[12 * grp + 8], buff[12 * grp + 9], buff[12 * grp +10], buff[12 * grp +11]);
+                    }
+                }
+                if ((rwnx_hw->chipid != PRODUCT_ID_AIC8800DC) &&
+                    (rwnx_hw->chipid != PRODUCT_ID_AIC8800DW)) {
+                    CliPrint("txpwr level 5g: [0]:11a, [1]:11n/11ac, [2]:11ax\n");
+                    for (grp = 0; grp < 3; grp++) {
+                        if (grp == 1) { // 10
+                            CliPrint("  [%x] = %2d %2d %2d %2d  %2d %2d %2d %2d  %2d %2d\r\n", grp,
+                                buff[12 * grp + 0], buff[12 * grp + 1], buff[12 * grp + 2], buff[12 * grp + 3],
+                                buff[12 * grp + 4], buff[12 * grp + 5], buff[12 * grp + 6], buff[12 * grp + 7],
+                                buff[12 * grp + 8], buff[12 * grp + 9]);
+                        } else {        // 12
+                            CliPrint("  [%x] = %2d %2d %2d %2d  %2d %2d %2d %2d  %2d %2d %2d %2d\r\n", grp,
+                                buff[12 * grp + 0], buff[12 * grp + 1], buff[12 * grp + 2], buff[12 * grp + 3],
+                                buff[12 * grp + 4], buff[12 * grp + 5], buff[12 * grp + 6], buff[12 * grp + 7],
+                                buff[12 * grp + 8], buff[12 * grp + 9], buff[12 * grp +10], buff[12 * grp +11]);
+                        }
                     }
                 }
             } else if (strcasecmp(argv[0], "RDWR_PWROFST") == 0) {
@@ -847,14 +869,23 @@ int handle_private_cmd(struct rwnx_hw *rwnx_hw, char *command)
                 if (func == 0) { // read cur
                     rwnx_send_rftest_req(rwnx_hw, RDWR_EFUSE_PWROFST, 0, NULL, &cfm);
                 } else if (func <= 2) { // write 2.4g/5g pwr ofst
-                    if (argc > 3) {
+                    if ((argc > 4) && (rwnx_hw->chipid == PRODUCT_ID_AIC8800D80)) {
+                        u8_l type = (u8_l)command_strtoul(argv[2], NULL, 16);
+                        u8_l chgrp = (u8_l)command_strtoul(argv[3], NULL, 16);
+                        s8_l pwrofst = (u8_l)command_strtoul(argv[4], NULL, 10);
+                        u8_l buf[4] = {func, type, chgrp, (u8_l)pwrofst};
+                        CliPrint("set efuse pwrofst_%s:[%x][%x]=%d\r\n", (func == 1) ? "2.4g" : "5g", type, chgrp, pwrofst);
+                        rwnx_send_rftest_req(rwnx_hw, RDWR_EFUSE_PWROFST, sizeof(buf), buf, &cfm);
+                    } else if ((argc > 3) && (rwnx_hw->chipid != PRODUCT_ID_AIC8800D80)) {
                         u8_l chgrp = (u8_l)command_strtoul(argv[2], NULL, 16);
                         s8_l pwrofst = (u8_l)command_strtoul(argv[3], NULL, 10);
                         u8_l buf[3] = {func, chgrp, (u8_l)pwrofst};
-                        CliPrint("set efuse pwrofst:[%x][%x]=%d\r\n", func, chgrp, pwrofst);
+                        CliPrint("set efuse pwrofst_%s:[%x]=%d\r\n", (func == 1) ? "2.4g" : "5g", chgrp, pwrofst);
                         rwnx_send_rftest_req(rwnx_hw, RDWR_EFUSE_PWROFST, sizeof(buf), buf, &cfm);
                     } else {
                         CliPrint("wrong args\r\n");
+                        bytes_written = -EINVAL;
+                        break;
                     }
                 } else {
                     CliPrint("wrong func: %x\r\n", func);
@@ -862,16 +893,50 @@ int handle_private_cmd(struct rwnx_hw *rwnx_hw, char *command)
                 //memcpy(command, &cfm.rftest_result[0], 7);
                 bytes_written = 7;
                 char *buff = (char *)&cfm.rftest_result[0];
-                CliPrint("done:\r\n"
-                       "efuse txpwr offset 2.4g:\r\n"
-                       "  [0]=%d(ch1~4)\r\n"
-                       "  [1]=%d(ch5~9)\r\n"
-                       "  [2]=%d(ch10~13)\r\n", (int8_t)buff[0], (int8_t)buff[1], (int8_t)buff[2]);
-                CliPrint("efuse txpwr offset 5g:\r\n"
-                       "  [0]=%d(ch36~64)\r\n"
-                       "  [1]=%d(ch100~120)\r\n"
-                       "  [2]=%d(ch122~140)\r\n"
-                       "  [3]=%d(ch142~165)\r\n", (int8_t)buff[3], (int8_t)buff[4], (int8_t)buff[5], (int8_t)buff[6]);
+                if (rwnx_hw->chipid == PRODUCT_ID_AIC8801) {
+                    #if 1//defined(CONFIG_AIC8801)
+                    CliPrint("done:\r\n"
+                           "efuse txpwr offset 2.4g:\r\n"
+                           "  [0]=%d(ch1~4)\r\n"
+                           "  [1]=%d(ch5~9)\r\n"
+                           "  [2]=%d(ch10~13)\r\n", (int8_t)buff[0], (int8_t)buff[1], (int8_t)buff[2]);
+                    CliPrint("efuse txpwr offset 5g:\r\n"
+                           "  [0]=%d(ch36~64)\r\n"
+                           "  [1]=%d(ch100~120)\r\n"
+                           "  [2]=%d(ch122~140)\r\n"
+                           "  [3]=%d(ch142~165)\r\n", (int8_t)buff[3], (int8_t)buff[4], (int8_t)buff[5], (int8_t)buff[6]);
+                    #endif /* CONFIG_AIC8801 */
+                } else if (rwnx_hw->chipid == PRODUCT_ID_AIC8800D80){
+                    int type, ch_grp;
+                    CliPrint("done:\n"
+                        "pwrofst2x 2.4g: [0]:11b, [1]:ofdm_highrate, [2]:ofdm_lowrate\n"
+                        "  chan=" "\t1-4" "\t5-9" "\t10-13");
+                    for (type = 0; type < 3; type++) {
+                        CliPrint("\n  [%d] =", type);
+                        for (ch_grp = 0; ch_grp < 3; ch_grp++) {
+                            CliPrint("\t%d", buff[3 * type + ch_grp]);
+                        }
+                    }
+                    CliPrint("\npwrofst2x 5g: [0]:ofdm_lowrate, [1]:ofdm_highrate, [2]:ofdm_midrate\n"
+                        "  chan=" "\t36-50" "\t51-64" "\t98-114" "\t115-130" "\t131-146" "\t147-166");
+                    buff = (signed char *)&cfm.rftest_result[3 * 3];
+                    for (type = 0; type < 3; type++) {
+                        CliPrint("\n  [%d] =", type);
+                        for (ch_grp = 0; ch_grp < 6; ch_grp++) {
+                            CliPrint("\t%d", buff[6 * type + ch_grp]);
+                        }
+                    }
+                    CliPrint("\n");
+                } else if (rwnx_hw->chipid == PRODUCT_ID_AIC8800DC || rwnx_hw->chipid == PRODUCT_ID_AIC8800DW){
+                    CliPrint("done:\n"
+                           "efuse txpwr offset 2.4g:\n"
+                           "  [0]=%d(remain:%x, ch1~4)\n"
+                           "  [1]=%d(remain:%x, ch5~9)\n"
+                           "  [2]=%d(remain:%x, ch10~13)\n",
+                           (int8_t)buff[0], (int8_t)buff[3],
+                           (int8_t)buff[1], (int8_t)buff[4],
+                           (int8_t)buff[2], (int8_t)buff[5]);
+                }
             } else if (strcasecmp(argv[0], "RDWR_EFUSE_DRVIBIT") == 0) {
                 u8_l func = 0;
                 CliPrint("read/write pa drv_ibit into efuse\r\n");
@@ -1252,6 +1317,108 @@ int handle_private_cmd(struct rwnx_hw *rwnx_hw, char *command)
             } else if (strcasecmp(argv[0], "STOP_AP") == 0) {
                 CliPrint("stop ap\r\n");
                 aic_wifi_deinit(WIFI_MODE_AP);
+            }
+            else if (strcasecmp(argv[0], "START_P2P") == 0) {
+                int fvif_idx = 0;
+                struct fhost_vif_p2p_cfg p2p_cfg = {{0,},};
+                int ssid_len, pass_len;
+                CliPrint("start p2p go\r\n");
+                ssid_len = strlen(P2P_GO_SSID_STRING);
+                memcpy(p2p_cfg.ssid.array, P2P_GO_SSID_STRING, ssid_len);
+                p2p_cfg.ssid.length = ssid_len;
+                p2p_cfg.ssid.array[ssid_len] = '\0';
+                pass_len = strlen(P2P_GO_PASS_STRING);
+                memcpy(p2p_cfg.key, P2P_GO_PASS_STRING, pass_len);
+                p2p_cfg.key[pass_len] = '\0';
+                if ((argc == 2) && (strncasecmp("5G", argv[1], strlen(argv[1])) == 0)) {
+                    p2p_cfg.chan.band = PHY_BAND_5G;
+                    p2p_cfg.chan.type = PHY_CHNL_BW_40;
+                    p2p_cfg.chan.prim20_freq = 5180;
+                    p2p_cfg.chan.center1_freq = 5190;
+                } else {
+                    p2p_cfg.chan.band = PHY_BAND_2G4;
+                    p2p_cfg.chan.type = PHY_CHNL_BW_20;
+                    p2p_cfg.chan.prim20_freq = 2412;
+                    p2p_cfg.chan.center1_freq = 2412;
+                }
+                p2p_cfg.chan.tx_power = 20;
+                p2p_cfg.enable_he = 1;
+                p2p_cfg.enable_acs = 0;
+                wlan_start_p2p(fvif_idx, &p2p_cfg);
+            }
+            else if (strcasecmp(argv[0], "STOP_P2P") == 0) {
+                int fvif_idx = 0;
+                CliPrint("stop p2p go\r\n");
+                wlan_stop_p2p(fvif_idx);
+            }
+            else if (strcasecmp(argv[0], "START_MON") == 0) {
+                struct fhost_vif_tag *p_fvif = fhost_vif_get_first_free_itf();
+                int fvif_idx;
+                struct wifi_api_monitor_start_tag mon_start;
+                struct fhost_vif_monitor_cfg *p_cfg = &mon_start.cfg;
+                struct mac_chan_def *chan_def;
+                struct mac_chan_op chan_op = {0,};
+                if (p_fvif == NULL) {
+                    DBG_APP_ERR("%s Fail to get free fvif\n", __func__);
+                    break;
+                }
+                fvif_idx = fhost_vif_idx_from_vif_tag(p_fvif);
+                if ((fvif_idx < 0) || (fvif_idx >= NX_VIRT_DEV_MAX)) {
+                    DBG_APP_ERR("invalid fvif=%p, idx=%d\n", p_fvif, fvif_idx);
+                    break;
+                }
+                mon_start.hdr.len = sizeof(struct wifi_api_monitor_start_tag);
+                mon_start.hdr.id  = WIFI_API_MONITOR_START;
+                mon_start.fhost_vif_idx = fvif_idx;
+                if ((argc == 2) && (strncasecmp("5G", argv[1], strlen(argv[1])) == 0)) {
+                    chan_def = fhost_chan_get(5180); // ch36
+                } else {
+                    chan_def = fhost_chan_get(2437); // ch6
+                }
+                chan_op.band = chan_def->band;
+                chan_op.tx_power = chan_def->tx_power;
+                chan_op.type = PHY_CHNL_BW_40;
+                chan_op.prim20_freq  = chan_def->freq;
+                chan_op.center1_freq = chan_def->freq + 10;
+                p_cfg->chan = chan_op;
+                p_cfg->uf = false;
+                p_cfg->cb = rwnx_rx_monitor_cb;
+                p_cfg->cb_arg = NULL;
+                p_cfg->rx_filter = (
+                    acceptOtherDataFrames |
+                    acceptQCFWOData |
+                    acceptQData |
+                    acceptCFWOData |
+                    acceptData |
+                    acceptOtherCntrlFrames |
+                    acceptOtherMgmtFrames |
+                    acceptProbeResp |
+                    acceptProbeReq |
+                    acceptMyUnicast |
+                    //acceptUnicast |
+                    acceptOtherBSSID |
+                    acceptBroadcast |
+                    //acceptMulticast |
+                    0);
+                wifi_api_msg_send(&mon_start);
+            }
+            else if (strcasecmp(argv[0], "STOP_MON") == 0) {
+                struct fhost_vif_tag *p_fvif = &fhost_env.vif[0];
+                int fvif_idx;
+                struct wifi_api_monitor_stop_tag mon_stop;
+                if (p_fvif == NULL) {
+                    DBG_APP_ERR("%s null fvif\n", __func__);
+                    break;
+                }
+                fvif_idx = fhost_vif_idx_from_vif_tag(p_fvif);
+                if ((fvif_idx < 0) || (fvif_idx >= NX_VIRT_DEV_MAX)) {
+                    DBG_APP_ERR("invalid fvif=%p, idx=%d\n", p_fvif, fvif_idx);
+                    break;
+                }
+                mon_stop.hdr.len = sizeof(struct wifi_api_monitor_stop_tag);
+                mon_stop.hdr.id  = WIFI_API_MONITOR_STOP;
+                mon_stop.fhost_vif_idx = fvif_idx;
+                wifi_api_msg_send(&mon_stop);
             } else if (strcasecmp(argv[0], "ADD_BLACK") == 0) {
                 CliPrint("Add Blacklist\r\n");
                 struct mac_addr macaddr;

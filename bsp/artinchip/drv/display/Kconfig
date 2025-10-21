@@ -138,6 +138,9 @@ choice
 config AIC_DISP_COLOR_BLOCK
     bool "Color Block"
 
+config AIC_DISP_BLACK_SCREEN
+    bool "Black Screen"
+
 config AIC_STARTUP_UI_SHOW
     bool "Bootup Animation"
     depends on LPKG_MPP

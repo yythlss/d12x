@@ -142,8 +142,9 @@ static unsigned char hex_pair_to_u8(char c1, char c2) {
 
 static void usage(char *app)
 {
-    printf("Usage: %s [Options], built on %s %s\n", app, __DATE__, __TIME__);
+    printf("Usage: %s [Options]\n", app);
     printf("\t-u, --usage \n");
+    printf("\t-d, --disp_type: print display type \n");
     printf("\t-t, --timing: config display timing \n");
     printf("\t-c, --connector: config display interface \n");
     printf("\t-g, --get: get aipq tools config \n");
@@ -523,7 +524,7 @@ static int aipq_config_test(int argc, char **argv)
     int connector_type = 1;
     int c, ret = 0;
 
-    const char sopts[] = "g:p:i:t:m:a:s:c:u";
+    const char sopts[] = "g:p:i:t:m:a:s:c:du";
     const struct option lopts[] = {
         {"timing",          required_argument, NULL, 't'},
         {"connector",       required_argument, NULL, 'c'},
@@ -533,6 +534,7 @@ static int aipq_config_test(int argc, char **argv)
         {"merge",           required_argument, NULL, 'm'},
         {"analysis",        required_argument, NULL, 'a'},
         {"spi-init",        required_argument, NULL, 's'},
+        {"disp_type",             no_argument, NULL, 'd'},
         {"usage",                 no_argument, NULL, 'u'},
         {0, 0, 0, 0}
     };
@@ -549,6 +551,14 @@ static int aipq_config_test(int argc, char **argv)
         case 'u':
             usage(argv[0]);
             return 0;
+        case 'd':
+        {
+            char *di_type[] = {"rgb", "lvds", "dsi", "dbi"};
+
+            printf("display interface type: %d (%s)\n",
+                    AIC_DI_TYPE, di_type[AIC_DI_TYPE - 1]);
+            return 0;
+        }
         case 'p':
         {
             u32 base = str2int(argv[2]);

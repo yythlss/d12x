@@ -455,6 +455,7 @@ int rwnx_send_add_if(struct rwnx_hw *rwnx_hw, struct mm_add_if_req *req, struct 
 {
     struct mm_add_if_req *add_if_req_param;
     int ret;
+    RWNX_DBG(RWNX_FN_ENTRY_STR);
 
     /* Build the ADD_IF_REQ message */
     add_if_req_param = rwnx_msg_zalloc(MM_ADD_IF_REQ, TASK_MM, DRV_TASK_ID,
@@ -1337,6 +1338,28 @@ int rwnx_send_scanu_req(struct rwnx_hw *rwnx_hw, struct scanu_start_req *start_r
         return -12;//ENOMEM;
 
     memcpy(req, start_req, sizeof_b(struct scanu_start_req));
+
+    #if 1
+    if (req->add_ie_len && req->add_ies) {
+        struct scanu_vendor_ie_req *ie_req = NULL;
+        ie_req = rwnx_msg_zalloc(SCANU_VENDOR_IE_REQ, TASK_SCANU, DRV_TASK_ID,
+                                 sizeof(struct scanu_vendor_ie_req));
+        if (!ie_req) {
+            rwnx_msg_free(rwnx_hw, req);
+            return -12;//ENOMEM;
+        }
+
+        ie_req->add_ie_len = req->add_ie_len;
+        ie_req->vif_idx = req->vif_idx;
+        memcpy(ie_req->ie, start_req->add_ies, req->add_ie_len);
+
+        err = rwnx_host_send_msg(rwnx_hw, ie_req, 1, SCANU_VENDOR_IE_CFM, NULL);
+        if (err)
+            aic_dbg("send msg(SCANU_VENDOR_IE_REQ) err: %d\n", err);
+    }
+    #endif
+    req->add_ie_len = 0;
+    req->add_ies = 0;
 
     /* Send the SCANU_START_REQ message to LMAC FW */
     err = rwnx_host_send_msg(rwnx_hw, req, 1,  SCANU_START_CFM_ADDTIONAL, NULL);

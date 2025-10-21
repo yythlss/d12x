@@ -67,7 +67,7 @@ void data_pkt_rssi_set(uint8_t *addr, int8_t rssi)
 }
 
 #if (AICWF_RWNX_TIMER_EN)
-#define RWNX_TIMER_COUNT    10
+#define RWNX_TIMER_COUNT    64
 
 struct rwnx_timer_tag {
     struct co_list free_list;
@@ -180,6 +180,7 @@ void rwnx_timer_task(void *arg)
             } else {
                 WRN_TIMER("rwnx_timer action invalid, [%p] %x\n", timer_hdl, msg.action);
             }
+            timer_hdl->action = RWNX_TIMER_ACTION_NONE;
         } else if (ret == AIC_RTOS_WAIT_ERROR) { // timed-out, callback funcs
             #if 1
             do {
@@ -298,10 +299,24 @@ void rwnx_timer_init(void)
 
 void rwnx_timer_deinit(void)
 {
-    ///TBD:
-    RTOS_RES_NULL(rwnx_timer_env.task_handle);
-    RTOS_RES_NULL(rwnx_timer_env.task_queue);
-	RTOS_RES_NULL(rwnx_timer_env.task_mutex);
+    uint32_t msg;
+    struct rwnx_timer_tag *timer_env = &rwnx_timer_env;
+    if (timer_env->task_handle) {
+        rtos_task_delete(timer_env->task_handle);
+        timer_env->task_handle = NULL;
+    }
+    if (timer_env->task_queue) {
+        while (!rtos_queue_is_empty(timer_env->task_queue)) {
+            rtos_queue_read(timer_env->task_queue, &msg, 30, false);
+            WRN_TIMER("timer_env->task_queue msg:%X\n", msg);
+        }
+        rtos_queue_delete(timer_env->task_queue);
+        timer_env->task_queue = NULL;
+    }
+    if (timer_env->task_mutex) {
+        rtos_mutex_delete(timer_env->task_mutex);
+        timer_env->task_mutex = NULL;
+    }
 }
 
 int rwnx_timer_create(rwnx_timer_handle *timer_ptr, uint32_t period_ms,
@@ -316,7 +331,7 @@ int rwnx_timer_create(rwnx_timer_handle *timer_ptr, uint32_t period_ms,
     do {
         timer_hdl = (rwnx_timer_handle)co_list_pop_front(&timer_env->free_list);
         if (timer_hdl == NULL) {
-            WRN_TIMER("rwnx_timer create fail\n");
+            ERR_TIMER("rwnx_timer create fail\n");
             ret = -1;
             break;
         }
@@ -326,18 +341,24 @@ int rwnx_timer_create(rwnx_timer_handle *timer_ptr, uint32_t period_ms,
         timer_hdl->expired_ms = rtos_now(false) + period_ms;
         timer_hdl->periodic = periodic;
         timer_hdl->auto_load = auto_load;
-        msg.action = RWNX_TIMER_ACTION_CREATE;
+        timer_hdl->action = msg.action = RWNX_TIMER_ACTION_CREATE;
         msg.hdl = timer_hdl;
         DBG_TIMER("rwnx_timer_create, timer_hdl=%p, ms=%d\n",timer_hdl,timer_hdl->expired_ms);
 
+        #if 0
 		do{
 			struct rwnx_timer_msg_s msg;
 			if(rtos_queue_is_full(timer_env->task_queue));
 			{
-				rtos_queue_read(timer_env->task_queue, &msg, 1, false);
+				WRN_TIMER("C: tmr q full, cnt=%d\n", rtos_queue_cnt(timer_env->task_queue));
+				int ret_rd = rtos_queue_read(timer_env->task_queue, &msg, 1, false);
+                if (ret_rd) {
+                    ERR_TIMER("C: tmr q rd fail: ret=%d\n", ret_rd);
+                }
 			}
 
 		}while(0);
+        #endif
 
         ret = rtos_queue_write(timer_env->task_queue, &msg, 0, false); // to be confirmed
         if (ret) {
@@ -357,29 +378,35 @@ int rwnx_timer_start(rwnx_timer_handle timer_hdl, uint32_t period_ms)
 {
     int ret = 0;
     if ((timer_hdl < &rwnx_timer_node_pool[0]) || (timer_hdl > &rwnx_timer_node_pool[RWNX_TIMER_COUNT - 1])) {
-        WRN_TIMER("rwnx_timer_start invalid handle=%p\n", timer_hdl);
+        ERR_TIMER("rwnx_timer_start invalid handle=%p\n", timer_hdl);
         ret = -1; // invalid ptr
     } else {
         struct rwnx_timer_tag *timer_env = &rwnx_timer_env;
         struct rwnx_timer_msg_s msg;
         rtos_mutex_lock(timer_env->task_mutex, -1);
         timer_hdl->expired_ms = rtos_now(false) + period_ms;
-        msg.action = RWNX_TIMER_ACTION_START;
+        timer_hdl->action = msg.action = RWNX_TIMER_ACTION_START;
         msg.hdl = timer_hdl;
         DBG_TIMER("rwnx_timer_start, timer_hdl=%p, ms=%d\n",timer_hdl,timer_hdl->expired_ms);
 
+        #if 0
 		do{
 			struct rwnx_timer_msg_s msg;
 			if(rtos_queue_is_full(timer_env->task_queue));
 			{
-				rtos_queue_read(timer_env->task_queue, &msg, 1, false);
+				WRN_TIMER("T: tmr q full, cnt=%d\n", rtos_queue_cnt(timer_env->task_queue));
+				int ret_rd = rtos_queue_read(timer_env->task_queue, &msg, 1, false);
+                if (ret_rd) {
+                    ERR_TIMER("T: tmr q rd fail: ret=%d\n", ret_rd);
+                }
 			}
 
 		}while(0);
+        #endif
 
         ret = rtos_queue_write(timer_env->task_queue, &msg, 0, false); // to be confirmed
         if (ret) {
-            WRN_TIMER("rwnx_timer_start queue write fail, ret=%x\n", ret);
+            ERR_TIMER("rwnx_timer_start queue write fail, ret=%x\n", ret);
 			ret = -2;
         }
         rtos_mutex_unlock(timer_env->task_mutex);
@@ -419,7 +446,7 @@ int rwnx_timer_restart(rwnx_timer_handle timer_hdl, uint32_t period_ms)
 {
     int ret = 0;
     if ((timer_hdl < &rwnx_timer_node_pool[0]) || (timer_hdl > &rwnx_timer_node_pool[RWNX_TIMER_COUNT - 1])) {
-        WRN_TIMER("rwnx_timer_start invalid handle=%p\n", timer_hdl);
+        ERR_TIMER("rwnx_timer_start invalid handle=%p\n", timer_hdl);
         ret = -1; // invalid ptr
     } else {
         struct rwnx_timer_tag *timer_env = &rwnx_timer_env;
@@ -427,7 +454,7 @@ int rwnx_timer_restart(rwnx_timer_handle timer_hdl, uint32_t period_ms)
         rtos_mutex_lock(timer_env->task_mutex, -1);
         timer_hdl->expired_ms = rtos_now(false) + period_ms;
         //if (timer_hdl->action != RWNX_TIMER_ACTION_RESTART) {
-            msg.action = RWNX_TIMER_ACTION_RESTART;
+            timer_hdl->action = msg.action = RWNX_TIMER_ACTION_RESTART;
             msg.hdl = timer_hdl;
             DBG_TIMER("rwnx_timer_restart, timer_hdl=%p, ms=%d\n",timer_hdl,timer_hdl->expired_ms);
             ret = rtos_queue_write(timer_env->task_queue, &msg, 0, false); // to be confirmed
@@ -445,24 +472,29 @@ int rwnx_timer_stop(rwnx_timer_handle timer_hdl)
 {
     int ret = 0;
     if ((timer_hdl < &rwnx_timer_node_pool[0]) || (timer_hdl > &rwnx_timer_node_pool[RWNX_TIMER_COUNT - 1])) {
-        WRN_TIMER("rwnx_timer_stop invalid handle=%p\n", timer_hdl);
+        ERR_TIMER("rwnx_timer_stop invalid handle=%p\n", timer_hdl);
         ret = -1; // invalid ptr
     } else {
         struct rwnx_timer_tag *timer_env = &rwnx_timer_env;
         struct rwnx_timer_msg_s msg;
         rtos_mutex_lock(timer_env->task_mutex, -1);
-        msg.action = RWNX_TIMER_ACTION_STOP;
+        timer_hdl->action = msg.action = RWNX_TIMER_ACTION_STOP;
         msg.hdl = timer_hdl;
 
+        #if 0
 		do{
 			struct rwnx_timer_msg_s msg;
 			if(rtos_queue_is_full(timer_env->task_queue));
 			{
-				rtos_queue_read(timer_env->task_queue, &msg, 1, false);
+				WRN_TIMER("P: tmr q full, cnt=%d\n", rtos_queue_cnt(timer_env->task_queue));
+				int ret_rd = rtos_queue_read(timer_env->task_queue, &msg, 1, false);
+                if (ret_rd) {
+                    ERR_TIMER("P: tmr q rd fail: ret=%d\n", ret_rd);
+                }
 			}
 
 		}while(0);
-
+        #endif
 
         DBG_TIMER("rwnx_timer_stop, timer_hdl=%p\n",timer_hdl);
         ret = rtos_queue_write(timer_env->task_queue, &msg, 0, false); // to be confirmed
@@ -479,13 +511,13 @@ int rwnx_timer_delete(rwnx_timer_handle timer_hdl)
 {
     int ret = 0;
     if ((timer_hdl < &rwnx_timer_node_pool[0]) || (timer_hdl > &rwnx_timer_node_pool[RWNX_TIMER_COUNT - 1])) {
-        WRN_TIMER("rwnx_timer_delete invalid handle=%p\n", timer_hdl);
+        ERR_TIMER("rwnx_timer_delete invalid handle=%p\n", timer_hdl);
         ret = -1; // invalid ptr
     } else {
         struct rwnx_timer_tag *timer_env = &rwnx_timer_env;
         struct rwnx_timer_msg_s msg;
         rtos_mutex_lock(timer_env->task_mutex, -1);
-        msg.action = RWNX_TIMER_ACTION_DELETE;
+        timer_hdl->action = msg.action = RWNX_TIMER_ACTION_DELETE;
         msg.hdl = timer_hdl;
         DBG_TIMER("rwnx_timer_delete, timer_hdl=%p\n",timer_hdl);
 
@@ -513,7 +545,7 @@ bool rwnx_timer_is_posted(rwnx_timer_handle timer_hdl)
 {
     bool posted = false;
     if ((timer_hdl < &rwnx_timer_node_pool[0]) || (timer_hdl > &rwnx_timer_node_pool[RWNX_TIMER_COUNT - 1])) {
-        WRN_TIMER("rwnx_timer_is_posted invalid handle=%p\n", timer_hdl);
+        ERR_TIMER("rwnx_timer_is_posted invalid handle=%p\n", timer_hdl);
     } else {
         struct rwnx_timer_tag *timer_env = &rwnx_timer_env;
         rtos_mutex_lock(timer_env->task_mutex, -1);
@@ -523,6 +555,22 @@ bool rwnx_timer_is_posted(rwnx_timer_handle timer_hdl)
         rtos_mutex_unlock(timer_env->task_mutex);
     }
     return posted;
+}
+
+bool rwnx_timer_action_in_progress(rwnx_timer_handle timer_hdl, enum rwnx_timer_action_e action)
+{
+    bool action_in_prog = false;
+    if ((timer_hdl < &rwnx_timer_node_pool[0]) || (timer_hdl > &rwnx_timer_node_pool[RWNX_TIMER_COUNT - 1])) {
+        ERR_TIMER("rwnx_timer_is_posted invalid handle=%p\n", timer_hdl);
+    } else {
+        struct rwnx_timer_tag *timer_env = &rwnx_timer_env;
+        rtos_mutex_lock(timer_env->task_mutex, -1);
+        if (timer_hdl->action == action) {
+            action_in_prog = true;
+        }
+        rtos_mutex_unlock(timer_env->task_mutex);
+    }
+    return action_in_prog;
 }
 #endif
 
@@ -786,7 +834,7 @@ bool reord_rxframes_process(struct reord_ctrl *preorder_ctrl, int bforced)
     prframe = (struct recv_msdu *)co_list_pick(&preorder_ctrl->reord_list);
     if (bforced == true && prframe != NULL) {
         preorder_ctrl->ind_sn = prframe->seq_num;
-        DBG_REORD("reord force ind_sn=%d,%d\n", preorder_ctrl->ind_sn,prframe->buf_len);
+        WRN_REORD("reord force ind_sn=%d,%d\n", preorder_ctrl->ind_sn,prframe->buf_len);
     }
     while (prframe) {
         if (!SN_LESS(preorder_ctrl->ind_sn, prframe->seq_num)) {
@@ -800,7 +848,7 @@ bool reord_rxframes_process(struct reord_ctrl *preorder_ctrl, int bforced)
         prframe = (struct recv_msdu *)co_list_next(&prframe->hdr);
     }
     if (prev_sn != preorder_ctrl->ind_sn) {
-        DBG_REORD("reord process set ind_sn=%d\n", preorder_ctrl->ind_sn);
+        WRN_REORD("reord process set ind_sn=%d\n", preorder_ctrl->ind_sn);
     }
     return bPktInBuf;
 }
@@ -810,10 +858,11 @@ void reord_rxframes_ind(struct reord_ctrl *preorder_ctrl)
     struct co_list *reord_list;
     struct recv_msdu *prframe;
     reord_list = &preorder_ctrl->reord_list;
+    rtos_mutex_lock(preorder_ctrl->reord_list_lock, -1);
     if (co_list_is_empty(reord_list)) {
+        rtos_mutex_unlock(preorder_ctrl->reord_list_lock);
         return;
     }
-    rtos_mutex_lock(preorder_ctrl->reord_list_lock, -1);
     do {
         prframe = (struct recv_msdu *)co_list_pick(reord_list);
         if (!prframe) {
@@ -890,7 +939,7 @@ void reord_timeout_handler(void *arg,void *arg1)
 {
     struct reord_ctrl *preorder_ctrl = (struct reord_ctrl *)arg;
 	struct reord_ctrl_info *reord_info = (struct reord_ctrl_info *)arg1;
-    DBG_REORD("reord TO\n");
+    WRN_REORD("reord TO\n");
 
     rtos_mutex_lock(stas_reord_lock, -1);
 	bool find = co_list_find(&stas_reord_list, &reord_info->hdr);
@@ -913,7 +962,7 @@ void reord_timeout_handler(void *arg,void *arg1)
         int ret;
         #if (AICWF_RWNX_TIMER_EN)
         if (preorder_ctrl->reord_timer) {
-            DBG_REORD("reord_timeout_handler, start timer,ind_sn=%d,cnt=%d\n",preorder_ctrl->ind_sn,preorder_ctrl->list_cnt);
+            WRN_REORD("reord_timeout_handler, start timer,ind_sn=%d,cnt=%d\n",preorder_ctrl->ind_sn,preorder_ctrl->list_cnt);
             #ifndef CONFIG_RWNX_TIMER_TASK_PB
             rwnx_timer_start(preorder_ctrl->reord_timer, REORDER_UPDATE_TIME);
             #else /* CONFIG_RWNX_TIMER_TASK_PB */
@@ -962,7 +1011,7 @@ int reord_process_unit(struct fhost_rx_buf_tag *buf, uint16_t seq_num, uint8_t *
 
     pframe = reord_rxframe_alloc(buf, seq_num, tid, forward);
     if (pframe == NULL) {
-        WRN_REORD("reord rxframe alloc fail\n");
+        ERR_REORD("reord rxframe alloc fail\n");
         return -1;
     }
     rtos_mutex_lock(stas_reord_lock, -1);
@@ -1019,10 +1068,13 @@ int reord_process_unit(struct fhost_rx_buf_tag *buf, uint16_t seq_num, uint8_t *
     }
 
     #ifndef CONFIG_RWNX_TIMER_TASK_PB
-    if (reord_rxframes_process(preorder_ctrl, false) == true) {
+    ret = reord_rxframes_process(preorder_ctrl, false);
+    rtos_mutex_unlock(preorder_ctrl->reord_list_lock);
+    if (ret == true) { //wait ind_sn frame
         #if (AICWF_RWNX_TIMER_EN)
         if (preorder_ctrl->reord_timer) {
-            if (!rwnx_timer_is_posted(preorder_ctrl->reord_timer)) {
+            if (!rwnx_timer_is_posted(preorder_ctrl->reord_timer) &&
+                !rwnx_timer_action_in_progress(preorder_ctrl->reord_timer, RWNX_TIMER_ACTION_START)) {
                 WRN_REORD("reord_process_unit, start timer,ind_sn=%d,cnt=%d\n", preorder_ctrl->ind_sn,preorder_ctrl->list_cnt);
                 rwnx_timer_start(preorder_ctrl->reord_timer, REORDER_UPDATE_TIME);
             } else {
@@ -1054,8 +1106,9 @@ int reord_process_unit(struct fhost_rx_buf_tag *buf, uint16_t seq_num, uint8_t *
     } else {
         if (preorder_ctrl->reord_timer) {
             #if (AICWF_RWNX_TIMER_EN)
-            if (rwnx_timer_is_posted(preorder_ctrl->reord_timer)) {
-                DBG_REORD("reord_process_unit, stop timer,ind_sn=%d,cnt=%d\n",preorder_ctrl->ind_sn,preorder_ctrl->list_cnt);
+            if (rwnx_timer_is_posted(preorder_ctrl->reord_timer) &&
+                !rwnx_timer_action_in_progress(preorder_ctrl->reord_timer, RWNX_TIMER_ACTION_STOP)) {
+                WRN_REORD("reord_process_unit, stop timer,ind_sn=%d,cnt=%d\n",preorder_ctrl->ind_sn,preorder_ctrl->list_cnt);
                 rwnx_timer_stop(preorder_ctrl->reord_timer);
             } else {
                 DBG_REORD("reord timer stoped\n");
@@ -1067,7 +1120,6 @@ int reord_process_unit(struct fhost_rx_buf_tag *buf, uint16_t seq_num, uint8_t *
             #endif
         }
     }
-    rtos_mutex_unlock(preorder_ctrl->reord_list_lock);
     #else /* CONFIG_RWNX_TIMER_TASK_PB */
     ret = reord_rxframes_process(preorder_ctrl, false);
     rtos_mutex_unlock(preorder_ctrl->reord_list_lock);
@@ -1144,12 +1196,16 @@ int rwnx_rxdataind_aicwf(struct fhost_rx_buf_tag *buf)
     uint8_t tid = 0;
     struct fhost_vif_tag *fhost_vif;
     bool resend = false, forward = true;
+    if (info->flags & RX_FLAGS_MONITOR_BIT) {
+        fhost_rx_monitor_cb(buf, false);
+        // return -1; // p2p + monitor
+    }
     if ((info->flags & RX_FLAGS_UPLOAD_BIT) == 0) {
         WRN_REORD("rxdata not upload\n");
         return -1;
     }
     if (info->flags & RX_FLAGS_NON_MSDU_MSK) {
-        WRN_REORD("rxdata is nonmasdu\n");
+        DBG_REORD("rxdata is nonmasdu\n");
         #ifdef CONFIG_RX_NOCOPY
         fhost_rx_buf_forward(buf, NULL, false);
         #else

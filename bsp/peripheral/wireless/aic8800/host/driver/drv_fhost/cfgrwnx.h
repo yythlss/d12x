@@ -140,6 +140,39 @@ enum cfgrwnx_msg_index {
     CFGRWNX_SET_PS_MODE_RESP,
 
     CFGRWNX_CH_SWITCH_EVENT,
+    /// Request to remain on specific channel (param: @ref cfgrwnx_remain_on_channel)
+    CFGRWNX_REMAIN_ON_CHANNEL_CMD,
+    /// Response to CFGRWNX_REMAIN_ON_CHANNEL_CMD. Only indicates if request was valid or
+    /// not. The actual status will be in CFGRWNX_REMAIN_ON_CHANNEL_EVENT (param: @ref
+    /// cfgrwnx_resp)
+    CFGRWNX_REMAIN_ON_CHANNEL_RESP,
+    /// Event sent after receiving CFGRWNX_REMAIN_ON_CHANNEL_CMD, to indicate that the
+    /// procedure is completed (param: @ref cfgrwnx_remain_on_channel_event)
+    CFGRWNX_REMAIN_ON_CHANNEL_EVENT,
+    /// Request to cancel remain on channel (param: @ref cfgrwnx_cancel_remain_on_channel)
+    CFGRWNX_CANCEL_REMAIN_ON_CHANNEL_CMD,
+    /// Response to CFGRWNX_CANCEL_REMAIN_ON_CHANNEL_CMD. Only indicates if request was
+    /// valid or not. The actual status will be in CFGRWNX_CANCEL_REMAIN_ON_CHANNEL_EVENT
+    /// (param: @ref cfgrwnx_resp)
+    CFGRWNX_CANCEL_REMAIN_ON_CHANNEL_RESP,
+    /// Event sent after receiving CFGRWNX_CANCEL_REMAIN_ON_CHANNEL_CMD, to indicate that
+    /// the procedure is completed (param: @ref cfgrwnx_remain_on_channel_event)
+    CFGRWNX_REMAIN_ON_CHANNEL_EXP_EVENT,
+
+    CFGRWNX_CANCEL_REMAIN_ON_CHANNEL_EVENT,
+    /// Request by Application to setup NOA protocol (param: @ref cfgrwnx_p2p_noa_cmd)
+    CFGRWNX_P2P_NOA_CMD,
+    /// Response to CFGRWNX_P2P_NOA_CMD (param: @ref cfgrwnx_resp)
+    CFGRWNX_P2P_NOA_RESP,
+    /// Notified by supplicant to indicate P2P Provision Discovery Request received (param: @ref cfgrwnx_p2p_prov_disc_req_note)
+    CFGRWNX_P2P_PROV_DISC_REQ_NOTE,
+
+    #ifdef CFG_SOFTAP
+    /// Sent by Supplicant to update the beacon (param: @ref cfgrwnx_bcn_update)
+    CFGRWNX_AP_UPDATE_BASICRATE_CMD,
+    /// Response to CFGRWNX_BCN_UPDATE (param: @ref cfgrwnx_resp)
+    CFGRWNX_AP_UPDATE_BASICRATE_RESP,
+    #endif
 };
 
 /// CFGRWNX status
@@ -723,6 +756,77 @@ struct cfgrwnx_set_ps_mode {
     uint16_t fhost_vif_idx;
     /// PS mode status
     bool enabled;
+};
+
+/// structure for CFGRWNX_REMAIN_ON_CHANNEL_CMD
+struct cfgrwnx_roc_cmd {
+    /// header
+    struct cfgrwnx_msg_hdr hdr;
+    /// freq
+    unsigned int freq;
+    /// duration
+    unsigned int duration;
+    /// Index of the FHOST vif
+    int fhost_vif_idx;
+    /// event socket
+    int sock;
+};
+
+/// structure for CFGRWNX_CANCEL_REMAIN_ON_CHANNEL_CMD
+struct cfgrwnx_cancel_roc_cmd {
+    /// header
+    struct cfgrwnx_msg_hdr hdr;
+    /// Index of the FHOST
+    int fhost_vif_idx;
+};
+
+/// structcure for CFGRWNX_ROC_EVENT
+struct cfgrwnx_roc_event {
+    /// header
+    struct cfgrwnx_msg_hdr hdr;
+    /// ieee80211_channel center_freq
+    uint32_t center_freq;
+    /// duration ms
+    unsigned int duration;
+};
+
+/// Structure for CFGRWNX_P2P_NOA_CMD
+struct cfgrwnx_p2p_noa_cmd
+{
+    /// header
+    struct cfgrwnx_msg_hdr hdr;
+    /// Vif idx
+    uint16_t fhost_vif_idx;
+    /// Count
+    uint8_t count;
+    /// Duration (in us)
+    uint32_t duration_us;
+    /// Interval (in us)
+    uint32_t interval_us;
+    /// Indicate if NoA can be paused for traffic reason
+    bool dyn_noa;
+};
+
+/// Structure for CFGRWNX_P2P_PROV_DISC_REQ_NOTE
+struct cfgrwnx_p2p_prov_disc_req_note {
+    /// header
+    struct cfgrwnx_msg_hdr hdr;
+    /// Vif idx
+    uint16_t fhost_vif_idx;
+    /// Reserved
+    uint8_t reserved0[2];
+    /// mac_peer
+    struct mac_addr mac_peer;
+};
+
+/// Structure for CFGRWNX_AP_UPDATE_BASICRATE
+struct cfgrwnx_ap_update_basicrate {
+    /// header
+    struct cfgrwnx_msg_hdr hdr;
+    /// Vif idx
+    uint16_t fhost_vif_idx;
+    /// Basic rates
+    struct mac_rateset basic_rates;
 };
 
 /**

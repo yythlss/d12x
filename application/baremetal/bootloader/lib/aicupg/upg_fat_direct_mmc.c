@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, Artinchip Technology Co., Ltd
+ * Copyright (c) 2024-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -13,14 +13,15 @@
 #include <upg_internal.h>
 #include <aic_core.h>
 #include <aicupg.h>
-#include <fatfs.h>
 #include <aic_utils.h>
 #include <sparse_format.h>
 #include <upg_fat_direct.h>
+#include <dfs_file.h>
 
 static int fat_direct_mmc_write_raw(struct aic_sdmc *host, char *fpath,
                                     u32 doffset)
 {
+    struct dfs_fd fd;
     u8 *buf = NULL;
     int ret = 0, endflag = 0;
     u32 soffset, start, count;
@@ -28,6 +29,12 @@ static int fat_direct_mmc_write_raw(struct aic_sdmc *host, char *fpath,
 
     printf("Programming %s to 0x%x\n", fpath, doffset);
     printf("\t");
+
+    if (dfs_file_open(&fd, fpath, O_RDONLY) < 0) {
+        printf("Open %s failed.\n", fpath);
+        return -1;
+    }
+
     buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     soffset = 0;
     writecnt = 0;
@@ -35,8 +42,16 @@ static int fat_direct_mmc_write_raw(struct aic_sdmc *host, char *fpath,
     while (1) {
         actread = 0;
         dolen = MAX_WRITE_SIZE;
-        ret = aic_fat_read_file(fpath, (void *)buf, soffset, dolen, &actread);
-        if (ret) {
+        if (dfs_file_lseek(&fd, soffset) != soffset) {
+            printf("Error:seek file %s failed!\n", fpath);
+            ret = 0;
+            break;
+        }
+
+        actread = dfs_file_read(&fd, buf, dolen);
+        if (actread <= 0) {
+            pr_err("Error:read file %s failed!\n", fpath);
+            ret = 0;
             break;
         }
         pr_debug("Going to read %ld from offset 0x%x, got 0x%ld\n", dolen,
@@ -63,6 +78,7 @@ static int fat_direct_mmc_write_raw(struct aic_sdmc *host, char *fpath,
 
     if (buf)
         aicupg_free_align(buf);
+    dfs_file_close(&fd);
     printf("\n");
     return ret;
 }
@@ -70,6 +86,7 @@ static int fat_direct_mmc_write_raw(struct aic_sdmc *host, char *fpath,
 static int fat_direct_mmc_write_sparse(struct aic_sdmc *host, char *fpath,
                                        u32 doffset)
 {
+    struct dfs_fd fd;
     u32 soffset, i, chunk, fill_val, chunk_blkcnt, doblk, blk_start, blks;
     ulong dolen, actread;
     u8 *buf = NULL, *p;
@@ -79,12 +96,26 @@ static int fat_direct_mmc_write_sparse(struct aic_sdmc *host, char *fpath,
 
     printf("Programming %s to 0x%x\n", fpath, doffset);
     printf("\t");
+
+    if (dfs_file_open(&fd, fpath, O_RDONLY) < 0) {
+        printf("Open %s failed.\n", fpath);
+        ret = -1;
+        goto out;
+    }
+
     buf = aicupg_malloc_align(MAX_WRITE_SIZE, FRAME_LIST_SIZE);
     soffset = 0;
 
     dolen = MAX_WRITE_SIZE;
-    ret = aic_fat_read_file(fpath, (void *)buf, soffset, dolen, &actread);
-    if (ret) {
+    if (dfs_file_lseek(&fd, soffset) != soffset) {
+        printf("Error:seek file %s failed!\n", fpath);
+        ret = -1;
+        goto out;
+    }
+
+    actread = dfs_file_read(&fd, buf, dolen);
+    if (actread <= 0) {
+        pr_err("Error:read file %s failed!\n", fpath);
         ret = -1;
         goto out;
     }
@@ -117,11 +148,19 @@ static int fat_direct_mmc_write_sparse(struct aic_sdmc *host, char *fpath,
 
         /* There are 4 bytes data for FILL/CRC32, read 4bytes more here first */
         dolen = sheader.chunk_hdr_sz + 4;
-        ret = aic_fat_read_file(fpath, (void *)p, soffset, dolen, &actread);
-        if (ret) {
+        if (dfs_file_lseek(&fd, soffset) != soffset) {
+            printf("Error:seek file %s failed!\n", fpath);
             ret = -1;
             goto out;
         }
+
+        actread = dfs_file_read(&fd, p, dolen);
+        if (actread <= 0) {
+            pr_err("Error:read file %s failed!\n", fpath);
+            ret = -1;
+            goto out;
+        }
+
         /* Read and skip over chunk header */
         cheader = (chunk_header_t *)p;
 
@@ -155,9 +194,15 @@ static int fat_direct_mmc_write_sparse(struct aic_sdmc *host, char *fpath,
                 }
 
                 dolen = chunk_data_sz;
-                ret = aic_fat_read_file(fpath, (void *)p, soffset, dolen,
-                                        &actread);
-                if (ret) {
+                if (dfs_file_lseek(&fd, soffset) != soffset) {
+                    printf("Error:seek file %s failed!\n", fpath);
+                    ret = -1;
+                    goto out;
+                }
+
+                actread = dfs_file_read(&fd, p, dolen);
+                if (actread <= 0) {
+                    pr_err("Error:read file %s failed!\n", fpath);
                     ret = -1;
                     goto out;
                 }
@@ -226,6 +271,7 @@ static int fat_direct_mmc_write_sparse(struct aic_sdmc *host, char *fpath,
 out:
     if (buf)
         aicupg_free_align(buf);
+    dfs_file_close(&fd);
     printf("\n");
     return ret;
 }

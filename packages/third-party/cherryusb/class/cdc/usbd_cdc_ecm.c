@@ -35,7 +35,7 @@ static uint32_t g_connect_speed_table[2] = { CDC_ECM_CONNECT_SPEED_UPSTREAM,
 
 void usbd_cdc_ecm_send_notify(uint8_t notifycode, uint8_t value, uint32_t *speed)
 {
-    struct cdc_ecm_notification *notify = (struct cdc_ecm_notification *)g_cdc_ecm_notify_buf;
+    struct cdc_eth_notification *notify = (struct cdc_eth_notification *)g_cdc_ecm_notify_buf;
     uint8_t bytes2send = 0;
 
     notify->bmRequestType = CDC_ECM_BMREQUEST_TYPE_ECM;
@@ -89,7 +89,7 @@ static int cdc_ecm_class_interface_request_handler(struct usb_setup_packet *setu
 
     switch (setup->bRequest) {
         case CDC_REQUEST_SET_ETHERNET_PACKET_FILTER:
-            /* bit0 Promiscuous 
+            /* bit0 Promiscuous
              * bit1 ALL Multicast
              * bit2 Directed
              * bit3 Broadcast
@@ -145,6 +145,7 @@ void cdc_ecm_bulk_in(uint8_t ep, uint32_t nbytes)
         /* send zlp */
         usbd_ep_start_write(ep, NULL, 0);
     } else {
+        usbd_cdc_ecm_data_send_done(g_cdc_ecm_tx_data_length);
         g_cdc_ecm_tx_data_length = 0;
     }
 }
@@ -164,10 +165,6 @@ uint8_t *usbd_cdc_ecm_get_tx_buffer(void)
 
 int usbd_cdc_ecm_start_write(uint32_t length)
 {
-    if (g_cdc_ecm_tx_data_length > 0) {
-        return -USB_ERR_BUSY;
-    }
-
     g_cdc_ecm_tx_data_length = length;
 
     USB_LOG_DBG("txlen:%d\r\n", g_cdc_ecm_tx_data_length);

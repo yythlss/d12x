@@ -15,7 +15,7 @@ if RT_USING_LWIP
             can be selected.
     choice
         prompt "lwIP version"
-        default RT_USING_LWIP203
+        default RT_USING_LWIP212
         help
             Select the lwIP version
 
@@ -131,37 +131,36 @@ if RT_USING_LWIP
 
     config RT_MEMP_NUM_NETCONN
         int "the number of struct netconns"
-        default 8
+        default 64
 
     config RT_LWIP_PBUF_NUM
         int "the number of PBUF"
-        default 16
+        default 64
 
     config RT_LWIP_RAW_PCB_NUM
         int "the number of raw connection"
-        default 4
+        default 64
 
     config RT_LWIP_UDP_PCB_NUM
         int "the number of UDP socket"
-        default 8 if RT_USING_DFS_NFS
-        default 4
+        default 64
 
     if RT_LWIP_TCP
     config RT_LWIP_TCP_PCB_NUM
         int "the number of TCP socket"
-        default 4
+        default 64
 
     config RT_LWIP_TCP_SEG_NUM
         int "the number of TCP segment"
-        default 40
+        default 512
 
     config RT_LWIP_TCP_SND_BUF
         int "the size of send buffer"
-        default 8196
+        default 65535
 
     config RT_LWIP_TCP_WND
         int "the size of TCP send window"
-        default 8196
+        default 65535
     endif
 
     config RT_LWIP_TCPTHREAD_PRIORITY
@@ -170,12 +169,11 @@ if RT_USING_LWIP
 
     config RT_LWIP_TCPTHREAD_MBOX_SIZE
         int "the number of mail in the lwIP thread mailbox"
-        default 8
+        default 128
 
     config RT_LWIP_TCPTHREAD_STACKSIZE
         int "the stack size of lwIP thread"
-        default 2048 if ARCH_CPU_64BIT
-        default 1024
+        default 4096
 
     config LWIP_NO_RX_THREAD
         bool "Not use Rx thread"
@@ -191,8 +189,7 @@ if RT_USING_LWIP
 
     config RT_LWIP_ETHTHREAD_STACKSIZE
         int "the stack size of ethernet thread"
-        default 2048 if ARCH_CPU_64BIT
-        default 1024
+        default 8192
 
     config RT_LWIP_ETHTHREAD_MBOX_SIZE
         int "the number of mail in the ethernet thread mailbox"
@@ -256,7 +253,7 @@ if RT_USING_LWIP
 
     config LWIP_USING_DHCPD
         bool "Enable DHCP server"
-        default n
+        default y
 
     if LWIP_USING_DHCPD
         config DHCPD_SERVER_IP

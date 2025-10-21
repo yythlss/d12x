@@ -7,10 +7,8 @@
 #ifndef _SID31_ROUTINE_CONTROL_H_
 #define _SID31_ROUTINE_CONTROL_H_
 
-
 #include <stdint.h>
 #include "uds_def.h"
-
 
 /******************************************************************************
 * 函数名称: void service_31_RoutineControl(const uint8_t* msg_buf, uint16_t msg_dlc)
@@ -21,8 +19,7 @@
 * 函数返回: 无
 * 其它说明: 无
 ******************************************************************************/
-void service_31_RoutineControl(const uint8_t* msg_buf, uint16_t msg_dlc);
-
+void service_31_RoutineControl(const uint8_t *msg_buf, uint16_t msg_dlc);
 
 /******************************************************************************
 * 函数名称: bool_t service_31_check_len(const uint8_t* msg_buf, uint16_t msg_dlc)
@@ -32,7 +29,7 @@ void service_31_RoutineControl(const uint8_t* msg_buf, uint16_t msg_dlc);
 * 函数返回: TRUE: 合法; FALSE: 非法
 * 其它说明: 无
 ******************************************************************************/
-bool_t service_31_check_len(const uint8_t* msg_buf, uint16_t msg_dlc);
+bool_t service_31_check_len(const uint8_t *msg_buf, uint16_t msg_dlc);
 
 #endif
 

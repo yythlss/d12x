@@ -341,6 +341,7 @@ static int aic_de_timing_enable(void)
                 comp->dither.enable);
 
     de_check_ui_alpha(comp);
+    de_ui_bg_blending_enable(comp->regs, 0);
     de_ui_alpha_blending_enable(comp->regs, comp->alpha[1].value,
                     comp->alpha[1].mode,
                     comp->alpha[1].enable);

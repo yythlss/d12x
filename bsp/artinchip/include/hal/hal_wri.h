@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -17,7 +17,7 @@
 #define WRI_SYS_BAK             (WRI_BASE + 0x104)
 #define WRI_VERSION             (WRI_BASE + 0xFFC)
 
-#if defined(AIC_WRI_DRV_V12)
+#if defined(AIC_WRI_DRV_V12) || defined(AIC_WRI_DRV_V16)
 #define REG_BOOT_INFO                           WRI_BOOT_INFO
 #define GET_REG_STATUS(c)                       readl(c)
 #define BOOT_INFO_SET(val, mask, shift, cur)    writel_bits(val, mask, shift, REG_BOOT_INFO)
@@ -53,51 +53,26 @@
 #define WRI_REBOOT_REASON_MASK  GENMASK(7, 4)
 #define WRI_REBOOT_REASON_SHIFT 4
 
-#if defined(AIC_WRI_DRV_V12) || defined(AIC_WRI_DRV_V11) || defined(AIC_WRI_DRV_V10)
+#if defined(AIC_WRI_DRV_V12) || defined(AIC_WRI_DRV_V11) || defined(AIC_WRI_DRV_V10) || defined(AIC_WRI_DRV_V16)
 enum aic_warm_reset_type {
-    WRI_TYPE_ERR = 0,
-    WRI_TYPE_POR = WRI_TYPE_ERR,
+    WRI_TYPE_POR = 0,
     WRI_TYPE_RTC,
     WRI_TYPE_EXT,
     WRI_TYPE_DM,
     WRI_TYPE_WDT,
+    WRI_TYPE_WDT_FORCE,
     WRI_TYPE_TSEN,
     WRI_TYPE_CMP,
+    WRI_TYPE_BOR,
     WRI_TYPE_MAX
 };
-#endif
 
-#if defined(AIC_WRI_DRV_V13)
-enum aic_warm_reset_type {
-    WRI_TYPE_ERR = 0,
-    WRI_TYPE_VDD11_SP_POR = WRI_TYPE_ERR,
-    WRI_TYPE_VDD11_SW_POR,
-    WRI_TYPE_VDD11_C908_POR,
-    WRI_TYPE_RTC_POR,
-    WRI_TYPE_PIN_RST,
-    WRI_TYPE_THS_RST,
-    WRI_TYPE_SP_WDOG_SYS_RST,
-    WRI_TYPE_SP_WDOG_CPU_RST,
-    WRI_TYPE_SP_DM_NDM_RST,
-    WRI_TYPE_SP_DM_CPU_RST,
-    WRI_TYPE_CS_WDOG_SYS_RST,
-    WRI_TYPE_CS_WDOG_CPU_RST,
-    WRI_TYPE_CS_DM_NDM_RST,
-    WRI_TYPE_CS_DM_CPU_RST,
-    WRI_TYPE_SC_WDOG_SYS_RST,
-    WRI_TYPE_SC_WDOG_CPU_RST,
-    WRI_TYPE_SC_DM_NDM_RST,
-    WRI_TYPE_SC_DM_CPU_RST,
-    WRI_TYPE_SE_WDOG_SYS_RST,
-    WRI_TYPE_SE_WDOG_CPU_RST,
-    WRI_TYPE_SE_DM_NDM_RST,
-    WRI_TYPE_MAX
-};
+#define WRI_TYPE_ERR    WRI_TYPE_POR
 #endif
 
 struct aic_wri_ops {
     u32 *wri_bit;
-    enum aic_warm_reset_type (*reset_type)(enum aic_warm_reset_type hw);
+    int (*is_wdt_reset)(enum aic_warm_reset_type hw);
     void (*hw_reboot_action)(enum aic_warm_reset_type hw);
     void (*sw_reboot_reason)(enum aic_reboot_reason sw,
                              enum aic_reboot_reason r);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -28,11 +28,11 @@
 #define AIC_PSADC_VOLTAGE_ACCURACY   10000
 
 static rt_adc_device_t psadc_dev;
-static const char sopts[] = "t:n:rsh";
+static const char sopts[] = "t:n:w:sh";
 static const struct option lopts[] = {
     {"voltage", required_argument, NULL, 't'},
     {"number",  required_argument, NULL, 'n'},
-    {"read",          no_argument, NULL, 'r'},
+    {"window",  required_argument, NULL, 'w'},
     {"status",        no_argument, NULL, 's'},
     {"help",          no_argument, NULL, 'h'},
     {0, 0, 0, 0}
@@ -42,34 +42,36 @@ static const struct option lopts[] = {
 
 static void cmd_psadc_usage(char *program)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: %s [options]\n", program);
-    printf("\t -r, --read\t\tRead the adc value\n");
     printf("\t -t, --voltage\t\tSet default voltage\n");
     printf("\t -s, --status\t\tShow more hardware information\n");
     printf("\t -n, --number\t\tSet the number of samples, default is 10\n");
+    printf("\t -w, --window\t\tOnly show sample rate within the window\n");
     printf("\t -h, --help \n");
     printf("\n");
-    printf("Example: %s -r -t 3 -n 10\n", program);
+    printf("Example: %s -t 3 -n 10\n", program);
 }
 
-static void test_psadc_adc2voltage(float ref_voltage, int adc_value)
+static int test_psadc_adc2voltage(float ref_voltage, int adc_value)
 {
-    int voltage;
-
-    voltage = (adc_value * (ref_voltage / 100)) / AIC_PSADC_ADC_MAX_VAL;
-
-    rt_kprintf(" %d.%02d V", voltage / 100, voltage % 100);
-    return;
+    return (adc_value * (ref_voltage / 100)) / AIC_PSADC_ADC_MAX_VAL;
 }
 
-int psadc_get_adc(float def_voltage, int sample_num)
+static void show_sample_rate(u32 cnt, u32 window, u64 start_us)
+{
+    u64 elapse = aic_get_time_us() - start_us;
+
+    printf("Cnt %d, Sample rate: %ld Hz\n", cnt,
+           (long)(((u64)window * 1000000ULL) / elapse));
+}
+
+int psadc_get_adc(float def_voltage, int sample_num, u32 window)
 {
     int ret = 0;
     u32 adc_values[AIC_PSADC_CH_NUM];
-    int cnt = 0;
+    int cnt = 0, i, voltage = 0;
     int chan_cnt = 0;
-    u64 start_us, end_us;
+    u64 start_us = 0, end_us = 0;
     int ref_voltage = 0;
 
     psadc_dev = (rt_adc_device_t)rt_device_find(AIC_PSADC_NAME);
@@ -85,65 +87,86 @@ int psadc_get_adc(float def_voltage, int sample_num)
         rt_kprintf("Failed to obtain reference voltage through eFuse\n");
         ref_voltage = (int)(def_voltage) * AIC_PSADC_VOLTAGE_ACCURACY;
     }
-    rt_kprintf("The reference voltage is %d.%02d V\n",
+    rt_kprintf("Reference voltage: %d.%04d V\n",
                ref_voltage / AIC_PSADC_VOLTAGE_ACCURACY,
                ref_voltage % AIC_PSADC_VOLTAGE_ACCURACY);
 
     rt_adc_enable(psadc_dev, AIC_PSADC_QC_MODE);
     chan_cnt = rt_adc_control(psadc_dev, RT_ADC_CMD_GET_CHAN_COUNT, NULL);
-    rt_kprintf("Start samplng %d samples for %d channels\n", sample_num,
-               chan_cnt);
+    printf("Will get %d data from %d channels in %s mode\n\n", sample_num,
+           chan_cnt,
+#ifdef AIC_PSADC_DRV_POLL
+           "poll"
+#else
+           "IRQ"
+#endif
+           );
+
+    if (!window) {
+        printf("Cnt ");
+        for (i = 0; i < chan_cnt; i++)
+            printf("Ch%d_ADC Ch%d_Vol ", i, i);
+        printf("Time(us)\n");
+    }
+
+    if (window)
+        start_us = aic_get_time_us();
 
     while (cnt < sample_num) {
         cnt++;
 
-        start_us = aic_get_time_us();
+        if (!window)
+            start_us = aic_get_time_us();
+
+#ifdef AIC_PSADC_DRV_POLL
         ret = rt_adc_control(psadc_dev, RT_ADC_CMD_GET_VALUES_POLL,
                              (void *)adc_values);
-        end_us = aic_get_time_us();
-        rt_kprintf("Sample time: %d us\n", abs(end_us - start_us));
+#else
+        ret = rt_adc_control(psadc_dev, RT_ADC_CMD_GET_VALUES,
+                             (void *)adc_values);
+#endif
+        if (window) {
+            if (cnt && cnt % window == 0) {
+                show_sample_rate(cnt, window, start_us);
+                start_us = aic_get_time_us();
+            }
+        } else {
+            end_us = aic_get_time_us();
+            printf("%3d ", cnt);
+            for (i = 0; i < chan_cnt; i++) {
+                voltage = test_psadc_adc2voltage(ref_voltage, adc_values[i]);
+                printf("%7d %2d.%02d V ", adc_values[i],
+                           voltage / 100, voltage % 100);
+            }
+            if (start_us)
+                printf("%8d\n", abs(end_us - start_us));
+        }
+
         if (ret < 0) {
-            rt_kprintf("Read timeout!\n");
+            printf("Read timeout! return %d\n", ret);
             return -RT_ERROR;
         }
-        // aic_udelay(10);
 
-        rt_kprintf("[%d] PSADC:", cnt);
-        for (int i = 0; i < chan_cnt; i++) {
-            rt_kprintf(" %d", adc_values[i]);
-        }
-        rt_kprintf("\nvoltage:");
-        for (int i = 0; i < chan_cnt; i++) {
-            test_psadc_adc2voltage(ref_voltage, adc_values[i]);
-        }
-        rt_kprintf("\n");
-
+#ifdef AIC_PSADC_TRIG_BY_SOFT
+        aicos_msleep(500);
+#endif
     }
     rt_adc_disable(psadc_dev, AIC_PSADC_QC_MODE);
 
     return -RT_ERROR;
 }
 
-
 static void cmd_test_psadc(int argc, char **argv)
 {
-    int c;
-    int sample_num = 10;
     float def_voltage = AIC_PSADC_DEFAULT_VOLTAGE;
     bool show_status = false;
-    int read_enable = 0;
-
-    if (argc < 2) {
-        cmd_psadc_usage(argv[0]);
-        return;
-    }
+    int sample_num = 10;
+    u32 window = 0;
+    int c;
 
     optind = 0;
     while ((c = getopt_long(argc, argv, sopts, lopts, NULL)) != -1) {
         switch (c) {
-        case 'r':
-            read_enable = 1;
-            break;
         case 't':
             def_voltage = atof(optarg);
             break;
@@ -152,6 +175,9 @@ static void cmd_test_psadc(int argc, char **argv)
             break;
         case 'n':
             sample_num = atoi(optarg);
+            break;
+        case 'w':
+            window = atoi(optarg);
             break;
         case 'h':
         default:
@@ -176,10 +202,8 @@ static void cmd_test_psadc(int argc, char **argv)
         return;
     }
 
-    if (read_enable)
-        psadc_get_adc(def_voltage, sample_num);
+    psadc_get_adc(def_voltage, sample_num, window);
 
-    return;
 }
 
 MSH_CMD_EXPORT_ALIAS(cmd_test_psadc, test_psadc, psadc device sample);

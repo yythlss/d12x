@@ -396,22 +396,36 @@ int show_color_block(int fd)
 
 static int test_vsync_repeat(void)
 {
-        int ret, i = 0;
-        u64 start, end;
+    struct aicfb_layer_data layer = {0};
+    int ret, i = 0;
+    u64 start, end;
 
-        do {
-                start = aic_get_time_us();
-                ret = mpp_fb_ioctl(g_fb, AICFB_WAIT_FOR_VSYNC, NULL);
-                if (ret) {
-                        printf("error: wait for sync timeout, DE not working\n");
-                        break;
-                }
-                end = aic_get_time_us();
-
-                printf("wait vsync time %lld us\n", end - start);
-        } while (i++ < 5);
-
+    layer.layer_id = AICFB_LAYER_TYPE_UI;
+    ret = mpp_fb_ioctl(g_fb, AICFB_GET_LAYER_CONFIG, &layer);
+        if (ret) {
+        printf("error: AICFB_GET_LAYER_CONFIG\n");
         return ret;
+    }
+
+    do {
+        ret = mpp_fb_ioctl(g_fb, AICFB_UPDATE_LAYER_CONFIG, &layer);
+        if (ret) {
+            printf("error: AICFB_UPDATE_LAYER_CONFIG\n");
+            break;
+        }
+
+        start = aic_get_time_us();
+        ret = mpp_fb_ioctl(g_fb, AICFB_WAIT_FOR_VSYNC, NULL);
+        if (ret) {
+            printf("error: wait for sync timeout, DE not working\n");
+            break;
+        }
+        end = aic_get_time_us();
+
+        printf("wait vsync time %lld us\n", end - start);
+    } while (i++ < 5);
+
+    return ret;
 }
 
 static int cmd_test_fb(int argc, char **argv)

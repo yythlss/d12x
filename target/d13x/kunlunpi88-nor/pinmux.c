@@ -168,6 +168,54 @@ struct aic_pinmux aic_pinmux_config[] = {
     {4, PIN_PULL_DIS, 3, "PD.26"},
     {4, PIN_PULL_DIS, 3, "PD.27"},
 #endif
+#ifdef AIC_USING_EPWM0
+    {7, PIN_PULL_DIS, 3, "PD.26"},
+    {7, PIN_PULL_DIS, 3, "PD.27"},
+#endif
+#ifdef AIC_USING_EPWM1
+    {7, PIN_PULL_DIS, 3, "PD.24"},
+    {7, PIN_PULL_DIS, 3, "PD.25"},
+#endif
+#ifdef AIC_USING_EPWM2
+    {7, PIN_PULL_DIS, 3, "PD.22"},
+    {7, PIN_PULL_DIS, 3, "PD.23"},
+#endif
+#ifdef AIC_USING_EPWM3
+    {7, PIN_PULL_DIS, 3, "PD.20"},
+    {7, PIN_PULL_DIS, 3, "PD.21"},
+#endif
+#ifdef AIC_USING_EPWM4
+    {7, PIN_PULL_DIS, 3, "PD.18"},
+    {7, PIN_PULL_DIS, 3, "PD.19"},
+#endif
+#ifdef AIC_USING_EPWM5
+    {7, PIN_PULL_DIS, 3, "PD.16"},
+    {7, PIN_PULL_DIS, 3, "PD.17"},
+#endif
+#ifdef AIC_USING_EPWM6
+    {7, PIN_PULL_DIS, 3, "PD.14"},
+    {7, PIN_PULL_DIS, 3, "PD.15"},
+#endif
+#ifdef AIC_USING_EPWM7
+    {7, PIN_PULL_DIS, 3, "PD.12"},
+    {7, PIN_PULL_DIS, 3, "PD.13"},
+#endif
+#ifdef AIC_USING_EPWM8
+    {7, PIN_PULL_DIS, 3, "PD.10"},
+    {7, PIN_PULL_DIS, 3, "PD.11"},
+#endif
+#ifdef AIC_USING_EPWM9
+    {7, PIN_PULL_DIS, 3, "PD.8"},
+    {7, PIN_PULL_DIS, 3, "PD.9"},
+#endif
+#ifdef AIC_USING_EPWM10
+    {7, PIN_PULL_DIS, 3, "PD.2"},
+    {7, PIN_PULL_DIS, 3, "PD.3"},
+#endif
+#ifdef AIC_USING_EPWM11
+    {7, PIN_PULL_DIS, 3, "PD.0"},
+    {7, PIN_PULL_DIS, 3, "PD.1"},
+#endif
 #ifdef AIC_USING_GMAC0
     /* gmac0 */
     {2, PIN_PULL_DIS, 3, "PE.0"},

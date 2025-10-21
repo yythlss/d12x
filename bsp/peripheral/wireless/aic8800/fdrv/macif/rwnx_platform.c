@@ -181,7 +181,7 @@ int rwnx_plat_bin_fw_upload_2(struct rwnx_hw *rwnx_hw, u32 fw_addr)
     // Read bin file
     size = rwnx_request_firmware_common(rwnx_hw, &dst);
     if (size <= 0) {
-            AIC_LOG_PRINTF("wrong size of firmware file\n");
+            DBG_MACIF_ERR("wrong size of firmware file\n");
             dst = NULL;
             err = -1;
     }
@@ -190,19 +190,19 @@ int rwnx_plat_bin_fw_upload_2(struct rwnx_hw *rwnx_hw, u32 fw_addr)
     AIC_LOG_PRINTF("\n### dst=%p, size=%d\n", dst, size);
     if (size > BLOCK_SIZE) {
         for (; i < (size - BLOCK_SIZE); i += BLOCK_SIZE) {
-            AIC_LOG_PRINTF("wr blk 0: %p -> %x\r\n", dst + i / 4, fw_addr + i);
+            DBG_MACIF_VRB("wr blk 0: %p -> %x\r\n", dst + i / 4, fw_addr + i);
             err = rwnx_send_dbg_mem_block_write_req(rwnx_hw, fw_addr + i, BLOCK_SIZE, dst + i / 4);
             if (err) {
-                AIC_LOG_PRINTF("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
+                DBG_MACIF_ERR("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
                 break;
             }
         }
     }
     if (!err && (i < size)) {
-        AIC_LOG_PRINTF("wr blk 1: %p -> %x\r\n", dst + i / 4, fw_addr + i);
+        DBG_MACIF_VRB("wr blk 1: %p -> %x\r\n", dst + i / 4, fw_addr + i);
         err = rwnx_send_dbg_mem_block_write_req(rwnx_hw, fw_addr + i, size - i, dst + i / 4);
         if (err) {
-            AIC_LOG_PRINTF("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
+            DBG_MACIF_ERR("bin upload fail: %x, err:%d\r\n", fw_addr + i, err);
         }
     }
 
@@ -477,6 +477,17 @@ void rwnx_platform_deinit(struct rwnx_hw *rwnx_hw)
 #endif
 }
 
+int rwnx_send_reboot(struct rwnx_hw *rwnx_hw)
+{
+    int ret = 0;
+    u32 delay = 100; //100ms
+
+    RWNX_DBG(RWNX_FN_ENTRY_STR);
+
+    ret = rwnx_send_dbg_start_app_req(rwnx_hw, delay, HOST_START_APP_REBOOT);
+    return ret;
+}
+
 #ifdef CONFIG_DPD
 int aicwf_plat_calib_load_8800dc(struct rwnx_hw *rwnx_hw)
 {
@@ -513,7 +524,7 @@ int aicwf_dpd_calib_8800dc(struct rwnx_hw *rwnx_hw, rf_misc_ram_lite_t *dpd_res)
     }
     /* fw start */
     fw_addr = 0x00130009;
-    boot_type = 4;//HOST_START_APP_FNCALL;
+    boot_type = HOST_START_APP_FNCALL;
     AIC_LOG_PRINTF("Start app: %08x, %d\n", fw_addr, boot_type);
     ret = rwnx_send_dbg_start_app_req(rwnx_hw, fw_addr, boot_type);
     if (ret) {

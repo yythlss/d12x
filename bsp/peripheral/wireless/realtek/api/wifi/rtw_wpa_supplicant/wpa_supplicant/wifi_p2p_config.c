@@ -22,7 +22,7 @@ enum p2p_wps_method {
 #define P2P_GW_ADDR0   192
 #define P2P_GW_ADDR1   168
 #define P2P_GW_ADDR2   42
-#define P2P_GW_ADDR3   1  
+#define P2P_GW_ADDR3   1
 
 #define P2P_GO_NEGO_RESULT_SIZE	376//256
 
@@ -110,7 +110,7 @@ int wifi_start_p2p_go(char *ssid, char *passphrase, u8 channel)
 	}
 
 	//netif_set_default(pnetif);
-	
+
 #if CONFIG_LWIP_LAYER
 #if defined(CONFIG_PLATFOMR_CUSTOMER_RTOS)
     //TODO
@@ -137,30 +137,34 @@ void cmd_wifi_p2p_start(int argc, char **argv)
 	u32 r = 0;
 	os_get_random((u8 *) &r, sizeof(r));
 	go_intent = r%15+1; /*1-15*/
-	
-	os_get_random((u8 *) &r, sizeof(r));
-	listen_ch = 1 + (r % 3) * 5;
 
-#if CONFIG_CUSTOMER_P2P_5G
-	op_ch = 40;// 1 6 11 for 2.4G / 36 40 44 48for 5G
-#else
-	os_get_random((u8 *) &r, sizeof(r));
-	op_ch = 1 + (r % 3) * 5;
-#endif	
+	if ((argc == 2) && (strncasecmp("5G", argv[1], strlen(argv[1])) == 0)) {
+		op_ch = 36;// 1 6 11 for 2.4G / 36 40 44 48for 5G
+		listen_ch = 36;
+	} else {
+		os_get_random((u8 *) &r, sizeof(r));
+		op_ch = 1 + (r % 3) * 5;
+		os_get_random((u8 *) &r, sizeof(r));
+		listen_ch = 1 + (r % 3) * 5;
+	}
+
 	wifi_off();
 	os_sleep(0, 20000);
 	wifi_on(RTW_MODE_P2P);
-	wifi_p2p_init(xnetif[0].hwaddr, go_intent, listen_ch, op_ch);	
+	wifi_p2p_init(xnetif[0].hwaddr, go_intent, listen_ch, op_ch);
 }
 
 void cmd_wifi_p2p_auto_go_start(int argc, char **argv)
 {
 	u8 *passphrase = "12345678";
-#if CONFIG_CUSTOMER_P2P_5G //for 5G channel
-	u8 channel = 40;	// 36, 40, 44, 48
-#else
-	u8 channel = 1;	// 1, 6, 11
-#endif
+	u8 channel;
+
+	if ((argc == 2) && (strncasecmp("5G", argv[1], strlen(argv[1])) == 0)) {
+		channel = 36;// 36 40 44 48for 5G
+	} else {
+		channel=  1;// 1 6 11 for 2.4G
+	}
+
 	const char *ssid_in = "DIRECT-34-Ameba";
 	const char *dev_name = "Ameba1234";	// max strlen 32
 	const char *manufacturer = "by customer";	// max strlen 64
@@ -180,7 +184,7 @@ void cmd_wifi_p2p_auto_go_start(int argc, char **argv)
 #endif
 	if(!is_wifi_p2p_initialized()){
 		printf("\r\n%s(): p2p inital fail\n", __func__);
-		return;	
+		return;
 	}
 	wifi_p2p_set_dev_name(dev_name);
 	wifi_p2p_set_manufacturer(manufacturer);
@@ -226,9 +230,9 @@ void cmd_p2p_peers(int argc, char **argv)
 void cmd_p2p_info(int argc, char **argv)
 {
 	u8 p2p_state;
-	
+
 	p2p_state = wifi_cmd_p2p_info();
-	
+
 	printf("\r\np2p state : %d",p2p_state);
 }
 
@@ -255,7 +259,7 @@ void cmd_p2p_connect(int argc, char **argv)
 		printf("\r\nP2P_CONNECT: dest address is not correct!\n");
 		return;
 	}
-	
+
 	printf("\r\nDEST: %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n", dest[0], dest[1], dest[2], dest[3], dest[4], dest[5]);
 	config_method = WPS_PBC;
 	if(argc == 3) {

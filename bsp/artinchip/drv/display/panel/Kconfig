@@ -58,6 +58,10 @@ if !AIC_DISP_PQ_TOOL
         bool "ArtInChip MIPI DSI FT8201 panel"
         depends on AIC_DISP_MIPI_DSI
 
+    config AIC_PANEL_DSI_ST7701S
+        bool "ArtInChip MIPI DSI ST7701S panel"
+        depends on AIC_DISP_MIPI_DSI
+
 #
 # MIPI-DBI Type B I8080 Panel
 #
@@ -104,6 +108,25 @@ if !AIC_DISP_PQ_TOOL
         depends on AIC_DISP_MIPI_DBI
         help
             MIPI-DBI Type C, SPI_4DA_RGB888
+
+    config AIC_PANEL_DBI_ST77916
+        bool "ArtInChip MIPI DBI ST77916 panel"
+        depends on AIC_DISP_MIPI_DBI
+        help
+            MIPI-DBI Type C, SPI_4LINE_RGB565
+
+    config AIC_PANEL_DBI_GC0D01N
+        bool "ArtInChip MIPI DBI GC0D01N panel"
+        depends on AIC_DISP_MIPI_DBI
+        help
+            MIPI-DBI Type C, SPI_4LINE_RGB565
+
+    config AIC_PANEL_DBI_ST77912
+        bool "ArtInChip MIPI DBI ST77912 panel"
+        depends on AIC_DISP_MIPI_DBI
+        help
+            MIPI-DBI Type C, SPI_4LINE_RGB565
+
 #
 # RGB Panel SPI Init
 #
@@ -146,6 +169,10 @@ if !AIC_DISP_PQ_TOOL
     config AIC_PANEL_BRIDGE_LT8911
         bool "ArtInChip LT8911 LVDS-eDP bridge"
         depends on AIC_DISP_LVDS
+
+    config AIC_PANEL_DSI_EDP_LT9811EXB
+        bool "ArtInChip MIPI DSI bridge eDP LT8911EXB"
+        depends on AIC_DISP_MIPI_DSI
 endif
     endchoice
 
@@ -229,6 +256,27 @@ config ST7789_PANEL_RESET
     string "ST7789 display panel reset pin"
     depends on AIC_PANEL_DBI_ST7789
     default "PD.23"
+
+choice
+    prompt "LT9811EXB Resolution List"
+    depends on AIC_PANEL_DSI_EDP_LT9811EXB
+    default LT9811EXB_1920X1080
+
+    config LT9811EXB_1920X1200
+        bool "1920x1200"
+    config LT9811EXB_1920X1080
+        bool "1920x1080"
+    config LT9811EXB_1366X768
+        bool "1366x768"
+endchoice
+
+config LT9811EXB_RESOLUTION
+    depends on AIC_PANEL_DSI_EDP_LT9811EXB
+    int
+    default 0 if LT9811EXB_1920X1200
+    default 1 if LT9811EXB_1920X1080
+    default 2 if LT9811EXB_1366X768
+
 
 if AIC_PANEL_CUSTOM_RESOLUTION && !AIC_DISP_PQ_TOOL
 source "bsp/artinchip/drv/display/panel/Kconfig.timing"

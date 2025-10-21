@@ -110,6 +110,18 @@ enum mac_chan_flags
     CHAN_DISABLED = BIT(1),
     /// Radar detection required on this channel
     CHAN_RADAR = BIT(2),
+    /// Can be primary channel of HT40- operating channel
+    CHAN_HT40M = BIT(3),
+    /// Can be primary channel of HT40+ operating channel
+    CHAN_HT40P = BIT(4),
+    /// Can be primary channel of VHT80 (1st position 10/70) operating channel
+    CHAN_VHT80_10_70 = BIT(5),
+    /// Can be primary channel of VHT80 (2nd position 30/50) operating channel
+    CHAN_VHT80_30_50 = BIT(6),
+    /// Can be primary channel of VHT80 (3rd position 50/30) operating channel
+    CHAN_VHT80_50_30 = BIT(7),
+    /// Can be primary channel of VHT80 (4th position 70/10) operating channel
+    CHAN_VHT80_70_10 = BIT(8)
 };
 
 /// Primary Channel definition

@@ -132,10 +132,12 @@ void hal_dvp_set_cfg(struct aic_dvp_config *cfg)
     dvp_writel(val, DVP_CTL);
 
     if (cfg->output == DVP_OUT_RAW_PASSTHROUGH)
-        dvp_writel(DVP_OUT_HOR_NUM_RAW(cfg->width), DVP_OUT_HOR_SIZE);
+        val = DVP_OUT_HOR_NUM_RAW(cfg->width) | DVP_OUT_HOR_BEG_RAW(cfg->crop_x);
     else
-        dvp_writel(DVP_OUT_HOR_NUM(cfg->width), DVP_OUT_HOR_SIZE);
-    dvp_writel(DVP_OUT_VER_NUM(height), DVP_OUT_VER_SIZE);
+        val = DVP_OUT_HOR_NUM(cfg->width) | DVP_OUT_HOR_BEG(cfg->crop_x);
+    dvp_writel(val, DVP_OUT_HOR_SIZE);
+
+    dvp_writel(DVP_OUT_VER_NUM(height) | DVP_OUT_VER_BEG(cfg->crop_y), DVP_OUT_VER_SIZE);
 
     dvp_writel(stride0, DVP_OUT_LINE_STRIDE0);
     dvp_writel(stride1, DVP_OUT_LINE_STRIDE1);

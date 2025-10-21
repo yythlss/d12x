@@ -86,8 +86,8 @@ MEM_SIZE and MEMP_NUM_XXX will be invalid */
 #define MEMP_NUM_NETCONN                LPKG_MEMP_NUM_NETCONN
 #endif
 #define MEMP_NUM_SELECT_CB              4
-#define MEMP_NUM_TCPIP_MSG_API          8
-#define MEMP_NUM_TCPIP_MSG_INPKT        8
+#define MEMP_NUM_TCPIP_MSG_API          128
+#define MEMP_NUM_TCPIP_MSG_INPKT        128
 #define MEMP_NUM_NETDB                  1
 #define MEMP_NUM_LOCALHOSTLIST          1
 #ifdef LPKG_LWIP_PBUF_NUM

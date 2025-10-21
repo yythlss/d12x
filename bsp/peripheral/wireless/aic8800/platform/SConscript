@@ -7,7 +7,6 @@ list = os.listdir(cwd)
 include_path =[]
 src = []
 
-include_path +=[cwd + '/../host/driver/layer_abstract/inc']
 include_path +=[cwd + '/../host/driver/drv_fhost']
 include_path +=[cwd + '/../host/driver/drv_macif']
 include_path +=[cwd + '/../host/driver/drv_wifi']
@@ -20,7 +19,7 @@ include_path +=[cwd + '/hal']
 include_path +=[cwd + '/inc']
 include_path +=[cwd + '/utils/inc']
 include_path +=[cwd + '/inc']
-include_path +=[cwd + '/../build']
+include_path +=[cwd + '/../config']
 
 src += Glob('netif/*.c')
 src += Glob('rtos/*.c')

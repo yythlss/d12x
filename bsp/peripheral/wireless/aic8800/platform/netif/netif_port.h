@@ -61,6 +61,7 @@ int rx_eth_data_process(unsigned char *pdata, unsigned short len, net_if_t *neti
 #else
 int rx_eth_data_process(unsigned char *pdata, unsigned short len, struct netif *netif);
 #endif /* CONFIG_RX_NOCOPY */
+int tx_mon_data_process(uint8_t *pkt, uint32_t len);
 
 //-------------------------------------------------------------------
 // Driver other API define

@@ -66,5 +66,9 @@ void lv_port_indev_init(void)
     lv_group_set_default(lv_group_create());
     lv_indev_set_group(encoder, lv_group_get_default());
 #endif
+#ifdef AIC_USE_LV_USB_MOUSE
+    extern void lv_aic_mouse_hotplug_init(void);
+    lv_aic_mouse_hotplug_init();
+#endif
 }
 #endif

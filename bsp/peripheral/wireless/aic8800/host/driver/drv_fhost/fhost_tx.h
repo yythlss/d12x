@@ -228,7 +228,12 @@ struct fhost_tx_sta_traffic
  * - One TXQ for unknown STA for each VIF (Only enabled for AP and Monitor interface)
  *   TXQ id is @verbatim (NX_REMOTE_STA_MAX * TID_MAX) + <vif_idx> @endverbatim
  */
+#if NX_P2P
+#define FHOST_TXQ_CNT ((STA_MAX * TID_MAX) + NX_VIRT_DEV_MAX + 1)
+#define FHOST_OFF_CHAN_TXQ_IDX ((STA_MAX * TID_MAX) + NX_VIRT_DEV_MAX)
+#else
 #define FHOST_TXQ_CNT ((STA_MAX * TID_MAX) + NX_VIRT_DEV_MAX)
+#endif
 
 /// FHOST RX environment structure
 struct fhost_tx_env_tag
@@ -398,6 +403,10 @@ void fhost_tx_do_vif_disable(uint8_t vif_idx);
 void fhost_tx_vif_txq_enable(struct fhost_vif_tag *fhost_vif);
 void fhost_txq_vif_stop(uint8_t sta_id, uint16_t reason);
 void fhost_txq_vif_start(uint8_t sta_id, uint16_t reason);
+#if NX_P2P
+struct fhost_tx_queue_tag* fhost_txq_offchan_init(void);
+void fhost_txq_offchan_deinit(struct fhost_tx_queue_tag* txq);
+#endif
 
 int fhost_tx_cntrl_by_timer(uint32_t timeout_ms, uint8_t num);
 int fhost_stop_tx_cntrl_by_timer(void);

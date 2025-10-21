@@ -731,6 +731,7 @@ typedef struct rt_thread *rt_thread_t;
 
 #define RT_WAITING_FOREVER              -1              /**< Block forever until get resource. */
 #define RT_WAITING_NO                   0               /**< Non-block. */
+#define RT_WAITING_TIMEOUT              1000
 
 /**
  * Base structure of IPC object

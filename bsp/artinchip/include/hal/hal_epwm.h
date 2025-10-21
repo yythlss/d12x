@@ -60,8 +60,8 @@ struct aic_epwm_action {
 
 struct aic_epwm_arg {
     bool sync_mode;
-    u16 available;
-    u16 id;
+    bool available;
+    u32 id;
     enum aic_epwm_mode mode;
     u32 clk_rate;
     u32 tb_clk_rate;
@@ -86,11 +86,10 @@ struct aic_epwm_pulse_para {
     u32 pulse_cnt;
 };
 
-void hal_epwm_ch_init(u32 ch, bool sync_mode, enum aic_epwm_mode mode, u32 default_level,
-                     struct aic_epwm_action *a0, struct aic_epwm_action *a1);
+void hal_epwm_ch_init(struct aic_epwm_arg *epwm_arg);
 void hal_epwm_act_sw_ct(u32 ch, u32 output, u32 action);
 void hal_epwm_count_ct(u32 ch, enum aic_epwm_mode mode);
-#ifdef AIC_EPWM_DRV_V11
+#if defined (AIC_EPWM_DRV_V11) || defined (AIC_EPWM_DRV_V12)
 void hal_epwm_pul_config(u32 ch);
 int hal_epwm_pul_set(u32 ch, u32 duty_ns, u32 period_ns, u32 output, u32 num);
 void hal_epwm_pul_out_ct(u32 ch, u32 enable);

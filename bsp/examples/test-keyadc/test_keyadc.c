@@ -38,7 +38,6 @@ static int key_flag_arr[] = {0x1, 0x2, 0x3};
 
 static void cmd_keyadc_usage(char *program)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: %s [options]\n", program);
     printf("\t -c, --channel\t\tSelect one channel in [0, %d], default is 2\n",
            AIC_GPAI_CH_NUM - 1);

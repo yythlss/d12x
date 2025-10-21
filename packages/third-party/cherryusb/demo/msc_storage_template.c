@@ -124,7 +124,7 @@ struct usbd_storage_p {
     bool storage_exist;
     uint8_t is_inited;
     uint8_t is_forbidden;
-    uint8_t is_configured;
+    uint8_t is_mounted;
 };
 #if defined(KERNEL_RTTHREAD)
 rt_thread_t usbd_msc_tid;
@@ -156,7 +156,6 @@ void usbd_event_handler(uint8_t event)
             usbd_msc_suspend();
             break;
         case USBD_EVENT_CONFIGURED:
-            g_usbd_storage.is_configured = true;
             usbd_msc_configured();
             break;
         case USBD_EVENT_SET_REMOTE_WAKEUP:
@@ -185,7 +184,10 @@ static void usbd_msc_suspend(void)
     if (usbd_storage == NULL || usbd_storage->fs == NULL)
         return;
 
-    if (usbd_storage->is_configured == false)
+    if (usb_device_is_configured()== false)
+        return;
+
+    if (usbd_storage->is_forbidden == true)
         return;
 
 #if defined(KERNEL_RTTHREAD)
@@ -206,7 +208,7 @@ static void usbd_msc_suspend(void)
 
     flag = usb_osal_enter_critical_section();
     usbd_storage->storage_exist = true;
-    usbd_storage->is_configured = false;
+    usbd_storage->is_mounted = true;
     usb_osal_leave_critical_section(flag);
 }
 
@@ -225,7 +227,10 @@ static void usbd_msc_configured(void)
     if (usbd_storage->is_inited == false)
         return;
 
-    if (usbd_storage->is_configured == false)
+    if (usb_device_is_configured() == false)
+        return;
+
+    if (usbd_storage->is_forbidden == true)
         return;
 
     ret = dfs_unmount(usbd_storage->fs_path);
@@ -243,7 +248,7 @@ static void usbd_msc_configured(void)
 #endif
     flag = usb_osal_enter_critical_section();
     usbd_storage->storage_exist = true;
-    g_usbd_storage.is_configured = true;
+    usbd_storage->is_mounted = false;
     usb_osal_leave_critical_section(flag);
 
 }
@@ -267,7 +272,7 @@ int usbd_msc_sector_read(uint32_t sector, uint8_t *buffer, uint32_t length)
     struct usbd_storage_p *usbd_storage = get_usbd_storage();
 
     if (usbd_storage->storage_exist == false || usbd_storage == NULL)
-        return 0;
+        return -1;
 
 #if defined(KERNEL_RTTHREAD)
     ret = rt_device_read(usbd_storage->dev,
@@ -288,7 +293,7 @@ int usbd_msc_sector_write(uint32_t sector, uint8_t *buffer, uint32_t length)
     struct usbd_storage_p *usbd_storage = get_usbd_storage();
 
     if (usbd_storage->storage_exist == false || usbd_storage == NULL)
-        return 0;
+        return -1;
 
 #if defined(KERNEL_RTTHREAD)
     ret = rt_device_write(usbd_storage->dev,
@@ -426,7 +431,8 @@ bool usbd_msc_check_storage(void)
     else
         usbd_storage->storage_exist = true;
 #endif
-    if (usbd_storage->is_forbidden == true)
+    if (usbd_storage->is_forbidden == true
+        || usbd_storage->is_inited == false)
         usbd_storage->storage_exist = false;
 
     usb_osal_leave_critical_section(flag);
@@ -439,6 +445,8 @@ void _msc_src_forbid(void)
     size_t flag;
     struct usbd_storage_p *usbd_storage = get_usbd_storage();
 
+    usbd_msc_suspend();
+
     flag = usb_osal_enter_critical_section();
     usbd_storage->is_forbidden = true;
     usb_osal_leave_critical_section(flag);
@@ -450,7 +458,6 @@ void _msc_src_forbid(void)
     if (usbd_msc_tid != NULL)
         rt_thread_delete(usbd_msc_tid);
 #endif
-    usbd_msc_suspend();
 }
 
 int msc_storage_forbid(void)
@@ -474,6 +481,8 @@ int msc_usbd_forbid(void)
     if (usbd_storage->is_forbidden == true)
         return -1;
 
+    _msc_src_forbid();
+
 #ifdef LPKG_CHERRYUSB_DEVICE_COMPOSITE
     size_t flag;
     flag = usb_osal_enter_critical_section();
@@ -483,8 +492,6 @@ int msc_usbd_forbid(void)
 #else
     msc_storage_deinit();
 #endif
-
-    _msc_src_forbid();
 
     return 0;
 }
@@ -605,13 +612,37 @@ USB_INIT_APP_EXPORT(usbd_msc_detection);
 
 int usbd_msc_init(void)
 {
-    msc_storage_allow();
+    size_t flag;
+    struct usbd_storage_p *usbd_storage = get_usbd_storage();
+
+    flag = usb_osal_enter_critical_section();
+    usbd_storage->is_forbidden = false;
+    usb_osal_leave_critical_section(flag);
+
+    usbd_msc_detection();
+
+    msc_usbd_init();
 
     return 0;
 }
 int usbd_msc_deinit(void)
 {
-    msc_usbd_forbid();
+    struct usbd_storage_p *usbd_storage = get_usbd_storage();
+
+    if (usbd_storage->is_inited == false)
+        return -1;
+
+#ifdef LPKG_CHERRYUSB_DEVICE_COMPOSITE
+    size_t flag;
+    flag = usb_osal_enter_critical_section();
+    usbd_storage->is_inited = false;
+    usb_osal_leave_critical_section(flag);
+    usbd_comp_func_release(msc_storage_descriptor, "msc");
+#else
+    msc_storage_deinit();
+#endif
+
+    _msc_src_forbid();
 
     return 0;
 }
@@ -662,10 +693,13 @@ static int cmd_test_msc_mount(int argc, char **argv)
             if (usbd_storage->is_forbidden == false) {
                 USB_LOG_WRN("Please forbidden msc function.\n"
                             "such as: test_msc -f [usb] or [media]\n");
+                break;
             }
             strcpy(msc_storage_path, optarg);
         case 'i':
             USB_LOG_INFO("MSC STORAGE PATH: %s\n", msc_storage_path);
+            USB_LOG_INFO("init:%d mount:%d forbid: %d storage: %d\n", usbd_storage->is_inited,
+                        usbd_storage->is_mounted, usbd_storage->is_forbidden, usbd_storage->storage_exist);
             break;
         case'h':
         default:

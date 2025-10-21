@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -13,7 +13,6 @@
 #include <upg_internal.h>
 #include <aic_core.h>
 #include <aicupg.h>
-#include <fatfs.h>
 #include <mtd.h>
 #include <aic_utils.h>
 #include <upg_fat_direct.h>

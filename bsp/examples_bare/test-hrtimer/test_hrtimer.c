@@ -20,7 +20,6 @@ static u32 g_gpio_group, g_gpio_pin;
 
 static void cmd_hrtimer_usage(void)
 {
-    printf("Compile time: %s %s\n", __DATE__, __TIME__);
     printf("Usage: test_hrtimer [options]\n");
     printf("the hrtimer will timed toggle the %s as a demonstration\n", GPIO_TEST_PIN);
     printf("test_hrtimer <channel> <time> : Channel range [0, %d], the time unit is 1us\n", AIC_HRTIMER_CH_NUM - 1);

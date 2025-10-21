@@ -17,7 +17,7 @@
 
 static DRESULT spinand_disk_nonftl_read(struct spinand_blk_device *blk_device,
                                         uint8_t *buf, uint32_t sector,
-                                        uint8_t cnt)
+                                        rt_size_t cnt)
 {
     rt_size_t sectors_per_page;
     rt_size_t start_page, block, offset;
@@ -154,7 +154,7 @@ exit_spinand_disk_read_malloc:
 
 #ifdef AIC_NFTL_SUPPORT
 DRESULT spinand_disk_nftl_read(struct spinand_blk_device *blk_device,
-                               uint8_t *buf, uint32_t sector, uint8_t cnt)
+                               uint8_t *buf, uint32_t sector, rt_size_t cnt)
 {
     if (!blk_device->nftl_handler)
         return RES_NOTRDY;
@@ -166,7 +166,7 @@ DRESULT spinand_disk_nftl_read(struct spinand_blk_device *blk_device,
 
 static DRESULT spinand_disk_nftl_write(struct spinand_blk_device *blk_device,
                                        const uint8_t *buf, uint32_t sector,
-                                       uint8_t cnt)
+                                       rt_size_t cnt)
 {
     if (!blk_device->nftl_handler)
         return RES_NOTRDY;
@@ -177,7 +177,7 @@ static DRESULT spinand_disk_nftl_write(struct spinand_blk_device *blk_device,
 #endif
 
 DRESULT spinand_disk_write(void *hdisk, const uint8_t *buf, uint32_t sector,
-                           uint8_t cnt)
+                            rt_size_t cnt)
 {
     struct spinand_blk_device *dev;
 
@@ -195,7 +195,7 @@ DRESULT spinand_disk_write(void *hdisk, const uint8_t *buf, uint32_t sector,
 }
 
 DRESULT spinand_disk_read(void *hdisk, uint8_t *buf, uint32_t sector,
-                          uint8_t cnt)
+                            rt_size_t cnt)
 {
     struct spinand_blk_device *dev;
 

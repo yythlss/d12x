@@ -8,8 +8,6 @@
 #include "service_cfg.h"
 #include "uds_def.h"
 
-
-
 /******************************************************************************
 * 函数名称: bool_t service_37_check_len(const uint8_t* msg_buf, uint16_t msg_dlc)
 * 功能说明: 检查 37 服务数据长度是否合法
@@ -18,15 +16,14 @@
 * 函数返回: TRUE: 合法; FALSE: 非法
 * 其它说明: 无
 ******************************************************************************/
-bool_t service_37_check_len(const uint8_t* msg_buf, uint16_t msg_dlc)
+bool_t service_37_check_len(const uint8_t *msg_buf, uint16_t msg_dlc)
 {
-	bool_t ret = FALSE;
-	
-	ret = TRUE;
+    bool_t ret = FALSE;
 
-	return ret;
+    ret = TRUE;
+
+    return ret;
 }
-
 
 /******************************************************************************
 * 函数名称: void service_37_RequestTransferExit(const uint8_t* msg_buf, uint16_t msg_dlc)
@@ -37,13 +34,18 @@ bool_t service_37_check_len(const uint8_t* msg_buf, uint16_t msg_dlc)
 * 函数返回: 无
 * 其它说明: 无
 ******************************************************************************/
-void service_37_RequestTransferExit(const uint8_t* msg_buf, uint16_t msg_dlc)
+void service_37_RequestTransferExit(const uint8_t *msg_buf, uint16_t msg_dlc)
 {
-	uint8_t rsp_buf[8];
+    uint8_t rsp_buf[8];
 
-	rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_37);
-	uds_positive_rsp(rsp_buf, 1);
+    if (transfer_file != NULL) {
+        printf("Transfer exit requested. Closing file.\n");
+        fclose(transfer_file);
+        transfer_file = NULL;
+    }
+
+    rsp_buf[0] = USD_GET_POSITIVE_RSP(SID_37);
+    uds_positive_rsp(rsp_buf, 1);
 }
-
 
 /****************EOF****************/

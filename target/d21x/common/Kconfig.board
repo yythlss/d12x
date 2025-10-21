@@ -1015,4 +1015,13 @@ config AIC_USING_PSADC11
     select AIC_PSADC_DRV
 endmenu
 
+#---------------------------
+# PBUS device global option
+#---------------------------
+
+config AIC_USING_PBUS
+    bool "Using PBUS"
+    default n
+    select AIC_PBUS_DRV
+
 endmenu

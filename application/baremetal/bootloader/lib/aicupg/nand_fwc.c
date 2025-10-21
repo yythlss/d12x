@@ -420,18 +420,7 @@ s32 nand_fwc_mtd_write(struct fwc_info *fwc, u8 *buf, s32 len)
         }
 
         /* Handle the part out of aligned. */
-        if (len % mtd->erasesize && (priv->remain_len == len)) {
-            pr_debug("priv->erase_offset[i]: %lu, priv->start_offset[i]: %lu\n", priv->erase_offset[i], priv->start_offset[i]);
-            dolen = len - (count * mtd->erasesize);
-            nand_fwc_mtd_erase_write(dolen, mtd, priv, i, buf_to_write);
-#ifdef AICUPG_SINGLE_TRANS_BURN_CRC32_VERIFY
-            mtd_read(mtd, priv->start_offset[i], buf_to_read, dolen);
-            buf_to_read += dolen;
-#endif
-            buf_to_write += dolen;
-            priv->start_offset[i] += dolen;
-            priv->remain_len -= dolen;
-        } else if (len % mtd->erasesize && (priv->remain_len != len)) {     /* data len is not enough a blocksize */
+        if (len % mtd->erasesize) {
             pr_debug("priv->erase_offset[i]: %lu, priv->start_offset[i]: %lu\n", priv->erase_offset[i], priv->start_offset[i]);
             dolen = len - (count * mtd->erasesize);
             nand_fwc_mtd_erase_write(dolen, mtd, priv, i, buf_to_write);

@@ -273,8 +273,7 @@ ble_hs_hci_wait_for_ack(void)
         rc = ble_hs_hci_phony_ack_cb((void *)ble_hs_hci_ack, 260);
     }
 #else
-    rc = ble_npl_sem_pend(&ble_hs_hci_sem,
-                          ble_npl_time_ms_to_ticks32(BLE_HCI_CMD_TIMEOUT_MS));
+    rc = ble_npl_sem_pend(&ble_hs_hci_sem, ble_npl_time_ms_to_ticks32(BLE_HCI_CMD_TIMEOUT_MS));
     switch (rc) {
     case 0:
         BLE_HS_DBG_ASSERT(ble_hs_hci_ack != NULL);

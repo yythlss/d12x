@@ -650,7 +650,7 @@ struct usb_desc_header {
     WBVAL(bcdDevice),           /* bcdDevice */                         \
     USB_STRING_MFC_INDEX,       /* iManufacturer */                     \
     USB_STRING_PRODUCT_INDEX,   /* iProduct */                          \
-    0x0,                        /* iSerial */                           \
+    USB_STRING_SERIAL_INDEX,    /* iSerial */                           \
     bNumConfigurations          /* bNumConfigurations */
 
 #define USB_CONFIG_DESCRIPTOR_INIT(wTotalLength, bNumInterfaces,        \

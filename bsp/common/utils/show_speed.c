@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2024-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -14,14 +14,14 @@
 
 void show_speed(char *msg, unsigned long len, unsigned long us)
 {
-    unsigned long tmp, speed;
+    unsigned long long tmp, speed;
 
     /* Split to serval step to avoid overflow */
-    tmp = 1000 * len;
+    tmp = (unsigned long long)1000 * len;
     tmp = tmp / us;
     tmp = 1000 * tmp;
     speed = tmp / 1024;
 
-    printf("%s: %ld byte, %ld us -> %ld KB/s\n", msg, len, us, speed);
+    printf("%s: %ld byte, %ld us -> %lld KB/s\n", msg, len, us, speed);
 }
 

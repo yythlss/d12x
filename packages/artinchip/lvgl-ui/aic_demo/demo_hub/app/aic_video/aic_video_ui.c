@@ -86,13 +86,6 @@ lv_obj_t *aic_video_ui_init(void)
 
     lv_obj_add_event_cb(aic_video_ui, ui_aic_video_cb, LV_EVENT_ALL, &player);
 
-    /* Enable LV_AIC_PLAYER_CMD_KEEP_LAST_FRAME_EX when playing multiple video sources
-       to avoid black screens during source switching, though it will increase memory usage.
-       Alternatively, add a loading icon to indicate to users that a switch is in progress,
-       which can mitigate the impact of black screens on viewing experience.
-       Need to set before setting src. */
-    //lv_aic_player_set_cmd(player.obj, LV_AIC_PLAYER_CMD_KEEP_LAST_FRAME_EX, NULL);
-
     lv_aic_player_set_src(player.obj, player.cur_info.source);
     lv_aic_player_set_cmd(player.obj, LV_AIC_PLAYER_CMD_START, NULL);
 

@@ -584,6 +584,13 @@ def aic_boot_gen_header_bytes(cfg, filesizes):
     load_address = 0
     entry_point = 0
     if "loader" in cfg:
+        if cfg["loader"]["load address"] == "CONFIG_AIC_BOOTLOADER_LOAD_BASE":
+            print("Error: Please compile the bootloader first.")
+            sys.exit(1)
+        if cfg["loader"]["entry point"] == "CONFIG_AIC_BOOTLOADER_TEXT_BASE":
+            print("Error: Please compile the bootloader first.")
+            sys.exit(1)
+
         load_address = int(cfg["loader"]["load address"], 16)
         entry_point = int(cfg["loader"]["entry point"], 16)
     sign_algo = 0
@@ -681,10 +688,16 @@ def aic_boot_gen_header_for_ext(cfg, filesizes):
         if "load address ext" in cfg["loader"]:
             load_address = int(cfg["loader"]["load address ext"], 16)
         else:
+            if cfg["loader"]["load address"] == "CONFIG_AIC_BOOTLOADER_LOAD_BASE":
+                print("Error: Please compile the bootloader first.")
+                sys.exit(1)
             load_address = int(cfg["loader"]["load address"], 16)
         if "entry point ext" in cfg["loader"]:
             entry_point = int(cfg["loader"]["entry point ext"], 16)
         else:
+            if cfg["loader"]["entry point"] == "CONFIG_AIC_BOOTLOADER_TEXT_BASE":
+                print("Error: Please compile the bootloader first.")
+                sys.exit(1)
             entry_point = int(cfg["loader"]["entry point"], 16)
     sign_algo = 0
     sign_offset = 0
@@ -780,8 +793,14 @@ def aic_boot_gen_header_bytes_v2(cfg, filesizes):
     entry_point = 0
     if "loader" in cfg:
         if "load address" in cfg["loader"]:
+            if cfg["loader"]["load address"] == "CONFIG_AIC_BOOTLOADER_LOAD_BASE":
+                print("Error: Please compile the bootloader first.")
+                sys.exit(1)
             load_address = int(cfg["loader"]["load address"], 16)
         if "entry point" in cfg["loader"]:
+            if cfg["loader"]["entry point"] == "CONFIG_AIC_BOOTLOADER_TEXT_BASE":
+                print("Error: Please compile the bootloader first.")
+                sys.exit(1)
             entry_point = int(cfg["loader"]["entry point"], 16)
         if "load address" in cfg["loader"] and "entry point" not in cfg["loader"]:
             entry_point = load_address + 256

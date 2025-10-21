@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -128,6 +128,7 @@ irqreturn_t aic_cap_irq(int irq, void *arg)
 {
     u32 stat;
 
+#if defined (AIC_CAP_DRV_V10) || defined (AIC_CAP_DRV_V11)
     for (int i = 0; i < AIC_CAP_CH_NUM; i++) {
         stat = hal_cap_int_flg(i);
         if (stat & CAP_EVENT3_FLG) {
@@ -135,7 +136,16 @@ irqreturn_t aic_cap_irq(int irq, void *arg)
             hal_cap_clr_flg(i, CAP_EVENT3_FLG);
         }
     }
+#endif
 
+#ifdef AIC_CAP_DRV_V12
+    u32 ch = irq - CAP0_IRQn;
+    stat = hal_cap_int_flg(ch);
+    if (stat & CAP_EVENT3_FLG) {
+        rt_hw_inputcapture_isr(&g_cap[ch]->rtdev, 0);
+        hal_cap_clr_flg(ch, CAP_EVENT3_FLG);
+    }
+#endif
     return IRQ_HANDLED;
 }
 
@@ -185,11 +195,16 @@ static int drv_cap_init(void)
         ret = aic_cap_probe(&g_cap_info[i]);
         if (ret)
             return ret;
+#ifdef AIC_CAP_DRV_V12
+        aicos_request_irq(CAP0_IRQn + g_cap_info[i].id, aic_cap_irq, 0, NULL, NULL);
+#endif
     }
 
     hal_cap_init();
-    aicos_request_irq(PWMCS_CAP_IRQn, aic_cap_irq, 0, NULL, NULL);
 
+#if defined (AIC_CAP_DRV_V10) || defined (AIC_CAP_DRV_V11)
+    aicos_request_irq(PWMCS_CAP_IRQn, aic_cap_irq, 0, NULL, NULL);
+#endif
     return ret;
 }
 INIT_DEVICE_EXPORT(drv_cap_init);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -13,6 +13,11 @@
 #if defined(AIC_WRI_DRV_V12) || defined(AIC_WRI_DRV_V11)
 #define WRI_FLAG_CMP_RST        BIT(12)
 #define WRI_FLAG_TSEN_RST       BIT(11)
+#endif
+#if defined(AIC_WRI_DRV_V16)
+#define WRI_FLAG_BOR_RST        BIT(13)
+#define WRI_FLAG_TSEN_RST       BIT(12)
+#define WRI_FLAG_WDT_FORCE_RST  BIT(11)
 #endif
 #define WRI_FLAG_WDT_RST        BIT(10)
 #define WRI_FLAG_DM_RST         BIT(9)
@@ -29,23 +34,33 @@ u32 wr_bit[WRI_TYPE_MAX] = {WRI_FLAG_SYS_POR, WRI_FLAG_RTC_RST,
 u32 wr_bit[WRI_TYPE_MAX] = {WRI_FLAG_SYS_POR, WRI_FLAG_RTC_RST,
                             WRI_FLAG_EXT_RST, WRI_FLAG_DM_RST,
                             WRI_FLAG_WDT_RST};
+#elif defined(AIC_WRI_DRV_V16)
+u32 wr_bit[WRI_TYPE_MAX] = {WRI_FLAG_SYS_POR,  WRI_FLAG_RTC_RST,
+                            WRI_FLAG_EXT_RST,  WRI_FLAG_DM_RST,
+                            WRI_FLAG_WDT_RST,  WRI_FLAG_WDT_FORCE_RST,
+                            WRI_FLAG_TSEN_RST, WRI_FLAG_BOR_RST};
 #endif
 
-static enum aic_warm_reset_type get_reset_type(enum aic_warm_reset_type hw)
+static int is_wdt_reset_type(enum aic_warm_reset_type hw)
 {
-    u16 hw_reason[] = {WRI_TYPE_WDT};
+    enum aic_warm_reset_type hw_reason[] = {
+            WRI_TYPE_WDT,
+#if defined(AIC_WRI_DRV_V16)
+            WRI_TYPE_WDT_FORCE
+#endif
+        };
 
     for (int i = 0; i < ARRAY_SIZE(hw_reason); i++) {
         if (hw == hw_reason[i])
             return hw_reason[i];
     }
-    return WRI_TYPE_ERR;
+    return 0;
 }
 
 static void get_sw_reboot_reason(enum aic_reboot_reason sw,
                                  enum aic_reboot_reason r)
 {
-    printf("Reboot action: Watchdog-Reset, reason: ");
+    printf("Reset action: Watchdog-Reset, reason: ");
     switch (sw) {
     case REBOOT_REASON_UPGRADE:
         printf("Upgrade-Mode\n");
@@ -80,7 +95,7 @@ static void get_warm_reboot_reason(enum aic_warm_reset_type hw,
         **r = REBOOT_REASON_RTC;
         break;
     case WRI_TYPE_EXT:
-        printf("External-Reset\n");
+        printf("External-PIN-Reset\n");
         **r = REBOOT_REASON_EXTEND;
         break;
     case WRI_TYPE_DM:
@@ -95,6 +110,10 @@ static void get_warm_reboot_reason(enum aic_warm_reset_type hw,
         printf("Undervoltage-Reset\n");
         **r = REBOOT_REASON_UNDER_VOL;
         break;
+    case WRI_TYPE_BOR:
+        printf("Brown-Out-Reset\n");
+        **r = REBOOT_REASON_UNDER_VOL;
+        break;
     default:
         printf("Unknown(%d)\n", hw);
         break;
@@ -105,22 +124,22 @@ static int get_hw_reboot_reason(enum aic_warm_reset_type hw,
                                 enum aic_reboot_reason *r, u32 sw)
 {
     if (*r == REBOOT_REASON_CMD_SHUTDOWN) {
-        printf("Reboot reason: Command-Poweroff\n");
+        printf("Reset reason: Command-Poweroff\n");
         return *r;
     }
 
     if (*r == REBOOT_REASON_SUSPEND) {
-        printf("Reboot reason: Suspend\n");
+        printf("Reset reason: Suspend\n");
         return *r;
     }
 
     if (*r == REBOOT_REASON_COLD) {
         if (hw == WRI_TYPE_POR) {
-            printf("Startup reason: Power-On-Reset\n");
+            printf("Reset reason: Power-On-Reset\n");
             return sw;
         }
 
-        printf("Reboot action: Warm-Reset, reason: ");
+        printf("Reset action: Warm-Reset, reason: ");
         get_warm_reboot_reason(hw, &r);
         return *r;
     }
@@ -129,7 +148,7 @@ static int get_hw_reboot_reason(enum aic_warm_reset_type hw,
 
 const struct aic_wri_ops wri_ops = {
     .wri_bit = wr_bit,
-    .reset_type = get_reset_type,
+    .is_wdt_reset = is_wdt_reset_type,
     .sw_reboot_reason = get_sw_reboot_reason,
     .hw_reboot_reason = get_hw_reboot_reason,
 };

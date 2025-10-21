@@ -1,6 +1,7 @@
 menu "Third-party packages options"
 
 source "packages/third-party/bonnie/Kconfig"
+source "packages/third-party/cpu_load/Kconfig"
 source "packages/third-party/cpu_usage/Kconfig"
 source "packages/third-party/ramdisk/Kconfig"
 source "packages/third-party/cherryusb/Kconfig"
@@ -28,6 +29,7 @@ source "packages/third-party/zlib/Kconfig"
 source "packages/third-party/sqlite/Kconfig"
 source "packages/third-party/llm_chat/Kconfig"
 source "packages/third-party/levelx/Kconfig"
+source "packages/third-party/miniz/Kconfig"
 # for baremetal mode
 source "packages/third-party/dfs/Kconfig"
 source "packages/third-party/minimp3/Kconfig"

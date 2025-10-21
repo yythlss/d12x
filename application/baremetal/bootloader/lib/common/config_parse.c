@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, Artinchip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -11,10 +11,10 @@
 #include <string.h>
 #include <config_parse.h>
 
-u32 boot_cfg_get_key_val(char *cfgtxt, u32 len, const char *key, u32 klen,
-                         char *val, u32 vlen)
+int boot_cfg_get_key_val(char *cfgtxt, int len, const char *key,  int klen,
+                         char *val, int vlen)
 {
-    u32 idx = 0, cnt = 0;
+    int idx = 0, cnt = 0;
 
     memset(val, 0, vlen);
     while (idx < len) {
@@ -69,9 +69,9 @@ u32 boot_cfg_get_key_val(char *cfgtxt, u32 len, const char *key, u32 klen,
  * - boot0=size@offset
  * - boot0=example.bin
  */
-static u32 boot_cfg_is_offset_format(char *val, u32 len)
+static int boot_cfg_is_offset_format(char *val, int len)
 {
-    u32 i = 0, sign_idx;
+    int i = 0, sign_idx;
 
     sign_idx = 0;
     for (i = 0; i < len; i++) {
@@ -102,11 +102,11 @@ static u32 boot_cfg_is_offset_format(char *val, u32 len)
  * - offset: The firmware data's start offset in the file data(fname)
  * - flen: The firmware data's valid length
  */
-int boot_cfg_parse_file(char *cfgtxt, u32 clen, char *key, char *fname,
-                        u32 nsiz, ulong *offset, ulong *flen)
+int boot_cfg_parse_file(char *cfgtxt, int clen, char *key, char *fname,
+                        int nsiz, int *offset, int *flen)
 {
     char val[IMG_NAME_MAX_SIZ];
-    u32 vlen = 0, sign_idx;
+    int vlen = 0, sign_idx;
 
     vlen = boot_cfg_get_key_val(cfgtxt, clen, key, strlen(key), val,
                                 IMG_NAME_MAX_SIZ);
@@ -115,8 +115,8 @@ int boot_cfg_parse_file(char *cfgtxt, u32 clen, char *key, char *fname,
 
     sign_idx = boot_cfg_is_offset_format(val, vlen);
     if (sign_idx) {
-        *flen = (ulong)strtoul(val, NULL, 16);
-        *offset = (ulong)strtoul(&val[sign_idx + 1], NULL, 16);
+        *flen = (int)strtol(val, NULL, 16);
+        *offset = (int)strtol(&val[sign_idx + 1], NULL, 16);
         vlen = boot_cfg_get_key_val(cfgtxt, clen, "image", 5, val, IMG_NAME_MAX_SIZ);
         memcpy(fname, val, min(vlen, nsiz));
         fname[vlen] = 0;
@@ -127,27 +127,27 @@ int boot_cfg_parse_file(char *cfgtxt, u32 clen, char *key, char *fname,
         fname[vlen] = 0;
     }
 
-    printf("0x%x @ %s\n", (u32)(*offset), fname);
+    printf("0x%x @ %s\n", *offset, fname);
     return vlen;
 }
 
-int boot_cfg_get_boot0(char *cfgtxt, u32 clen, char *name, u32 nsiz,
-                       ulong *offset, ulong *boot1len)
+int boot_cfg_get_boot0(char *cfgtxt, int clen, char *name, int nsiz,
+                       int *offset, int *boot1len)
 {
     return boot_cfg_parse_file(cfgtxt, clen, "boot0", name, nsiz, offset,
                                boot1len);
 }
 
-int boot_cfg_get_boot1(char *cfgtxt, u32 clen, char *name, u32 nsiz,
-                       ulong *offset, ulong *boot1len)
+int boot_cfg_get_boot1(char *cfgtxt, int clen, char *name, int nsiz,
+                       int *offset, int *boot1len)
 {
     return boot_cfg_parse_file(cfgtxt, clen, "boot1", name, nsiz, offset,
                                boot1len);
 }
 
-int boot_cfg_get_image(char *cfgtxt, u32 clen, char *name, u32 nsiz)
+int boot_cfg_get_image(char *cfgtxt, int clen, char *name, int nsiz)
 {
-    u32 ret = 0;
+    int ret = 0;
 
     if (NULL == name)
         return -1;
@@ -159,9 +159,9 @@ int boot_cfg_get_image(char *cfgtxt, u32 clen, char *name, u32 nsiz)
     return 0;
 }
 
-int boot_cfg_get_protection(char *cfgtxt, u32 clen, char *name, u32 nsiz)
+int boot_cfg_get_protection(char *cfgtxt, int clen, char *name, int nsiz)
 {
-    u32 ret = 0;
+    int ret = 0;
 
     if (NULL == name)
         return -1;

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -132,6 +132,7 @@ enum mpp_dec_cmd {
 	MPP_DEC_INIT_CMD_SET_OUTPUT_POS,
 	MPP_DEC_INIT_CMD_SET_EXT_PACKET_ALLOCATOR,// packet buffer allocator
 	MPP_DEC_INIT_CMD_SET_PARAMS,
+	MPP_DEC_SET_MAX_RESOLUTION,
 };
 
 enum mpp_dec_errno {

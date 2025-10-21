@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -21,7 +21,7 @@
 
 static int mtd_spinand_read(struct mtd_dev *mtd, u32 offset, u8 *data, u32 len)
 {
-    u8 err;
+    int err;
     u32 start, dolen;
     struct aic_spinand *flash;
 
@@ -73,7 +73,7 @@ static int mtd_spinand_read_oob(struct mtd_dev *mtd, u32 offset, u8 *data,
 
 static int mtd_spinand_erase(struct mtd_dev *mtd, u32 offset, u32 len)
 {
-    u8 err;
+    int err;
     u32 start, dolen;
     struct aic_spinand *flash;
     u32 flash_size = 0;
@@ -103,7 +103,7 @@ static int mtd_spinand_erase(struct mtd_dev *mtd, u32 offset, u32 len)
 
 static int mtd_spinand_block_isbad(struct mtd_dev *mtd, u32 offset)
 {
-    u8 err;
+    int err;
     u32 start;
     u32 blk;
     struct aic_spinand *flash;
@@ -138,7 +138,7 @@ static int mtd_spinand_block_isbad(struct mtd_dev *mtd, u32 offset)
 
 static int mtd_spinand_block_markbad(struct mtd_dev *mtd, u32 offset)
 {
-    u8 err;
+    int err;
     u32 start;
     u16 blk;
     struct aic_spinand *flash;
@@ -175,7 +175,7 @@ static int mtd_spinand_block_markbad(struct mtd_dev *mtd, u32 offset)
 
 static int mtd_spinand_write(struct mtd_dev *mtd, u32 offset, u8 *data, u32 len)
 {
-    u8 err;
+    int err;
     u32 start, dolen;
     struct aic_spinand *flash;
 
@@ -197,7 +197,7 @@ static int mtd_spinand_write(struct mtd_dev *mtd, u32 offset, u8 *data, u32 len)
 static int mtd_spinand_write_oob(struct mtd_dev *mtd, u32 offset, u8 *data,
                                  u32 len, u8 *spare_data, u32 spare_len)
 {
-    u8 err;
+    int err;
     u32 start;
     u32 page;
     struct aic_spinand *flash;
@@ -326,7 +326,7 @@ static char *aic_spinand_get_partition_string(struct mtd_dev *mtd)
 
 struct aic_spinand *spinand_probe(u32 spi_bus)
 {
-    u8 err = 0;
+    int err = 0;
     struct mtd_dev *mtd;
     struct mtd_partition *part, *p;
     struct aic_spinand *flash = NULL;

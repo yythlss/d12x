@@ -20,5 +20,6 @@ void aic_touch_rotate(int16_t *x_coordinate, int16_t *y_coordinate);
 void aic_touch_scale(int16_t *x_coordinate, int16_t *y_coordinate);
 rt_int8_t aic_touch_crop(int16_t *x_coordinate, int16_t *y_coordinate);
 void aic_touch_dynamic_rotate(struct rt_touch_device *touch, int16_t *x_coordinate, int16_t *y_coordinate);
+rt_int8_t aic_touch_dynamic_crop(struct rt_touch_device *touch, int16_t *input_x, int16_t *input_y);
 
 #endif

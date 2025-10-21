@@ -50,8 +50,7 @@ static uint8_t heartrate = 90;
  *     o General discoverable mode
  *     o Undirected connectable mode
  */
-static void
-blehr_advertise(void)
+static void blehr_advertise(void)
 {
     struct ble_gap_adv_params adv_params;
     struct ble_hs_adv_fields fields;
@@ -70,8 +69,7 @@ blehr_advertise(void)
      *      o Discoverability in forthcoming advertisement (general)
      *      o BLE-only (BR/EDR unsupported)
      */
-    fields.flags = BLE_HS_ADV_F_DISC_GEN |
-                    BLE_HS_ADV_F_BREDR_UNSUP;
+    fields.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
 
     /*
      * Indicate that the TX power level field should be included; have the
@@ -104,15 +102,13 @@ blehr_advertise(void)
     }
 }
 
-static void
-blehr_tx_hrate_stop(void)
+static void blehr_tx_hrate_stop(void)
 {
     ble_npl_callout_stop(&blehr_tx_timer);
 }
 
 /* Reset heartrate measurement */
-static void
-blehr_tx_hrate_reset(void)
+static void blehr_tx_hrate_reset(void)
 {
     int rc __attribute__((unused));
 
@@ -121,8 +117,7 @@ blehr_tx_hrate_reset(void)
 }
 
 /* This functions simulates heart beat and notifies it to the client */
-static void
-blehr_tx_hrate(struct ble_npl_event *ev)
+static void blehr_tx_hrate(struct ble_npl_event *ev)
 {
     static uint8_t hrm[2];
     int rc __attribute__((unused));
@@ -146,13 +141,15 @@ blehr_tx_hrate(struct ble_npl_event *ev)
     om = ble_hs_mbuf_from_flat(hrm, sizeof(hrm));
 
     rc = ble_gatts_notify_custom(conn_handle, hrs_hrm_handle, om);
+    if (rc != 0) {
+        MODLOG_DFLT(ERROR, "ble gatts notify custom failed. rc=%d\n", rc);
 
-    assert(rc == 0);
+        assert(rc == 0);
+    }
     blehr_tx_hrate_reset();
 }
 
-static int
-blehr_gap_event(struct ble_gap_event *event, void *arg)
+static int blehr_gap_event(struct ble_gap_event *event, void *arg)
 {
     switch (event->type) {
     case BLE_GAP_EVENT_CONNECT:
@@ -165,8 +162,7 @@ blehr_gap_event(struct ble_gap_event *event, void *arg)
             /* Connection failed; resume advertising */
             blehr_advertise();
             conn_handle = 0;
-        }
-        else {
+        } else {
           conn_handle = event->connect.conn_handle;
         }
 
@@ -200,14 +196,15 @@ blehr_gap_event(struct ble_gap_event *event, void *arg)
                     event->mtu.conn_handle,
                     event->mtu.value);
         break;
+    case BLE_GAP_EVENT_NOTIFY_TX:
+        break;
 
     }
 
     return 0;
 }
 
-static void
-blehr_on_sync(void)
+static void blehr_on_sync(void)
 {
     int rc __attribute__((unused));
 
@@ -229,8 +226,7 @@ blehr_on_sync(void)
  */
 extern int nimble_ble_enable(void);
 extern struct ble_npl_eventq *nimble_port_get_dflt_eventq(void);
-int
-ble_hr(int argc, char **argv)
+int ble_hr(int argc, char **argv)
 {
     int rc __attribute__((unused));
     static int init_flag = 0;

@@ -23,6 +23,7 @@
 #include "aic_audio_render_device.h"
 #include "mpp_log.h"
 #include "mpp_mem.h"
+#include "aic_mix.h"
 
 struct aic_audio_render_scene {
     enum audio_render_scene_type scene_type;
@@ -46,6 +47,9 @@ struct aic_audio_render_manager {
     int dev_id;
     int scene_id;
     void (*event_handler)(int event);
+
+    int mix_enable;
+    struct aic_pcm_mix *mix;
 };
 
 struct aic_audio_render_dev_manager g_audio_render_device[AIC_AUDIO_RENDER_DEVICE_NUM] = {0};
@@ -89,6 +93,11 @@ s32 aic_audio_render_manager_destroy(struct aic_audio_render *render)
     printf("[%s]dev_ref_cnt %d, scene_type %d, scene_id %d success.\n", __func__,
            render_device->dev_ref_cnt, audio_render->scene_type, audio_render->scene_id);
 
+    if (1 == audio_render->mix_enable) {
+        aic_pcm_mix_destroy(audio_render->mix);
+        audio_render->mix = NULL;
+    }
+
     if (render_device->dev_ref_cnt == 0) {
         pthread_mutex_destroy(&render_device->dev_lock);
         aic_audio_render_dev_destroy(audio_render->render_dev);
@@ -100,7 +109,7 @@ s32 aic_audio_render_manager_destroy(struct aic_audio_render *render)
     return 0;
 }
 
-s32 aic_audio_render_manager_check_bypass(struct aic_audio_render *render)
+static s32 aic_audio_render_manager_check_bypass(struct aic_audio_render *render)
 {
     if (!render)
         return -1;
@@ -117,15 +126,21 @@ s32 aic_audio_render_manager_check_bypass(struct aic_audio_render *render)
             render_device->render_scene[i].flag == 0) {
             continue;
         }
+
         if (highest_priority < render_device->render_scene[i].priority) {
+            highest_priority = render_device->render_scene[i].priority;
+        }
+
+        if (audio_render->scene_type == render_device->render_scene[i].scene_type) {
             render_scene = &render_device->render_scene[i];
         }
     }
+
     if (!render_scene) {
         return 1;
     }
 
-    if (render_scene->scene_type != audio_render->scene_type) {
+    if (render_scene->priority < highest_priority) {
         return 1;
     }
 
@@ -149,9 +164,18 @@ s32 aic_audio_render_manager_control(struct aic_audio_render *render,
             ((struct aic_audio_render_attr *)params)->transfer_mode = 1;
         else
             ((struct aic_audio_render_attr *)params)->transfer_mode = 0;
-        ret = aic_audio_render_dev_set_attr(audio_render->render_dev,
-                                            (struct aic_audio_render_attr *)params);
+
+        if (AUDIO_RENDER_SCENE_WARNING_TONE != audio_render->scene_type) {
+            ret = aic_audio_render_dev_set_attr(audio_render->render_dev,
+                                               (struct aic_audio_render_attr *)params);
+        }
+
         memcpy(&audio_render->attr, params, sizeof(struct aic_audio_render_attr));
+
+        if (audio_render->mix_enable) {
+            struct aic_audio_render_attr *attr = (struct aic_audio_render_attr *)params;
+            aic_pcm_mix_set_attr(audio_render->mix, attr->smples_per_frame, attr->channels, attr->sample_rate, attr->bits_per_sample / 8);
+        }
         pthread_mutex_unlock(&render_device->dev_lock);
         break;
     case AUDIO_RENDER_CMD_GET_ATTR:
@@ -200,6 +224,11 @@ s32 aic_audio_render_manager_control(struct aic_audio_render *render,
         }
         break;
 
+    case AUDIO_RENDER_CMD_SET_SUB_TRACK_VOL:
+        break;
+    case AUDIO_RENDER_CMD_GET_SUB_TRACK_REMAIN_DATA:
+        *(unsigned long *)params = get_mix_reamin_data(audio_render->mix);
+        break;
     default:
         loge("unsupport audio render control cmd %d", cmd);
         return -1;
@@ -208,7 +237,7 @@ s32 aic_audio_render_manager_control(struct aic_audio_render *render,
     return ret;
 }
 
-static int64_t wait_time(int size, struct aic_audio_render_attr *attr)
+int64_t wait_time(int size, struct aic_audio_render_attr *attr)
 {
     if (size <= 0)
         return 0;
@@ -222,10 +251,39 @@ static int64_t wait_time(int size, struct aic_audio_render_attr *attr)
     return (data_size * 1000000 / pcm_size_1s);//us
 }
 
+static s32 need_do_mix(struct aic_audio_render_dev_manager *render_device)
+{
+    int has_main_track = 0, has_sub_track = 0, ret = -1;
+
+    if (NULL == render_device) {
+        loge("invalid parameter!\n");
+        return -1;
+    }
+
+    for (int i = 0; i < AUDIO_RENDER_SCENE_MAX; i++) {
+        if (render_device->render_scene[i].scene_type == AUDIO_RENDER_SCENE_DEFAULT &&
+            render_device->render_scene[i].flag == 1) {
+            has_main_track = 1;;
+        }
+        if (render_device->render_scene[i].scene_type == AUDIO_RENDER_SCENE_WARNING_TONE &&
+            render_device->render_scene[i].flag == 1) {
+            has_sub_track = 1;;
+        }
+    }
+
+    if (has_main_track && has_sub_track) {
+        ret = 0;
+    }
+
+    return ret;
+}
+
 s32 aic_audio_render_manager_rend(struct aic_audio_render *render, void *data, s32 size)
 {
-    if (!render || !data)
+    if (!render || !data || size <= 0) {
+        loge("invalid parameter render:%p data:%p size:%d]\n", render, data, size);
         return -1;
+    }
 
     int ret = 0;
     static enum audio_render_scene_type last_scene_type = 0;
@@ -235,7 +293,7 @@ s32 aic_audio_render_manager_rend(struct aic_audio_render *render, void *data, s
     ret = aic_audio_render_manager_check_bypass(render);
     if(ret != 0) {
         /*Bypass audio render means drop the data and return success*/
-        usleep(wait_time(size, &audio_render->attr));
+        // usleep(wait_time(size, &audio_render->attr));
         return 0;
     }
 
@@ -250,10 +308,21 @@ s32 aic_audio_render_manager_rend(struct aic_audio_render *render, void *data, s
         if (last_scene_type == AUDIO_RENDER_SCENE_UAC) {
             aic_audio_render_manager_control(render, AUDIO_RENDER_CMD_SET_ATTR, &audio_render->attr);
         }
-        pthread_mutex_lock(&render_device->dev_lock);
-        ret = aic_audio_render_dev_rend(audio_render->render_dev, data, size);
-        pthread_mutex_unlock(&render_device->dev_lock);
+        // pthread_mutex_lock(&render_device->dev_lock);
+        if (audio_render->mix_enable && (0 == need_do_mix(render_device))) {
+            aic_pcm_mix_write_data(audio_render->mix, data, size);
+            if (AUDIO_RENDER_SCENE_DEFAULT == audio_render->scene_type) {
+                ret = do_mix(NULL, size / sizeof(int16_t));
+                if ((ret * sizeof(int16_t)) == size) {
+                    ret = aic_audio_render_dev_rend(audio_render->render_dev, audio_render->mix->mix_manager->mix_buf, size);
+                }
+            }
+        } else {
+            ret = aic_audio_render_dev_rend(audio_render->render_dev, data, size);
+        }
+        // pthread_mutex_unlock(&render_device->dev_lock);
     }
+
     last_scene_type = audio_render->scene_type;
     return ret;
 }
@@ -263,6 +332,7 @@ s32 aic_audio_render_create(struct aic_audio_render **render,
 {
     struct aic_audio_render_manager *audio_render = NULL;
     struct aic_audio_render_dev_manager *render_device = NULL;
+
     if (!create_params) {
         loge("audio render create_params is null\n");
         *render = NULL;
@@ -280,7 +350,18 @@ s32 aic_audio_render_create(struct aic_audio_render **render,
         loge("dev_id %d is exceed the max audio devices num", create_params->dev_id);
         goto exit;
     }
-    render_device = &g_audio_render_device[audio_render->dev_id];
+    render_device = &g_audio_render_device[create_params->dev_id];
+
+    if (create_params->mix_enable) {
+        if (AUDIO_RENDER_SCENE_DEFAULT == create_params->scene_type) {
+            audio_render->mix = aic_pcm_mix_create(NULL, 0, 2048);
+            audio_render->mix_enable = 1;
+        } else if (AUDIO_RENDER_SCENE_WARNING_TONE == create_params->scene_type) {
+            audio_render->mix = aic_pcm_mix_create(NULL, 1, 8192);
+            audio_render->mix_enable = 1;
+        }
+    }
+
     audio_render->scene_type = create_params->scene_type;
     audio_render->dev_id = create_params->dev_id;
     audio_render->scene_id = render_device->dev_ref_cnt;

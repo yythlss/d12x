@@ -321,7 +321,7 @@ static s32 spl_build_page_table(struct aicupg_nand_spl *spl,
             ret = -1;
             goto out;
         }
-        pa = (blkidx << 6) + page_in_blk;
+        pa = (blkidx * page_per_blk) + page_in_blk;
         if (pgidx < PAGE_TABLE_MAX_ENTRY) {
             pt->entry[pgidx].pageaddr[0] = pa;
             pt->entry[pgidx].checksum = ~sumval;
@@ -334,7 +334,7 @@ static s32 spl_build_page_table(struct aicupg_nand_spl *spl,
 
     pgidx = 0;
     blkidx = spl->spl_blocks[0];
-    pa = (blkidx << 6) + pgidx;
+    pa = (blkidx * page_per_blk) + pgidx;
     pt->entry[0].pageaddr[0] = pa;
     pt->entry[0].checksum = 0;
     memset(page_data, 0xFF, PAGE_TABLE_USE_SIZE);

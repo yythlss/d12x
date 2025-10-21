@@ -188,23 +188,20 @@ static rt_err_t drv_wdt_control(rt_watchdog_t *wdt, int cmd, void *args)
 
 rt_err_t drv_wdt_init(rt_watchdog_t *wdt)
 {
-    rt_err_t ret = RT_EOK;
     struct aic_wdt_dev *wdt_dev = (struct aic_wdt_dev*)wdt;
 
     RT_ASSERT(wdt != NULL);
-    if (hal_clk_enable(CLK_WDT) < 0) {
+    if (hal_clk_enable(CLK_WDT)) {
         LOG_E("Watchdog clk enable failed!");
         return -RT_EINVAL;
     }
 
-    hal_reset_assert(RESET_WDT);
-    if (ret < -1) {
+    if (hal_reset_assert(RESET_WDT)) {
         LOG_E("Watchdog reset assert failed.");
         return -RT_EINVAL;
     }
 
-    hal_reset_deassert(RESET_WDT);
-    if (ret < -1) {
+    if (hal_reset_deassert(RESET_WDT)) {
         LOG_E("Watchdog reset deassert failed.");
         return -RT_EINVAL;
     }
@@ -214,10 +211,10 @@ rt_err_t drv_wdt_init(rt_watchdog_t *wdt)
     wdt_dev->dbg_continue = 0;
     wdt_dev->cur_chan = 0;
 
-    return ret;
+    return RT_EOK;
 }
 
-void drv_wdt_uninit(rt_watchdog_t *wdt)
+void drv_wdt_deinit(rt_watchdog_t *wdt)
 {
     aicos_irq_disable(WDT_IRQn);
     hal_clk_disable_assertrst(CLK_WDT);

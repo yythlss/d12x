@@ -1,7 +1,5 @@
-/*_------------------------------------------------------------------------------*/
-
 /*
- * Copyright (c) 2022, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -66,12 +64,14 @@ struct usbh_uvc_player_t {
     bool stream_record;
 }g_usbh_uvc_player;
 
-#define UVC_DATA_PATH "/sdcard/uvc_data.raw"
-static struct usbh_videoframe frame_pool[2];
-struct mpp_frame g_frame[2];
-struct mpp_packet packet;
-int cur_frame_id = 0;
-int last_frame_id = 0;
+#define UVC_DATA_PATH "/sdcard/uvc_data"
+#define USBH_VID_START_FRAME    3
+#define USBH_VID_BUF_NUM        2
+static struct usbh_videoframe frame_pool[USBH_VID_BUF_NUM];
+static struct mpp_frame g_frame[2] = { 0 };
+static struct mpp_packet g_packet = { 0 };
+static int cur_frame_id = 0;
+static int last_frame_id = 0;
 
 void usbh_video_fps_init(void);
 
@@ -90,9 +90,6 @@ void usbh_video_fps_init(void);
 #define ALIGN_64B(x) (((x) + (63)) & ~(63))
 #define ALIGN_128B(x) (((x) + (127)) & ~(127))
 #define ALIGN_1024B(x) (((x) + (1023)) & ~(1023))
-
-#define AICFB_VID_BUF_NUM   2
-
 struct video_data_format {
     enum mpp_pixel_format format;
     char f_str[16];
@@ -123,7 +120,7 @@ static struct video_data_format g_vformat[] = {
     {MPP_FMT_YUV422_128x16_TILE, "yuv422_128x16", 2, 0, 0, 0},
     {MPP_FMT_YUV422_64x32_TILE,  "yuv422_64x32",  2, 0, 0, 0},
 
-    {MPP_FMT_YUV420P, "mjpeg", 3, 0, 2, 2},
+    {MPP_FMT_YUV420P, "mjpeg", 1, 1, 0, 0},
     {MPP_FMT_MAX, "", 0, 0, 0, 0}
 };
 
@@ -142,7 +139,7 @@ struct aicfb_video_layer {
     int h;
     int s;
     struct video_data_format *f;
-    struct video_buf vbuf[AICFB_VID_BUF_NUM];
+    struct video_buf vbuf[USBH_VID_BUF_NUM];
 };
 
 static struct aicfb_video_layer g_vlayer = {0};
@@ -332,7 +329,7 @@ static int vidbuf_request(struct aicfb_video_layer *vlayer)
 
     /* Prepare two group buffer for video player,
        and each group has three planes: y, u, v. */
-    for (i = 0; i < AICFB_VID_BUF_NUM; i++) {
+    for (i = 0; i < USBH_VID_BUF_NUM; i++) {
         struct video_plane *p = (struct video_plane *)&vlayer->vbuf[i];
         int *shift = &vlayer->f->y_shift;
 
@@ -362,7 +359,7 @@ void vidbuf_release(struct aicfb_video_layer *vlayer)
     int i;
     struct video_plane *p = NULL;
 
-    for (i = 0; i < AICFB_VID_BUF_NUM; i++) {
+    for (i = 0; i < USBH_VID_BUF_NUM; i++) {
         p = (struct video_plane *)&vlayer->vbuf[i];
         if (p->buf == NULL)
             continue;
@@ -472,18 +469,32 @@ static int vidbuf_write(struct usbh_videoframe *frame)
 {
     struct usbh_uvc_player_t *uvc_player = get_uvc_player();
     int fd = uvc_player->video_fd;
+    char file_name[30] = {0};
 
     if (uvc_player->frame_cnt > uvc_player->max_frame_cnt)
         return 0;
 
-    write(fd, (void *)frame->frame_buf, frame->frame_bufsize);
+    USB_LOG_DBG("%d frame[%d]:%#lx %d\n",
+                uvc_player->frame_cnt,
+                frame->index, (long)frame->frame_buf,
+                frame->frame_size);
+
+    if (uvc_player->format_index == USBH_VIDEO_FORMAT_MJPEG)
+        snprintf(file_name, sizeof(file_name), "%s%d.jpeg", UVC_DATA_PATH, uvc_player->frame_cnt);
+    else
+        snprintf(file_name, sizeof(file_name), "%s%d.raw", UVC_DATA_PATH, uvc_player->frame_cnt);
+
+    uvc_player->video_fd = open(file_name, O_RDWR);
+    if (uvc_player->video_fd < 0) {
+        creat(file_name, O_RDWR);
+        uvc_player->video_fd = open(file_name, O_RDWR);
+    }
+
+    write(fd, (void *)frame->frame_buf, frame->frame_size);
+
     fsync(fd);
 
-    uvc_player->frame_cnt++;
-
-    if (uvc_player->frame_cnt == uvc_player->max_frame_cnt)
-        close(fd);
-
+    close(fd);
 
     return 0;
 }
@@ -509,15 +520,8 @@ static void uvc_record_start(int max_frame_cnt)
         return;
 
     uvc_player->stream_record = true;
-    uvc_player->frame_cnt = 0;
-    uvc_player->max_frame_cnt = max_frame_cnt;
-    USB_LOG_INFO("UVC start recoring.(max frame cnt: %d)\n", uvc_player->max_frame_cnt);
-
-    uvc_player->video_fd = open(UVC_DATA_PATH, O_RDWR);
-    if (uvc_player->video_fd < 0) {
-        creat(UVC_DATA_PATH, O_RDWR);
-        uvc_player->video_fd = open(UVC_DATA_PATH, O_RDWR);
-    }
+    uvc_player->max_frame_cnt = max_frame_cnt + uvc_player->frame_cnt;
+    USB_LOG_INFO("UVC start recoring.(max frame cnt: %d)\n", max_frame_cnt);
 
     if (uvc_player->stream_record == true && uvc_player->record_sem == NULL
         && uvc_player->record_tid == NULL) {
@@ -585,7 +589,8 @@ static int usb_video_src_release(void)
                 vidbuf_release(uvc_player->vlayer);
             break;
         case USBH_VIDEO_FORMAT_MJPEG:
-            for (int i = 0; i < 2; i++) {
+            video_layer_disable();
+            for (int i = 0; i < USBH_VID_BUF_NUM; i++) {
                 usb_osal_free_align(MEM_CMA, frame_pool[i].frame_buf);
             }
             break;
@@ -635,7 +640,7 @@ static int parse_options(struct usbh_uvc_player_t *uvc_player, int cnt, char**op
                 uvc_player->format_index = USBH_VIDEO_FORMAT_UNCOMPRESSED_NV12;
                 strcpy(uvc_player->format, "nv12");
             }
-            if (strcmp(optarg, "yuy2") == 0 || strcmp(optarg, "yuyv") == 0 ) {
+            if (strcmp(optarg, "yuy2") == 0 || strcmp(optarg, "yuyv") == 0) {
                 uvc_player->format_index = USBH_VIDEO_FORMAT_UNCOMPRESSED_YUY2;
                 strcpy(uvc_player->format, "yuyv");
             }
@@ -691,7 +696,6 @@ static void uvc_yuv_init(void)
     struct usbh_uvc_player_t *uvc_player = get_uvc_player();
 
     vidbuf_request(uvc_player->vlayer);
-    video_layer_set_yuv(uvc_player->vlayer, uvc_player->buf_index);
 }
 
 static int uvc_yuv_update_callback(void *data)
@@ -753,10 +757,16 @@ static int aic_uvc_player_update_callback(void *data)
     struct usbh_uvc_player_t *uvc_player = get_uvc_player();
 
     uvc_player->cur_frame = (struct usbh_videoframe *)data;
+
+    if (uvc_player->frame_cnt == USBH_VID_START_FRAME) /* do not display the first 2 frames */
+        video_layer_set_yuv(&g_vlayer, uvc_player->buf_index);
+
     uvc_player->video_update_callback(data);
 
     if (uvc_player->stream_record == true || uvc_player->record_sem)
         usb_osal_sem_give(uvc_player->record_sem);
+
+    uvc_player->frame_cnt++;
 
     return 0;
 }
@@ -863,20 +873,18 @@ static int usb_disp_render_frame(int cur_frame_id, int last_frame_id)
 static void uvc_decode_init(void)
 {
     struct usbh_uvc_player_t *uvc_player = get_uvc_player();
-    uint32_t max_frame_size = ALIGN_UP((uvc_player->width * uvc_player->height * 3) / 2, 16) + 16;
+    uint32_t max_frame_size = ALIGN_UP((uvc_player->width * uvc_player->height), CACHE_LINE_SIZE);
 
     memset(g_frame, 0, sizeof(g_frame));
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < USBH_VID_BUF_NUM; i++) {
         if ((uvc_player->format_index == USBH_VIDEO_FORMAT_H264))
             frame_pool[i].frame_buf = usb_osal_malloc_align(MEM_CMA, max_frame_size, 1024);
         else
             frame_pool[i].frame_buf = usb_osal_malloc_align(MEM_CMA, max_frame_size, CACHE_LINE_SIZE);
         frame_pool[i].frame_bufsize = max_frame_size;
+        frame_pool[i].index = i;
     }
-
-    if (video_layer_set_yuv(uvc_player->vlayer, 0))
-        return;
 
     uvc_player->image_size = max_frame_size;
     if (usb_disp_decoder_init())
@@ -889,8 +897,8 @@ static int uvc_decode_update_callback(void *data)
     int ret = 0;
     int buff_len= ALIGN_UP((uvc_player->width * uvc_player->height * 3) / 2, 16) + 16;
 
-    memset(&packet, 0, sizeof(struct mpp_packet));
-    ret = mpp_decoder_get_packet(uvc_player->mpp_dec, &packet, buff_len);
+    memset(&g_packet, 0, sizeof(struct mpp_packet));
+    ret = mpp_decoder_get_packet(uvc_player->mpp_dec, &g_packet, buff_len);
     if (ret) {
         USB_LOG_ERR("mpp_decoder_get_packet error = %d.\n", ret);
         return -1;
@@ -898,7 +906,7 @@ static int uvc_decode_update_callback(void *data)
         USB_LOG_DBG("mpp_decoder_get_packet succeed.\n");
     }
 
-    ret = mpp_decoder_put_packet(uvc_player->mpp_dec, &packet);
+    ret = mpp_decoder_put_packet(uvc_player->mpp_dec, &g_packet);
     if (ret) {
         USB_LOG_ERR("mpp_decoder_put_packet error = %d.\n", ret);
         return -1;
@@ -911,8 +919,6 @@ static int uvc_decode_update_callback(void *data)
         USB_LOG_DBG("mpp_decoder_decode error, no empty frame.\n");
     } else if (ret) {
         USB_LOG_ERR("mpp_decoder_decode error = %d.\n", ret);
-        if (uvc_player->stream_record == true || uvc_player->record_sem)
-            usb_osal_sem_give(uvc_player->record_sem);
         return -1;
     } else {
         USB_LOG_DBG("mpp_decoder_decode succeed.\n");
@@ -984,7 +990,7 @@ static void test_usbh_video(int argc, char **argv)
 
     uvc_player->frame_buffer1 = frame_pool[0].frame_buf;
     uvc_player->frame_buffer2 = frame_pool[1].frame_buf;
-    usbh_video_stream_init(5, frame_pool, AICFB_VID_BUF_NUM);
+    usbh_video_stream_init(5, frame_pool, USBH_VID_BUF_NUM);
 
     usbh_video_player_register(aic_uvc_player_update_callback);
     usbh_video_player_deinit_register(aic_uvc_player_deinit_callback);

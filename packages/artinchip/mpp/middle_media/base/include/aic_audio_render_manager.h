@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -35,6 +35,9 @@ enum audio_render_cmd_type {
     AUDIO_RENDER_CMD_GET_TRANSFER_BUFFER,
     AUDIO_RENDER_CMD_GET_BYPASS,
     AUDIO_RENDER_CMD_SET_EVENT_HANDLER,
+    // sub track
+    AUDIO_RENDER_CMD_GET_SUB_TRACK_REMAIN_DATA,
+    AUDIO_RENDER_CMD_SET_SUB_TRACK_VOL,
 };
 
 
@@ -59,6 +62,7 @@ enum audio_render_event_type {
 
 struct audio_render_create_params {
     int dev_id;
+    int mix_enable;
     enum audio_render_scene_type scene_type;
 };
 

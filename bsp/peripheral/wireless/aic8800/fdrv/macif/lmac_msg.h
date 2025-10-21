@@ -1696,6 +1696,11 @@ struct scanu_vendor_ie_req
 	u8_l  ie[256];
 };
 
+struct scanu_scan_cancel_req
+{
+    u8_l status;
+};
+
 /// Structure containing the parameters of the @ref SCANU_START_CFM message
 struct scanu_start_cfm
 {
@@ -2768,7 +2773,7 @@ struct dbg_rftest_cmd_req
 
 struct dbg_rftest_cmd_cfm
 {
-    u32_l rftest_result[16];
+    u32_l rftest_result[32];
 };
 
 #ifdef CONFIG_MCU_MESSAGE
@@ -2847,7 +2852,8 @@ struct dbg_start_app_cfm
 
 enum {
     HOST_START_APP_AUTO = 1,
-    HOST_START_APP_CUSTOM,
+    HOST_START_APP_CUSTOM = 2,
+    HOST_START_APP_REBOOT = 3,
     HOST_START_APP_FNCALL = 4,
     HOST_START_APP_DUMMY  = 5,
 };

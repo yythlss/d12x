@@ -18,6 +18,12 @@
 static uint16_t g_touch_angle = 0;
 static uint8_t g_touch_dynamic_enable = 0;
 static uint8_t g_osd_enable = 0;
+/* Dynamic Crop Width */
+static rt_int32_t g_width = 0;
+/* Dynamic Crop Height */
+static rt_int32_t g_height = 0;
+/* Dynamic Crop Switch */
+static rt_uint8_t g_crop_enable = 0;
 
 static void aic_set_dynamic_touch_rotation(uint16_t angle)
 {
@@ -43,6 +49,20 @@ static void aic_set_osd_rotation_flag(uint8_t flag)
 static uint8_t aic_get_osd_rotation_flag(uint8_t flag)
 {
     return g_osd_enable;
+}
+
+static void aic_touch_set_dynamic_crop(rt_int32_t width, rt_int32_t height, rt_uint8_t enable)
+{
+    g_width = width;
+    g_height = height;
+    g_crop_enable = enable;
+}
+
+static void aic_touch_get_dynamic_crop(rt_int32_t *width, rt_int32_t *height, rt_uint8_t *enable)
+{
+    *width = g_width;
+    *height = g_height;
+    *enable = g_crop_enable;
 }
 
 /* ISR for touch interrupt */
@@ -248,6 +268,24 @@ static rt_err_t rt_touch_control(rt_device_t dev, int cmd, void *args)
             *(rt_uint8_t *)args = aic_get_osd_rotation_flag(flag);
         else
             result = -RT_EINVAL;
+
+        break;
+    case RT_TOUCH_CTRL_SET_DYNAMIC_CROP:
+        if (args) {
+            struct rt_touch_crop_info *crop_info = (struct rt_touch_crop_info *)args;
+            aic_touch_set_dynamic_crop(crop_info->width, crop_info->height, crop_info->enable);
+        } else {
+            result = -RT_EINVAL;
+        }
+
+        break;
+    case RT_TOUCH_CTRL_GET_DYNAMIC_CROP:
+        if (args) {
+            struct rt_touch_crop_info *crop_info = (struct rt_touch_crop_info *)args;
+            aic_touch_get_dynamic_crop(&crop_info->width, &crop_info->height, &crop_info->enable);
+        } else {
+            result = -RT_EINVAL;
+        }
 
         break;
     case RT_TOUCH_CTRL_DISABLE_INT:

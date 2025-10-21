@@ -85,9 +85,9 @@ static inline int aicos_sem_take(aicos_sem_t sem, uint32_t msec)
         result = rt_sem_take((rt_sem_t)sem, RT_WAITING_FOREVER);
     else
         result = rt_sem_take((rt_sem_t)sem, rt_tick_from_millisecond(msec));
-    if (result == RT_ETIMEOUT) {
+    if (result == -RT_ETIMEOUT) {
         ret = -ETIMEDOUT;
-    } else if (result == RT_ERROR) {
+    } else if (result == -RT_ERROR) {
         ret = -EINVAL;
     } else {
         ret = 0;
@@ -160,9 +160,9 @@ static inline int aicos_event_recv(aicos_event_t event, uint32_t set, uint32_t *
         result = rt_event_recv((rt_event_t)event, set, RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR, RT_WAITING_FOREVER, (rt_uint32_t *)recved);
     else
         result = rt_event_recv((rt_event_t)event, set, RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR, rt_tick_from_millisecond(msec), (rt_uint32_t *)recved);
-    if (result == RT_ETIMEOUT) {
+    if (result == -RT_ETIMEOUT) {
         ret = -ETIMEDOUT;
-    } else if (result == RT_ERROR) {
+    } else if (result == -RT_ERROR) {
         ret = -EINVAL;
     } else {
         ret = 0;

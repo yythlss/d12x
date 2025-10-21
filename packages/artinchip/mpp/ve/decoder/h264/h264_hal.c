@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -573,7 +573,7 @@ static void config_picture_info(struct h264_dec_ctx *s)
 {
 	int i;
 	u32* ptr_tmp = NULL;
-	u32 phy_addr_offset[3] = {0};
+	u32 phy_addr_offset[3] = {0, 0, 0};
 	struct h264_picture* pic = NULL;
 	struct h264_picture* cur_pic = s->frame_info.cur_pic_ptr;
 	struct frame_format_reg frm_format;
@@ -590,7 +590,10 @@ static void config_picture_info(struct h264_dec_ctx *s)
 		frm_format.color_mode = 0;
 	else
 		frm_format.color_mode = 4; // yuv400
-	frm_format.stride = cur_pic->frame->mpp_frame.buf.stride[0];
+	if (s->max_width)
+		frm_format.stride = s->width;
+	else
+		frm_format.stride = cur_pic->frame->mpp_frame.buf.stride[0];
 	frm_format.cbcr_interleaved = (s->pix_format == MPP_FMT_NV12) || (s->pix_format == MPP_FMT_NV21);
 
 	phy_addr_offset[0] = s->decoder.output_y * cur_pic->frame->mpp_frame.buf.stride[0]

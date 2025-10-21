@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -25,27 +25,28 @@ enum aic_psadc_mode {
 enum aic_psadc_queue_type {
     AIC_PSADC_QC = 0,
     AIC_PSADC_Q1 = 1,
-    AIC_PSADC_Q2 = 2
+    AIC_PSADC_Q2 = 2,
+    AIC_PSADC_Q_NUM
 };
 
 struct aic_psadc_ch {
     u8 id;
     u8 available;
-    enum aic_psadc_mode mode;
     u8 fifo_depth;
+    enum aic_psadc_mode mode;
 };
 
 struct aic_psadc_queue {
     u8 id;
-    int type;
     u8 nodes_num;
+    int type;
     aicos_sem_t complete;
 };
 
 void hal_psadc_enable(int enable);
 void hal_psadc_single_queue_mode(int enable);
-void hal_psadc_qc_irq_enable(int enable);
-int hal_psadc_ch_init();
+void hal_psadc_qc_irq_enable(bool enable);
+int hal_psadc_ch_init(void);
 irqreturn_t hal_psadc_isr(int irq, void *arg);
 int hal_psadc_read(u32 *val, u32 timeout);
 int hal_psadc_read_poll(u32 *val, u32 timeout);

@@ -7,7 +7,6 @@
 #ifndef _SID27_SECURITY_ACCESS_H_
 #define _SID27_SECURITY_ACCESS_H_
 
-
 #include <stdint.h>
 #include "uds_def.h"
 #include "uds_def.h"
@@ -21,8 +20,7 @@
 * 函数返回: 无
 * 其它说明: 无
 ******************************************************************************/
-void service_27_SecurityAccess(const uint8_t* msg_buf, uint16_t msg_dlc);
-
+void service_27_SecurityAccess(const uint8_t *msg_buf, uint16_t msg_dlc);
 
 /******************************************************************************
 * 函数名称: bool_t service_27_check_len(const uint8_t* msg_buf, uint16_t msg_dlc)
@@ -32,8 +30,7 @@ void service_27_SecurityAccess(const uint8_t* msg_buf, uint16_t msg_dlc);
 * 函数返回: TRUE: 合法; FALSE: 非法
 * 其它说明: 无
 ******************************************************************************/
-bool_t service_27_check_len(const uint8_t* msg_buf, uint16_t msg_dlc);
-
+bool_t service_27_check_len(const uint8_t *msg_buf, uint16_t msg_dlc);
 
 /******************************************************************************
 * 函数名称: void set_current_sa_lv(uds_sa_lv level)
@@ -45,7 +42,6 @@ bool_t service_27_check_len(const uint8_t* msg_buf, uint16_t msg_dlc);
 ******************************************************************************/
 void set_current_sa_lv(uds_sa_lv level);
 
-
 /******************************************************************************
 * 函数名称: uds_session_t get_current_sa_lv(void)
 * 功能说明: 获取当前安全访问等级
@@ -56,9 +52,6 @@ void set_current_sa_lv(uds_sa_lv level);
 ******************************************************************************/
 uds_sa_lv get_current_sa_lv(void);
 
-
-
 #endif
-
 
 /****************EOF****************/

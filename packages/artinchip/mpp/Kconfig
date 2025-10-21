@@ -20,6 +20,16 @@ config AIC_MPP_PLAYER_AUDIO_RENDER_SHARE_TEST
     default n
     depends on LPKG_MPP && AIC_MPP_PLAYER_INTERFACE
 
+config AIC_MPP_PLAYER_FILE_CACHE
+    bool "Enable player read file using cache"
+    default n
+    depends on LPKG_MPP && AIC_MPP_PLAYER_INTERFACE
+
+config AIC_MPP_PLAYER_FILE_CACHE_SIZE
+    int "Config player file read cache size"
+    default 65536
+    depends on AIC_MPP_PLAYER_FILE_CACHE
+
 config AIC_MPP_AVI_DEMUX
     bool "Enable avi demux"
     default n

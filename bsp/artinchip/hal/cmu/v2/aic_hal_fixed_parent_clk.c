@@ -37,7 +37,8 @@ static int clk_fixed_parent_enable(struct aic_clk_comm_cfg *comm_cfg)
 static void clk_fixed_parent_disable(struct aic_clk_comm_cfg *comm_cfg)
 {
     struct aic_clk_fixed_parent_cfg *mod = to_clk_fixed_parent(comm_cfg);
-    u32 i, val;
+    u32 val = 0;
+    s32 i;
 
     if (!mod->table_gates) {
         hal_log_err("%s does not have valid table_gates\n", comm_cfg->name);

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2024 ArtInChip Technology Co. Ltd
+ * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -22,6 +22,8 @@ extern "C" {
 struct aic_stream {
 	/* read data */
 	s64 (*read)(struct aic_stream *stream, void *buf, s64 len);
+	/* read cached data */
+	s64 (*read_cached)(struct aic_stream *stream, void *buf, s64 len);
 	/* write data */
 	s64 (*write)(struct aic_stream *stream, void *buf, s64 len);
 	/* return current file offset */
@@ -93,6 +95,12 @@ struct aic_stream {
 		   buf,				  \
 		   len)               \
 	    ((struct aic_stream*)stream)->read(stream, buf, len)
+
+#define aic_stream_read_cached(      \
+		   stream,            \
+		   buf,				  \
+		   len)               \
+	    ((struct aic_stream*)stream)->read_cached(stream, buf, len)
 
 #define aic_stream_write(      \
 		   stream,            \

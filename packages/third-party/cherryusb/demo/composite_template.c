@@ -786,6 +786,7 @@ int make_comp_intf_ep_desc(uint8_t *dest, uint8_t *src,
 
     intf_ptr = dest;
     ep_ptr = dest;
+    c->func_table[index]->ep_num = 0;
 
     do {
         /* check if the first descriptor is IAD ? */

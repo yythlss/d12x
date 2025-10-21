@@ -196,9 +196,11 @@ save_boot_params_ret:
 #endif
 
 #if (defined(KERNEL_RTTHREAD) || defined(KERNEL_FREERTOS))
-    jal     entry
+    la      a5, entry
+    jalr    a5
 #else
-    jal     main
+    la      a5, main
+    jalr    a5
 #endif
 
     .size   Reset_Handler, . - Reset_Handler

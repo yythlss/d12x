@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -14,6 +14,7 @@
 
 struct reboot_info {
     u32 inited;
+    u32 reg_val;
     enum aic_reboot_reason reason;
     enum aic_reboot_reason sw_reason;
     enum aic_warm_reset_type hw_reason;
@@ -34,6 +35,8 @@ enum aic_warm_reset_type aic_wr_type_get(void)
     if (!val)
         return WRI_TYPE_ERR;
 
+    g_last_reboot.reg_val = val;
+
     for (i = WRI_TYPE_MAX - 1; i >= 0; i--) {
         if (val & ops->wri_bit[i]) {
             g_last_reboot.hw_reason = (enum aic_warm_reset_type)i;
@@ -52,14 +55,8 @@ enum aic_reboot_reason aic_judge_reboot_reason(enum aic_warm_reset_type hw,
     enum aic_reboot_reason r = (enum aic_reboot_reason)sw;
 
     /* First, check the software-triggered reboot */
-    if (wri_ops.reset_type(hw)) {
-#if defined(AIC_WRI_DRV_V12) || defined(AIC_WRI_DRV_V11) || defined(AIC_WRI_DRV_V10)
+    if (wri_ops.is_wdt_reset(hw)) {
         wri_ops.sw_reboot_reason(sw, r);
-#endif
-#if defined(AIC_WRI_DRV_V13)
-        wri_ops.hw_reboot_action(hw);
-        wri_ops.sw_reboot_reason(sw, r);
-#endif
         return r;
     }
 
@@ -69,7 +66,7 @@ enum aic_reboot_reason aic_judge_reboot_reason(enum aic_warm_reset_type hw,
         return (enum aic_reboot_reason)ret;
     }
 
-    pr_warn("Unknown reboot reason: %d - %d\n", hw, sw);
+    pr_warn("Unknown reset reason: %d - %d\n", hw, sw);
     return r;
 }
 
@@ -86,7 +83,7 @@ void aic_set_reboot_reason(enum aic_reboot_reason r)
     BOOT_INFO_SET(r, WRI_REBOOT_REASON_MASK, WRI_REBOOT_REASON_SHIFT, cur);
 
     if (r <= reason_num)
-        pr_debug("Set reboot reason %d\n", r);
+        pr_debug("Set reset reason %d\n", r);
 }
 
 enum aic_reboot_reason aic_get_reboot_reason(void)
@@ -99,7 +96,8 @@ enum aic_reboot_reason aic_get_reboot_reason(void)
 
     BOOT_INFO_GET(WRI_REBOOT_REASON_MASK, WRI_REBOOT_REASON_SHIFT, val);
 
-    pr_debug("Last reboot info: hw %d, sw %d\n", hw, val);
+    pr_debug("Last reset info: hw %d, sw %d\n", hw, val);
+    printf("Reset flag: 0x%x\n", g_last_reboot.reg_val);
     g_last_reboot.reason = aic_judge_reboot_reason(hw, val);
     g_last_reboot.inited = 1;
 

@@ -20,8 +20,7 @@
 * 函数返回: 无
 * 其它说明: 无
 ******************************************************************************/
-void service_10_SessionControl(const uint8_t* msg_buf, uint16_t msg_dlc);
-
+void service_10_SessionControl(const uint8_t *msg_buf, uint16_t msg_dlc);
 
 /******************************************************************************
 * 函数名称: bool_t service_10_check_len(const uint8_t* msg_buf, uint16_t msg_dlc)
@@ -31,8 +30,7 @@ void service_10_SessionControl(const uint8_t* msg_buf, uint16_t msg_dlc);
 * 函数返回: TRUE: 合法; FALSE: 非法
 * 其它说明: 无
 ******************************************************************************/
-bool_t service_10_check_len(const uint8_t* msg_buf, uint16_t msg_dlc);
-
+bool_t service_10_check_len(const uint8_t *msg_buf, uint16_t msg_dlc);
 
 /******************************************************************************
 * 函数名称: void set_current_session(uds_session_t session)
@@ -44,7 +42,6 @@ bool_t service_10_check_len(const uint8_t* msg_buf, uint16_t msg_dlc);
 ******************************************************************************/
 void set_current_session(uds_session_t session);
 
-
 /******************************************************************************
 * 函数名称: uds_session_t get_current_session(void)
 * 功能说明: 读取当前诊断会话状态
@@ -54,7 +51,6 @@ void set_current_session(uds_session_t session);
 * 其它说明: 无
 ******************************************************************************/
 uds_session_t get_current_session(void);
-
 
 #endif
 /****************EOF****************/

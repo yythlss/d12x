@@ -117,13 +117,19 @@ static int png_decode_idat(struct png_dec_ctx *s, int length)
     int avail = length < left_bytes ? length : left_bytes;
     const unsigned char *next = s->gb.buffer;
 
-    if (s->idat_mpp_buf) {
-        memcpy(s->idat_mpp_buf->vir_addr + s->idat_data_size, next, avail);
-        ve_buffer_sync(s->idat_mpp_buf, CACHE_CLEAN);
+    if (s->decode_next_dat) {
+        s->fdat_buf = (unsigned char *)s->gb.buffer;
+        s->idat_data_size = avail;
+    } else {
+        if (s->idat_mpp_buf) {
+            memcpy(s->idat_mpp_buf->vir_addr + s->idat_data_size, next, avail);
+            ve_buffer_sync(s->idat_mpp_buf, CACHE_CLEAN);
 
-        s->idat_data_size += avail;
-        logd("idat_mpp_buf %p, length: %d", s->idat_mpp_buf->vir_addr, length);
+            s->idat_data_size += avail;
+            logd("idat_mpp_buf %p, length: %d", s->idat_mpp_buf->vir_addr, length);
+        }
     }
+
 
     bytestream2_skip(&s->gb, length);
 
@@ -197,10 +203,13 @@ static int decode_idat_chunk(struct png_dec_ctx *s, uint32_t length)
 {
     int ret;
 
-    if (!(s->state & PNG_IHDR)) {
-        loge("IDAT without IHDR");
-        return -1;
+    if (!s->decode_next_dat) {
+        if (!(s->state & PNG_IHDR)) {
+            loge("IDAT without IHDR");
+            return -1;
+        }
     }
+
     if (!(s->state & PNG_IDAT)) {
         s->channels       = png_get_nb_channels(s->color_type);
         s->bits_per_pixel = s->bit_depth * s->channels;
@@ -296,12 +305,16 @@ static int decode_fctl_chunk(struct png_dec_ctx *s, uint32_t length)
     uint32_t sequence_number;
     int cur_w, cur_h, x_offset, y_offset, dispose_op, blend_op;
 
-    if (length != 26)
+    if (length != 26) {
+        loge("wrong length %d != 26", (int)length);
         return -1;
+    }
 
-    if (!(s->state & PNG_IHDR)) {
-        loge("fctl before IHDR\n");
-        return -1;
+    if (!s->decode_next_dat) {
+        if (!(s->state & PNG_IHDR)) {
+            loge("fctl before IHDR\n");
+            return -1;
+        }
     }
 
     s->last_dispose_op = s->dispose_op;
@@ -316,16 +329,8 @@ static int decode_fctl_chunk(struct png_dec_ctx *s, uint32_t length)
     blend_op        = bytestream2_get_byte(&s->gb);
     bytestream2_skip(&s->gb, 4); /* crc */
 
-    if (((sequence_number == 0) &&
-        (cur_w != s->width)) ||
-            (cur_h != s->height) ||
-            (x_offset != 0) ||
-            (y_offset != 0) ||
-        cur_w <= 0 || cur_h <= 0 ||
-        x_offset < 0 || y_offset < 0 ||
-        cur_w > s->width - x_offset|| cur_h > s->height - y_offset)
-            return -1;
-
+    logd("fctl: sequence_number:%u, cur_w:%d, cur_h:%d, x_off:%d, y_off:%d\n",
+        (unsigned int)sequence_number, cur_w, cur_h, x_offset, y_offset);
     if (blend_op != APNG_BLEND_OP_OVER && blend_op != APNG_BLEND_OP_SOURCE) {
         loge("Invalid blend_op %d\n", blend_op);
         return -1;
@@ -373,7 +378,7 @@ static int decode_get_frame(struct png_dec_ctx *s)
 
     if(s->decoder.fm == NULL) {
         struct frame_manager_init_cfg cfg = {0};
-        cfg.frame_count = 1;
+        cfg.frame_count = s->extra_frame_num + 1;
         cfg.height = s->height;
         cfg.width = s->width;
         cfg.stride = s->stride;
@@ -397,6 +402,7 @@ static int decode_frame_common(struct png_dec_ctx *s)
     int decode_next_dat = 0;
     int ret;
     s->idat_data_size = 0;
+    s->fdat_buf = NULL;
 
     for (;;) {
         length = bytestream2_get_bytes_left(&s->gb);
@@ -422,16 +428,13 @@ static int decode_frame_common(struct png_dec_ctx *s)
                 return ret;
             break;
         case SHOW_TAG('f', 'c', 'T', 'L'):
-            // not support apng, skip it now
-            goto skip_tag;
-
+            logd("find fcTL.\n");
             if ((ret = decode_fctl_chunk(s, length)) < 0)
                 return ret;
-            decode_next_dat = 1;
+            s->decode_next_dat = decode_next_dat = 1;
+            logd("decode_next_dat %d.\n", s->decode_next_dat);
             break;
         case SHOW_TAG('f', 'd', 'A', 'T'):
-        // not support apng, skip it now
-                goto skip_tag;
             if (!decode_next_dat) {
                 return -1;
             }
@@ -475,12 +478,22 @@ exit_loop:
 #ifdef AIC_VE_DRV_V10
     memset_last_row_data(s);
 #endif
-    logd("png_hardware_decode vir:%p phy: %lx %d", s->idat_mpp_buf->vir_addr,
-        s->idat_mpp_buf->phy_addr,s->idat_mpp_buf->size);
+
 
     //hw only decode deflate bitstream, skip zlib header and tailer
-    s->vbv_offset = 2;
-    png_hardware_decode(s, s->idat_mpp_buf->vir_addr + 2, s->idat_data_size - 6);
+    if (s->decode_next_dat) {
+        if (s->fdat_buf == NULL || s->idat_data_size <= 0) {
+            loge("apng fdat buf or size is illegal.");
+            return -1;
+        }
+        s->vbv_offset = (s->fdat_buf - s->curr_packet->data) + 2;
+        png_hardware_decode(s, s->fdat_buf + 2, s->idat_data_size - 6);
+    } else {
+        logd("png_hardware_decode vir:%p phy: %lx %d", s->idat_mpp_buf->vir_addr,
+            s->idat_mpp_buf->phy_addr,s->idat_mpp_buf->size);
+        s->vbv_offset = 2;
+        png_hardware_decode(s, s->idat_mpp_buf->vir_addr + 2, s->idat_data_size - 6);
+    }
 
     if(s->curr_packet->flag & PACKET_FLAG_EOS)
         s->curr_frame->mpp_frame.flags |= FRAME_FLAG_EOS;
@@ -510,12 +523,15 @@ int __png_decode_frame(struct mpp_decoder *ctx)
     s->packet_size = buf_size;
 
     bytestream2_init(&s->gb, buf, buf_size);
-
-    /* check signature */
-    sig = bytestream2_get_be64(&s->gb);
-    if (sig != PNGSIG && sig != MNGSIG) {
-        loge("Invalid PNG signature 0x%08llx.\n", sig);
-        return -1;
+    logd("decode_next_dat  %d", s->decode_next_dat);
+    /*filter apng check signature when not process the first frame*/
+    if (!s->decode_next_dat) {
+        /* check signature */
+        sig = bytestream2_get_be64(&s->gb);
+        if (sig != PNGSIG && sig != MNGSIG) {
+            loge("Invalid PNG signature 0x%08llx.\n", sig);
+            return -1;
+        }
     }
 
     s->state = 0;
@@ -558,6 +574,7 @@ static int __png_decode_init(struct mpp_decoder *ctx, struct decode_config *conf
     s->regs_base = ve_get_reg_base();
 
     s->vbv_offset = 0;
+    s->decode_next_dat = 0;
 
     s->reg_list = mpp_alloc(sizeof(struct png_register_list));
     if(!s->reg_list)
@@ -570,6 +587,7 @@ static int __png_decode_init(struct mpp_decoder *ctx, struct decode_config *conf
     cfg.packet_count = config->packet_count;
     cfg.pkt_allocator = s->decoder.pkt_allocator;
     s->decoder.pm = pm_create(&cfg);
+    s->extra_frame_num = config->extra_frame_num;
     if (!s->decoder.pm) {
        loge("Insufficient CMA memory resources \n");
        return DEC_ERR_NULL_PTR;

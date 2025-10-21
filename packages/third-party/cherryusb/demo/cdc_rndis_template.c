@@ -1,3 +1,10 @@
+/*
+ * Copyright (c) 2025, sakumisu
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ */
+
 #include "usbd_core.h"
 #include "usbd_rndis.h"
 
@@ -101,7 +108,7 @@ static const uint8_t cdc_descriptor[] = {
     0x00
 };
 
-const uint8_t mac[6] = { 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff };
+static uint8_t mac[6] = { 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff };
 /*Static IP ADDRESS: IP_ADDR0.IP_ADDR1.IP_ADDR2.IP_ADDR3 */
 #define IP_ADDR0 (uint8_t)192
 #define IP_ADDR1 (uint8_t)168
@@ -124,6 +131,7 @@ const uint8_t mac[6] = { 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff };
 #include <rtthread.h>
 #include <rtdevice.h>
 #include <netif/ethernetif.h>
+#include <dhcp_server.h>
 
 const ip_addr_t ipaddr = IPADDR4_INIT_BYTES(IP_ADDR0, IP_ADDR1, IP_ADDR2, IP_ADDR3);
 const ip_addr_t netmask = IPADDR4_INIT_BYTES(NETMASK_ADDR0, NETMASK_ADDR1, NETMASK_ADDR2, NETMASK_ADDR3);
@@ -137,8 +145,11 @@ static rt_err_t rt_usbd_rndis_control(rt_device_t dev, int cmd, void *args)
         case NIOCTL_GADDR:
 
             /* get mac address */
-            if (args)
-                rt_memcpy(args, mac, 6);
+            if (args) {
+                uint8_t *mac_dev = (uint8_t *)args;
+                rt_memcpy(mac_dev, mac, 6);
+                mac_dev[5] = ~mac_dev[5]; /* device mac can't same as host. */
+            }
             else
                 return -RT_ERROR;
 
@@ -166,15 +177,27 @@ void usbd_rndis_data_recv_done(void)
     eth_device_ready(&rndis_dev);
 }
 
+#ifdef RT_USING_DEVICE_OPS
+static const struct rt_device_ops aicusb_device_rndis_ops = {
+    .control = rt_usbd_rndis_control,
+};
+#endif
+
 void rt_usbd_rndis_init(void)
 {
+#ifdef RT_USING_DEVICE_OPS
+    rndis_dev.parent.ops = &aicusb_device_rndis_ops;
+#else
     rndis_dev.parent.control = rt_usbd_rndis_control;
+#endif
+
     rndis_dev.eth_rx = rt_usbd_rndis_eth_rx;
     rndis_dev.eth_tx = rt_usbd_rndis_eth_tx;
 
     eth_device_init(&rndis_dev, "u0");
 
     eth_device_linkchange(&rndis_dev, RT_FALSE);
+    dhcpd_start("u0");
 }
 #else
 #include "netif/etharp.h"
@@ -294,7 +317,7 @@ void usbd_event_handler(uint8_t event)
 struct usbd_interface intf0;
 struct usbd_interface intf1;
 
-void cdc_rndis_init(void)
+static int cdc_rndis_init(void)
 {
 #ifdef RT_USING_LWIP
     rt_usbd_rndis_init();
@@ -305,4 +328,8 @@ void cdc_rndis_init(void)
     usbd_add_interface(usbd_rndis_init_intf(&intf0, CDC_OUT_EP, CDC_IN_EP, CDC_INT_EP, mac));
     usbd_add_interface(usbd_rndis_init_intf(&intf1, CDC_OUT_EP, CDC_IN_EP, CDC_INT_EP, mac));
     usbd_initialize();
+
+    return 0;
 }
+
+INIT_DEVICE_EXPORT(cdc_rndis_init);

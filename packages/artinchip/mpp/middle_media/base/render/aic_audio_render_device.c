@@ -42,6 +42,8 @@ struct aic_rt_audio_render{
     int status;
 };
 
+static struct aic_rt_audio_render *g_rt_render = NULL;
+
 s32 rt_audio_render_init(struct aic_audio_render_dev *render,s32 dev_id)
 {
     long ret;
@@ -70,6 +72,7 @@ s32 rt_audio_render_destroy(struct aic_audio_render_dev *render)
 
     rt_device_close(rt_render->snd_dev);
     mpp_free(rt_render);
+    g_rt_render = NULL;
 
     return 0;
 }
@@ -296,8 +299,11 @@ s32 rt_audio_render_get_transfer_buffer(struct aic_audio_render_dev *render,
 
 s32 aic_audio_render_dev_create(struct aic_audio_render_dev **render)
 {
-    struct aic_rt_audio_render * rt_render;
-    rt_render = mpp_alloc(sizeof(struct aic_rt_audio_render));
+    struct aic_rt_audio_render * rt_render = g_rt_render;
+    if (NULL == rt_render) {
+        rt_render = mpp_alloc(sizeof(struct aic_rt_audio_render));
+    }
+    
     if (rt_render == NULL) {
         loge("mpp_alloc alsa_render fail!!!\n");
         *render = NULL;
@@ -318,6 +324,8 @@ s32 aic_audio_render_dev_create(struct aic_audio_render_dev **render)
     rt_render->base.clear_cache = rt_audio_render_clear_cache;
     rt_render->base.get_transfer_buffer = rt_audio_render_get_transfer_buffer;
     *render = &rt_render->base;
+    g_rt_render = rt_render;
+
     return 0;
 }
 

@@ -17,7 +17,7 @@ lv_obj_t *simple_screen_create(void)
 {
     char current_name[32] = {0};
 
-    snprintf(current_name, sizeof(current_name), "simple_screen_%d:None", simple_screen_count);
+    snprintf(current_name, sizeof(current_name), "simple_screen_%d:None", (int)simple_screen_count);
 
     lv_obj_t *screen = lv_obj_create(NULL);
     lv_obj_set_size(screen, LV_HOR_RES, LV_VER_RES);
@@ -52,8 +52,8 @@ static void simple_screen_cb(lv_event_t *e)
     }
 
     if (code == LV_EVENT_SCREEN_LOADED) {
-        snprintf(current_name, sizeof(current_name), "simple_screen_%d", *id);
-        extern void set_current_acvtive_screen_str(const char *name);
-        set_current_acvtive_screen_str(current_name);
+        snprintf(current_name, sizeof(current_name), "simple_screen_%d", (int)*id);
+        extern void set_current_active_screen_str(const char *name);
+        set_current_active_screen_str(current_name);
     }
 }

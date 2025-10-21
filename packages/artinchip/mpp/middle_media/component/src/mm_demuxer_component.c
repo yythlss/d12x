@@ -1108,8 +1108,10 @@ mm_demuxer_component_process_video_pkt(mm_demuxer_data *p_demuxer_data,
     diff = (after.tv_sec - before.tv_sec) * 1000 * 1000 +
            (after.tv_nsec - before.tv_nsec) / 1000;
     if (diff > 42 * 1000) {
-        printf("[%s:%d]:%ld\n", __FUNCTION__, __LINE__, diff);
+        printf("[%s:%d]:aic_parser_read video %ld us, pkt_size:%d\n",
+            __FUNCTION__, __LINE__, diff, p_pkt->size);
     }
+
 
     logi("video aic_parser_read,pts:%lld,type = %d,size:%d,flag:0x%x\n",
          p_pkt->pts, p_pkt->type, p_pkt->size, p_pkt->flag);

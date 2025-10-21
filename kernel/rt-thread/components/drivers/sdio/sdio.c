@@ -1079,8 +1079,8 @@ static void sdio_irq_thread(void *param)
             break;
     }
 
-    if (host->sdio_irq_delete_sem)
-        rt_sem_release(host->sdio_irq_delete_sem);
+    rt_event_delete(host->sdio_irq_event);
+    host->sdio_irq_event = NULL;
 }
 
 static rt_int32_t sdio_irq_thread_create(struct rt_mmcsd_card *card)
@@ -1093,8 +1093,6 @@ static rt_int32_t sdio_irq_thread_create(struct rt_mmcsd_card *card)
         host->sdio_irq_num++;
         host->sdio_irq_event = rt_event_create("sdio_irq", 0);
         RT_ASSERT(host->sdio_irq_event != RT_NULL);
-        host->sdio_irq_delete_sem = rt_sem_create("sdio_irq_delete", 0, RT_IPC_FLAG_FIFO);
-        RT_ASSERT(host->sdio_irq_delete_sem != RT_NULL);
 
         host->sdio_irq_thread = rt_thread_create("sdio_irq", sdio_irq_thread, host,
                              RT_SDIO_STACK_SIZE, RT_SDIO_THREAD_PRIORITY, 20);
@@ -1119,10 +1117,6 @@ static rt_int32_t sdio_irq_thread_delete(struct rt_mmcsd_card *card)
         if (host->flags & MMCSD_SUP_SDIO_IRQ)
             host->ops->enable_sdio_irq(host, 0);
         rt_event_send(host->sdio_irq_event, RT_SDIO_IRQ_THREAD_EXIT);
-        rt_sem_take(host->sdio_irq_delete_sem, RT_WAITING_FOREVER);
-
-        rt_sem_delete(host->sdio_irq_delete_sem);
-        rt_event_delete(host->sdio_irq_event);
     }
 
     return 0;

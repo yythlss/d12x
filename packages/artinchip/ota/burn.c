@@ -191,10 +191,16 @@ int aic_ota_nand_erase_part(void)
     LOG_I("Start erase nand flash partition!");
 
     while (nand_mtd->block_total > blk_offset) {
+        if (rt_mtd_nand_check_block(nand_mtd, blk_offset)) {
+            LOG_W("find a bad block(%d), off adjust to the next block\n", blk_offset);
+            blk_offset++;
+            continue;
+        }
         if (rt_mtd_nand_erase_block(nand_mtd, blk_offset) != RT_EOK) {
             LOG_W("Erase block failed, mark it. block offset: %u\n", blk_offset);
             if (rt_mtd_nand_mark_badblock(nand_mtd, blk_offset)) {
                 LOG_E("Mark bad block failed.\n");
+                return -1;
             }
         }
 
@@ -203,6 +209,19 @@ int aic_ota_nand_erase_part(void)
 
     LOG_I("Erase nand flash partition success! len = %d",
           nand_mtd->block_total);
+
+#ifdef OTA_DATA_DIRECT
+    int ret = 0;
+    if (g_nftl_flag) {
+        LOG_I("Reinit the nftl for Data partition.\n");
+        extern rt_err_t rt_spinand_init_nftl(rt_device_t dev);
+        ret = rt_spinand_init_nftl(nand_dev);
+        if (ret) {
+            LOG_E("spinand init nftl fail!\n");
+            return ret;
+        }
+    }
+#endif
 
     return 0;
 }
@@ -231,7 +250,6 @@ int aic_ota_nand_write(uint32_t addr, const uint8_t *buf, size_t size)
         }
 
         blk_size = nand_mtd->pages_per_block * nand_mtd->page_size;
-
         offset = addr + bad_block_off;
 
         /* Search for the first good block after the given offset */
@@ -248,8 +266,11 @@ int aic_ota_nand_write(uint32_t addr, const uint8_t *buf, size_t size)
         page = offset / nand_mtd->page_size;
         ret = rt_mtd_nand_write(nand_mtd, page, buf, size, RT_NULL, 0);
         if (ret) {
-            LOG_E("Failed to write data to NAND.\n");
+            LOG_E("Write data to page %u error.\n", page);
             ret = -RT_ERROR;
+            if (rt_mtd_nand_mark_badblock(nand_mtd, offset / blk_size)) {
+                LOG_E("Mark bad block failed.\n");
+            }
         }
 
         rt_device_close(nand_dev);

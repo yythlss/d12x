@@ -706,7 +706,7 @@ static void cmd_barcode_demo(int argc, char **argv)
     g_ddata.h = g_vdata.h;
     g_ddata.dready = false;
     g_running = true;
-    g_ddata.in_buffer = aicos_malloc(MEM_CMA, g_ddata.w * g_ddata.w);
+    g_ddata.in_buffer = aicos_malloc(MEM_CMA, g_ddata.w * g_ddata.h);
     g_ddata.lock = aicos_mutex_create();
     g_ddata.data_ready_event = aicos_event_create();
 
@@ -759,23 +759,24 @@ INIT_LATE_APP_EXPORT (barcode_demo);
 static void cmd_printf_chipid(int argc, char **argv)
 {
 #ifdef AIC_USING_SID
+#define CHIPID_BUF_SIZE 64
     u32 chipid[4];
     drv_efuse_read_chip_id(chipid);
     pr_info("chipid:[%.4x][%.4x][%.4x][%.4x]\n",chipid[0],chipid[1],chipid[2],chipid[3]);
 
-    u8 reserved[64] = {0};
+    u8 reserved[CHIPID_BUF_SIZE] = {0};
     drv_efuse_read_reserved_1(reserved);
     pr_info("reseved 1 :[");
-    for(size_t i = 0; i < 64; i++) {
-	printf("0x%02x ", reserved[i]);
+    for(size_t i = 0; i < CHIPID_BUF_SIZE; i++) {
+        printf("0x%02x ", reserved[i]);
     }
     printf("]\n");
 
-    memset(reserved, 0, sizeof(reserved[64]));
+    memset(reserved, 0, sizeof(reserved));
     drv_efuse_read_reserved_2(reserved);
     pr_info("reseved 2 :[");
-    for(size_t i = 0; i < 64; i++) {
-	printf("0x%02x ", reserved[i]);
+    for(size_t i = 0; i < CHIPID_BUF_SIZE; i++) {
+        printf("0x%02x ", reserved[i]);
     }
     printf("]\n");
 #endif
