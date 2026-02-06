@@ -957,7 +957,7 @@ int wifi_get_ap_info(rtw_bss_info_t * ap_info, rtw_security_t* security)
 	return ret;
 }
 
-int wifi_get_drv_ability(uint32_t *ability)
+int wifi_get_drv_ability(__u32 *ability)
 {
 	return wext_get_drv_ability(WLAN0_NAME, ability);
 }

@@ -5,7 +5,7 @@
 
 MY_NAME=$0
 TOPDIR=$PWD
-AIC_UD_PKG="AicUSBDisplay"
+AIC_UD_PKG="AiCast"
 
 # Return value
 ERR_CANCEL=100
@@ -41,7 +41,7 @@ check_root()
 	if [ "$CUR_USER" = "root" ]; then
 		return
 	fi
-	sudo -l -U $(whoami) | grep ALL > /dev/null
+	sudo -l -U "$(whoami)" | grep ALL > /dev/null
 	if [ $? -eq 0 ]; then
 		return
 	fi
@@ -63,7 +63,7 @@ check_os()
 	OS_VER=$(echo $OS_VER | sed 's/"//g')
 
 	echo "  "$OS_TYPE $OS_VER
-	echo "  "$(uname -rsm)
+	echo "  ""$(uname -rsm)"
 }
 
 check_arch()
@@ -94,7 +94,7 @@ check_pi()
 	else
 		XORG_CFG_WAY="sudo vim /etc/gdm3/custom.conf\n\tthen unncomment \"#WaylandEnable=false\"\n"
 	fi
-	echo "  "$(cat /proc/cpuinfo | grep Model | awk -F ': ' '{printf $2}')
+	echo "  ""$(cat /proc/cpuinfo | grep Model | awk -F ': ' '{printf $2}')"
 }
 
 check_xorg()

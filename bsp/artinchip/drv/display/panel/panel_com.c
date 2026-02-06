@@ -85,6 +85,12 @@ static struct aic_panel *panels[] = {
 #ifdef AIC_PANEL_RGB_ST7701S
     &rgb_st7701s,
 #endif
+#ifdef AIC_PANEL_RGB_ST77916
+    &rgb_st77916,
+#endif
+#ifdef AIC_PANEL_RGB_JD9855
+    &rgb_jd9855,
+#endif
 #ifdef AIC_PANEL_RGB_GC9A01A
     &rgb_gc9a01a,
 #endif
@@ -109,8 +115,11 @@ static struct aic_panel *panels[] = {
 #ifdef AIC_PANEL_DBI_CO5300
     &dbi_co5300,
 #endif
-#ifdef AIC_PANEL_DBI_GC0D01N
-    &dbi_gc9d01n,
+#ifdef AIC_PANEL_SPI_GENERAL
+    &spi_general,
+#endif
+#ifdef AIC_PANEL_DBI_GC9108
+    &dbi_gc9108,
 #endif
 };
 
@@ -349,6 +358,12 @@ static inline void panel_spi_set_cs(u32 value)
     panel_gpio_set_value(&spi.cs, value);
 }
 
+static inline void panel_spi_set_dc(u32 value)
+{
+    panel_gpio_set_value(&spi.dc, value);
+}
+
+#ifndef AIC_SPI_EMULATION_WITH_DC
 void panel_spi_cmd_wr(u8 cmd)
 {
     u32 i;
@@ -436,4 +451,80 @@ void panel_spi_device_emulation(char *cs, char *sdi, char *scl)
 
     panel_spi_emulation = true;
 }
+#else
+void panel_spi_cmd_wr(u8 cmd)
+{
+    u32 i;
+
+    if (!panel_spi_emulation)
+        return;
+
+    aic_delay_us(1);
+    panel_spi_set_cs(0);
+    aic_delay_us(1);
+    panel_spi_set_dc(0);
+
+    for (i = 0; i < 8; i++) {
+        if ((cmd & 0x80) == 0x80)
+            panel_spi_set_sdi(1);
+        else
+            panel_spi_set_sdi(0);
+
+        cmd = cmd << 1;
+        aic_delay_us(1);
+        panel_spi_set_scl(1);
+        aic_delay_us(1);
+        panel_spi_set_scl(0);
+    }
+
+    aic_delay_us(1);
+    panel_spi_set_cs(1);
+    aic_delay_us(1);
+}
+
+void panel_spi_data_wr(u8 data)
+{
+    u32 i;
+
+    if (!panel_spi_emulation)
+        return;
+
+    aic_delay_us(1);
+    panel_spi_set_cs(0);
+    aic_delay_us(1);
+    panel_spi_set_dc(1);
+
+    for (i = 0; i < 8; i++) {
+        if ((data & 0x80) == 0x80)
+            panel_spi_set_sdi(1);
+        else
+            panel_spi_set_sdi(0);
+
+        data = data << 1;
+        aic_delay_us(1);
+        panel_spi_set_scl(1);
+        aic_delay_us(1);
+        panel_spi_set_scl(0);
+    }
+
+    aic_delay_us(1);
+    panel_spi_set_cs(1);
+    aic_delay_us(1);
+}
+void panel_spi_device_emulation(char *cs, char *sdi, char *scl, char *dc)
+{
+    panel_get_gpio(&spi.cs, cs);
+    panel_get_gpio(&spi.scl, scl);
+    panel_get_gpio(&spi.sdi, sdi);
+    panel_get_gpio(&spi.dc, dc);
+
+    panel_spi_set_cs(1);
+    panel_spi_set_scl(0);
+    panel_spi_set_sdi(1);
+    panel_spi_set_dc(1);
+    aic_delay_us(1);
+
+    panel_spi_emulation = true;
+}
+#endif
 #endif

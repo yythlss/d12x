@@ -87,6 +87,10 @@ if GetDepend('AIC_TOUCH_PANEL_JD9366'):
     CPPPATH.append(cwd + '/jd9366/inc')
     src += Glob('jd9366/src/*.c')
 
+if GetDepend('AIC_TOUCH_PANEL_ILI2117'):
+    CPPPATH.append(cwd + '/ili2511/inc')
+    src += Glob('ili2511/src/*.c')
+
 group = DefineGroup('touch', src, depend = [''], CPPPATH = CPPPATH)
 
 Return('group')

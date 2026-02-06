@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2022-2025 ArtInChip Technology Co., Ltd.
+ * Copyright (C) 2022-2026 ArtInChip Technology Co., Ltd.
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -39,8 +39,17 @@ static void use_touch_monkey_test(void)
 #ifdef AIC_LVGL_DEMO
 void aic_ui_init()
 {
+
+#if defined(AIC_LVGL_MUSIC_DEMO)
+    lv_demo_music();
+#elif defined(AIC_LVGL_DEMO_BENCHMARK)
+    lv_demo_benchmark();
+#elif defined(AIC_LVGL_DEMO_WIDGETS)
+    lv_demo_widgets();
+#else
     extern void ui_init(void);
     ui_init();
+#endif
 
 #ifdef AIC_USE_TOUCH_MONKEY_TEST
     use_touch_monkey_test();

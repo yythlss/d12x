@@ -115,9 +115,10 @@ if !AIC_DISP_PQ_TOOL
         help
             MIPI-DBI Type C, SPI_4LINE_RGB565
 
-    config AIC_PANEL_DBI_GC0D01N
-        bool "ArtInChip MIPI DBI GC0D01N panel"
+    config AIC_PANEL_DBI_GC9108
+        bool "ArtInChip MIPI DBI GC9108 panel"
         depends on AIC_DISP_MIPI_DBI
+        depends on AIC_DISP_MIPI_DBI_DRV_V13
         help
             MIPI-DBI Type C, SPI_4LINE_RGB565
 
@@ -127,6 +128,11 @@ if !AIC_DISP_PQ_TOOL
         help
             MIPI-DBI Type C, SPI_4LINE_RGB565
 
+    config AIC_PANEL_SPI_GENERAL
+        bool "ArtInChip SPI General panel"
+        depends on AIC_DISP_MIPI_DBI
+        help
+            Use SPI Controller refresh SPI LCD Peripheral
 #
 # RGB Panel SPI Init
 #
@@ -134,6 +140,18 @@ if !AIC_DISP_PQ_TOOL
         bool "ArtInChip RGB ST7701S panel"
         depends on AIC_DISP_RGB
         select AIC_PANEL_SPI_EMULATION
+
+    config AIC_PANEL_RGB_ST77916
+        bool "ArtInChip RGB ST77916 panel"
+        depends on AIC_DISP_RGB
+        select AIC_PANEL_SPI_EMULATION
+        select AIC_SPI_EMULATION_WITH_DC
+
+    config AIC_PANEL_RGB_JD9855
+        bool "ArtInChip RGB JD9855 panel"
+        depends on AIC_DISP_RGB
+        select AIC_PANEL_SPI_EMULATION
+        select AIC_SPI_EMULATION_WITH_DC
 
     config AIC_PANEL_RGB_GC9A01A
         bool "ArtInChip RGB GC9A01A panel"
@@ -277,6 +295,15 @@ config LT9811EXB_RESOLUTION
     default 1 if LT9811EXB_1920X1080
     default 2 if LT9811EXB_1366X768
 
+if AIC_PANEL_SPI_GENERAL
+config SPI_GENERAL_WIDTH
+    int "SPI LCD Width"
+    default 160
+
+config SPI_GENERAL_HEIGHT
+    int "SPI LCD Height"
+    default 160
+endif
 
 if AIC_PANEL_CUSTOM_RESOLUTION && !AIC_DISP_PQ_TOOL
 source "bsp/artinchip/drv/display/panel/Kconfig.timing"

@@ -1,5 +1,5 @@
 ﻿/*
- * Copyright (c) 2022-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -10,7 +10,7 @@
 #include "usbd_core.h"
 #include "usb_dc_aic_reg.h"
 
-extern irqreturn_t USBD_IRQHandler(int irq, void * data);
+extern irqreturn_t usbd_irq_handler(int irq, void * data);
 
 uint32_t usbd_clk;
 static unsigned char dma_sync_buffer[CACHE_LINE_SIZE] __attribute__((aligned(CACHE_LINE_SIZE)));
@@ -43,7 +43,7 @@ void usb_dc_low_level_init(void)
     usbd_clk = hal_clk_get_freq(CONFIG_USB_AIC_DC_CLK);
 
     /* register interrupt callback */
-    aicos_request_irq(CONFIG_USB_AIC_DC_IRQ_NUM, USBD_IRQHandler,
+    aicos_request_irq(CONFIG_USB_AIC_DC_IRQ_NUM, usbd_irq_handler,
                       0, "usb_device", NULL);
     aicos_irq_enable(CONFIG_USB_AIC_DC_IRQ_NUM);
 }

@@ -828,7 +828,7 @@ struct video_cs_if_vc_input_terminal_descriptor {
     uint16_t wObjectiveFocalLenMax;
     uint16_t wOcularFocalLength;
     uint8_t bControlSize;
-    uint8_t bmaControls[];
+    uint8_t bmaControls[3];
 } __PACKED;
 
 #define VIDEO_SIZEOF_VC_INPUT_TERMINAL_DESC(n) (15 + n)
@@ -841,7 +841,7 @@ struct video_cs_if_vc_processing_unit_descriptor {
     uint8_t bSourceID;
     uint16_t wMaxMultiplier;
     uint8_t bControlSize;
-    // uint8_t bmaControls[];
+    uint8_t bmaControls[2];
     uint8_t iProcessing;
     uint8_t bmVideoStandards;
 } __PACKED;

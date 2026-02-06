@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2024-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -103,13 +103,26 @@ static rt_size_t ili2511_read_point(struct rt_touch_device *touch, void *buf,
 
     rt_memset(buf, 0, sizeof(struct rt_touch_data) * read_num);
 
+#ifdef AIC_TOUCH_PANEL_ILI2117
+    reg = ILI2117_PID_REG;
+#else
     reg = ILI2511_PACKET_NUMBER;
+#endif
+
     if (ili2511_read_regs(&ili2511_client, &reg, read_buf, sizeof(read_buf)) != RT_EOK) {
         LOG_E("read point failed\n");
         read_num = 0;
         goto __exit;
     }
 
+#ifdef AIC_TOUCH_PANEL_ILI2117
+    touch_num = 5;
+    for (i = 0; i < ILI2511_MAX_TOUCH; i++) {
+        touch_status = read_buf[i * ILI2511_POINT_LEN + 1];
+        if (touch_status == 0xff)
+            touch_num--;
+    }
+#else
     touch_status = read_buf[0];
     if (!touch_status) {
         LOG_D("No touch!\n");
@@ -125,6 +138,7 @@ static rt_size_t ili2511_read_point(struct rt_touch_device *touch, void *buf,
 #endif
             touch_num++;
     }
+#endif
 
     for (recombine_id = 0; recombine_id < touch_num; recombine_id++)
         touch_id[recombine_id] = recombine_id;
@@ -161,6 +175,9 @@ static rt_size_t ili2511_read_point(struct rt_touch_device *touch, void *buf,
 #ifdef AIC_TOUCH_PANEL_ILI2511
             input_x = ((read_buf[off_set + 1] & 0x3f) << 8) | read_buf[off_set + 2];
             input_y = ((read_buf[off_set + 3] & 0x3f) << 8) | read_buf[off_set + 4];
+#elif defined(AIC_TOUCH_PANEL_ILI2117)
+            input_x = ((read_buf[off_set + 1] & 0xf0) << 4) | read_buf[off_set + 2];
+            input_y = ((read_buf[off_set + 1] & 0x0f) << 8) | read_buf[off_set + 3];
 #else
             input_x = ((read_buf[off_set + 3] & 0x3f) << 8) | read_buf[off_set + 2];
             input_y = ((read_buf[off_set + 5] & 0x3f) << 8) | read_buf[off_set + 4];
