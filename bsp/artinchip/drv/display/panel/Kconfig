@@ -62,6 +62,9 @@ if !AIC_DISP_PQ_TOOL
         bool "ArtInChip MIPI DSI ST7701S panel"
         depends on AIC_DISP_MIPI_DSI
 
+    config AIC_PANEL_DSI_JD9366TC
+        bool "ArtInChip MIPI DSI JD9366TC panel"
+        depends on AIC_DISP_MIPI_DSI
 #
 # MIPI-DBI Type B I8080 Panel
 #
@@ -79,6 +82,12 @@ if !AIC_DISP_PQ_TOOL
 
     config AIC_PANEL_DBI_ST7789
         bool "ArtInChip MIPI DBI ST7789 panel"
+        depends on AIC_DISP_MIPI_DBI
+        help
+            MIPI-DBI Type B, I8080_RGB565_8BIT
+
+    config AIC_PANEL_DBI_GC9B72NA
+        bool "ArtInChip MIPI DBI GC9B72NA panel"
         depends on AIC_DISP_MIPI_DBI
         help
             MIPI-DBI Type B, I8080_RGB565_8BIT
@@ -167,6 +176,11 @@ if !AIC_DISP_PQ_TOOL
         bool "ArtInChip RGB ST77922 panel"
         depends on AIC_DISP_RGB
         select AIC_PANEL_SPI_EMULATION
+
+    config AIC_PANEL_RGB_ST7102
+        bool "ArtInChip RGB ST7102 panel"
+        depends on AIC_DISP_RGB
+        select AIC_PANEL_SPI_EMULATION
 #
 # SRGB Panel
 #
@@ -252,6 +266,22 @@ config ILI9881C_MATCH_ID
     default 1 if TFT050BP071_DEFAULT
 
 choice
+    prompt "JD9365 Match Table"
+    depends on AIC_PANEL_DSI_JD9365
+    default JD9365_DEFAULT_800X800
+
+    config JD9365_DEFAULT_800X800
+        bool "default 800x800"
+    config JD9365DA_800X1280
+        bool "jd9365da 800x1280"
+endchoice
+
+config JD9365_MATCH_ID
+    int
+    default 0 if JD9365_DEFAULT_800X800
+    default 1 if JD9365DA_800X1280
+
+choice
     prompt "ST7789 Match Table"
     depends on AIC_PANEL_DBI_ST7789
     default ST7789_P3
@@ -307,6 +337,40 @@ endif
 
 if AIC_PANEL_CUSTOM_RESOLUTION && !AIC_DISP_PQ_TOOL
 source "bsp/artinchip/drv/display/panel/Kconfig.timing"
+endif
+
+config AIC_SIMPLE_PANEL_POWER_GPIO
+    bool "simple panel power control via GPIO"
+    depends on AIC_SIMPLE_PANEL
+    default n
+    help
+        Enable simple panel power control using a fixed GPIO pin.
+        This GPIO pin does not need to registered in pinmux.c file.
+        Say Y if simple panel needs to apply a dedicated power enable GPIO.
+
+if AIC_SIMPLE_PANEL_POWER_GPIO
+
+config AIC_SIMPLE_PANEL_POWER_GPIO_PIN
+    string "panel power GPIO pin"
+    default "PE.13"
+    help
+        Specify the GPIO pin used for simple panel power control.
+        Format: "PX.NN" (e.g., "PE.20", "PA.5")
+
+config AIC_SIMPLE_PANEL_POWER_GPIO_LOW_ACTIVE
+    bool "power control GPIO is low active"
+    default n
+    help
+        Say Y here if the GPIO needs to be driven low to enable LCD power,
+        and high to disable. If unsure, say N (default high active).
+
+config AIC_SIMPLE_PANEL_POWER_DELAY_MS
+    int "panel power on delay (ms)"
+    default 0
+    range 0 1000
+    help
+        Delay in milliseconds after enabling power before
+        initializing the panel. Some panels require stabilization time.
 endif
 
 endmenu

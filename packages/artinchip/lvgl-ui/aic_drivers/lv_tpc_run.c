@@ -9,7 +9,7 @@
  */
 
 #include <rtconfig.h>
-#ifdef KERNEL_RTTHREAD
+#if defined(KERNEL_RTTHREAD) && defined(AIC_USING_TOUCH)
 #include <rtdevice.h>
 #include <rtthread.h>
 #include "lv_tpc_run.h"
@@ -59,7 +59,9 @@ static void touch_entry(void *parameter) /* touch panel control entry */
 
     while (1)
     {
+#ifndef AIC_CTP_POLLING_MODE
         rt_sem_take(touch_sem, RT_WAITING_FOREVER);
+#endif
         int num = rt_device_read(dev, 0, read_data, info.point_num);
         if (num > 0)
         {
@@ -91,16 +93,21 @@ static void touch_entry(void *parameter) /* touch panel control entry */
                 }
             }
         }
-        //aicos_msleep(10);
+#ifdef AIC_CTP_POLLING_MODE
+        aicos_msleep(10);
+#else
         rt_device_control(dev, RT_TOUCH_CTRL_ENABLE_INT, RT_NULL);
+#endif
     }
 }
 
 static rt_err_t rx_callback(rt_device_t dev, rt_size_t size)
 {
+#ifndef AIC_CTP_POLLING_MODE
     if (touch_sem)
         rt_sem_release(touch_sem);
     rt_device_control(dev, RT_TOUCH_CTRL_DISABLE_INT, RT_NULL);
+#endif
 #ifdef AIC_PM_DEMO
     extern struct rt_event pm_event;
     rt_event_send(&pm_event, 2);

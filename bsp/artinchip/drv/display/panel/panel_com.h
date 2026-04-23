@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023-2025, ArtInChip Technology Co., Ltd
+ * Copyright (C) 2023-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -36,6 +36,7 @@ extern struct aic_panel dsi_nv3051;
 extern struct aic_panel dsi_fl7707;
 extern struct aic_panel dsi_ft8201;
 extern struct aic_panel dsi_st7701s;
+extern struct aic_panel dsi_jd9366tc;
 extern struct aic_panel dsi_edp_lt9811exb;
 
 /*
@@ -44,6 +45,7 @@ extern struct aic_panel dsi_edp_lt9811exb;
 extern struct aic_panel dbi_ili9488;
 extern struct aic_panel dbi_ili9486l;
 extern struct aic_panel dbi_st7789;
+extern struct aic_panel dbi_gc9b72na;
 
 /*
  * MIPI-DBI Type C SPI Panel
@@ -68,6 +70,7 @@ extern struct aic_panel rgb_nt35560;
 extern struct aic_panel rgb_st77922;
 extern struct aic_panel rgb_st77916;
 extern struct aic_panel rgb_jd9855;
+extern struct aic_panel rgb_st7102;
 
 /*
  * SRGB Panel
