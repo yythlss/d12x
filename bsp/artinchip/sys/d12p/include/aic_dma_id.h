@@ -27,7 +27,7 @@
 #define DMA_ID_EPWM2        26
 #define DMA_ID_ECAP0        27
 #define DMA_ID_ECAP1        28
-#define DMA_ID_CANFD        30
+#define DMA_ID_CANFD0       30
 #define DMA_ID_I2S0         34
 #define DMA_ID_AUDIO_DMIC   35
 #define DMA_ID_XPWM0        40
@@ -38,6 +38,7 @@
 #define DMA_ID_XPWM5        45
 #define DMA_ID_XPWM6        46
 #define DMA_ID_XPWM7        47
+#define DMA_ID_RTP          49
 #define DMA_ID_GPAI0        50
 #define DMA_ID_GPAI1        51
 #define DMA_ID_GPAI2        52

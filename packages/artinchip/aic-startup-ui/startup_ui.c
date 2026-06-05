@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2020-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -62,7 +62,7 @@
 #define IMAGE_PATH_ROOT "/data/image"
 #endif
 
-#if defined (AIC_CHIP_D13X) || defined (AIC_CHIP_D12X)
+#if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D12X) || defined(AIC_CHIP_D12P)
 #define FORMAT_RGB
 #endif
 

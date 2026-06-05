@@ -65,6 +65,22 @@ if !AIC_DISP_PQ_TOOL
     config AIC_PANEL_DSI_JD9366TC
         bool "ArtInChip MIPI DSI JD9366TC panel"
         depends on AIC_DISP_MIPI_DSI
+
+    config AIC_PANEL_DSI_EK79007AD
+        bool "ArtInChip MIPI DSI EK79007AD panel"
+        depends on AIC_DISP_MIPI_DSI
+
+    config AIC_PANEL_DSI_GC9703
+        bool "ArtInChip MIPI DSI GC9703 panel"
+        depends on AIC_DISP_MIPI_DSI
+
+    config AIC_PANEL_DSI_ST7102
+        bool "ArtInChip MIPI DSI ST7102 panel"
+        depends on AIC_DISP_MIPI_DSI
+
+    config AIC_PANEL_DSI_SVC1K26
+        bool "ArtInChip MIPI DSI SVC1K26 panel"
+        depends on AIC_DISP_MIPI_DSI
 #
 # MIPI-DBI Type B I8080 Panel
 #
@@ -91,7 +107,11 @@ if !AIC_DISP_PQ_TOOL
         depends on AIC_DISP_MIPI_DBI
         help
             MIPI-DBI Type B, I8080_RGB565_8BIT
-#
+
+    config AIC_PANEL_DBI_AXS15231E
+        bool "ArtInChip MIPI DBI AXS15231E"
+        depends on AIC_DISP_MIPI_DBI
+
 # MIPI-DBI Type C SPI Panel
 #
     config AIC_PANEL_DBI_ILI9341
@@ -133,6 +153,12 @@ if !AIC_DISP_PQ_TOOL
 
     config AIC_PANEL_DBI_ST77912
         bool "ArtInChip MIPI DBI ST77912 panel"
+        depends on AIC_DISP_MIPI_DBI
+        help
+            MIPI-DBI Type C, SPI_4LINE_RGB565
+
+    config AIC_PANEL_DBI_IL79400A
+        bool "ArtInChip MIPI DBI IL79400A panel"
         depends on AIC_DISP_MIPI_DBI
         help
             MIPI-DBI Type C, SPI_4LINE_RGB565
