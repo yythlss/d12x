@@ -1,5 +1,98 @@
 # V1.3.1.a #
 ## 新增 ##
+- AiCast: Linux更新到V1.5.1，增强Linux版本兼容性
+- LVGL:v9: 添加RAW_JPEG输出格式
+- MIPI DSI: 支持根据Panel ID切换不同型号的屏幕
+- MPP:mini_auido_player: 添加获取PCM数据的回调处理
+- NFTL: 更新版本1.0.1
+- Flash: 添加多Flash设备支持
+- RTP: 支持硬件压力检测
+- test-pm: 添加PM压力测试功能
+- nimble: 添加GATT client示例
+- barcode & uvc: 增加FPS调试信息
+- bootloader: 添加FAT升级状态跟踪
+- RTT: 完善PM的调试日志
+- Doc: 添加AI友好的必要文档
+- PM: 添加pm_list命令展示已注册的PM设备
+- WiFi: 支持P2P GO作为AP
+- AIC8800：支持从eFuse ChipID生成MAC地址
+- 新增SoC：D12p、D126、G72x
+- 新增方案：d12p_demo88 NOR、d126 demo124-nor
+- 第三方器件：
+- Panel: EK79007AD、GC9703、IL79400A、ST7102、SVC1K26、AXS15231
+- Nand: UM19C0HISW
+- Camera：NVP6158
+- Audio codec：ALC5616
+- WiFi：AIC8800DL
+- 新增示例：test-vin、test_audio_loopback
+- 新增自研组件：early print、基于SPIENC的认证
+- 新增第三方组件：Zephyr BT、librws、libopus
+
+## 优化 ##
+- LVGL:
+  - v9: 优化JPEG解码器用于RGB565 SPI显示
+  - SPI屏：兼容幕宽度不对齐的情况
+  - player：支持16位深度的视频播放
+  - player: 优化控制命令的容错处理
+  - camera: 优化并发情况下的内存保护
+  - camera: 优化互斥锁的使用流程
+  - canvas_image: 优先使用MPP缓冲区
+- NFTL：优化预留块的管理逻辑
+- SPI：优化reset FIFO的处理流程；优化clk的分频计算
+- AIC8800: 减少WiFi固件内存占用
+- CANFD: 优化发送的状态判断逻辑；优化ECC处理的兼容性
+- TSEN: 优化工作模式的设置流程；统一单次和周期模式下的同步机制
+- DE: 优化UI和VIDEO同时开启时的同步处理
+- Panel: 优化时序提升兼容性
+- RTP: 优化Rx/Ry的测量算法
+- GPAI: 优化DMA配置和处理流程；支持在驱动层分配DMA缓冲区
+- Audio：优化对异常I2C配置的容错处理
+- RTT: 完善PM的回滚处理
+- barcode: 重构为更模块化的设计
+- CMD: 完善reboot命令的容错处理
+- 打包: 完善脚本中的容错处理；Windows/Linux统一使用Python脚本打包
+
+## 修改 ##
+- LVGL:
+  - 默认线程栈大小提高到32KB - 修复V1.3.0a的问题
+  - 删除不必要的Demo
+  - camera: 修复重复开关的死锁问题
+- CANFD：
+  - 修复清除中断标志的问题
+  - 修正工作模式的指针传递处理
+  - 修复DMA配置和传输流程
+  - 修复ID过滤器的配置
+- USB: 使用V2.6.1工具链构建静态库
+- UART: 修复软件流控的数组越界问题
+- DVP: 根据输入格式计算stride
+- DE：兼容BLACK_SCREEN场景的初始化流程
+- ST77916：调整初始化的命令序列
+- aicupg: 烧录工具默认启用CRC32校验
+- AiPQ: 调整DBI接口vbp_num的格式
+- D11x: 默认禁用C++特性
+- G73x:
+- 默认关闭DE节省资源占用
+- demo100-nor方案配置中关闭XIP
+- ge-test: 修复内存泄漏问题
+- RTP:
+  - 修复休眠时的卡死问题 - 修复V1.3.0a的问题
+  - 调整周期和消抖设置
+  - 读取FIFO后再清除中断状态
+- WiFi: 休眠时不操作power引脚
+- RTT: waitqueue退出时移除节点
+- OTA：修正2K对齐的镜像文件处理逻辑
+- 打包: 优先使用board目录的pbp_cfg.json配置
+- mtop: 修正编译依赖的条件
+- WRI: 调整"冷启动"的描述为"Power-on"
+- FAL: 默认关闭DEBUG选项
+- audio: 修复录音播放过快问题
+- Baremetal: 修复关闭CONSOLE后的编译错误
+- OneStep: 在checkout_binary()中检查.git文件夹
+- cmd_list_module: 更名为scan_module
+
+
+# V1.3.1.a #
+## 新增 ##
 - D125/D126 开发板支持
 
 # V1.3.0 #
