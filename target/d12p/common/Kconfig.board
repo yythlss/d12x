@@ -103,6 +103,21 @@ if AIC_USING_USB0
             select AIC_USB_HOST_EHCI_DRV
             select AIC_USB_OTG_DRV
     endchoice
+
+    menu "Usb parameter"
+
+    config AIC_USB_RES_CAL
+        hex "USB Calibration Resistance Value"
+        default 0x60
+
+    config AIC_USB_PHY_TXREF
+        hex "USB PHY tx ref tune"
+        default 0x8
+
+    config AIC_USB_TXPREEMPAMP
+        hex "USB PHY Transmitter Pre-Emphasis Current"
+        default 0
+    endmenu
 endif
 
 #---------------------------
@@ -360,10 +375,6 @@ menu "SPI1 Parameter"
                 Rx delay mode select, 0: auto, 1: none delay,
                                         2: delay half cycle, 3: delay one cycle
 
-    config AIC_QSPI1_DYNAMIC_DMA
-        depends on AIC_USING_DMA
-        bool "Dynamic DMA channel SPI1"
-        default n
 
     config AIC_QSPI1_BUS_SPI
         bool "Work in SPI BUS Mode"
@@ -407,10 +418,6 @@ menu "SPI2 Parameter"
                 Rx delay mode select, 0: auto, 1: none delay,
                                         2: delay half cycle, 3: delay one cycle
 
-    config AIC_QSPI2_DYNAMIC_DMA
-        depends on AIC_USING_DMA
-        bool "Dynamic DMA channel SPI2"
-        default n
 
     config AIC_QSPI2_BUS_SPI
         bool "Work in SPI BUS Mode"
@@ -569,17 +576,6 @@ config AIC_USING_SDMC1
     select AIC_SDMC_DRV
 
 source "bsp/artinchip/drv/sdmc/Kconfig"
-
-#---------------------------
-# WLAN device global option
-#---------------------------
-comment "WLAN Related:"
-
-menuconfig AIC_WIRELESS_LAN
-        bool "Using Wireless LAN"
-        default n
-
-source "bsp/peripheral/wireless/Kconfig"
 
 #================================================
 # Analog Class
@@ -764,8 +760,16 @@ comment "System Related:"
 # DMA device global option
 #---------------------------
 
+#---------------------------
+# QSPI iDMA device global option
+#---------------------------
+
+config AIC_QSPI_IDMA
+    bool "Using QSPI iDMA (internal DMA)"
+    default n
+
 config AIC_USING_DMA
-    bool "Using DMA"
+    bool "Using DMA (GPDMA)"
     default n
     select AIC_DMA_DRV
 
@@ -844,6 +848,10 @@ menu "PSRAM parameter"
         hex "Software size in PSRAM"
         range 0 AIC_PSRAM_SIZE
         default 0x100000
+
+    config AIC_PSRAM_SW_EN
+        bool
+        default y if AIC_PSRAM_SW_SIZE > 0
 endmenu
 
 # 3. XIP
@@ -857,6 +865,14 @@ menu "XIP parameter"
     config AIC_XIP_FW_OFFSET
     hex "XIP fw start addr"
     default 0x0
+
+config AIC_XIP_FLASH_WRITE
+    bool "Enable XIP Flash Write"
+    default n
+    help
+        Write Flash during XIP, but it will cause system low performance. Every time flash erasing
+        and writing need to work in critical section, system disables interrupts and scheduling.
+
 endmenu
 
 # 4. Interrupt Stack Size

@@ -445,6 +445,10 @@ static int aic_hash_do_one_req(struct hash_tfm *tfm, struct hash_request *req)
     if (DEBUG_CE)
         hal_crypto_dump_task(rctx->task, rctx->tasklen);
 
+    if (rctx->ivbuf) {
+        aicos_dcache_invalid_range((void *)(uintptr_t)rctx->ivbuf, CE_MAX_DIGEST_SIZE);
+    }
+
     hal_crypto_init();
     hal_crypto_irq_enable(ALG_HASH_ACCELERATOR);
     hal_crypto_start_hash(rctx->task);
@@ -462,7 +466,6 @@ static int aic_hash_do_one_req(struct hash_tfm *tfm, struct hash_request *req)
 
     aicos_dma_sync();
     if (rctx->ivbuf) {
-        aicos_dcache_invalid_range((void *)(uintptr_t)rctx->ivbuf, CE_MAX_DIGEST_SIZE);
         memcpy(rctx->digest, rctx->ivbuf, CE_MAX_DIGEST_SIZE);
     }
 

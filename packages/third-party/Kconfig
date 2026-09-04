@@ -43,5 +43,6 @@ source "packages/third-party/fdtlib/Kconfig"
 source "packages/third-party/gif/Kconfig"
 source "packages/third-party/micropython-1.13.0/Kconfig"
 source "packages/third-party/libopus/Kconfig"
+source "packages/third-party/librws/Kconfig"
 
 endmenu

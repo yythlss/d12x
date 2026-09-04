@@ -123,7 +123,7 @@ void show_banner(void)
 int main(void)
 {
     enum boot_device bd;
-    int ctrlc = -1, cont_boot = 1;
+    int ctrlc = -1, cont_boot = 1, time_start;
 
     boot_time_trace("Enter main");
 
@@ -151,7 +151,8 @@ int main(void)
     console_init();
     console_set_usrname("aic");
 
-    for (int check = 0; check < 4; check++) {
+    time_start = aic_get_time_ms();
+    while (aic_get_time_ms() - time_start < AIC_CONSOLE_CTRLC_TMO) {
         ctrlc = console_get_ctrlc();
         if (ctrlc > 0)
             break;

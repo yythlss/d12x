@@ -452,7 +452,8 @@ int hal_i2c_master_10bit_addr(aic_i2c_ctrl *i2c_dev);
 int hal_i2c_slave_10bit_addr(aic_i2c_ctrl *i2c_dev);
 int hal_i2c_slave_own_addr(aic_i2c_ctrl *i2c_dev, uint32_t addr);
 void hal_i2c_target_addr(aic_i2c_ctrl *i2c_dev, uint32_t addr);
-void hal_i2c_set_hold(aic_i2c_ctrl *i2c_dev, u32 val);
+void hal_i2c_set_hold_time(aic_i2c_ctrl *i2c_dev, u32 time_ns);
+void hal_i2c_set_setup_time(aic_i2c_ctrl *i2c_dev, u32 time_ns);
 int hal_i2c_set_speed(aic_i2c_ctrl *i2c_dev);
 int32_t hal_i2c_wait_bus_free(aic_i2c_ctrl *i2c_dev, uint32_t timeout);
 int32_t hal_i2c_master_send_msg(aic_i2c_ctrl *i2c_dev,

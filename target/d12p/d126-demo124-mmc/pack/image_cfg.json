@@ -1,0 +1,109 @@
+{
+    "mmc": { // Device, The name should be the same with string in image:info:media:type
+        "size": "8G", // Size of SD/eMMC
+        "partitions": {
+            "spl":        { "offset": "0x4400", "size": "495k" },
+            "env":        { "size": "256k" },
+            "env_r":      { "size": "256k" },
+            "os":         { "size": "2m" },
+            "rodata":     { "size": "3m" },
+            "data":       { "size": "4m" }
+        },
+    },
+    "image": {
+        "info": { // Header information about image
+            "platform": "d12p",
+            "product": "d126-demo124-mmc",
+            "version": "1.0.0",
+            "media": {
+                "type": "mmc",
+                "device_id": 0,
+            }
+        },
+        "updater": { // Image writer which is downloaded to RAM by USB
+            "psram": {
+                "file": "usbupg-psram-init.aic",
+                "attr": ["required", "run"],
+                "ram": "0x30043000"
+            },
+             "spl": {
+                 "file": "bootloader.aic",
+                 "attr": ["required", "run"],
+                 "ram": "CONFIG_AIC_BOOTLOADER_LOAD_BASE",
+             },
+            "env": {
+                "file": "env.bin",
+                "attr": ["required"],
+                "ram": "0x40140000"
+             },
+        },
+        "target": { // Image components which will be burn to device's partitions
+             "spl": {
+                 "file": "bootloader.aic",
+                 "attr": ["required"],
+                 "part": ["spl"],
+             },
+            "env": {
+                "file": "env.bin",
+                "attr": ["mtd", "optional"],
+                "part": ["env"]
+            },
+            "env_r": {
+                "file": "env.bin",
+                "attr": ["mtd", "optional"],
+                "part": ["env_r"]
+            },
+            "os": {
+                "file": "d12p_os.itb",
+                "attr": ["block", "required"],
+                "part": ["os"],
+            },
+            "rodata": {
+                "file": "rodata.fatfs",
+                "attr": ["block", "optional"],
+                "part": ["rodata"]
+            },
+            "data": {
+                "file": "data.ext4",
+                "attr": ["block", "optional"],
+                "part": ["data"]
+            },
+        },
+    },
+    "pre-process": {
+	"aicimage": {
+            "usbupg-psram-init.aic": { // No loader, only PreBootProgram to initialize PSRAM
+                "head_ver": "0x00010001",
+                "resource": {
+                    "private2": "pbp_cfg.bin",
+                    "pbp2": "d12p.pbp",
+                },
+            },
+             "bootloader.aic": {
+                 "head_ver": "0x00010001",
+                 "loader": {
+                     "file": "bootloader.bin",
+                     "load address": "CONFIG_AIC_BOOTLOADER_LOAD_BASE",
+                     "entry point": "CONFIG_AIC_BOOTLOADER_TEXT_BASE", // 256 byte aic header
+                     "run in dram": "false",
+                 },
+                "resource": {
+                    "private2": "pbp_cfg.bin",
+                    "pbp2": "d12p.pbp",
+                },
+             },
+         },
+        "itb": {
+            "d12p_os.itb": {
+                "its": "d12p_os.its",
+            },
+        },
+        "uboot_env": {
+            "env.bin": {
+                "file": "env.txt",
+                "size": "4096",
+                "redundant": "enable",
+            },
+        },
+    },
+}

@@ -226,31 +226,70 @@ static void blehr_on_sync(void)
  */
 extern int nimble_ble_enable(void);
 extern struct ble_npl_eventq *nimble_port_get_dflt_eventq(void);
+
+static bool g_ble_hr_running = false;      /* advertising is active */
+static bool g_ble_hr_inited = false;       /* host stack ever initialized */
+
+/*
+ * Stop advertising before deep sleep. The host thread and GATT
+ * state stay alive; they survive the sleep (RAM preserved).
+ * Use "ble_hr" after wakeup to restart advertising.
+ */
+static int ble_hr_stop(int argc, char **argv)
+{
+    int rc;
+
+    if (!g_ble_hr_running) {
+        rt_kprintf("ble_hr not advertising\n");
+        return 0;
+    }
+
+    /* Must disconnect first if a device is connected,
+     * otherwise ble_gap_adv_stop returns BLE_HS_EBUSY */
+    if (conn_handle != 0) {
+        rc = ble_gap_terminate(conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+        rt_kprintf("ble_hr disconnect, rc=%d\n", rc);
+        aicos_msleep(100); /* wait for disconnect to complete */
+    }
+
+    rc = ble_gap_adv_stop();
+    rt_kprintf("ble_hr stop advertising, rc=%d\n", rc);
+    g_ble_hr_running = false;
+
+    return 0;
+}
+MSH_CMD_EXPORT(ble_hr_stop, stop BLE advertising before sleep);
+
 int ble_hr(int argc, char **argv)
 {
     int rc __attribute__((unused));
-    static int init_flag = 0;
 
-    if (init_flag)
+    if (g_ble_hr_running)
         return 0;
-    init_flag = 1;
 
-    /* Initialize the NimBLE host configuration */
-    ble_hs_cfg.sync_cb = blehr_on_sync;
+    if (!g_ble_hr_inited) {
+        /* First init */
+        ble_hs_cfg.sync_cb = blehr_on_sync;
 
-    ble_npl_callout_init(&blehr_tx_timer, nimble_port_get_dflt_eventq(),
-                    blehr_tx_hrate, NULL);
+        ble_npl_callout_init(&blehr_tx_timer, nimble_port_get_dflt_eventq(),
+                        blehr_tx_hrate, NULL);
 
-    rc = gatt_svr_init();
-    assert(rc == 0);
+        rc = gatt_svr_init();
+        assert(rc == 0);
 
-    /* Set the default device name */
-    rc = ble_svc_gap_device_name_set(device_name);
-    assert(rc == 0);
+        rc = ble_svc_gap_device_name_set(device_name);
+        assert(rc == 0);
 
-    /* startup bluetooth host stack*/
-    ble_hs_thread_startup();
+        ble_hs_thread_startup();
 
+        g_ble_hr_inited = true;
+    } else {
+        /* Re-init after sleep: host thread still alive, just re-advertise */
+        ble_hs_cfg.sync_cb = blehr_on_sync;
+        blehr_advertise();
+    }
+
+    g_ble_hr_running = true;
     return 0;
 }
 MSH_CMD_EXPORT_ALIAS(ble_hr, ble_hr, "bluetoooth heartrate senson sample");

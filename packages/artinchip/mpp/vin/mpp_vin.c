@@ -53,6 +53,7 @@ int mpp_vin2_init(struct vin_dev_ctx *ctx)
         }
         if (rt_device_open(camera_dev, RT_DEVICE_FLAG_RDONLY) < 0) {
             pr_err("Failed to open %s\n", ctx->camera);
+            ctx->camera_dev = NULL;
             return -1;
         }
         ctx->camera_dev = camera_dev;
@@ -78,7 +79,7 @@ error:
 
 int mpp_vin2_reinit(u32 ch, struct vin_dev_ctx *ctx)
 {
-    if (!ctx->camera || !ctx->vin_buf) {
+    if (!ctx->camera) {
         pr_err("Must init MPP vin first!\n");
         return -1;
     }
@@ -140,9 +141,11 @@ void mpp_vin2_deinit(struct vin_dev_ctx *ctx)
         ctx->camera_dev = NULL;
     }
 
-    if (ctx->vin_buf) {
-        aicos_free(MEM_CMA, ctx->vin_buf);
-        ctx->vin_buf = NULL;
+    for (int i = 0; i < VIN_MAX_CHANNELS; i++) {
+        if (ctx->vin_buf[i]) {
+            aicos_free(MEM_CMA, ctx->vin_buf[i]);
+            ctx->vin_buf[i] = NULL;
+        }
     }
 #ifdef AIC_USING_DVP
     if (ctx->type == VIN_DEV_DVP)
@@ -158,27 +161,18 @@ static int mpp_vin2_req_buf(struct vin_dev_ctx *ctx, struct vin_video_buf *binfo
     u32 align_offset = 0;
     char *tmp = NULL;
 
-    if (ctx->dst_fmt.stitch_mode != MPP_STITCH_INVALID)
-        buf_size *= 2;
-
-    if (!ctx->vin_buf) {
-        ctx->vin_buf = (char *)aicos_malloc(MEM_CMA, buf_size);
-        if (!ctx->vin_buf) {
+    if (!ctx->vin_buf[ch]) {
+        ctx->vin_buf[ch] = (char *)aicos_malloc(MEM_CMA, buf_size);
+        if (!ctx->vin_buf[ch]) {
             pr_err("Failed to malloc %d buffer\n", buf_size);
             return -1;
         }
 
-        pr_debug("MPP VIN buffer: 0x%lx, size %d\n", (ptr_t)ctx->vin_buf, buf_size);
+        pr_debug("MPP VIN buffer: 0x%lx, size %d\n", (ptr_t)ctx->vin_buf[ch], buf_size);
     }
 
-    align_offset = CACHE_LINE_SIZE - (ptr_t)ctx->vin_buf % CACHE_LINE_SIZE;
-    tmp = ctx->vin_buf + align_offset;
-
-    if (ctx->dst_fmt.stitch_mode == MPP_STITCH_NONE) {
-        buf_size /= 2;
-        if (ch > 0)
-            tmp += buf_size;
-    }
+    align_offset = CACHE_LINE_SIZE - (ptr_t)ctx->vin_buf[ch] % CACHE_LINE_SIZE;
+    tmp = ctx->vin_buf[ch] + align_offset;
 
     return aic_dvp_req_buf(tmp, buf_size - align_offset, binfo DVP_PARAMS_CH);
 }
@@ -201,12 +195,23 @@ int mpp_vin2_ioctl(int cmd, void *arg, u32 ch, struct vin_dev_ctx *ctx)
 
     switch (cmd) {
     case DVP_IN_S_FMT:
+        if (!arg)
+            return -EINVAL;
         return aic_dvp_set_in_fmt((struct mpp_video_fmt *)arg);
 
     case DVP_OUT_S_FMT:
+        if (!arg)
+            return -EINVAL;
         return aic_dvp_set_out_fmt((struct dvp_out_fmt *)arg);
 
 #ifdef AIC_USING_CAMERA
+    case VIN_CAM_S_FMT:
+        if (!arg)
+            return -EINVAL;
+        if (camera_dev)
+            return rt_device_control(camera_dev, CAMERA_CMD_SET_FMT, arg);
+        return -ENODEV;
+
     case DVP_IN_G_FMT:
         if (camera_dev)
             return rt_device_control(camera_dev, CAMERA_CMD_GET_FMT, arg);
@@ -215,36 +220,52 @@ int mpp_vin2_ioctl(int cmd, void *arg, u32 ch, struct vin_dev_ctx *ctx)
         return -ENODEV;
 
     case DVP_STREAM_ON:
+        if (!camera_dev)
+            return -ENODEV;
+
         camera_start(camera_dev);
         if (aic_dvp_stream_on(DVP_PARAM_CH))
             return -1;
         return 0;
 
     case DVP_STREAM_OFF:
+        if (!camera_dev)
+            return -ENODEV;
+
         camera_stop(camera_dev);
         if (aic_dvp_stream_off(DVP_PARAM_CH))
             return -1;
         return 0;
 
     case DVP_STREAM_PAUSE:
+        if (!camera_dev)
+            return -ENODEV;
+
         camera_pause(camera_dev);
         aicos_msleep(50);
         aic_dvp_stream_pause(DVP_PARAM_CH);
         return 0;
 
     case DVP_STREAM_RESUME:
+        if (!camera_dev)
+            return -ENODEV;
+
         camera_resume(camera_dev);
         aic_dvp_stream_resume(DVP_PARAM_CH);
         return 0;
 #endif
 #ifdef AIC_DVP_DRV
     case DVP_REQ_BUF:
+        if (!arg)
+            return -EINVAL;
         return mpp_vin2_req_buf(ctx, (struct vin_video_buf *)arg, ch);
 
     case DVP_Q_BUF:
         return aic_dvp_q_buf((u32)(ptr_t)arg DVP_PARAMS_CH);
 
     case DVP_DQ_BUF:
+        if (!arg)
+            return -EINVAL;
         return aic_dvp_dq_buf((u32 *)arg DVP_PARAMS_CH);
 
     case DVP_GET_TIMESTAMP:

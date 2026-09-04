@@ -68,6 +68,7 @@ typedef enum
 #define SHARED_ENABLED  0x00008000
 #define WPA_SECURITY    0x00200000
 #define WPA2_SECURITY   0x00400000
+#define WPA3_SECURITY   0x00800000
 #define WPS_ENABLED     0x10000000
 #define WEP_ENABLED     0x0001
 #define TKIP_ENABLED    0x0002
@@ -106,6 +107,8 @@ typedef enum
     SECURITY_WPA2_AES_PSK   = (WPA2_SECURITY | AES_ENABLED),                    /* WPA2 Security with AES                  */
     SECURITY_WPA2_TKIP_PSK  = (WPA2_SECURITY | TKIP_ENABLED),                   /* WPA2 Security with TKIP                 */
     SECURITY_WPA2_MIXED_PSK = (WPA2_SECURITY | AES_ENABLED | TKIP_ENABLED),     /* WPA2 Security with AES & TKIP           */
+    SECURITY_WPA3_AES_PSK   = (WPA3_SECURITY | AES_ENABLED),                    /* WPA3-SAE Security with AES (CCMP)       */
+    SECURITY_WPA3_MIXED_PSK = (WPA3_SECURITY | WPA2_SECURITY | AES_ENABLED),    /* WPA3/WPA2 Transition Mode with AES      */
     SECURITY_WPS_OPEN       = WPS_ENABLED,                                      /* WPS with open security                  */
     SECURITY_WPS_SECURE     = (WPS_ENABLED | AES_ENABLED),                      /* WPS with AES security                   */
     SECURITY_UNKNOWN        = -1,                                               /* May be returned by scan function if security is unknown.

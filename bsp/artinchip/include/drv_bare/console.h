@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2020-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -15,6 +15,18 @@ extern "C" {
 #define CONSOLE_ERROR     (-1)
 #define CONSOLE_QUIT      (-2)
 #define CONSOLE_ERROR_ARG (-3)
+
+#ifdef AIC_CONSOLE_USING_AUTH
+#ifndef AIC_CONSOLE_PASSWORD_MAX
+#define AIC_CONSOLE_PASSWORD_MAX 32
+#endif
+#ifndef AIC_CONSOLE_PASSWORD_MIN
+#define AIC_CONSOLE_PASSWORD_MIN 3
+#endif
+#ifndef AIC_CONSOLE_DEFAULT_PASSWORD
+#define AIC_CONSOLE_DEFAULT_PASSWORD "bootloader"
+#endif
+#endif
 
 #define __console_init \
     __attribute__((used)) __attribute__((section(".tinyspl.console.cmd")))

@@ -378,6 +378,7 @@
 
 #define Mic_secs_Per_Second     1000000
                 /* Berkeley UNIX C returns process times in seconds/HZ */
+#define CPU_FREQ    (long)(AIC_CLK_CPU_FREQ / 1000000)
 
 #ifdef  NOSTRUCTASSIGN
 #define structassign(d, s)      memcpy(&(d), &(s), sizeof(d))

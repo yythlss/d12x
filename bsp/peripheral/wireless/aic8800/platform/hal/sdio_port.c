@@ -595,20 +595,20 @@ int aicwf_sdio_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
     if (sdio_block_size != SDIOWIFI_FUNC_BLOCKSIZE) {
         ret = EREMOTEIO;
         AIC_LOG_PRINTF("sdio_host_init: blksize set failed\n");
-        return ret;
+        goto func1_err;
     }
 
     ret = aic_sdio_enable_func(sdio_function[FUNC_1]);
     if (ret) {
         AIC_LOG_PRINTF("sdio func1 enable failed, ret=%d\n", ret);
-        return ret;
+        goto func1_err;
     }
 
     sdio_writeb(sdio_function[FUNC_1], block_bit0, sdiodev->sdio_reg.register_block, &ret);
     if (ret < 0) {
         ret = EREMOTEIO;
         AIC_LOG_PRINTF("reg:%d write failed!\n", sdiodev->sdio_reg.register_block);
-        return ret;
+        goto func1_err;
     }
 
     //1: no byte mode
@@ -616,7 +616,7 @@ int aicwf_sdio_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
     if (ret < 0) {
         ret = EREMOTEIO;
         AIC_LOG_PRINTF("reg:%d write failed!\n", sdiodev->sdio_reg.bytemode_enable_reg);
-        return ret;
+        goto func1_err;
     }
 
     #if 0
@@ -625,7 +625,7 @@ int aicwf_sdio_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
     if (ret < 0) {
         ret = EREMOTEIO;
         AIC_LOG_PRINTF("reg:%d write failed!\n", sdiodev->sdio_reg.intr_config_reg);
-        return ret;
+        goto func1_err;
     }
     #endif
 
@@ -651,20 +651,20 @@ int aicwf_sdio_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
         ret = aic_sdio_enable_func(sdio_function[FUNC_2]);
         if (ret) {
             AIC_LOG_PRINTF("sdio func2 enable failed, ret=%d\n", ret);
-            return ret;
+            goto func2_err;
         }
 
         sdio_writeb(sdio_function[FUNC_2], block_bit0, sdiodev->sdio_reg.register_block, &ret);
         if (ret < 0) {
             AIC_LOG_PRINTF("reg:%d write failed!\n", sdiodev->sdio_reg.register_block);
-            return ret;
+            goto func2_err;
         }
 
         //1: no byte mode
         sdio_writeb(sdio_function[FUNC_2], byte_mode_disable, sdiodev->sdio_reg.bytemode_enable_reg, &ret);
         if (ret < 0) {
             AIC_LOG_PRINTF("reg:%d write failed!\n", sdiodev->sdio_reg.bytemode_enable_reg);
-            return ret;
+            goto func2_err;
         }
 
         #if 0
@@ -672,7 +672,7 @@ int aicwf_sdio_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
         sdio_writeb(sdio_function[FUNC_2], 0x7, sdiodev->sdio_reg.intr_config_reg, &ret);
         if (ret < 0) {
             AIC_LOG_PRINTF("reg:%d write failed!\n", sdiodev->sdio_reg.intr_config_reg);
-            return ret;
+            goto func2_err;
         }
         #endif
 
@@ -681,6 +681,12 @@ int aicwf_sdio_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
     }
 
     return 0;
+
+func2_err:
+    sdio_release_host(sdio_function[FUNC_2]);
+func1_err:
+    sdio_release_host(sdio_function[FUNC_1]);
+    return ret;
 }
 
 int aicwf_sdiov3_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
@@ -701,13 +707,13 @@ int aicwf_sdiov3_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
     if (sdio_block_size != SDIOWIFI_FUNC_BLOCKSIZE) {
         ret = EREMOTEIO;
         AIC_LOG_PRINTF("sdio_host_init: blksize set failed\n");
-        return ret;
+        goto func1_err;
     }
 
     ret = aic_sdio_enable_func(sdio_function[FUNC_1]);
     if (ret) {
         AIC_LOG_PRINTF("sdio func1 enable failed, ret=%d\n", ret);
-        return ret;
+        goto func1_err;
     }
 
     #if 0 //set phase and sample
@@ -716,23 +722,23 @@ int aicwf_sdiov3_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
         sdio_f0_writeb(0x7F, 0xF2, &ret);
         if (ret) {
             AIC_LOG_PRINTF("set fn0 0xF2 fail %d\n", ret);
-            return ret;
+            goto func1_err;
         }
         val |= SDIOCLK_FREE_RUNNING_BIT;
         sdio_f0_writeb(val, 0xF0, &ret);
         if (ret) {
             AIC_LOG_PRINTF("set iopad ctrl fail %d\n", ret);
-            return ret;
+            goto func1_err;
         }
         sdio_f0_writeb(0x0, 0xF8, &ret);
         if (ret) {
             AIC_LOG_PRINTF("set iopad delay2 fail %d\n", ret);
-            return ret;
+            goto func1_err;
         }
         sdio_f0_writeb(0x20, 0xF1, &ret);
         if (ret) {
             AIC_LOG_PRINTF("set iopad delay1 fail %d\n", ret);
-            return ret;
+            goto func1_err;
         }
         rtos_udelay(100);
     }
@@ -741,7 +747,7 @@ int aicwf_sdiov3_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
     sdio_f0_writeb(0x7F, 0xF2, &ret);
     if (ret) {
         AIC_LOG_PRINTF("set fn0 0xF2 fail %d\n", ret);
-        return ret;
+        goto func1_err;
     }
 
     aic_sdio_set_clock(0);
@@ -750,7 +756,7 @@ int aicwf_sdiov3_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
     sdio_writeb(sdio_function[FUNC_1], byte_mode_disable, sdiodev->sdio_reg.bytemode_enable_reg, &ret);
     if (ret < 0) {
         AIC_LOG_PRINTF("reg:%d write failed! ret=%d\n", sdiodev->sdio_reg.bytemode_enable_reg, ret);
-        return ret;
+        goto func1_err;
     }
 
     #if 0
@@ -773,7 +779,7 @@ int aicwf_sdiov3_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
     if (ret == FALSE) {
         ret = EREMOTEIO;
         AIC_LOG_PRINTF("reg:%d write failed!\n", sdiodev->sdio_reg.intr_config_reg);
-        return ret;
+        goto func1_err;
     }
     #endif
 
@@ -781,6 +787,10 @@ int aicwf_sdiov3_func_init(uint16_t chipid, struct aic_sdio_dev *sdiodev)
     AIC_LOG_PRINTF("sdio_host_init:enable fun1 ok!\n");
 
     return 0;
+
+func1_err:
+    sdio_release_host(sdio_function[FUNC_1]);
+    return ret;
 }
 
 int aicwf_sdio_probe(struct sdio_func *func)

@@ -79,6 +79,13 @@ typedef struct _rws_ssl_struct
 } _rws_ssl;
 #endif
 
+
+typedef struct _rws_custom_header
+{
+    char *key;
+    char *value;
+} _rws_custom_header;
+
 static const char *k_rws_socket_min_http_ver = "1.1";
 static const char *k_rws_socket_sec_websocket_accept = "Sec-WebSocket-Accept";
 
@@ -121,6 +128,8 @@ typedef struct _rws_socket_struct
     int custom_mode;
     char *header_buff;
     char *payload_buff;
+
+    _rws_list *custom_headers;
 
 #ifdef LIBRWS_USING_MBED_TLS
     const char *server_cert; /**< Server certification. */

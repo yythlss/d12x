@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -14,6 +14,10 @@
 #include <console.h>
 #include <artinchip_fb.h>
 #include <video_font_data.h>
+
+#ifdef AIC_BOOTLOADER_SPI_LCD
+#include "spi_lcd.h"
+#endif
 
 #undef ALIGN_DOWM
 #define ALIGN_DOWM(x, align)        ((x) & ~(align - 1))
@@ -136,6 +140,11 @@ void aicfb_draw_rect(struct aicfb_screeninfo *info,
                     unsigned int width, unsigned int height,
                     u8 red, u8 green, u8 blue)
 {
+#ifdef AIC_BOOTLOADER_SPI_LCD
+    spi_lcd_fill_rect(info, x, y, width, height, red, green, blue);
+    return;
+#endif
+
 #ifndef AIC_BOOTLOADER_CMD_ONLY_FB_CONSOLE
     int pbytes = info->bits_per_pixel / 8;
     unsigned char *fb;
@@ -236,8 +245,14 @@ static void aicfb_console_put_string(struct aicfb_screeninfo *info,
 
     for (s = str, i = 0; *s; s++, i++)
         aicfb_console_putc(info, x + (i * VIDEO_FONT_WIDTH), y, *s);
-
 #endif /* AIC_BOOTLOADER_CMD_FB_CONSOLE */
+
+#ifdef AIC_BOOTLOADER_SPI_LCD
+    if (str && *str) {
+        spi_lcd_flush_region(x, y, strlen(str) * VIDEO_FONT_WIDTH,
+                             VIDEO_FONT_HEIGHT, info->framebuffer);
+    }
+#endif
 }
 
 static void console_set_default_colors(struct aicfb_screeninfo *info)
@@ -245,11 +260,35 @@ static void console_set_default_colors(struct aicfb_screeninfo *info)
 #ifdef AIC_BOOTLOADER_CMD_FB_CONSOLE
     int fore, back;
 
-    fore = CONSOLE_LIGHT_GRAY;
-    back = CONSOLE_BLACK;
+    fore = CONSOLE_COLOR_FG;
+    back = CONSOLE_COLOR_BG;
 
     colour_fg = console_color(info, fore);
     colour_bg = console_color(info, back);
+#endif
+}
+
+static void progress_bar_flush_black(struct aicfb_screeninfo *info)
+{
+#ifndef AIC_BOOTLOADER_CMD_ONLY_FB_CONSOLE
+    memset(info->framebuffer, 0x00, info->smem_len);
+    aicos_dcache_clean_range((unsigned long *)info->framebuffer, info->smem_len);
+#endif
+
+#ifdef AIC_BOOTLOADER_SPI_LCD
+    spi_lcd_set_window(0, 0, info->width - 1, info->height - 1);
+    spi_lcd_flush(info->framebuffer, info->smem_len);
+#else
+#ifndef AIC_BOOTLOADER_CMD_ONLY_FB_CONSOLE
+    aicfb_draw_rect(info, 0, 0, info->width, info->height, 0, 0, 0);
+#endif
+#if defined(AIC_FB_ROTATE_EN) && !defined(AIC_BOOTLOADER_SPI_LCD)
+    {
+        int index = 0;
+
+        aicfb_ioctl(AICFB_PAN_DISPLAY, &index);
+    }
+#endif
 #endif
 }
 
@@ -264,25 +303,35 @@ void aicfb_draw_bar(unsigned int value)
 #endif
     char str[5];
 
+#ifdef AIC_BOOTLOADER_SPI_LCD
+    spi_lcd_init();
+    spi_lcd_get_info(&info);
+#else
     aicfb_probe();
 
     if (aicfb_ioctl(AICFB_GET_SCREENINFO, &info) < 0)
         return;
+#endif
 
     if (!power_on) {
-        memset(info.framebuffer, 0x00, info.smem_len);
-        aicos_dcache_clean_range((unsigned long *)info.framebuffer, info.smem_len);
-
-        aicfb_ioctl(AICFB_POWERON, 0);
-        power_on = true;
-
         console_set_default_colors(&info);
+        progress_bar_flush_black(&info);
+#ifdef AIC_BOOTLOADER_SPI_LCD
+        spi_lcd_backlight_on();
+#else
+        aicfb_ioctl(AICFB_POWERON, 0);
+#endif
+        power_on = true;
     }
 
     width     = SPLIT_WIDTH(info.width);
     height    = BAR_HEIGHT;
     bar_x     = (info.width - width) / 2;
+#ifdef AIC_BOOTLOADER_SPI_LCD
+    bar_y     = (info.height - BAR_HEIGHT - VIDEO_FONT_HEIGHT - 5) / 2;
+#else
     bar_y     = 0;
+#endif
     console_x = info.width / 2;
     console_y = bar_y + BAR_HEIGHT + 5;
 
@@ -292,8 +341,8 @@ void aicfb_draw_bar(unsigned int value)
 #endif
         console_x -= VIDEO_FONT_WIDTH;
         aicfb_draw_rect(&info, bar_x, bar_y, width, height, BAR_BACKGROUND_COLOR);
-        aicfb_console_put_string(&info, console_x, console_y,"0%");
-#ifdef AIC_FB_ROTATE_EN
+        aicfb_console_put_string(&info, console_x, console_y, "0%");
+#if defined(AIC_FB_ROTATE_EN) && !defined(AIC_BOOTLOADER_SPI_LCD)
         aicfb_ioctl(AICFB_PAN_DISPLAY, &index);
 #endif
         return;
@@ -307,7 +356,7 @@ void aicfb_draw_bar(unsigned int value)
     if (value == 100) {
         console_x -= VIDEO_FONT_WIDTH * 2;
         aicfb_console_put_string(&info, console_x, console_y, "100%");
-#ifdef AIC_FB_ROTATE_EN
+#if defined(AIC_FB_ROTATE_EN) && !defined(AIC_BOOTLOADER_SPI_LCD)
         aicfb_ioctl(AICFB_PAN_DISPLAY, &index);
 #endif
         return;
@@ -320,7 +369,7 @@ void aicfb_draw_bar(unsigned int value)
 
     snprintf(str, sizeof(str), "%d%%", value);
     aicfb_console_put_string(&info, console_x, console_y, str);
-#ifdef AIC_FB_ROTATE_EN
+#if defined(AIC_FB_ROTATE_EN) && !defined(AIC_BOOTLOADER_SPI_LCD)
     aicfb_ioctl(AICFB_PAN_DISPLAY, &index);
 #endif
 }

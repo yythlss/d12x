@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
+ * Copyright (C) 2020-2026 ArtInChip Technology Co. Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -70,13 +70,15 @@ static s32 component_event_handler(
 
     switch ((s32)event) {
     case MM_EVENT_MUXER_NEED_NEXT_FILE:
-        recorder->event_handle(recorder->app_data,
-                               AIC_RECORDER_EVENT_NEED_NEXT_FILE, 0, 0);
+        if (recorder->event_handle)
+            recorder->event_handle(recorder->app_data,
+                                AIC_RECORDER_EVENT_NEED_NEXT_FILE, 0, 0);
         break;
 
 
     case MM_EVENT_BUFFER_FLAG:
-         recorder->event_handle(recorder->app_data, AIC_RECORDER_EVENT_COMPLETE, 0, 0);
+         if (recorder->event_handle)
+            recorder->event_handle(recorder->app_data, AIC_RECORDER_EVENT_COMPLETE, 0, 0);
          break;
 
     default:
@@ -92,7 +94,7 @@ s32 component_giveback_buffer(mm_handle h_component,
     s32 error = MM_ERROR_NONE;
 
     struct aic_recorder *recorder = (struct aic_recorder *)p_app_data;
-    if (h_component == recorder->venc_handle) {
+    if (h_component == recorder->venc_handle && recorder->giveback_buffer) {
         recorder->giveback_buffer(recorder->app_data,
                                  AIC_RECORDER_EVENT_GIVEBACK_FRAME,
                                  p_buffer->p_buffer);
@@ -234,8 +236,8 @@ s32 aic_recorder_init(struct aic_recorder *recorder,
         port_define.format.video.frame_height = recorder->config.video_config.out_height;
         port_define.format.video.framerate = recorder->config.video_config.out_frame_rate;
         port_define.format.video.bitrate = recorder->config.video_config.out_bit_rate;
-        if (recorder->config.video_config.codec_type != MPP_CODEC_VIDEO_DECODER_MJPEG) {
-            loge("only support MPP_CODEC_VIDEO_DECODER_MJPEG.\n");
+        if (recorder->config.video_config.codec_type != MPP_CODEC_VIDEO_ENCODER_MJPEG) {
+            loge("only support MPP_CODEC_VIDEO_ENCODER_MJPEG.\n");
             ret = -1;
             goto _EXIT;
         }
@@ -454,10 +456,11 @@ s32 aic_recorder_set_output_file_path(struct aic_recorder *recorder, char *uri)
     }
     memset(recorder->uri, 0x00, sizeof(recorder->uri));
     strncpy(recorder->uri, uri, sizeof(recorder->uri) - 1);
+    recorder->uri[sizeof(recorder->uri) - 1] = '\0';
     bytes = strlen(recorder->uri);
-    uri_param = (mm_param_content_uri *)mpp_alloc(sizeof(mm_param_content_uri) + bytes);
+    uri_param = (mm_param_content_uri *)mpp_alloc(sizeof(mm_param_content_uri) + bytes + 1);
     uri_param->size = sizeof(mm_param_content_uri) + bytes;
-    strcpy((char *)uri_param->content_uri, recorder->uri);
+    strncpy((char *)uri_param->content_uri, recorder->uri, bytes + 1);
     mm_set_parameter(recorder->muxer_handle, MM_INDEX_PARAM_CONTENT_URI, uri_param);
     mpp_free(uri_param);
     return 0;
@@ -475,10 +478,11 @@ s32 aic_recorder_set_input_file_path(struct aic_recorder *recorder, char *video_
     }
     memset(recorder->uri, 0x00, sizeof(recorder->uri));
     strncpy(recorder->uri, video_uri, sizeof(recorder->uri) - 1);
+    recorder->uri[sizeof(recorder->uri) - 1] = '\0';
     bytes = strlen(recorder->uri);
-    uri_param = (mm_param_content_uri *)mpp_alloc(sizeof(mm_param_content_uri) + bytes);
+    uri_param = (mm_param_content_uri *)mpp_alloc(sizeof(mm_param_content_uri) + bytes + 1);
     uri_param->size = sizeof(mm_param_content_uri) + bytes;
-    strcpy((char *)uri_param->content_uri, recorder->uri);
+    strncpy((char *)uri_param->content_uri, recorder->uri, bytes + 1);
     mm_set_parameter(recorder->vin_handle, MM_INDEX_PARAM_CONTENT_URI, uri_param);
     mpp_free(uri_param);
 #endif

@@ -362,7 +362,6 @@ static void aic_canfd_resume(const struct rt_device *device, rt_uint8_t mode)
 {
     struct aic_canfd *p_aic_canfd = (struct aic_canfd *)device;
     canfd_handle *phandle = &p_aic_canfd->canfdHandle;
-    struct aic_canfd_allbaud_info set_baud = {0};
 
     switch (mode)
     {
@@ -372,6 +371,9 @@ static void aic_canfd_resume(const struct rt_device *device, rt_uint8_t mode)
     case PM_SLEEP_MODE_DEEP:
     case PM_SLEEP_MODE_STANDBY:
 #ifdef AIC_PM_DRV_V15
+    {
+        struct aic_canfd_allbaud_info set_baud = {0};
+
         hal_canfd_init(phandle);
 
         /* Reset baudrate */
@@ -389,6 +391,7 @@ static void aic_canfd_resume(const struct rt_device *device, rt_uint8_t mode)
         /* Reset int */
         if (phandle->running)
             hal_canfd_enable_int(phandle, 1);
+    }
 #else
         hal_clk_enable(phandle->clk_id);
 #endif

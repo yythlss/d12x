@@ -7,7 +7,7 @@ if AIC_NFTL_SUPPORT
     config AIC_NFLT_USED_LIB
         depends on AIC_NFTL_SUPPORT
         bool "Aic NFTL use lib"
-        default n
+        default y
 
     config AIC_NFLT_TEST
         depends on AIC_NFTL_SUPPORT

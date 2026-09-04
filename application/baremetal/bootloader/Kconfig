@@ -33,6 +33,9 @@ menu "Console"
         int "Console UART ID"
         range 0 8
         default 0
+    config AIC_CONSOLE_CTRLC_TMO
+        int "Time out for Ctrl + C (ms)"
+        default 30
 endmenu
 
 menu "Drivers"
@@ -188,7 +191,7 @@ menu "Commands"
     config AIC_BOOTLOADER_CMD_XIP_BOOT
         bool "xip boot"
         default n
-        select AIC_BOOTLOADER_SPINOR_SUPPORT
+        depends on AIC_QSPI_DRV_V11 || AIC_QSPI_DRV_V34
 
     config AIC_BOOTLOADER_CMD_NAND_BOOT
         bool "nand boot"
@@ -231,10 +234,80 @@ menu "Commands"
         default n
         depends on AIC_SDMC_DRV
 
+    config AIC_BOOTLOADER_SPI_LCD
+        bool "SPI LCD support"
+        default n
+        select AIC_QSPI_DRV
+
+    if AIC_BOOTLOADER_SPI_LCD
+
+    choice
+        prompt "SPI LCD Panel"
+        default AIC_BOOTLOADER_SPI_LCD_PANEL_ST77916
+
+    config AIC_BOOTLOADER_SPI_LCD_PANEL_ST7789
+        bool "ST7789"
+
+    config AIC_BOOTLOADER_SPI_LCD_PANEL_ST77916
+        bool "ST77916"
+
+    config AIC_BOOTLOADER_SPI_LCD_PANEL_GC9109
+        bool "GC9109"
+
+    endchoice
+
+    config SPI_LCD_BUS_IDX
+        int "QSPI bus index"
+        default 2
+        help
+            QSPI controller index (0-3) for the LCD panel.
+
+    config SPI_LCD_MAX_HZ
+        int "QSPI bus max frequency (Hz)"
+        default 10000000
+        help
+            Maximum SPI clock frequency for the LCD panel.
+
+    config SPI_LCD_QSPI_MODE
+        bool "QSPI 4-wire mode (no RS pin)"
+        default y
+        help
+            Enable QSPI 4-wire mode using instruction+data phases.
+            Disable for SPI 1-wire mode with RS pin.
+
+    config SPI_LCD_RS_PIN
+        string "RS pin"
+        depends on !SPI_LCD_QSPI_MODE
+        default "PE.10"
+        help
+            RS (register select) pin name for SPI 1-wire mode.
+
+    config SPI_LCD_BL_PIN
+        string "Backlight pin"
+        default "PD.7"
+        help
+            GPIO pin for LCD backlight control.
+
+    config SPI_LCD_RST_PIN
+        string "Reset pin"
+        default "PD.6"
+        help
+            GPIO pin for LCD hardware reset.
+
+    config SPI_LCD_ENABLE_QSPI_BUS
+        bool
+        default y
+        select AIC_USING_QSPI0 if SPI_LCD_BUS_IDX = 0
+        select AIC_USING_QSPI1 if SPI_LCD_BUS_IDX = 1
+        select AIC_USING_QSPI2 if SPI_LCD_BUS_IDX = 2
+        select AIC_USING_QSPI3 if SPI_LCD_BUS_IDX = 3
+
+    endif # AIC_BOOTLOADER_SPI_LCD
+
     config AIC_BOOTLOADER_CMD_PROGRESS_BAR
         bool "boot progress bar"
-        depends on AIC_DE_DRV
-        default n
+        depends on AIC_DE_DRV || AIC_BOOTLOADER_SPI_LCD
+        default y
 
     config AIC_BOOTLOADER_CMD_FB_CONSOLE
         bool "fb console support"

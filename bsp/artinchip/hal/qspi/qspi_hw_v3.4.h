@@ -72,7 +72,7 @@ extern "C" {
 #define SPI_ENABLE		        (1U << 0)
 #define SPI_DISP_EN		        (1U << 8)
 #define SPI_TXIDMA_DONE	        (1U << 23)
-#define SPI_DISP_RESTART	    (0x1<<31)
+#define SPI_DISP_RESTART	    (0x1UL<<31)
 #define SPI_DISP_PARA_DECEN	    (0x1<<9)
 #define SPI_TXIDMA_EN		    (1U << 4)
 #define SPI_DISP_ERR_INT_EN	    (1U << 27)
@@ -436,6 +436,12 @@ extern "C" {
 #define HAL_QSPI_INPUT_MAX_FREQ_HZ_V2           200000000
 #define HAL_QSPI_INPUT_MIN_FREQ_HZ_V2           63000000
 
+enum qspi_dma_mode {
+    QSPI_DMA_NONE,
+    QSPI_DMA_IDMA,
+    QSPI_DMA_GPDMA,
+};
+
 static inline u32 qspi_hw_index_to_base(u32 idx)
 {
     switch (idx) {
@@ -455,7 +461,7 @@ static inline u32 qspi_hw_index_to_base(u32 idx)
         default:
             break;
     }
-    return 0;
+    return QSPI_INVALID_BASE;
 }
 
 static inline u32 qspi_hw_base_to_index(u32 base)
@@ -577,8 +583,7 @@ static inline void qspi_hw_set_rx_delay_normal(u32 base, u32 mode)
 
 static inline void qspi_hw_set_delay_mode_normal(u32 base)
 {
-    u32 val = readl(QSPI_REG_PHACTL(base));
-    val = 0;
+    u32 val = 0;
     val |= (PHACTL_RX_PHASE_EN_MASK);
     val |= (PHACTL_TX_PHASE_EN_MASK);
     writel(val, QSPI_REG_PHACTL(base));
@@ -1008,6 +1013,18 @@ static inline bool qspi_hw_check_gpdma_rx_done(u32 base)
 {
     u32 val = readl(QSPI_REG_ISTS(base));
     return ((val & ISTS_BIT_GPDMA_RX_DONE) != 0);
+}
+
+static inline bool qspi_hw_check_idma_tx_done(u32 base)
+{
+    u32 val = readl(QSPI_REG_ISTS(base));
+    return ((val & ISTS_BIT_IDMA_TXDONE_INTE) != 0);
+}
+
+static inline bool qspi_hw_check_idma_rx_done(u32 base)
+{
+    u32 val = readl(QSPI_REG_ISTS(base));
+    return ((val & ISTS_BIT_IDMA_RXDONE_INTE) != 0);
 }
 
 static inline void qspi_hw_set_txdly_en(u32 base, u8 enable)

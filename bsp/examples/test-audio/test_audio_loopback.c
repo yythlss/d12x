@@ -32,7 +32,7 @@ static struct {
     rt_uint32_t capacity;
     rt_uint32_t total;
     rt_sem_t done_sem;
-    rt_bool_t stop_flag;
+    volatile rt_bool_t stop_flag;
 } g_rx_ctx;
 
 static aic_i2s_ctrl g_i2s_ctrl = { 0 };
@@ -61,13 +61,25 @@ static void rx_capture_entry(void *param)
     if (!g_rx_ctx.stop_flag) {
         rt_sem_release(g_rx_ctx.done_sem);
     }
+
+    rt_sem_delete(g_rx_ctx.done_sem);
+    g_rx_ctx.done_sem = RT_NULL;
 }
 
 static void build_tx_buffer(rt_uint32_t *buf, rt_uint32_t count)
 {
-    buf[0] = SYNC_WORD;
-    for (rt_uint32_t i = 1; i < count; i++)
-        buf[i] = (rt_uint32_t)(i * 5);
+    rt_uint16_t *samples = (rt_uint16_t *)buf;
+    rt_uint32_t frame_count = count;  /* count = stereo frames */
+
+    /* Sync frame: both channels = 0x5AA5 */
+    samples[0] = (rt_uint16_t)(SYNC_WORD & 0xFFFF);
+    samples[1] = (rt_uint16_t)((SYNC_WORD >> 16) & 0xFFFF);
+
+    /* Data frames: samples increment continuously: 0x0001, 0x0002, 0x0003, ... */
+    for (rt_uint32_t i = 1; i < frame_count; i++) {
+        samples[i * 2]     = (rt_uint16_t)(i * 2 - 1); /* L channel */
+        samples[i * 2 + 1] = (rt_uint16_t)(i * 2);     /* R channel */
+    }
 }
 
 static rt_bool_t verify_loopback_data(const rt_uint32_t *rx_buf, rt_uint32_t rx_total_samples,
@@ -76,26 +88,30 @@ static rt_bool_t verify_loopback_data(const rt_uint32_t *rx_buf, rt_uint32_t rx_
 {
     rt_uint32_t rx_avail = rx_total_samples - sync_idx;
     rt_bool_t passed = RT_TRUE;
+    const rt_uint16_t *rx_samp = (const rt_uint16_t *)(rx_buf + sync_idx);
+    const rt_uint16_t *tx_samp = (const rt_uint16_t *)tx_buf;
 
-    rt_kprintf("\n[Verify] TX samples: %u | RX samples from sync: %u\n", tx_count, rx_avail);
+    rt_kprintf("\n[Verify] TX frames: %u | RX frames from sync: %u\n", tx_count, rx_avail);
 
     if (rx_avail < tx_count) {
-        rt_kprintf("[FAIL] Size mismatch: expected %u samples, only received %u\n", tx_count,
+        rt_kprintf("[FAIL] Size mismatch: expected %u frames, only received %u\n", tx_count,
                    rx_avail);
         passed = RT_FALSE;
     } else {
-        rt_kprintf("[PASS] Size check OK: received at least %u samples after sync\n", tx_count);
+        rt_kprintf("[PASS] Size check OK: received at least %u frames after sync\n", tx_count);
     }
     rt_uint32_t cmp_count = (rx_avail < tx_count) ? rx_avail : tx_count;
+    rt_uint32_t cmp_samp = cmp_count * 2;
     rt_uint32_t mismatch = 0;
 
-    for (rt_uint32_t i = 0; i < cmp_count; i++) {
-        rt_uint32_t rx_val = rx_buf[sync_idx + i];
-        rt_uint32_t tx_val = tx_buf[i];
+    for (rt_uint32_t i = 0; i < cmp_samp; i++) {
+        rt_uint16_t rx_val = rx_samp[i];
+        rt_uint16_t tx_val = tx_samp[i];
 
         if (rx_val != tx_val) {
             if (mismatch < MAX_MISMATCH_PRINT)
-                rt_kprintf("  [MISMATCH] [%u] tx=0x%08X  rx=0x%08X\n", i, tx_val, rx_val);
+                rt_kprintf("  [MISMATCH] frame[%u] %s: tx=0x%04X  rx=0x%04X\n",
+                           i / 2, (i & 1) ? "R" : "L", tx_val, rx_val);
             mismatch++;
             passed = RT_FALSE;
         }
@@ -105,9 +121,9 @@ static rt_bool_t verify_loopback_data(const rt_uint32_t *rx_buf, rt_uint32_t rx_
         rt_kprintf("  ... and %u more mismatch(es) omitted\n", mismatch - MAX_MISMATCH_PRINT);
 
     if (passed)
-        rt_kprintf("[PASS] All %u samples matched\n", tx_count);
+        rt_kprintf("[PASS] All %u frames (%u samples) matched\n", cmp_count, cmp_samp);
     else
-        rt_kprintf("[FAIL] %u / %u sample(s) mismatched\n", mismatch, cmp_count);
+        rt_kprintf("[FAIL] %u / %u sample(s) mismatched\n", mismatch, cmp_samp);
 
     return passed;
 }
@@ -188,29 +204,31 @@ static int test_audio_loopback(int argc, char *argv[])
                    tx_written);
         g_rx_ctx.stop_flag = RT_TRUE;
         rt_device_close(dev);
-        rt_thread_mdelay(100);
-        rt_thread_delete(rx_thread);
-        rt_sem_delete(g_rx_ctx.done_sem);
+        for (int retry = 0; retry < 50; retry++) {
+            if (g_rx_ctx.done_sem == RT_NULL)
+                break;
+            rt_thread_mdelay(20);
+        }
         return -1;
     }
 
     /* Block until capture completes or the watchdog timeout fires */
     if (rt_sem_take(g_rx_ctx.done_sem, rt_tick_from_millisecond(RX_CAPTURE_TIMEOUT_MS)) != RT_EOK) {
         rt_kprintf("[WARN] RX capture timeout, captured %u bytes so far\n", g_rx_ctx.total);
-        g_rx_ctx.stop_flag = RT_TRUE;
     }
 
     /* Close device first to unblock any pending rt_device_read in rx thread,
-     * then wait for the thread to exit its loop before deleting it */
+     * then wait for the thread to exit its loop before releasing resources */
+    g_rx_ctx.stop_flag = RT_TRUE;
     rt_device_close(dev);
-
-    rt_thread_mdelay(100);
-    rt_thread_delete(rx_thread);
-    rt_sem_delete(g_rx_ctx.done_sem);
+    for (int retry = 0; retry < 50; retry++) {
+        if (g_rx_ctx.done_sem == RT_NULL)
+            break;
+        rt_thread_mdelay(20);
+    }
 
     rt_uint32_t rx_samples = g_rx_ctx.total / sizeof(rt_uint32_t);
     rt_kprintf("RX captured: %u samples (%u bytes)\n", rx_samples, g_rx_ctx.total);
-
     /* Locate the first sync word in the received buffer */
     for (rt_uint32_t i = 0; i < rx_samples; i++) {
         if (g_rx_buf[i] == SYNC_WORD) {

@@ -1,0 +1,14 @@
+menu "WLAN Configuration"
+
+if !KERNEL_BAREMETAL
+
+menuconfig AIC_WIRELESS_LAN
+        bool "Using Wireless LAN"
+        default n
+
+if AIC_WIRELESS_LAN
+    source "bsp/peripheral/wireless/Kconfig"
+endif
+
+endif
+endmenu

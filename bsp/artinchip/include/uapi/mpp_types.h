@@ -237,6 +237,7 @@ struct dma_buf_info {
 struct mpp_video_fmt {
     unsigned int width;
     unsigned int height;
+    unsigned int fps;
     enum mpp_mbus_fmt code;
     enum mpp_mbus_type bus_type;
     unsigned int colorspace;

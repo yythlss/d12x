@@ -141,7 +141,7 @@ config AIC_UART_DRV_VER
 
 config AIC_UART_DEV_NUM
     int
-    default 4 if AIC_UART_DRV
+    default 5 if AIC_UART_DRV
 
 #--------------------------------------------
 # i2c driver global option
@@ -630,13 +630,13 @@ config AIC_SID_DRV
     bool
     default n
 
-config AIC_SID_DRV_V12
+config AIC_SID_DRV_V17
     bool
     default y if AIC_SID_DRV
 
 config AIC_SID_DRV_VER
     string
-    default "12" if AIC_SID_DRV_V12
+    default "17" if AIC_SID_DRV_V17
 
 #--------------------------------------------
 # dce driver global option
@@ -661,14 +661,6 @@ config AIC_DCE_DRV_VER
 config AIC_MTOP_DRV
     bool
     default n
-
-config AIC_MTOP_DRV_V21
-    bool
-    default y if AIC_MTOP_DRV
-
-config AIC_MTOP_DRV_VER
-    string
-    default "21" if AIC_MTOP_DRV_V21
 
 #--------------------------------------------
 # CANFD driver global option

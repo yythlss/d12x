@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025 ArtInChip Technology Co.,Ltd
+ * Copyright (C) 2024-2026 ArtInChip Technology Co.,Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -22,6 +22,7 @@ enum PSRAM_FUSE_ID {
     APS3208K = 0x00,
     SCKW18_12816O = 0x01,
     APS12816O = 0x02,
+    APS25616N = 0x03,
 };
 
 struct _psram_id {
@@ -60,6 +61,8 @@ struct _psram_info {
     {0x08, PSRAM_PARALLEL, 0x800000, {APS3208K, 0x80c980c9}},                   \
     /* D123BCV 16M */                                                           \
     {0x09, PSRAM_PARALLEL, 0x1000000, {APS12816O, 0xdd8ddd8d}},                 \
+    /* D121BDV 32M */                                                           \
+    {0x0B, PSRAM_PARALLEL, 0x2000000, {APS25616N, 0xdf8ddf8d}},                 \
     /* TR230 8M */                                                              \
     {0xA1, PSRAM_PARALLEL, 0x800000, {APS3208K, 0x80c980c9}},                   \
     /* JYX58 8M */                                                              \
@@ -73,7 +76,7 @@ u8 psram_get_mark_id(void)
     u32 fuse_218 = readl(EFUSE_218_REG);
     u8 mark_id = fuse_218 & 0xff;
 
-    pr_info("fuse_218(0x19010218)=0x%x, mark_id=0x%x\n", fuse_218, mark_id);
+    pr_debug("fuse_218(0x19010218)=0x%x, mark_id=0x%x\n", fuse_218, mark_id);
     return mark_id;
 }
 
@@ -82,7 +85,7 @@ u8 psram_get_psram_id(void)
     u32 fuse_21c = readl(EFUSE_21C_REG);
     u8 psram_id = (fuse_21c & 0xff) >> 4;
 
-    pr_info("fuse_21c(0x1901021c)=0x%x, psram_id=0x%x\n", fuse_21c, psram_id);
+    pr_debug("fuse_21c(0x1901021c)=0x%x, psram_id=0x%x\n", fuse_21c, psram_id);
     return psram_id;
 }
 
@@ -100,10 +103,14 @@ struct _psram_info *psram_get_info(u8 mark_id, u8 psram_fuse_id)
     return &psram_table_info[0]; //if not find anyone, return the default info.
 }
 
+static struct _psram_info *psram_info = NULL;
+
 u32 aic_get_ram_size(void)
 {
-    struct _psram_info *psram_info;
     u8 mark_id, psram_id;
+
+    if (psram_info)
+        return psram_info->psram_size;
 
     writel(0x1100, EFUSE_CMU_REG);
     mark_id = psram_get_mark_id();
@@ -112,4 +119,16 @@ u32 aic_get_ram_size(void)
     writel(0x0, EFUSE_CMU_REG);
 
     return psram_info->psram_size;
+}
+
+void aic_show_ram_size(void)
+{
+    char *psram_ids[] = {"APS32", "SCKW18", "APS128", "APS256"};
+
+    if (!psram_info)
+        aic_get_ram_size();
+
+    printf("PSRAM: %s, size %d MB\n",
+           psram_ids[psram_info->psram_id.psram_fuse_id],
+           psram_info->psram_size / 1024 / 1024);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025 ArtInChip Technology Co.,Ltd
+ * Copyright (C) 2024-2026 ArtInChip Technology Co.,Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -57,7 +57,7 @@ u8 psram_get_mark_id(void)
     u32 fuse_218 = readl(EFUSE_218_REG);
     u8 mark_id = fuse_218 & 0xff;
 
-    pr_info("fuse_218(0x19010218)=0x%x, mark_id=0x%x\n", fuse_218, mark_id);
+    pr_debug("fuse_218(0x19010218)=0x%x, mark_id=0x%x\n", fuse_218, mark_id);
     return mark_id;
 }
 
@@ -66,7 +66,7 @@ u8 psram_get_psram_id(void)
     u32 fuse_224 = readl(EFUSE_224_REG);
     u8 psram_id = (fuse_224 & 0xff0000) >> 20;
 
-    pr_info("fuse_224(0x19010224)=0x%x, psram_id=0x%x\n", fuse_224, psram_id);
+    pr_debug("fuse_224(0x19010224)=0x%x, psram_id=0x%x\n", fuse_224, psram_id);
     return psram_id;
 }
 
@@ -84,10 +84,14 @@ struct _psram_info *psram_get_info(u8 mark_id, u8 psram_fuse_id)
     return &psram_table_info[0]; //if not find anyone, return the default info.
 }
 
+static struct _psram_info *psram_info = NULL;
+
 u32 aic_get_ram_size(void)
 {
-    struct _psram_info *psram_info;
     u8 mark_id, psram_id;
+
+    if (psram_info)
+        return psram_info->psram_size;
 
     writel(0x1100, EFUSE_CMU_REG);
     mark_id = psram_get_mark_id();
@@ -96,4 +100,16 @@ u32 aic_get_ram_size(void)
     writel(0x0, EFUSE_CMU_REG);
 
     return psram_info->psram_size;
+}
+
+void aic_show_ram_size(void)
+{
+    char *psram_ids[] = {"APS32", "SCKW18", "APS128"};
+
+    if (!psram_info)
+        aic_get_ram_size();
+
+    printf("PSRAM: %s, size %d MB\n",
+           psram_ids[psram_info->psram_id.psram_fuse_id],
+           psram_info->psram_size / 1024 / 1024);
 }

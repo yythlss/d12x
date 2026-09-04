@@ -12,6 +12,12 @@
 #include <aic_utils.h>
 
 struct aic_pinmux aic_pinmux_config[] = {
+#ifdef AIC_LVGL_FIVE_DISP_DEMO
+    {1, PIN_PULL_DIS, 3, "PD.7"},
+    {1, PIN_PULL_DIS, 3, "PD.10"},
+    {1, PIN_PULL_DIS, 3, "PD.27"},
+    {1, PIN_PULL_DIS, 3, "PD.23"},
+#endif
 #ifdef AIC_USING_CIR
     /* cir */
     {3, PIN_PULL_DIS, 3, "PA.0"},
@@ -27,6 +33,13 @@ struct aic_pinmux aic_pinmux_config[] = {
     {5, PIN_PULL_DIS, 3, "PA.2"},
     {5, PIN_PULL_UP, 3, "PA.3"},
 #endif
+#ifdef AIC_USING_UART3
+    /* uart3 */
+    {7, PIN_PULL_DIS, 3, "PB.18"},
+    {7, PIN_PULL_UP, 3, "PB.19"},
+    {7, PIN_PULL_DIS, 3, "PB.20"},
+    {7, PIN_PULL_DIS, 3, "PB.21"},
+#endif
 #ifdef AIC_USING_CANFD0
     /* can0 */
     {4, PIN_PULL_DIS, 3, "PA.4"},
@@ -41,13 +54,21 @@ struct aic_pinmux aic_pinmux_config[] = {
     {4, PIN_PULL_DIS, 3, "PD.3"},  // SDA
 #endif
 #ifdef AIC_USING_QSPI1
-    /* qspi0 */
+#ifdef AIC_LVGL_FIVE_DISP_DEMO
+    {7, PIN_PULL_UP, 3, "PC.0"},
+    {7, PIN_PULL_UP, 3, "PC.1"},
+    {7, PIN_PULL_UP, 3, "PC.2"},
+    {7, PIN_PULL_UP, 3, "PC.3"},
+    {7, PIN_PULL_UP, 3, "PC.4"},
+    {7, PIN_PULL_UP, 3, "PC.5"},
+#else
     {2, PIN_PULL_UP, 3, "PB.0"},
     {2, PIN_PULL_UP, 3, "PB.1"},
     {2, PIN_PULL_UP, 3, "PB.2"},
     {2, PIN_PULL_UP, 3, "PB.3"},
     {2, PIN_PULL_UP, 3, "PB.4"},
     {2, PIN_PULL_UP, 3, "PB.5"},
+#endif
 #endif
 #ifdef AIC_USING_SDMC0
     {2, PIN_PULL_UP, 7, "PB.6"},
@@ -92,12 +113,37 @@ struct aic_pinmux aic_pinmux_config[] = {
     {8, PIN_PULL_UP, 7, "PE.17"},
 #endif
 #ifdef AIC_USING_QSPI2
+#ifdef AIC_LVGL_FIVE_DISP_DEMO
+    {3, PIN_PULL_UP, 7, "PB.6"},
+    {3, PIN_PULL_UP, 7, "PB.7"},
+    {3, PIN_PULL_UP, 7, "PB.8"},
+    {3, PIN_PULL_UP, 7, "PB.9"},
+    {3, PIN_PULL_UP, 7, "PB.10"},
+    {3, PIN_PULL_UP, 7, "PB.11"},
+#else
     {3, PIN_PULL_UP, 7, "PC.6"},
     {3, PIN_PULL_UP, 7, "PC.7"},
     {3, PIN_PULL_UP, 7, "PC.8"},
     {3, PIN_PULL_UP, 7, "PC.9"},
     {3, PIN_PULL_UP, 7, "PC.10"},
     {3, PIN_PULL_UP, 7, "PC.11"},
+#endif
+#endif
+#ifdef AIC_USING_QSPI3
+    {7, PIN_PULL_UP, 3, "PD.16"},
+    {1, PIN_PULL_DIS, 3, "PD.17"},
+    {7, PIN_PULL_UP, 3, "PD.18"},
+    {7, PIN_PULL_UP, 3, "PD.19"},
+#endif
+#ifdef AIC_USING_QSPI4
+    {7, PIN_PULL_UP, 3, "PD.20"},
+    {7, PIN_PULL_UP, 3, "PD.21"},
+    {7, PIN_PULL_UP, 3, "PD.22"},
+#endif
+#ifdef AIC_USING_QSPI5
+    {7, PIN_PULL_UP, 3, "PD.24"},
+    {7, PIN_PULL_UP, 3, "PD.25"},
+    {7, PIN_PULL_UP, 3, "PD.26"},
 #endif
 #ifdef AIC_USING_I2S0
     {4, PIN_PULL_DIS, 3, "PD.11"},

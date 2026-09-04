@@ -396,34 +396,45 @@ int show_color_block(int fd)
 
 static int test_vsync_repeat(void)
 {
-    struct aicfb_layer_data layer = {0};
-    int ret, i = 0;
+#define VSYNC_STAT_FRAMES 100
+    unsigned long max_us = 0, min_us = ~0UL, sum_us = 0;
+    unsigned long time_us, avg_us;
     u64 start, end;
+    int counted = 0;
+    int ret, i;
 
-    layer.layer_id = AICFB_LAYER_TYPE_UI;
-    ret = mpp_fb_ioctl(g_fb, AICFB_GET_LAYER_CONFIG, &layer);
-        if (ret) {
-        printf("error: AICFB_GET_LAYER_CONFIG\n");
-        return ret;
-    }
+    printf("Wait VSync over %d frames ...\n", VSYNC_STAT_FRAMES);
 
-    do {
-        ret = mpp_fb_ioctl(g_fb, AICFB_UPDATE_LAYER_CONFIG, &layer);
-        if (ret) {
-            printf("error: AICFB_UPDATE_LAYER_CONFIG\n");
-            break;
-        }
-
+    for (i = 0; i < VSYNC_STAT_FRAMES; i++) {
         start = aic_get_time_us();
         ret = mpp_fb_ioctl(g_fb, AICFB_WAIT_FOR_VSYNC, NULL);
         if (ret) {
-            printf("error: wait for sync timeout, DE not working\n");
+            pr_err("ioctl WAIT_FOR_VSYNC timeout at frame %d\n", i);
             break;
         }
         end = aic_get_time_us();
 
-        printf("wait vsync time %lld us\n", end - start);
-    } while (i++ < 5);
+        time_us = (unsigned long)(end - start);
+
+        if (time_us > max_us)
+            max_us = time_us;
+        if (time_us < min_us)
+            min_us = time_us;
+        sum_us += time_us;
+        counted++;
+    }
+
+    if (counted > 0) {
+        avg_us = sum_us / counted;
+        printf("\tMax: %2lu.%03lu ms\n", max_us / 1000, max_us % 1000);
+        printf("\tMin: %2lu.%03lu ms\n", min_us / 1000, min_us % 1000);
+        printf("\tAvg: %2lu.%03lu ms\n", avg_us / 1000, avg_us % 1000);
+        if (avg_us > 0)
+            printf("   est. FPS: %2lu.%lu\n",
+                   1000000UL / avg_us, (1000000UL * 10 / avg_us) % 10);
+    } else {
+        printf("no valid vsync data collected\n");
+    }
 
     return ret;
 }

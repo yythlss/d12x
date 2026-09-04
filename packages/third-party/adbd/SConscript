@@ -6,6 +6,7 @@ from building import *
 cwd = GetCurrentDir()
 all_src = Glob('core/*.c')
 
+exclude_patterns = []
 if GetDepend('LPKG_USING_CHERRYUSB_V1_5_0'):
     exclude_patterns = ['adbcherryusb.c']
 

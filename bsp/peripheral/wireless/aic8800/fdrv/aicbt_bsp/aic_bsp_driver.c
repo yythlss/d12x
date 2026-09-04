@@ -292,14 +292,14 @@ static struct aicbt_info_t aicbt_info = {
 struct aicbt_info_t aicbt_info_8800dc = {
 	.btmode        = AICBT_BTMODE_BT_WIFI_COMBO,
 	.btport        = AICBT_BTPORT_DEFAULT,
-	.uart_baud     = AICBT_UART_BAUD_DEFAULT,
+	.uart_baud     = AICBT_UART_BAUD_1_5M,
 	.uart_flowctrl = AICBT_UART_FC_DEFAULT,
 	.lpm_enable    = AICBT_LPM_ENABLE_DEFAULT,
 	.txpwr_lvl     = AICBT_TXPWR_LVL_8800dc,
 };
 
 struct aicbt_info_t aicbt_info_880080 = {
-	.btmode        = AICBT_BTMODE_BT_WIFI_COMBO,
+	.btmode        = AICBT_BTMODE_BT_ONLY,
 	.btport        = AICBT_BTPORT_DEFAULT,
 	.uart_baud     = AICBT_UART_BAUD_1_5M,
 	.uart_flowctrl = AICBT_UART_FC_DEFAULT,
@@ -323,18 +323,33 @@ int aicbt_patch_table_load(struct rwnx_hw *rwnx_hw, struct aicbt_patch_table *he
 			*(data + 3)  = aicbsp_info.hwinfo;
 			*(data + 5)  = (rwnx_hw->chipid == PRODUCT_ID_AIC8800DC ? aicbsp_info.cpmode : 0);
 
-			*(data + 7)  = aicbt_info_880080.btmode;
-			*(data + 9)  = aicbt_info_880080.btport;
-			*(data + 11) = aicbt_info_880080.uart_baud;
-			*(data + 13) = aicbt_info_880080.uart_flowctrl;
-			*(data + 15) = aicbt_info_880080.lpm_enable;
-			*(data + 17) = aicbt_info_880080.txpwr_lvl;
+			if (rwnx_hw->chipid == PRODUCT_ID_AIC8800DC) {
+				*(data + 7)  = aicbt_info_8800dc.btmode;
+				*(data + 9)  = aicbt_info_8800dc.btport;
+				*(data + 11) = aicbt_info_8800dc.uart_baud;
+				*(data + 13) = aicbt_info_8800dc.uart_flowctrl;
+				*(data + 15) = aicbt_info_8800dc.lpm_enable;
+				*(data + 17) = aicbt_info_8800dc.txpwr_lvl;
 
-			aic_dbg("%s bt btmode[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.btmode);
-			aic_dbg("%s bt uart_baud[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.uart_baud);
-			aic_dbg("%s bt uart_flowctrl[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.uart_flowctrl);
-			aic_dbg("%s bt lpm_enable[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.lpm_enable);
-			aic_dbg("%s bt tx_pwr[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.txpwr_lvl);
+				aic_dbg("%s bt btmode[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_8800dc.btmode);
+				aic_dbg("%s bt uart_baud[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_8800dc.uart_baud);
+				aic_dbg("%s bt uart_flowctrl[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_8800dc.uart_flowctrl);
+				aic_dbg("%s bt lpm_enable[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_8800dc.lpm_enable);
+				aic_dbg("%s bt tx_pwr[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_8800dc.txpwr_lvl);
+			} else {
+				*(data + 7)  = aicbt_info_880080.btmode;
+				*(data + 9)  = aicbt_info_880080.btport;
+				*(data + 11) = aicbt_info_880080.uart_baud;
+				*(data + 13) = aicbt_info_880080.uart_flowctrl;
+				*(data + 15) = aicbt_info_880080.lpm_enable;
+				*(data + 17) = aicbt_info_880080.txpwr_lvl;
+
+				aic_dbg("%s bt btmode[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.btmode);
+				aic_dbg("%s bt uart_baud[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.uart_baud);
+				aic_dbg("%s bt uart_flowctrl[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.uart_flowctrl);
+				aic_dbg("%s bt lpm_enable[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.lpm_enable);
+				aic_dbg("%s bt tx_pwr[%d]:%d \r\n", __func__, rwnx_hw->chipid, aicbt_info_880080.txpwr_lvl);
+			}
 		}
 
 		if (AICBT_PT_VER == p->type) {

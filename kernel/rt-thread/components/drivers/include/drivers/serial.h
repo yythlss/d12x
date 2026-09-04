@@ -92,6 +92,7 @@
 
 #define RT_SERIAL_RS485_MODE             1       /* ArtInChip Uart 485 mode flag */
 #define RT_SERIAL_RS485_SIMULATION_MODE  7      /* ArtInChip Uart simulation 485 mode flag */
+#define RT_SERIAL_RS232_SIMULATION_MODE  8      /* ArtInChip Uart simulation 485 mode flag */
 #define RT_SERIAL_RS485_RTS_LOW         0x80    /* ArtInChip Uart 485 RTS_Pin Low level*/
 #define RT_SERIAL_RS485_RTS_HIGH        0x81    /* ArtInChip Uart 485 RTS_Pin High Level */
 #define RT_SERIAL_232_RESUME_DATA       0x83
@@ -100,6 +101,7 @@
 #define RT_SERIAL_SW_RECEIVE_ON_OFF     0x86
 #define RT_SERIAL_SET_BAUDRATE          0x87
 #define RT_SERIAL_GET_CONFIG            0x88
+#define RT_SERIAL_ENABLE_SREE_INT       0x89
 
 typedef enum
 {

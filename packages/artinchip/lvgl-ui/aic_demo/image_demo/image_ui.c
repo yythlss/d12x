@@ -89,6 +89,7 @@ static void change_file_image_callback(lv_timer_t *tmr)
     (void)tmr;
     static int id = 1;
 
+    // actively mark and clear the cache of the previous image.
     lv_img_cache_invalidate_src(lv_img_get_src(file_img_cook));
     if (id == 0)
         lv_img_set_src(file_img_cook, LVGL_PATH(cook_2.jpg));
@@ -108,20 +109,27 @@ void image_ui_init(void)
     extern void lv_canvas_image_text(void);
     lv_canvas_image_text();
 #else
+    /*
+     * the mem img modes is commonly used in cases involving network transmission,
+     * and its typical usage should refer to the file img mode.
+     */
+    file_img_cook = lv_img_create(lv_scr_act());
+    lv_obj_align(file_img_cook, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_obj_set_style_img_opa(file_img_cook, LV_OPA_50, LV_PART_MAIN);
+
+    lv_timer_create(change_file_image_callback, 1000, 0);
+
+    /* the following are cases commonly used in network/USB transmission. */
     image_data = (uint8_t *)aicos_malloc(MEM_CMA, MAX_IMAGE_SIZE);
     if (!image_data) {
         LV_LOG_ERROR("malloc image_data failed");
         return;
     }
-    file_img_cook = lv_img_create(lv_scr_act());
-    lv_obj_align(file_img_cook, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_obj_set_style_img_opa(file_img_cook, LV_OPA_50, LV_PART_MAIN);
 
     mem_img_cook = lv_img_create(lv_scr_act());
     lv_obj_center(mem_img_cook);
 
     lv_timer_create(change_mem_image_callback, 1000, 0);
-    lv_timer_create(change_file_image_callback, 1000, 0);
 #endif
 }
 

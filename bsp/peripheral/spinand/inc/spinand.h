@@ -223,6 +223,7 @@ struct spi_nand_cmd_cfg {
 #define CFG_QUAD_ENABLE BIT(0)
 
 /* status register */
+#define REG_FEATURE2        0xd0
 #define REG_STATUS          0xc0
 #define STATUS_BUSY         BIT(0)
 #define STATUS_ERASE_FAILED BIT(2)
@@ -284,6 +285,9 @@ extern const struct spinand_manufacturer fudanmicro_spinand_manufacturer;
 #endif
 #ifdef SPI_NAND_UNIM
 extern const struct spinand_manufacturer unim_spinand_manufacturer;
+#endif
+#ifdef SPI_NAND_MK
+extern const struct spinand_manufacturer mk_spinand_manufacturer;
 #endif
 
 extern struct spi_nand_cmd_cfg cmd_cfg_table[];

@@ -14,6 +14,7 @@
 #include "wifi_port.h"
 #include "fhost.h"
 #include "cli_al.h"
+#include "wifi_def.h"
 
 #ifdef WIFI_USING_LOOPBACK_NETDEV
 bool loop_dev_reg_flag = 0;
@@ -60,30 +61,34 @@ rt_err_t aic8800_set_mode(struct rt_wlan_device *wlan, rt_wlan_mode_t mode)
 
 static int wlan_security2aic(rt_wlan_security_t security)
 {
-    int type = 0;
+    int type = KEY_WPA2;
 
     switch(security)
     {
     case SECURITY_OPEN:
-
+        type = KEY_NONE;
         break;
     case SECURITY_WEP_PSK:
-
-        break;
     case SECURITY_WEP_SHARED:
-
+        type = KEY_WEP;
         break;
     case SECURITY_WPA_AES_PSK:
-
+        type = KEY_WPA;
         break;
     case SECURITY_WPA2_AES_PSK:
-
+        type = KEY_WPA2;
         break;
     case SECURITY_WPA2_MIXED_PSK:
-
+        type = KEY_WPA_WPA2;
+        break;
+    case SECURITY_WPA3_AES_PSK:
+        type = KEY_WPA3;
+        break;
+    case SECURITY_WPA3_MIXED_PSK:
+        type = KEY_WPA2_WPA3;
         break;
     default:
-
+        type = KEY_WPA2;
         break;
     }
     return type;
@@ -99,7 +104,7 @@ static rt_wlan_security_t aic8800_akm2security(uint32_t akm, uint16_t group_ciph
     if (akm & CO_BIT(MAC_AKM_PRE_RSN)) {
         if (pairwise_cipher &
             (CO_BIT(MAC_CIPHER_WEP40)
-            | CO_BIT(MAC_CIPHER_WEP40))) {
+            | CO_BIT(MAC_CIPHER_WEP104))) {
             wlan_sec = SECURITY_WEP_PSK;
         } else
         if (pairwise_cipher & CO_BIT(MAC_CIPHER_TKIP)) {
@@ -109,6 +114,32 @@ static rt_wlan_security_t aic8800_akm2security(uint32_t akm, uint16_t group_ciph
             (CO_BIT(MAC_CIPHER_CCMP)
             | CO_BIT(MAC_CIPHER_CCMP_256))) {
             wlan_sec = SECURITY_WPA_AES_PSK;
+        }
+    } else
+    /* WPA3-SAE (includes transition mode where both SAE and PSK are advertised) */
+    if (akm & CO_BIT(MAC_AKM_SAE)) {
+        if (akm & CO_BIT(MAC_AKM_PSK)) {
+            /* WPA3-SAE transition mode: AP supports both SAE and WPA2-PSK */
+            wlan_sec = SECURITY_WPA3_MIXED_PSK;
+        } else {
+            /* Pure WPA3-SAE */
+            wlan_sec = SECURITY_WPA3_AES_PSK;
+        }
+    } else
+    if (akm & CO_BIT(MAC_AKM_PSK_SHA256)) {
+        /* WPA2-PSK with SHA256 AKM (802.11w capable) */
+        if ((pairwise_cipher &
+            (CO_BIT(MAC_CIPHER_TKIP) | CO_BIT(MAC_CIPHER_CCMP))) ==
+            (CO_BIT(MAC_CIPHER_TKIP) | CO_BIT(MAC_CIPHER_CCMP))) {
+            wlan_sec = SECURITY_WPA2_MIXED_PSK;
+        } else
+        if (pairwise_cipher & CO_BIT(MAC_CIPHER_TKIP)) {
+            wlan_sec = SECURITY_WPA2_TKIP_PSK;
+        } else
+        if (pairwise_cipher &
+            (CO_BIT(MAC_CIPHER_CCMP)
+            | CO_BIT(MAC_CIPHER_CCMP_256))) {
+            wlan_sec = SECURITY_WPA2_AES_PSK;
         }
     } else
     if (akm & CO_BIT(MAC_AKM_PSK)) {
@@ -226,7 +257,7 @@ rt_err_t aic8800_softap(struct rt_wlan_device *wlan, struct rt_ap_info *ap_info)
     ap_cfg.channel = ap_info->channel;
     ap_cfg.enable_he = 1;
     ap_cfg.enable_acs = 0;
-    ap_cfg.sercurity_type = (ap_info->key.len == 0) ? KEY_NONE : KEY_WPA2;
+    ap_cfg.sercurity_type = (ap_info->key.len == 0) ? KEY_NONE : (AIC_WIFI_SECURITY_TYPE)wlan_security2aic(ap_info->security);
     ap_cfg.dtim = 1;
     ap_cfg.sta_num = aic_wifi_fmac_remote_sta_max_get();
     AIC_LOG_PRINTF("Start ap ssid: %s\n", ap_cfg.aic_ap_ssid.array);
@@ -449,3 +480,32 @@ rt_err_t wifi_test(int argc, char** argv)
     return ret;
 }
 MSH_CMD_EXPORT(wifi_test, wifi test cmd);
+
+rt_err_t aic8800_late_power_on(int argc, char** argv)
+{
+    struct rt_mmcsd_host *host;
+
+    aic_platform_wlan_hw_reset();
+
+    aic_platform_bt_hw_reset();
+
+    host = aic_sdmc_get_rthost(AIC_WIFI_SDMC_ID);
+    if (!host) {
+        return -1;
+    }
+
+    mmcsd_change(host);
+    return 0;
+}
+MSH_CMD_EXPORT(aic8800_late_power_on, wifi late power on);
+
+#if AIC_WIRELESS_DELAY_POWER_ON > 0
+static int aic8800_delay_power_on(void)
+{
+    rt_thread_mdelay(AIC_WIRELESS_DELAY_POWER_ON * 1000);
+    aic8800_late_power_on(0, NULL);
+    return 0;
+}
+INIT_LATE_APP_EXPORT(aic8800_delay_power_on);
+#endif
+

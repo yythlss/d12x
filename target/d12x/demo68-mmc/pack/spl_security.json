@@ -1,0 +1,8 @@
+{
+	"security": {
+		"keydata": {
+			"version": "1",
+			"file": "app_chacha20_key_encrypted.bin"
+		}
+	}
+}

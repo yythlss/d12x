@@ -57,6 +57,7 @@ extern "C" {
 #define DMA_IRQ_HALF_TASK   BIT(0)
 #define DMA_IRQ_ONE_TASK    BIT(1)
 #define DMA_IRQ_ALL_TASK    BIT(2)
+#define DMA_IRQ_TASK_DONE   (DMA_IRQ_HALF_TASK | DMA_IRQ_ONE_TASK | DMA_IRQ_ALL_TASK)
 #define DMA_IRQ_CH_WIDTH    (4)
 #define DMA_IRQ_MASK(ch)    (GENMASK(2, 0) << DMA_IRQ_SHIFT(ch))
 #endif

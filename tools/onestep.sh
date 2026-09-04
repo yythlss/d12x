@@ -349,13 +349,13 @@ build_one_solution()
 	SOLUTION_NAME=${DEFCONFIG_NAME::-10}
 	LOG_FILE=$LOG_DIR/$SOLUTION_NAME".log"
 	echo
-	echo --------------------------------------------------------------
+	echo ---------------------------------------------------------------
 	if [ -z $SOLUTION_TOTAL ]; then
 		echo Build $SOLUTION_NAME
 	else
 		echo ${SOLUTION_CNT}/${SOLUTION_TOTAL}. Build $SOLUTION_NAME
 	fi
-	echo --------------------------------------------------------------
+	echo ---------------------------------------------------------------
 
 	scons --apply-def=$DEFCONFIG_NAME -C $SDK_PRJ_TOP_DIR
 
@@ -367,7 +367,7 @@ build_one_solution()
 	scons -C $SDK_PRJ_TOP_DIR -j 8 2>&1 | tee $LOG_FILE
 
 	BUILD_CNT=`expr $BUILD_CNT + 1`
-	SUCCESS=`grep "Luban-Lite is built successfully" $LOG_FILE -wc`
+	SUCCESS=`grep -Ec "Luban-Lite is built successfully|is up to date" $LOG_FILE`
 	WAR_CNT=`grep -E "warning:|pinmux conflicts" $LOG_FILE -i | grep "is shorter than expected" -vc`
 
 	if [ $SUCCESS -ne 0 ]; then
@@ -454,13 +454,10 @@ function _make_boot()
 		return
 	fi
 
-	checkout_binary
-
 	CUR_DEF=$(_get_cur_def)
 	boot_filter=`echo ${CUR_DEF} | grep baremetal_bootloader`
 	if [ -n "$boot_filter" ]; then
 		# Current defconfig is bootloader
-		echo "Build $SDK_PRJ_TOP_DIR/${CUR_DEF}"
 		scons -C $SDK_PRJ_TOP_DIR -j 8
 	else
 		BUILD_CNT=0
@@ -506,7 +503,6 @@ function _make_app()
 		echo "Not lunch application yet"
 		return
 	fi
-	echo "Build $SDK_PRJ_TOP_DIR/${CUR_DEF}"
 	if [ -n "${CLEAN_FLAG}" ]; then
 		scons -c -C $SDK_PRJ_TOP_DIR -j 8
 	fi
@@ -528,12 +524,9 @@ function _make_boot_and_app()
 		return
 	fi
 
-	checkout_binary
-
 	CUR_DEF=$(_get_cur_def)
 	boot_filter=`echo $CUR_DEF | grep baremetal_bootloader`
 	if [ -n "$boot_filter" ]; then
-		echo "Build $SDK_PRJ_TOP_DIR/$CUR_DEF"
 		scons -C $SDK_PRJ_TOP_DIR -j 8
 	else
 		BUILD_CNT=0
@@ -580,7 +573,6 @@ function _clean_boot_and_app()
 	CUR_DEF=$(_get_cur_def)
 	boot_filter=`echo ${CUR_DEF} | grep baremetal_bootloader`
 	if [ -n "$boot_filter" ]; then
-		echo "Build $SDK_PRJ_TOP_DIR/${CUR_DEF}"
 		scons -c -C $SDK_PRJ_TOP_DIR
 	else
 		BUILD_CNT=0
@@ -637,21 +629,21 @@ function build_check_all()
 		build_one_solution $app $1
 		WAR_SUM=$(expr $WAR_SUM + $WAR_CNT)
 	done
-	echo -------------------------------------------------------------- >> $RESULT_FILE
+	echo --------------------------------------------------------------- >> $RESULT_FILE
 	printf "Total: %d, Success: %d, Failed: %d, Warning: %d\n" \
 		$SOLUTION_TOTAL $SOLUTION_OK_CNT "$(expr $SOLUTION_TOTAL - $SOLUTION_OK_CNT)" $WAR_SUM >> $RESULT_FILE
 
 	echo
-	echo --------------------------------------------------------------
+	echo ---------------------------------------------------------------
 	echo The build result of all solution:
-	echo --------------------------------------------------------------
+	echo ---------------------------------------------------------------
 	cat $RESULT_FILE
 
 	if [ -f $WARNING_FILE ]; then
 		echo
-		echo --------------------------------------------------------------
+		echo ---------------------------------------------------------------
 		echo The warning information of all solution:
-		echo --------------------------------------------------------------
+		echo ---------------------------------------------------------------
 		cat $WARNING_FILE
 		echo
 	fi

@@ -80,77 +80,6 @@ DRESULT spinor_disk_levelx_write(void *hdisk, const uint8_t *buf, uint32_t secto
     return RES_OK;
 }
 #else
-#ifdef AIC_FATFS_ENABLE_WRITE_IN_SPINOR
-static rt_size_t blk_dev_cal_phy_len(struct spinor_blk_device *dev,
-                                        uint32_t pos, rt_size_t size, rt_size_t cluster_size)
-{
-    rt_size_t phy_len = 0;
-    uint32_t phy_sector_num = 0;
-
-    phy_sector_num = roundup(pos % cluster_size + size, cluster_size);
-    phy_len = phy_sector_num * dev->info.bytes_per_sector;
-
-    return phy_len;
-}
-
-DRESULT spinor_disk_mtd_write(void *hdisk, const uint8_t *buf, uint32_t sector,
-                                rt_size_t cnt)
-{
-    struct spinor_blk_device *dev = hdisk;
-    struct mtd_dev *mtd;
-
-    rt_size_t total_phy_len, total_copy_len;
-    rt_size_t do_phy_len, do_copy_len;
-    uint32_t phy_pos, buf_pos;
-    int ret = 0;
-
-    if (!dev)
-        return RES_NOTRDY;
-
-    mtd = dev->mtd_device;
-    if (!mtd)
-        return RES_NOTRDY;
-
-    total_phy_len = blk_dev_cal_phy_len(dev, sector, cnt, 8);
-    buf_pos = sector % 8 * dev->info.bytes_per_sector;
-    phy_pos = (sector - sector % 8) * dev->info.bytes_per_sector;
-    total_copy_len = cnt * dev->info.bytes_per_sector;
-
-    while (total_copy_len != 0) {
-        if (total_phy_len > dev->length) {
-            do_phy_len = dev->length;
-            do_copy_len = dev->length - sector % 8 * dev->info.bytes_per_sector;
-        } else {
-            do_phy_len = total_phy_len;
-            do_copy_len = total_copy_len;
-        }
-        memset(dev->buf, 0xFF, dev->length);
-        ret = mtd_read(mtd, phy_pos, dev->buf, do_phy_len);
-        if (ret) {
-            pr_err("mtd_read read data failed!\n");
-            return -RT_ERROR;
-        }
-        memcpy(dev->buf + buf_pos, buf, do_copy_len);
-        mtd_erase(mtd, phy_pos, do_phy_len);
-
-        ret = mtd_write(mtd, phy_pos, dev->buf, do_phy_len);
-        if (ret) {
-            pr_err("Mtd write data failed!\n");
-            return -RT_ERROR;
-        }
-
-        phy_pos += do_phy_len;
-        buf += do_phy_len - buf_pos;
-        sector += do_copy_len / dev->info.bytes_per_sector;
-        buf_pos = 0;
-        total_copy_len -= do_copy_len;
-        total_phy_len -= do_phy_len;
-    }
-
-    return RES_OK;
-}
-#endif
-
 static DRESULT spinor_disk_mtd_read(void *hdisk, uint8_t *buf, uint32_t sector,
                                         rt_size_t cnt)
 {
@@ -185,15 +114,15 @@ static DRESULT spinor_disk_mtd_read(void *hdisk, uint8_t *buf, uint32_t sector,
 DRESULT spinor_disk_write(void *hdisk, const uint8_t *buf, uint32_t sector,
                             rt_size_t cnt)
 {
-#ifndef AIC_FATFS_ENABLE_WRITE_IN_SPINOR
-    pr_warn("This config only supports read!\n");
-    return RES_OK;
-#else
 #ifdef LPKG_USING_LEVELX
     return spinor_disk_levelx_write(hdisk, buf, sector, cnt);
 #else
-    return spinor_disk_mtd_write(hdisk, buf, sector, cnt);
-#endif
+    (void)hdisk;
+    (void)buf;
+    (void)sector;
+    (void)cnt;
+    pr_warn("This config only supports read!\n");
+    return RES_OK;
 #endif
 }
 
@@ -277,17 +206,6 @@ void *spinor_disk_initialize(const char *device_name)
         free(dev);
         return NULL;
     }
-
-#ifdef AIC_FATFS_ENABLE_WRITE_IN_SPINOR
-    dev->length = AIC_USING_FS_IMAGE_TYPE_FATFS_CLUSTER_SIZE * 512 * 2;
-    dev->buf = (uint8_t *)aicos_malloc(MEM_CMA, dev->length);
-    if (!dev->buf) {
-        pr_err("Error: no memory for create SPI NOR block buf");
-        free(dev);
-        return NULL;
-    }
-
-#endif
 
     dev->info.bytes_per_sector = 512;
     dev->info.block_size = dev->info.bytes_per_sector;

@@ -23,6 +23,7 @@
 
 #include <rtthread.h>
 #include <wlan_cfg.h>
+#include "aic_utils.h"
 
 #include "nimble/ble.h"
 #include "host/ble_hs.h"
@@ -143,13 +144,18 @@ void blufi_wlan_connect(struct rt_work *work, void *data)
 
         rt_wlan_cfg_save(&wlan_cfg_info->cfg);
         rt_wlan_disconnect();
-        rt_wlan_connect(wlan_cfg_info->cfg.info.ssid.val, wlan_cfg_info->cfg.key.val);
+        rt_wlan_connect((const char *)wlan_cfg_info->cfg.info.ssid.val, (const char *)wlan_cfg_info->cfg.key.val);
 }
 
 void blufi_wlan_disconnect(struct rt_work *work, void *data)
 {
         rt_wlan_disconnect();
 }
+
+static bool g_blufi_stopping = false;
+static bool g_blufi_running = false;
+static bool g_blufi_inited = false;
+static bool g_blufi_gatt_inited = false;
 
 static void blufi_event_callback(blufi_cb_event_t event, blufi_cb_param_t *param)
 {
@@ -171,7 +177,8 @@ static void blufi_event_callback(blufi_cb_event_t event, blufi_cb_param_t *param
     case BLUFI_EVENT_BLE_DISCONNECT:
         MODLOG_DFLT_INFO("BLUFI ble disconnect\n");
         ble_is_connected = false;
-        blufi_adv_start();
+        if (!g_blufi_stopping)
+            blufi_adv_start();
         break;
     case BLUFI_EVENT_SET_WIFI_OPMODE:
         MODLOG_DFLT_INFO("BLUFI Set WIFI opmode %d\n", param->wifi_mode.op_mode);
@@ -375,21 +382,44 @@ static void blufi_on_sync(void)
 extern void ble_store_config_init(void);
 extern int nimble_ble_enable(void);
 extern struct ble_npl_eventq *nimble_port_get_dflt_eventq(void);
+
+/*
+ * Stop advertising, disconnect, and deinit profile before sleep.
+ * The host thread stays alive (RAM preserved across sleep).
+ * Use "blufi" after wakeup to restart.
+ */
+static int blufi_stop(int argc, char **argv)
+{
+    if (!g_blufi_running) {
+        rt_kprintf("blufi not running\n");
+        return 0;
+    }
+
+    g_blufi_stopping = true;
+    blufi_adv_stop();
+    blufi_disconnect();
+    blufi_profile_deinit();
+    rt_kprintf("blufi stopped\n");
+    g_blufi_running = false;
+    return 0;
+}
+MSH_CMD_EXPORT(blufi_stop, stop BLE blufi before sleep);
+
 int blufi(int argc, char **argv)
 {
     int rc __attribute__((unused));
-    static int init_flag = 0;
 
-    if (init_flag)
+    if (g_blufi_running)
         return 0;
-    init_flag = 1;
+
+    g_blufi_stopping = false;
+
     blufi_register_callbacks(&blufi_callbacks);
 
     rt_work_init(&set_mode_work, blufi_wlan_set_mode, &wlan_cfg_info);
     rt_work_init(&wlan_connect_work, blufi_wlan_connect, &wlan_cfg_info);
     rt_work_init(&wlan_disconnect_work, blufi_wlan_disconnect, &wlan_cfg_info);
 
-    /* Initialize the NimBLE host configuration */
     ble_hs_cfg.reset_cb = blufi_on_reset;
     ble_hs_cfg.sync_cb = blufi_on_sync;
     ble_hs_cfg.gatts_register_cb = blufi_gatt_svr_register_cb;
@@ -412,19 +442,24 @@ int blufi(int argc, char **argv)
 #endif
 #endif
 
-    rc = blufi_gatt_svr_init();
-    assert(rc == 0);
+    if (!g_blufi_gatt_inited) {
+        rc = blufi_gatt_svr_init();
+        assert(rc == 0);
+        rc = ble_svc_gap_device_name_set(BLUFI_DEVICE_NAME);
+        assert(rc == 0);
+        ble_store_config_init();
+        g_blufi_gatt_inited = true;
+    }
 
-    /* Set the default device name */
-    rc = ble_svc_gap_device_name_set(BLUFI_DEVICE_NAME);
-    assert(rc == 0);
+    if (!g_blufi_inited) {
+        ble_hs_thread_startup();
+        g_blufi_inited = true;
+    } else {
+        /* Re-init after sleep: host thread alive, just re-init profile */
+        blufi_profile_init();
+    }
 
-    /* XXX Need to have template for store */
-    ble_store_config_init();
-
-    /* startup bluetooth host stack*/
-    ble_hs_thread_startup();
-
+    g_blufi_running = true;
     return 0;
 }
 MSH_CMD_EXPORT_ALIAS(blufi, blufi, "bluetoooth config wifi sample");

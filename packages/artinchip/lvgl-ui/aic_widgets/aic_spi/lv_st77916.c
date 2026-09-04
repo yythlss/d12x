@@ -12,7 +12,7 @@
 #ifdef LV_SPI_BUS_WIDTH_1
 #define ST77916_RST_PIN  "PE.11"
 
-void lv_spi_panel_enable(struct lv_spi_dev *dev)
+static void lv_spi_panel(struct lv_spi_dev *dev)
 {
     u32 rst_pin;
 
@@ -226,6 +226,8 @@ void lv_spi_panel_enable(struct lv_spi_dev *dev)
 #endif
 
 #ifdef LV_SPI_BUS_WIDTH_4
+#define ST77916_RST_PIN  "PD.10"
+
 static const struct qspi_disp_priv st77916 = {
     .instruction = {
         .cmd_content = 0x02002C00,
@@ -235,13 +237,21 @@ static const struct qspi_disp_priv st77916 = {
     .data_lines = 4,
 };
 
-struct qspi_cfg qspi = {
+struct qspi_cfg qspi_st77916 = {
     .disp_mode = false,
     .priv = &st77916,
 };
 
-void lv_spi_panel_enable(struct lv_spi_dev *dev)
+static void lv_spi_panel(struct lv_spi_dev *dev)
 {
+    u32 rst_pin;
+
+    rst_pin = rt_pin_get(ST77916_RST_PIN);
+    rt_pin_mode(rst_pin, PIN_MODE_OUTPUT);
+
+    rt_pin_write(rst_pin, 1);
+    rt_thread_mdelay(80);
+
     lv_spi_write_seq(dev, 0xF0, 0x28);
     lv_spi_write_seq(dev, 0xF2, 0x28);
     lv_spi_write_seq(dev, 0x73, 0xF0);
@@ -435,3 +445,13 @@ void lv_spi_panel_enable(struct lv_spi_dev *dev)
     lv_spi_write_seq(dev, 0x29);
 }
 #endif
+
+struct lv_spi_panel_driver lv_spi_st77916 = {
+    .name = "st77916",
+    .enable = lv_spi_panel,
+    .width = 360,
+    .height = 360,
+#if defined(LV_SPI_BUS_WIDTH_4)
+    .qspi_cfg = &qspi_st77916,
+#endif
+};

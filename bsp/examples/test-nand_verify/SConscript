@@ -1,0 +1,15 @@
+Import('AIC_ROOT')
+Import('PRJ_KERNEL')
+from building import *
+
+cwd = GetCurrentDir()
+src = []
+CPPPATH = [cwd]
+
+if GetDepend('AIC_NAND_VERIFY') and GetDepend('RT_USING_FINSH'):
+    src += Glob('nand_verify_core.c')
+    src += Glob('nand_verify_cmd.c')
+
+group = DefineGroup('test-nand_verify', src, depend = [''], CPPPATH = CPPPATH)
+
+Return('group')

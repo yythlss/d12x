@@ -601,6 +601,12 @@ irqreturn_t hal_dma_irq(int irq, void *arg)
             if ((!chan->used) || !(status & chan->irq_type))
                 continue;
 
+            /* Only trigger callback on completion interrupt */
+            if (!(status & DMA_IRQ_TASK_DONE)) {
+                pr_err("DMA ch%d unexpected irq, status: 0x%x\n", j, status);
+                continue;
+            }
+
             cb = chan->callback;
             cb_data = chan->callback_param;
             if (cb)
@@ -663,7 +669,7 @@ int hal_dma_chan_prep_memcpy(struct aic_dma_chan *chan,
 {
     u32 mem_id, mem_width;
     struct aic_dma_task *task;
-
+    struct aic_dma_task *prev = NULL;
     CHECK_PARAM(chan != NULL && len != 0 && len < MAX_LEN, -EINVAL);
 
     // CHECK_PARAM((p_dest%AIC_DMA_ALIGN_SIZE) == 0 && (p_src%AIC_DMA_ALIGN_SIZE) == 0, -EINVAL);
@@ -693,7 +699,13 @@ int hal_dma_chan_prep_memcpy(struct aic_dma_chan *chan,
     aicos_dcache_clean_range((void *)(unsigned long)task->src, task->len);
     aicos_dcache_clean_invalid_range((void *)(unsigned long)task->dst, task->len);
 
-    aic_dma_task_add(NULL, task, chan);
+    prev = chan->desc;
+    if (prev != NULL) {
+        while (prev->v_next != NULL) {
+            prev = prev->v_next;
+        }
+    }
+    aic_dma_task_add(prev, task, chan);
 
 #ifdef AIC_DMA_DRV_DEBUG
     hal_dma_task_dump(chan);

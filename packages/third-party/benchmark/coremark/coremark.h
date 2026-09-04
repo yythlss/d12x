@@ -55,6 +55,8 @@ Original Author: Shay Gal-on
 #endif
 #endif
 
+#define CPU_FREQ    (long)(AIC_CLK_CPU_FREQ / 1000000)
+
 /* Actual benchmark execution in iterate */
 void *iterate(void *pres);
 

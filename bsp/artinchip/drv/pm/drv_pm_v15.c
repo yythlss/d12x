@@ -69,7 +69,7 @@ void aic_pm_enter_light_sleep(void)
     *(volatile uint32_t *)(SYSCFG_BASE + 0x408) &= ~(1U << 0);
     /* disable the XTAL */
     val = readl(CMU_BASE + PLL_IN_REG);
-    val &= ~(1 << 29);
+    val &= ~(7 << 29);
     writel((0xA1C << 20) | PLL_IN_REG, cmu_reg(0xFE8));
     aic_mdelay(1);
     writel(val, CMU_BASE + PLL_IN_REG);
@@ -83,7 +83,7 @@ void aic_pm_enter_light_sleep(void)
     /* wakeup flow */
     /* enable the XTAL */
     val = readl(CMU_BASE + PLL_IN_REG);
-    val |= (1 << 29);
+    val |= (7 << 29);
     writel((0xA1C << 20) | PLL_IN_REG, cmu_reg(0xFE8));
     aic_mdelay(1);
     writel(val, CMU_BASE + PLL_IN_REG);
@@ -204,23 +204,28 @@ static void aic_run(struct rt_pm *pm, rt_uint8_t mode)
     switch(mode)
     {
     case PM_RUN_MODE_HIGH_SPEED: /* 480MHz */
-    case PM_RUN_MODE_NORMAL_SPEED:
         hal_clk_set_parent(CLK_CPU, CLK_PLL_INT0);
         hal_clk_set_freq(CLK_PLL_INT0, 480000000);
         break;
 
-    case PM_RUN_MODE_MEDIUM_SPEED: /* 240Mhz */
+    case PM_RUN_MODE_NORMAL_SPEED: /* 240MHz */
         hal_clk_set_parent(CLK_CPU, CLK_PLL_INT0);
         hal_clk_set_freq(CLK_PLL_INT0, 240000000);
         break;
 
-    case PM_RUN_MODE_LOW_SPEED: /* 24Mhz */
+    case PM_RUN_MODE_MEDIUM_SPEED: /* 160MHz */
+        hal_clk_set_parent(CLK_CPU, CLK_PLL_INT0);
+        hal_clk_set_freq(CLK_PLL_INT0, 160000000);
+        break;
+
+    case PM_RUN_MODE_LOW_SPEED: /* 24MHz */
         hal_clk_set_parent(CLK_CPU, CLK_OSC24M);
         break;
 
     default:
         return;
     }
+    prev_mode = mode;
 }
 
 /* timeout unit is rt_tick_t, but MTIMECMPH/L unit is HZ

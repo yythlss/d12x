@@ -303,7 +303,8 @@ int hal_cap_get(u32 ch)
 
 int hal_cap_get_clk_rate()
 {
-#if defined (AIC_HRTIMER_DRV_V10) || defined (AIC_CAP_DRV_V10) || defined (AIC_CAP_DRV_V12)
+#if defined (AIC_HRTIMER_DRV_V10) || defined (AIC_CAP_DRV_V10) \
+    || defined (AIC_CAP_DRV_V12) || defined (AIC_HRTIMER_DRV_V12)
     return hal_clk_get_freq(CLK_PWMCS);
 #elif defined (AIC_HRTIMER_DRV_V11) || defined (AIC_CAP_DRV_V11)
     return hal_clk_get_freq(CLK_PWMCS_SDFM);
@@ -321,7 +322,8 @@ int hal_cap_init(void)
         hal_log_debug("PWMCS was already inited\n");
         return 0;
     }
-#if defined (AIC_HRTIMER_DRV_V10) || defined (AIC_CAP_DRV_V10) || defined (AIC_CAP_DRV_V12)
+#if defined (AIC_HRTIMER_DRV_V10) || defined (AIC_CAP_DRV_V10) \
+    || defined (AIC_CAP_DRV_V12) || defined (AIC_HRTIMER_DRV_V12)
     u32 clk_id = CLK_PWMCS;
 #elif defined (AIC_HRTIMER_DRV_V11) || defined (AIC_CAP_DRV_V11)
     u32 clk_id = CLK_PWMCS_SDFM;

@@ -642,14 +642,6 @@ config AIC_MTOP_DRV
     bool
     default n
 
-config AIC_MTOP_DRV_V10
-    bool
-    default y if AIC_MTOP_DRV
-
-config AIC_MTOP_DRV_VER
-    string
-    default "10" if AIC_MTOP_DRV_V10
-
 #--------------------------------------------
 # CAN driver global option
 #--------------------------------------------

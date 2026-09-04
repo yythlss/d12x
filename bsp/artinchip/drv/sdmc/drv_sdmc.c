@@ -290,6 +290,7 @@ static void aic_sdmc_request(struct rt_mmcsd_host *rthost,
 
     if (i == retry) {
         LOG_W("CMD%d done timeout.\n", cmd->cmd_code);
+        hal_sdmc_soft_reset(&host->host);
         cmd->err = -RT_ETIMEOUT;
         goto out;
     }
@@ -314,11 +315,21 @@ static void aic_sdmc_request(struct rt_mmcsd_host *rthost,
     if (data) {
 #ifndef AIC_SDMC_IRQ_MODE
         aic_sdmc_data_transfer(host, data);
-        if (!(host->fifo_mode))
-            hal_sdmc_idma_stop(&host->host, &bbstate,
-                               data->flags == DATA_DIR_READ);
+        if (!(host->fifo_mode)) {
+            ret = hal_sdmc_idma_stop(&host->host, &bbstate, data->flags == DATA_DIR_READ);
+            if (ret < 0) {
+                hal_sdmc_soft_reset(&host->host);
+                data->err = -RT_ETIMEOUT;
+                goto out;
+            }
+        }
 #else
-        hal_sdmc_idma_stop(&host->host, &bbstate,data->flags == DATA_DIR_READ);
+        ret = hal_sdmc_idma_stop(&host->host, &bbstate, data->flags == DATA_DIR_READ);
+        if (ret < 0) {
+            hal_sdmc_soft_reset(&host->host);
+            data->err = -RT_ETIMEOUT;
+            goto out;
+        }
 #endif
     }
 

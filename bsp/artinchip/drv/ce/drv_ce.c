@@ -87,6 +87,22 @@ static u32 select_opsize(u32 opsize)
         return 0xFF;
     }
 }
+
+static u32 ce_cacheline_align_up(u32 len)
+{
+    return (len + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1);
+}
+
+static s32 ce_cacheline_aligned(const void *addr)
+{
+    return ((uintptr_t)addr & (CACHE_LINE_SIZE - 1)) == 0;
+}
+
+static s32 ce_dma_output_safe(const void *addr, u32 len)
+{
+    return ce_cacheline_aligned(addr) && (len & (CACHE_LINE_SIZE - 1)) == 0;
+}
+
 rt_err_t drv_aes_init(struct rt_hwcrypto_ctx *ctx)
 {
     rt_err_t res = RT_EOK;
@@ -144,6 +160,7 @@ static s32 aes_ecb_crypto(u8 *key, u8 keylen, u8 dir, u8 *in, u8 *out, u32 len)
         task.data.out_len = bytelen;
 
         aicos_dcache_clean_range((void *)(unsigned long)&task, sizeof(task));
+        aicos_dcache_invalid_range((void *)(unsigned long)pout, bytelen);
         hal_crypto_start_symm(&task);
 
         if (hal_crypto_poll_finish(ALG_SK_ACCELERATOR, timeout)) {
@@ -157,7 +174,6 @@ static s32 aes_ecb_crypto(u8 *key, u8 keylen, u8 dir, u8 *in, u8 *out, u32 len)
             return -RT_ERROR;
         }
         aicos_dma_sync();
-        aicos_dcache_invalid_range((void *)(unsigned long)pout, bytelen);
 
         remain -= bytelen;
         pin += bytelen;
@@ -208,6 +224,7 @@ static s32 aes_cbc_crypto(u8 *key, u8 keylen, u8 dir, u8 *iv, u8 *in, u8 *out,
         task.data.out_len = bytelen;
 
         aicos_dcache_clean_range((void *)(uintptr_t)&task, sizeof(task));
+        aicos_dcache_invalid_range((void *)(unsigned long)pout, bytelen);
         hal_crypto_start_symm(&task);
 
         if (hal_crypto_poll_finish(ALG_SK_ACCELERATOR, timeout)) {
@@ -221,9 +238,6 @@ static s32 aes_cbc_crypto(u8 *key, u8 keylen, u8 dir, u8 *iv, u8 *in, u8 *out,
             return -RT_ERROR;
         }
         aicos_dma_sync();
-        writel(0xA0, 0x19030FFCUL);
-        aicos_dcache_invalid_range((void *)(unsigned long)pout, bytelen);
-        writel(0xA1, 0x19030FFCUL);
         /* prepare iv for next */
         if (bytelen >= AES_BLOCK_SIZE) {
             if (dir == ALG_DIR_ENCRYPT)
@@ -433,6 +447,7 @@ rt_err_t drv_sha_update(aic_sha_context_t *context, const void *input,
 
         aicos_dcache_clean_range((void *)(uintptr_t)&task,
                                  sizeof(struct crypto_task));
+        aicos_dcache_invalid_range((void *)(uintptr_t)out, SHA_MAX_OUTPUT_LEN);
         hal_crypto_start_hash(&task);
 
         if (hal_crypto_poll_finish(ALG_HASH_ACCELERATOR, timeout)) {
@@ -447,7 +462,6 @@ rt_err_t drv_sha_update(aic_sha_context_t *context, const void *input,
         }
 
         aicos_dma_sync();
-        aicos_dcache_invalid_range((void *)(uintptr_t)out, SHA_MAX_OUTPUT_LEN);
 
         remain -= bytelen;
         p += bytelen;
@@ -515,6 +529,7 @@ rt_err_t drv_sha_finish(struct hwcrypto_hash *ctx, void *output,
 
     aicos_dcache_clean_range((void *)(unsigned long)&task,
                              sizeof(struct crypto_task));
+    aicos_dcache_invalid_range((void *)(unsigned long)out, SHA_MAX_OUTPUT_LEN);
     hal_crypto_start_hash(&task);
 
     if (hal_crypto_poll_finish(ALG_HASH_ACCELERATOR, timeout)) {
@@ -528,7 +543,6 @@ rt_err_t drv_sha_finish(struct hwcrypto_hash *ctx, void *output,
         return -RT_ERROR;
     }
     aicos_dma_sync();
-    aicos_dcache_invalid_range((void *)(unsigned long)out, SHA_MAX_OUTPUT_LEN);
     memcpy(output, out, priv->digest_len);
 
     *out_size = priv->digest_len;
@@ -542,6 +556,7 @@ rt_err_t drv_sha_finish(struct hwcrypto_hash *ctx, void *output,
 static rt_err_t drv_aes_crypt(struct hwcrypto_symmetric *symmetric_ctx,
                               struct hwcrypto_symmetric_info *symmetric_info)
 {
+    rt_err_t ret = RT_EOK;
     struct aic_hwcrypto_device *hwcrypto =
         (struct aic_hwcrypto_device *)symmetric_ctx->parent.device;
     hwcrypto_mode mode;
@@ -568,33 +583,35 @@ static rt_err_t drv_aes_crypt(struct hwcrypto_symmetric *symmetric_ctx,
     dlen = symmetric_info->length;
 
 #if !defined(AIC_HWCRYPTO_NOT_ALIGN_CHECK)
-    if (((rt_uint32_t)(uintptr_t)in % CACHE_LINE_SIZE) != 0 ||
-        ((rt_uint32_t)(uintptr_t)out % CACHE_LINE_SIZE) != 0) {
-        in = aicos_malloc_align(0, symmetric_info->length, CACHE_LINE_SIZE);
+    if (!ce_cacheline_aligned(in) || !ce_dma_output_safe(out, dlen)) {
+        in = aicos_malloc_align(0, ce_cacheline_align_up(dlen), CACHE_LINE_SIZE);
         if (in) {
             memcpy(in, symmetric_info->in, symmetric_info->length);
             out = in;
             data_align_flag = 1;
         } else {
-            return -RT_ENOMEM;
+            ret = -RT_ENOMEM;
+            goto out;
         }
     }
-    if (((rt_uint32_t)(uintptr_t)key % CACHE_LINE_SIZE) != 0) {
+    if (!ce_cacheline_aligned(key)) {
         key = aicos_malloc_align(0, klen, CACHE_LINE_SIZE);
         if (key) {
             memcpy(key, symmetric_ctx->key, klen);
             key_align_flag = 1;
         } else {
-            return -RT_ENOMEM;
+            ret = -RT_ENOMEM;
+            goto out;
         }
     }
-    if (((rt_uint32_t)(uintptr_t)iv % CACHE_LINE_SIZE) != 0) {
-        iv = aicos_malloc_align(0, ivlen, CACHE_LINE_SIZE);
+    if (!ce_cacheline_aligned(iv) || (ivlen & (CACHE_LINE_SIZE - 1)) != 0) {
+        iv = aicos_malloc_align(0, ce_cacheline_align_up(ivlen), CACHE_LINE_SIZE);
         if (iv) {
             memcpy(iv, symmetric_ctx->iv, ivlen);
             iv_align_flag = 1;
         } else {
-            return -RT_ENOMEM;
+            ret = -RT_ENOMEM;
+            goto out;
         }
     }
 #endif
@@ -607,33 +624,38 @@ static rt_err_t drv_aes_crypt(struct hwcrypto_symmetric *symmetric_ctx,
     switch (symmetric_ctx->parent.type &
             (HWCRYPTO_MAIN_TYPE_MASK | HWCRYPTO_SUB_TYPE_MASK)) {
         case HWCRYPTO_TYPE_AES_ECB:
-            aes_ecb_crypto(key, klen, mode, in, out, dlen);
+            ret = aes_ecb_crypto(key, klen, mode, in, out, dlen);
             break;
         case HWCRYPTO_TYPE_AES_CBC:
-            aes_cbc_crypto(key, klen, mode, iv, in, out, dlen);
+            ret = aes_cbc_crypto(key, klen, mode, iv, in, out, dlen);
             break;
         case HWCRYPTO_TYPE_AES_CTR:
             break;
         default:
-            return -RT_ERROR;
+            ret = -RT_ERROR;
+            break;
     }
 #if !defined(AIC_HWCRYPTO_NOT_LOCK)
     rt_mutex_release(&hwcrypto->mutex);
 #endif
 #if !defined(AIC_HWCRYPTO_NOT_ALIGN_CHECK)
+out:
     if (data_align_flag) {
-        memcpy(symmetric_info->out, out, symmetric_info->length);
+        if (ret == RT_EOK) {
+            memcpy(symmetric_info->out, out, symmetric_info->length);
+        }
         aicos_free_align(0, in);
     }
     if (key_align_flag) {
         aicos_free_align(0, key);
     }
     if (iv_align_flag) {
+        memcpy(symmetric_ctx->iv, iv, ivlen);
         aicos_free_align(0, iv);
     }
 #endif
 
-    return RT_EOK;
+    return ret;
 }
 
 static rt_err_t drv_hash_update(struct hwcrypto_hash *ctx, const rt_uint8_t *in,
@@ -808,6 +830,7 @@ static s32 rsa_calc(void *mod, void *prime, void *src, u32 mod_size, u32 prime_s
 
     aicos_dcache_clean_range((void *)(unsigned long)pp, CE_WORK_BUF_LEN);
     aicos_dcache_clean_range((void *)(unsigned long)&task, sizeof(task));
+    aicos_dcache_invalid_range((void *)(unsigned long)pout, opsize);
 
     hal_crypto_start_asym(&task);
 
@@ -825,7 +848,6 @@ static s32 rsa_calc(void *mod, void *prime, void *src, u32 mod_size, u32 prime_s
     }
 
     aicos_dma_sync();
-    aicos_dcache_invalid_range((void *)(unsigned long)pout, opsize);
     memcpy(out, pout, opsize);
 
 out:

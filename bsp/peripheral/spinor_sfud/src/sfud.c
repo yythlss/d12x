@@ -30,6 +30,7 @@
 #include "../inc/sfud.h"
 #include "sfud_qe.h"
 #include <string.h>
+#include <inttypes.h>
 #include "sfud_private.h"
 
 /* send dummy data for read data */
@@ -94,6 +95,22 @@ sfud_err sfud_device_init(sfud_flash *flash) {
         result = software_init(flash);
     }
 
+#if defined(AIC_SPIENC_DRV)
+    if (result == SFUD_SUCCESS) {
+        /* Enable SPIENC */
+        uint32_t bus_id;
+
+        result = flash->spi.get_bus_id(&flash->spi, &bus_id);
+        if (result == SFUD_SUCCESS) {
+            pr_info("init %d spienc...\n", (unsigned int)bus_id);
+            if (spienc_init() != 0) {
+                pr_err("spienc init failed.\n");
+                result = SFUD_ERR_NOT_FOUND;
+            }
+        }
+    }
+#endif
+
     if (result == SFUD_SUCCESS) {
         flash->init_ok = true;
         SFUD_INFO("%s flash device initialized successfully.", flash->name);
@@ -101,20 +118,6 @@ sfud_err sfud_device_init(sfud_flash *flash) {
         flash->init_ok = false;
         SFUD_INFO("Error: %s flash device initialization failed.", flash->name);
     }
-
-#if defined(AIC_SPIENC_DRV)
-    /* Enable SPIENC */
-    uint32_t bus_id;
-
-    result = flash->spi.get_bus_id(&flash->spi, &bus_id);
-    if (result)
-        return result;
-    pr_info("init %d spienc...\n", (unsigned int)bus_id);
-    if (spienc_init() != 0) {
-        pr_err("spienc init failed.\n");
-        return -1;
-    }
-#endif
 
     return result;
 }
@@ -342,12 +345,12 @@ static sfud_err sfud_check_flash(sfud_flash *flash) {
         /* print manufacturer and flash chip name */
         SFUD_INFO("Flash ID: 0x%02x%02x%02x", flash->chip.mf_id, flash->chip.type_id, flash->chip.capacity_id);
         if (flash_mf_name && flash->chip.name) {
-            SFUD_INFO("Find a %s %s flash chip. Size is %ld bytes.", flash_mf_name, flash->chip.name,
+            SFUD_INFO("Find a %s %s flash chip. Size is %" PRIu32 " bytes.", flash_mf_name, flash->chip.name,
                     flash->chip.capacity);
         } else if (flash_mf_name) {
-            SFUD_INFO("Find a %s flash chip. Size is %ld bytes.", flash_mf_name, flash->chip.capacity);
+            SFUD_INFO("Find a %s flash chip. Size is %" PRIu32 " bytes.", flash_mf_name, flash->chip.capacity);
         } else {
-            SFUD_INFO("Find a flash chip. Size is %ld bytes.", flash->chip.capacity);
+            SFUD_INFO("Find a flash chip. Size is %" PRIu32 " bytes.", flash->chip.capacity);
         }
     }
 
@@ -529,6 +532,11 @@ sfud_err sfud_read(const sfud_flash *flash, uint32_t addr, size_t size, uint8_t 
     }
 
     result = wait_busy(flash, SFUD_CHECK_BUSY_TIMEOUT);
+    if (result != SFUD_SUCCESS) {
+        if (spi->unlock)
+            spi->unlock(spi);
+        return result;
+    }
 
     /* Default to use user's data buffer */
     copy_flag = 0;
@@ -973,6 +981,8 @@ sfud_err sfud_write(const sfud_flash *flash, uint32_t addr, size_t size, const u
         result = aai_write(flash, addr, size, data);
     } else if (flash->chip.write_mode & SFUD_WM_DUAL_BUFFER) {
         //TODO dual-buffer write mode
+        SFUD_INFO("Error: Dual-buffer write mode is not supported.");
+        result = SFUD_ERR_WRITE;
     }
 
     return result;
@@ -1268,7 +1278,7 @@ sfud_err sfud_write_status_ext(const sfud_flash *flash, bool is_volatile, uint8_
                 break;
             default:
                 SFUD_INFO("Error: unsupport reg: 0x%x.", reg);
-                return -SFUD_ERR_NOT_FOUND;
+                return SFUD_ERR_NOT_FOUND;
         }
         cmd_data[1] = stsval;
         result = spi->wr(spi, cmd_data, 2, NULL, 0);
@@ -1373,7 +1383,7 @@ static sfud_err auto_set_rx_delay_mode(sfud_flash *flash) {
             flash->spi.set_rx_delay(&flash->spi, mode);
     }
 
-    return -SFUD_ERR_NOT_FOUND;
+    return SFUD_ERR_NOT_FOUND;
 }
 
 #ifdef SFUD_USING_SECURITY_REGISTER
@@ -1406,14 +1416,20 @@ sfud_err sfud_read_secur(const sfud_flash *flash, uint8_t reg, uint8_t *data)
     const sfud_spi *spi = &flash->spi;
     uint8_t cmd_data[6], cmd_size;
 
+    SFUD_ASSERT(flash);
+    /* must be call this function after initialize OK */
+    SFUD_ASSERT(flash->init_ok);
     /* lock SPI */
     if (spi->lock) {
         spi->lock(spi);
     }
 
     result = wait_busy(flash, SFUD_CHECK_BUSY_TIMEOUT);
-    if (result)
+    if (result) {
+        if (spi->unlock)
+            spi->unlock(spi);
         return result;
+    }
 
     cmd_data[0] = SFUD_CMD_READ_SECURITY_REGISTER;
     make_secur_adress_array(flash, reg, &cmd_data[1]);

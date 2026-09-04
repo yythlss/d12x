@@ -21,6 +21,7 @@
 #include "mpp_log.h"
 #include "mpp_list.h"
 #include "mpp_mem.h"
+#include "mpp_thread.h"
 #include "aic_message.h"
 #include "mpp_decoder.h"
 #include "mpp_dec_type.h"
@@ -56,7 +57,7 @@ typedef struct mm_adec_data {
     enum aic_audio_codec_type code_type;
     mm_audio_param_port_format audio_format;
 
-    pthread_t thread_id;
+    mpp_thread_t thread_handle;
     pthread_t decode_thread_id;
     struct aic_message_queue s_msg;
 
@@ -78,7 +79,7 @@ typedef struct mm_adec_data {
 
 static void mm_adec_event_notify(mm_adec_data *p_adec_data, MM_EVENT_TYPE event,
                                  u32 data1, u32 data2, void *p_event_data);
-static void *mm_adec_component_thread(void *p_thread_data);
+static void mm_adec_component_thread(void *p_thread_data);
 static void mm_adec_show_debug_info(mm_adec_data *p_adec_data);
 
 static s32 mm_adec_send_command(mm_handle h_component, MM_COMMAND_TYPE cmd,
@@ -475,7 +476,7 @@ s32 mm_adec_component_deinit(mm_handle h_component)
     s_msg.message_id = MM_COMMAND_STOP;
     s_msg.data_size = 0;
     aic_msg_put(&p_adec_data->s_msg, &s_msg);
-    pthread_join(p_adec_data->thread_id, (void *)&error);
+    mpp_thread_delete(p_adec_data->thread_handle);
     pthread_mutex_destroy(&p_adec_data->in_pkt_lock);
     pthread_mutex_destroy(&p_adec_data->out_frame_lock);
     pthread_mutex_destroy(&p_adec_data->state_lock);
@@ -494,36 +495,16 @@ s32 mm_adec_component_deinit(mm_handle h_component)
     return error;
 }
 
-static int adc_thread_attr_init(pthread_attr_t *attr)
-{
-    // default stack size is 2K, it is not enough for decode thread
-    if (attr == NULL) {
-        return EINVAL;
-    }
-    pthread_attr_init(attr);
-#ifdef AIC_MPP_AAC_DEC
-    attr->stacksize = 64 * 1024;
-#else
-    attr->stacksize = 32 * 1024;
-#endif
-    attr->schedparam.sched_priority = MM_COMPONENT_ADEC_THREAD_PRIORITY;
-    return 0;
-}
-
 s32 mm_adec_component_init(mm_handle h_component)
 {
     mm_component *p_comp;
     mm_adec_data *p_adec_data;
     s32 error = MM_ERROR_NONE;
-    u32 err;
 
     s8 msg_create = 0;
     s8 in_pkt_lock_init = 0;
     s8 out_frame_lock_init = 0;
     s8 sate_lock_init = 0;
-
-    pthread_attr_t attr;
-    adc_thread_attr_init(&attr);
 
     logw("mm_adec_component_init....\n");
 
@@ -594,10 +575,17 @@ s32 mm_adec_component_init(mm_handle h_component)
     }
     sate_lock_init = 1;
 
-    err = pthread_create(&p_adec_data->thread_id, &attr,
-                         mm_adec_component_thread, p_adec_data);
-    if (err) {
-        loge("pthread_create fail!\n");
+#ifdef AIC_MPP_AAC_DEC
+    p_adec_data->thread_handle = mpp_thread_create("adec", 64 * 1024,
+                                               MM_COMPONENT_ADEC_THREAD_PRIORITY,
+                                               mm_adec_component_thread, p_adec_data);
+#else
+    p_adec_data->thread_handle = mpp_thread_create("adec", 32 * 1024,
+                                               MM_COMPONENT_ADEC_THREAD_PRIORITY,
+                                               mm_adec_component_thread, p_adec_data);
+#endif
+    if (!p_adec_data->thread_handle) {
+        loge("mpp_thread_create adec comp thread fail!\n");
         error = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
@@ -607,10 +595,10 @@ s32 mm_adec_component_init(mm_handle h_component)
 
 _EXIT:
 
-    if (out_frame_lock_init) {
+    if (in_pkt_lock_init) {
         pthread_mutex_destroy(&p_adec_data->in_pkt_lock);
     }
-    if (in_pkt_lock_init) {
+    if (out_frame_lock_init) {
         pthread_mutex_destroy(&p_adec_data->out_frame_lock);
     }
     if (sate_lock_init) {
@@ -802,7 +790,7 @@ static void mm_adec_show_debug_info(mm_adec_data *p_adec_data)
     printf("\nstate: %s\n\n", mm_component_sta_to_str(p_adec_data->state));
 }
 
-static void *mm_adec_component_thread(void *p_thread_data)
+static void mm_adec_component_thread(void *p_thread_data)
 {
     s32 cmd = MM_COMMAND_UNKNOWN;
     mm_adec_data *p_adec_data = (mm_adec_data *)p_thread_data;
@@ -898,5 +886,4 @@ static void *mm_adec_component_thread(void *p_thread_data)
     }
 _EXIT:
     mm_adec_show_debug_info(p_adec_data);
-    return (void *)MM_ERROR_NONE;
 }

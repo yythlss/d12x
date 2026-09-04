@@ -25,12 +25,8 @@ extern "C" {
 struct spinor_blk_device {
     struct mtd_dev *mtd_device;
     struct rt_device_blk_geometry info;
-#ifdef AIC_FATFS_ENABLE_WRITE_IN_SPINOR
-    uint32_t length;
-    uint8_t *buf;
 #ifdef LPKG_USING_LEVELX
     LX_NOR_FLASH    *lx_nor_flash;
-#endif
 #endif
 };
 

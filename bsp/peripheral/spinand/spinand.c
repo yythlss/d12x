@@ -73,6 +73,9 @@ static const struct spinand_manufacturer *spinand_manufacturers[] = {
 #ifdef SPI_NAND_UNIM
     &unim_spinand_manufacturer,
 #endif
+#ifdef SPI_NAND_MK
+    &mk_spinand_manufacturer,
+#endif
 };
 
 #define SPINAND_LIST_NUM \
@@ -361,7 +364,7 @@ int spinand_config_set(struct aic_spinand *flash, u8 mask, u8 val)
 }
 
 static bool spinand_support_regs(u8 reg) {
-    if (reg == REG_BLOCK_LOCK || reg == REG_CFG || reg == REG_STATUS)
+    if (reg == REG_BLOCK_LOCK || reg == REG_CFG || reg == REG_STATUS || reg == REG_FEATURE2)
         return true;
 
     return false;

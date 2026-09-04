@@ -164,6 +164,9 @@ def aic_create_two_flash_parts_json_legacy(cfg, media_type, part_type):
         nftl = nftl[0:-1]
         json_fields.append("\t\t\"nftl\" : \"{}\"".format(nftl))
 
+    # Deduplicate part_type and add to fields
+    unique_part_types = list(dict.fromkeys(part_type))
+    json_fields.append('\t\t"type": {}'.format(str(unique_part_types).replace("'", '"')))
     # Join fields with comma and newline
     part_str += ",\n".join(json_fields) + "\n"
 

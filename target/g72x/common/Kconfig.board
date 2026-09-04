@@ -103,6 +103,21 @@ if AIC_USING_USB0
             select AIC_USB_HOST_EHCI_DRV
             select AIC_USB_OTG_DRV
     endchoice
+
+    menu "Usb parameter"
+
+    config AIC_USB_RES_CAL
+        hex "USB Calibration Resistance Value"
+        default 0x60
+
+    config AIC_USB_PHY_TXREF
+        hex "USB PHY tx ref tune"
+        default 0x8
+
+    config AIC_USB_TXPREEMPAMP
+        hex "USB PHY Transmitter Pre-Emphasis Current"
+        default 0
+    endmenu
 endif
 
 #---------------------------
@@ -696,6 +711,10 @@ menu "PSRAM parameter"
         hex "Software size in PSRAM"
         range 0 AIC_PSRAM_SIZE
         default 0x100000
+
+    config AIC_PSRAM_SW_EN
+        bool
+        default y if AIC_PSRAM_SW_SIZE > 0
 endmenu
 
 # 3. XIP

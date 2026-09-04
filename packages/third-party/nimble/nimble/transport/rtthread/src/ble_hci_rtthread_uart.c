@@ -117,6 +117,16 @@ static void rtthread_uart_rx_entry(void *parameter)
         if (!rt_mq_recv(&g_rx_mq, &size, sizeof(rt_size_t), 10000)) {
             data_len = rt_device_read(g_serial, 0, &data, size);
             if (data_len > 0) {
+                extern rt_mq_t bt_driver_server_queue;
+                if (bt_driver_server_queue) {
+                    uint8_t *raw_copy = malloc(2048);
+                    if (raw_copy) {
+                        memset(raw_copy, 0, 2048);
+                        memcpy(raw_copy, data, data_len);
+                        rt_mq_send(bt_driver_server_queue, raw_copy, 2048);
+                        free(raw_copy);
+                    }
+                }
 #if defined(LPKG_NIMBLE_HCI_H5) // H5
                 hci_h5_sm_rx(&g_hci_h5sm, data, data_len);
 #elif defined(LPKG_NIMBLE_HCI_H4)

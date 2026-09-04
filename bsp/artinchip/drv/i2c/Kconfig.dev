@@ -317,5 +317,11 @@ menu "R_I2C1 Parameter"
 
 endmenu
 
-# common parameter
+menu "I2C Global Config"
+    depends on AIC_I2C_DRV
 
+    config AIC_I2C_INTERRUPT_MODE
+        bool "Support I2C Dev Interrupt Mode"
+        default n
+
+endmenu

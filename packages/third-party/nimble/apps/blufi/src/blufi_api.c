@@ -29,7 +29,7 @@ int blufi_profile_init(void)
     return 0;
 }
 
-int blufi_profie_deinit(void)
+int blufi_profile_deinit(void)
 {
     ble_blufi_call_handler(BLUFI_ACT_DEINIT, NULL);
 

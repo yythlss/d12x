@@ -132,6 +132,7 @@ src_failed:
 void lv_aic_player_set_cmd(lv_obj_t * obj, lv_aic_player_cmd_t cmd, void *data)
 {
     lv_aic_player_t * player = (lv_aic_player_t *)obj;
+    uint8_t display_area_reset = true;
 
     if (!obj || !player->ctx || !player->timer || lv_player_is_slave(obj))
         return;
@@ -140,6 +141,7 @@ void lv_aic_player_set_cmd(lv_obj_t * obj, lv_aic_player_cmd_t cmd, void *data)
     case LV_AIC_PLAYER_CMD_START:
         player_backend_control(player->ctx, PLAYER_CMD_START, data);
         player_backend_control(player->ctx, PLAYER_CMD_GET_FRAME, NULL);
+        player_backend_control(player->ctx, PLAYER_CMD_UPDATE_DISPLAY_AREA, &display_area_reset);
         lv_timer_resume(player->timer);
         break;
     case LV_AIC_PLAYER_CMD_STOP:
@@ -764,6 +766,8 @@ int32_t lv_aic_player_get_scale_x(lv_obj_t * obj)
     return 0;
 #elif LVGL_VERSION_MAJOR == 9
     return lv_image_get_scale_x(obj);
+#else
+    return 0;
 #endif
 }
 
@@ -774,6 +778,8 @@ int32_t lv_aic_player_get_scale_y(lv_obj_t * obj)
     return 0;
 #elif LVGL_VERSION_MAJOR == 9
     return lv_image_get_scale_y(obj);
+#else
+    return 0;
 #endif
 }
 

@@ -64,7 +64,7 @@ void lv_qspi_disp_mode_init(struct lv_spi_dev *spi_dev)
     spi_dev->qspi_priv = &st77903;
 }
 
-void lv_spi_panel_enable(struct lv_spi_dev *dev)
+static void lv_spi_panel(struct lv_spi_dev *dev)
 {
     u32 rst_pin;
 
@@ -119,3 +119,10 @@ void lv_spi_panel_enable(struct lv_spi_dev *dev)
     lv_spi_write_seq(dev, 0x29);
     rt_thread_mdelay(120);
 }
+
+struct lv_spi_panel_driver lv_spi_st77903 = {
+    .name = "st77903",
+    .enable = lv_spi_panel,
+    .width = 240,
+    .height = 320,
+};

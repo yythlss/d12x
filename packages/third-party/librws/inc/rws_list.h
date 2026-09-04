@@ -47,4 +47,6 @@ void rws_list_delete_clean(_rws_list **list);
 
 void rws_list_append(_rws_list *list, _rws_node_value value);
 
+void rws_list_add(_rws_list *list, _rws_list *node);
+
 #endif

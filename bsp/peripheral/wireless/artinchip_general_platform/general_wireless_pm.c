@@ -83,7 +83,7 @@ int aic_wlan_pm_free_device()
     }
 
     device = (struct rt_wlan_device *)rt_device_find(RT_WLAN_DEVICE_STA_NAME);
-    if (device == RT_NULL){
+    if (device == RT_NULL) {
         return -RT_EIO;
     }
 
@@ -192,10 +192,19 @@ static void _wlan_pm_resume_deferred(struct rt_work *work, void *work_data)
  */
 static int _wlan_pm_suspend(const struct rt_device *device, rt_uint8_t mode)
 {
-    if (mode == PM_SLEEP_MODE_IDLE)
-        return RT_EOK;
-
-    aic_platform_wlan_power_off();
+    switch (mode) {
+    case PM_SLEEP_MODE_IDLE:
+        break;
+    case PM_SLEEP_MODE_LIGHT:
+    case PM_SLEEP_MODE_DEEP:
+    case PM_SLEEP_MODE_STANDBY:
+    case PM_SLEEP_MODE_SHUTDOWN:
+        aic_platform_wlan_power_off();
+        aic_platform_bt_power_off();
+        break;
+    default:
+        break;
+    }
 
     return RT_EOK;
 }
@@ -213,27 +222,35 @@ static int _wlan_pm_suspend(const struct rt_device *device, rt_uint8_t mode)
  */
 static void _wlan_pm_resume(const struct rt_device *device, rt_uint8_t mode)
 {
-    struct rt_mmcsd_host *host;
+    struct rt_mmcsd_host *host = NULL;
 
-    if (mode == PM_SLEEP_MODE_IDLE)
-        return;
+    switch (mode) {
+    case PM_SLEEP_MODE_IDLE:
+        break;
+    case PM_SLEEP_MODE_LIGHT:
+    case PM_SLEEP_MODE_DEEP:
+    case PM_SLEEP_MODE_STANDBY:
+    case PM_SLEEP_MODE_SHUTDOWN:
+        host = aic_sdmc_get_rthost(AIC_WIFI_SDMC_ID);
+        if (!host)
+            break;
 
-    host = aic_sdmc_get_rthost(AIC_WIFI_SDMC_ID);
-    if (!host) {
-        return;
+        aic_platform_wlan_power_on();
+        aic_platform_bt_power_on();
+        aicos_msleep(10);
+
+        /*
+         * Block the idle thread from re-entering sleep before the
+         * workqueue completes deinit + mmcsd_change + card detection.
+         */
+        rt_pm_module_request(PM_POWER_ID, PM_SLEEP_MODE_NONE);
+
+        g_resume_work.work_data = (void *)host;
+        rt_workqueue_submit_work(g_wifi_pm_wq, &g_resume_work, 0);
+        break;
+    default:
+        break;
     }
-
-    aic_platform_wlan_power_on();
-    aicos_msleep(10);
-
-    /*
-     * Block the idle thread from re-entering sleep before the
-     * workqueue completes deinit + mmcsd_change + card detection.
-     */
-    rt_pm_module_request(PM_POWER_ID, PM_SLEEP_MODE_NONE);
-
-    g_resume_work.work_data = (void *)host;
-    rt_workqueue_submit_work(g_wifi_pm_wq, &g_resume_work, 0);
 }
 
 static struct rt_device_pm_ops _wlan_pm_ops =

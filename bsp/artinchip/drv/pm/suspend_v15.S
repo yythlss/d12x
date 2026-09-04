@@ -9,7 +9,6 @@
 #include <aic_soc.h>
 
 #define RTC_WR_KEY            (RTC_BASE + 0x0fc)
-#define RTC_ANALOG3           (RTC_BASE + 0x05c)
 #define RTC_SLEEP_CFG         (RTC_BASE + 0x014)
 #define CMU_GTC               (CMU_BASE + 0x90c)
 #define GTC_CNTVL             (GTC_BASE + 0x008)
@@ -267,15 +266,6 @@ save_context_and_suspend:
 
     fence.i
     fence
-
-    /* psram pad hold configuration */
-    unlock
-    li      t0,   RTC_ANALOG3
-    lw      t1,   0(t0)
-    li      t2,   0x8
-    or      t1,   t1, t2
-    sw      t1,   0(t0)
-    lock
 
     /* system suspend */
     unlock

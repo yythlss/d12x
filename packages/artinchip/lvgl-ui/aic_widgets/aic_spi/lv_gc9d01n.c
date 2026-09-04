@@ -11,7 +11,7 @@
 
 #define GC9D01N_RST_PIN  "PB.11"
 
-void lv_spi_panel_enable(struct lv_spi_dev *dev)
+static void lv_spi_panel(struct lv_spi_dev *dev)
 {
     u32 rst_pin;
 
@@ -76,3 +76,10 @@ void lv_spi_panel_enable(struct lv_spi_dev *dev)
     lv_spi_write_seq(dev, 0x29);
     rt_thread_mdelay(20);
 }
+
+struct lv_spi_panel_driver lv_spi_gc9d01n = {
+    .name = "gc9d01n",
+    .enable = lv_spi_panel,
+    .width = 160,
+    .height = 160,
+};

@@ -43,6 +43,69 @@ struct mmcsd_blk_device
 #define RT_MMCSD_MAX_PARTITION 16
 #endif
 
+#if defined(RT_USING_DFS_MNTTABLE) && defined(AIC_AB_SYSTEM_INTERFACE)
+extern const struct dfs_mount_tbl mount_table[];
+
+static const struct dfs_mount_tbl *mmcsd_find_ab_mount_entry(const char *logical_name,
+                                                             const char *path,
+                                                             const char *part_name,
+                                                             const char *dev_name)
+{
+    int index = 0;
+
+    while (mount_table[index].path != RT_NULL)
+    {
+        const struct dfs_mount_tbl *entry = &mount_table[index];
+
+        if ((entry->device_name != RT_NULL) &&
+            !strncmp(entry->path, path, PARTITION_NAME_MAX) &&
+            (!strncmp(entry->device_name, logical_name, PARTITION_NAME_MAX) ||
+             !strncmp(entry->device_name, part_name, PARTITION_NAME_MAX) ||
+             !strncmp(entry->device_name, dev_name, PARTITION_NAME_MAX)))
+        {
+            return entry;
+        }
+
+        index++;
+    }
+
+    return RT_NULL;
+}
+
+static int mmcsd_mount_ab_partition(struct mmcsd_blk_device *blk_dev,
+                                    const char *logical_name,
+                                    const char *path,
+                                    const char *default_fs,
+                                    unsigned long default_rwflag,
+                                    const void *default_data)
+{
+    const struct dfs_mount_tbl *entry;
+    const char *fs_type = default_fs;
+    unsigned long rwflag = default_rwflag;
+    const void *data = default_data;
+
+    entry = mmcsd_find_ab_mount_entry(logical_name, path, blk_dev->part.name,
+                                      blk_dev->dev.parent.name);
+    if (entry != RT_NULL)
+    {
+        fs_type = entry->filesystemtype;
+        rwflag = entry->rwflag;
+        data = entry->data;
+    }
+
+    if (dfs_mount(blk_dev->dev.parent.name, path, fs_type, rwflag, data) == 0)
+    {
+        LOG_I("mount fs[%s] device[%s] to %s ok.\n",
+              fs_type, blk_dev->dev.parent.name, path);
+        return RT_EOK;
+    }
+
+    LOG_E("mount fs[%s] device[%s] to %s failed.\n",
+          fs_type, blk_dev->dev.parent.name, path);
+    return -RT_ERROR;
+}
+#endif
+
 rt_int32_t mmcsd_num_wr_blocks(struct rt_mmcsd_card *card)
 {
     rt_int32_t err;
@@ -458,6 +521,12 @@ static struct mmcsd_blk_device * rt_mmcsd_create_blkdev(struct rt_mmcsd_card *ca
 
     rt_snprintf(sname, sizeof(sname), "sem_%s", dname);
     blk_dev->part.lock = rt_sem_create(sname, 1, RT_IPC_FLAG_FIFO);
+    if (blk_dev->part.lock == RT_NULL)
+    {
+        LOG_E("mmcsd:create semaphore failed!");
+        rt_free(blk_dev);
+        return RT_NULL;
+    }
 
     blk_dev->max_req_size = BLK_MIN((card->host->max_dma_segs *
                                      card->host->max_seg_size) >> 9,
@@ -487,48 +556,43 @@ static struct mmcsd_blk_device * rt_mmcsd_create_blkdev(struct rt_mmcsd_card *ca
     rt_list_insert_after(&card->blk_devices, &blk_dev->list);
 
 #ifdef RT_USING_DFS_MNTTABLE
-    if ( blk_dev )
-    {
-        LOG_D("Try to mount %s\n", blk_dev->dev.parent.name);
+    LOG_D("Try to mount %s\n", blk_dev->dev.parent.name);
 #ifdef AIC_AB_SYSTEM_INTERFACE
-        rt_int32_t id = 0;
-        char ro_target[32] = { 0 };
-        char rw_target[32] = { 0 };
+    rt_int32_t id = 0;
+    char ro_target[32] = { 0 };
+    char rw_target[32] = { 0 };
 
-        id = (aic_get_boot_device() == BD_SDMC0) ? 0 : 1;
-        /* Check if the current device is a boot device */
-        if (blk_dev->card->host->id == id) {
-            /* Check if the current device partition is rodata */
-            if (!strncmp("rodata", blk_dev->part.name, 6)) {
-                aic_ota_status_update();
-                /* Try to get the rodata device name or partition name from env */
-                aic_get_rodata_to_mount(ro_target);
-                if (!strcmp(ro_target, blk_dev->part.name) ||
-                    !strcmp(ro_target, blk_dev->dev.parent.name)) {
-                    /* Try to mount the rodata device */
-                    if (dfs_mount(blk_dev->dev.parent.name, "/rodata", "elm", MS_RDONLY, 0) == 0)
-                        LOG_I("mount fs[elm] device[%s] to /rodata ok.\n", blk_dev->dev.parent.name);
-                }
-            }
-            /* Check if the current device partition is data */
-            if (!strncmp("data", blk_dev->part.name, 4)) {
-                aic_ota_status_update();
-                /* Try to get the data device name or partition name from env */
-                aic_get_data_to_mount(rw_target);
-                if (!strcmp(rw_target, blk_dev->part.name) ||
-                    !strcmp(rw_target, blk_dev->dev.parent.name)) {
-                    /* Try to mount the data device */
-                    if (dfs_mount(blk_dev->dev.parent.name, "/data", "elm", 0, 0) == 0)
-                        LOG_I("mount fs[elm] device[%s] to /data ok.\n", blk_dev->dev.parent.name);
-                }
+    id = (aic_get_boot_device() == BD_SDMC0) ? 0 : 1;
+    /* Check if the current device is a boot device */
+    if (blk_dev->card->host->id == id) {
+        /* Check if the current device partition is rodata */
+        if (!strncmp("rodata", blk_dev->part.name, 6)) {
+            aic_ota_status_update();
+            /* Try to get the rodata device name or partition name from env */
+            aic_get_rodata_to_mount(ro_target);
+            if (!strncmp(ro_target, blk_dev->part.name, sizeof(ro_target)) ||
+                !strncmp(ro_target, blk_dev->dev.parent.name, sizeof(ro_target))) {
+                /* Try to mount the rodata device */
+                mmcsd_mount_ab_partition(blk_dev, "rodata", "/rodata", "elm", MS_RDONLY, 0);
             }
         }
-#endif
-
-        /* try to mount file system on this block device */
-        dfs_mount_device(&(blk_dev->dev));
+        /* Check if the current device partition is data */
+        if (!strncmp("data", blk_dev->part.name, 4)) {
+            aic_ota_status_update();
+            /* Try to get the data device name or partition name from env */
+            aic_get_data_to_mount(rw_target);
+            if (!strncmp(rw_target, blk_dev->part.name, sizeof(rw_target)) ||
+                !strncmp(rw_target, blk_dev->dev.parent.name, sizeof(rw_target))) {
+                /* Try to mount the data device */
+                mmcsd_mount_ab_partition(blk_dev, "data", "/data", "elm", 0, 0);
+            }
+        }
     }
 #endif
+
+    /* try to mount file system on this block device */
+    dfs_mount_device(&(blk_dev->dev));
+#endif  /* RT_USING_DFS_MNTTABLE */
 
     return blk_dev;
 }
@@ -651,6 +715,9 @@ exit_rt_mmcsd_blk_probe:
 
     /* release sector buffer */
     rt_free(sector);
+
+    if (err)
+        rt_mmcsd_blk_remove(card);
 
     return err;
 }

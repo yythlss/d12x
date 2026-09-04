@@ -284,12 +284,15 @@ choice
         bool "default 4 lane 800x1280"
     config TFT050BP071_DEFAULT
         bool "tft050bp071 2 lane 720"
+    config ILI9881C_04_DEFAULT
+        bool "ili9881c_04 4 lane 800x1280"
 endchoice
 
 config ILI9881C_MATCH_ID
     int
     default 0 if ILI9881C_DEFAULT
     default 1 if TFT050BP071_DEFAULT
+    default 2 if ILI9881C_04_DEFAULT
 
 choice
     prompt "JD9365 Match Table"
@@ -306,6 +309,22 @@ config JD9365_MATCH_ID
     int
     default 0 if JD9365_DEFAULT_800X800
     default 1 if JD9365DA_800X1280
+
+choice
+    prompt "ST7102 Match Table"
+    depends on AIC_PANEL_DSI_ST7102
+    default ST7102_480X800
+
+    config ST7102_480X800
+        bool "480x800"
+    config ST7102_480X960
+        bool "480x960"
+endchoice
+
+config ST7102_MATCH_ID
+    int
+    default 0 if ST7102_480X800
+    default 1 if ST7102_480X960
 
 choice
     prompt "ST7789 Match Table"

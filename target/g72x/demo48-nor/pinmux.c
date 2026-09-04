@@ -17,6 +17,11 @@ struct aic_pinmux aic_pinmux_config[] = {
     {3, PIN_PULL_DIS, 3, "PA.0"},
     {3, PIN_PULL_UP, 3, "PA.1"},
 #endif
+#ifdef AIC_USING_UART0
+    /* uart0 */
+    {5, PIN_PULL_DIS, 3, "PA.0"},
+    {5, PIN_PULL_UP, 3, "PA.1"},
+#endif
 #ifdef AIC_USING_UART1
     /* uart1 */
     {5, PIN_PULL_DIS, 3, "PA.2"},
@@ -28,8 +33,8 @@ struct aic_pinmux aic_pinmux_config[] = {
     {4, PIN_PULL_DIS, 3, "PA.5"},
 #endif
 #ifdef AIC_USING_I2C0
-    {4, PIN_PULL_DIS, 3, "PA.6"},  // SCK
-    {4, PIN_PULL_DIS, 3, "PA.7"},  // SDA
+    {4, PIN_PULL_DIS, 3, "PE.12"},  // SCK
+    {4, PIN_PULL_DIS, 3, "PE.13"},  // SDA
 #endif
 #ifdef AIC_USING_QSPI1
     /* qspi0 */

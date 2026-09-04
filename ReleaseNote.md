@@ -1,4 +1,122 @@
-# V1.3.1.a #
+# V1.3.2 #
+## 新增 ##
+- LVGL：
+  - 新增双摄像头的Demo
+  - SPI屏增加 GC9A01屏幕
+  - 增加 screen ctl Demo
+  - 增加五个SPI屏的Demo
+- MPP:
+  - 新增 recorder_cam 组件
+  - 增加关于线程的封装API
+- D12p:
+  - 支持安全启动
+  - 支持XIP模式可以写Flash
+  - 通过VE实现DVP的旋转显示
+  - 支持温度校准处理
+  - 支持System Heap的自适应扩展
+- D12x: 支持基于 SPIENC 的硬件授权方案
+- Bootloader:
+  - 新增 SD卡升级时的进度条展示
+  - 支持从 4 个 NAND 块加载 SPL
+  - 控制台支持登录认证
+- CMU：支持开启PLL的展频功能
+- DMA：在memcpy时支持任务链
+- I2C: 优化 hold/setup 时间在跨平台的兼容处理
+- SPI：使用IDMA进行数据传输
+- UART: 新增 RS232 模拟 RS485 功能
+- USBD: 支持配置 USB 阻抗与 PHY 参数
+- NAND: 新增一键验证的测试工具
+- LittleFS: 支持 SD/MMC 与 SPI NAND 块设备
+- Finsh: 新增行编辑、单词编辑的快捷键，修正Home键处理
+- Camera：
+  - 支持使用软件模拟的I2C
+  - SC030/031iot：增加Pause/Resume功能
+  - XS9950: 支持运行时切换通道
+  - DVP 1.0：增加一些运行时的统计信息
+- 新增SoC：D121BDV
+- 新增方案：D21x demo132_nand、d126_demo124-mmc、d12p_demo88-nand
+- 新增第三方包：iozone_lite
+- 新增器件：
+  - PANEL: ILI9881C_04、ST7102 480x800
+  - NAND: MKSV1GIL-AE、MKSV4GIL-AE
+  - Camera：BF2072
+- test-uart：增加loopback的测试模式
+- test-i2c：增加loopback的测试模式
+- test-tsen：新增DVFS的Demo
+- Audio：新增 dummy codec 外设
+- WiFi: 新增P2P GO测试工具
+- AIC8800：
+  - 新增BT测试工具
+  - AP模式支持WPA3-SAE认证方式
+- NimeBLE: 新增 stop 命令与重新初始化的处理
+
+##优化##
+- LVGL：优化Image UI Demo中的文件资源管理
+- Bootloader: 优化NFTL写时的CRC判断逻辑
+- D12p：
+  - PSRAM主频提升到252MHz
+  - 优化休眠时的功耗
+  - 完善SPL加密Key的管理
+  - 优化SPI/SDMC的clk配置
+  - 优化WLAN的配置选项
+  - 编译打包：
+  - 优化链接的文件排序处理
+  - 优化UBI FS的兼容处理
+  - 兼容Win7系统的文件路径处理
+  - 优化pre-process的流程
+  - 优化Windows环境打包bin的兼容处理
+- WiFi：优化 PM 休眠/恢复流程
+- DMA：
+  - 优化中断回调的调用逻辑
+  - 完善跨平台的兼容处理
+- SDMC: 优化异常情况下的恢复机制
+- SPI: 优化 DMA 的资源释放管理
+- mtop: 重构代码，精简冗余代码
+- DVP 2.0：
+  - 优化暂停的闪烁问题处理
+  - 优化摄像头的信号兼容处理
+  - OV9281：优化PCLK的配置方式
+- common：优化数据类型的定义语法
+- abdb：优化编译脚本的路径处理
+- Finsh：优化free命令的多线程处理
+- cpu_load：优化线程池的回收处理
+- Benchmark：在log中展示最终的评分
+- librws：优化链接稳定性
+- JY6311：优化初始化流程的异常处理
+- test_dvp：
+  - 显示时支持等比例/全屏缩放
+  - 在未收到摄像头数据时显示黑白色块
+- test_vin: 支持H、V方向的拼接显示模式
+- test_fb：新增参数“-r”可估算显示的帧率
+- test-pm：优化压力测试的处理流程
+
+##修改##
+- LVGL:
+  - 修正某些场景下的图像缩放崩溃问题
+  - 修正某些场景下的图像旋转异常问题
+  - 修复 SPI 屏显示的配置
+- Bootloader: 启动时等待Ctrl+C的延迟支持可配置
+- D12p：
+  - 完善分区表2.0的处理流程
+  - 修正UART控制器的数量
+- D13x-demo88-nand：默认改用LVGL v8
+- 打包：修正双Flash方案的兼容处理
+- G720 demo：打开SC035HGS的配置
+- CE: 修复 AES DMA 的刷Cache流程
+- DVP：调整频率到150MHz
+- HRTimer: 修正跨平台的配置方式
+- Disp：调整AiPQ工具的编译依赖
+- AIC8800：修正D40L/DL的BT模式配置
+- SFUD：修正 32/64 bit的数据格式处理
+- TP2825/9951: 修改 VSYNC 极性为 ACTIVE_LOW
+- FAL: 移除 FatFS的 spinor 写代码
+- XPWM: 提前初始化以修复背光启动失败
+- OneStep: 仅在buildall命令时才执行 checkout 二进制的动作
+- test-i2s：修正多线程时的资源释放处理
+
+
+
+# V1.3.1 #
 ## 新增 ##
 - AiCast: Linux更新到V1.5.1，增强Linux版本兼容性
 - LVGL:v9: 添加RAW_JPEG输出格式

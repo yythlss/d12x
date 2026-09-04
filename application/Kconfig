@@ -60,6 +60,7 @@ config AIC_LITTLEFS_BLOCK_SIZE_FOR_0
     default 4096
 config AIC_LITTLEFS_PAGE_SIZE_FOR_0
     int "Page size"
+    default 512 if LPKG_LITTLEFS_USING_BLOCK_DEVICE
     default 256
 endif
 
@@ -119,6 +120,7 @@ config AIC_LITTLEFS_BLOCK_SIZE_FOR_1
     default 4096
 config AIC_LITTLEFS_PAGE_SIZE_FOR_1
     int "Page size"
+    default 512 if LPKG_LITTLEFS_USING_BLOCK_DEVICE
     default 256
 endif
 
@@ -178,6 +180,7 @@ config AIC_LITTLEFS_BLOCK_SIZE_FOR_2
     default 4096
 config AIC_LITTLEFS_PAGE_SIZE_FOR_2
     int "Page size"
+    default 512 if LPKG_LITTLEFS_USING_BLOCK_DEVICE
     default 256
 endif
 
@@ -290,6 +293,9 @@ if AIC_WIDGETS_DEMO
 
         config AIC_SWIPE_V1_DEMO
            bool "LVGL swipe v1 demo"
+
+        config AIC_LVGL_CAMERA_DUAL_TEST
+           bool "LVGL camera dual channel test"
     endchoice
 endif
 
@@ -339,6 +345,16 @@ config AIC_LVGL_DOUBLE_DISP_DEMO
     select AIC_LVGL_SPI_WIDGET
     select AIC_QSPI_LCD_INTERFACE
 
+config AIC_LVGL_FIVE_DISP_DEMO
+    bool "LVGL five display demo"
+    select AIC_LVGL_SPI_WIDGET
+    select AIC_QSPI_LCD_INTERFACE
+    select LV_SPI_ST77916
+    select LV_SPI_GC9A01
+    select LV_SPI_SCREEN_BUS_WIDTH_1
+    select LV_SPI_SCREEN_BUS_WIDTH_4
+    select LV_USE_SPI_REPLACE_MIPI_DBI
+
 config AIC_SPI_SCREEN_DEMO
     bool "LVGL SPI screen demo"
 
@@ -349,6 +365,7 @@ config AIC_LVGL_OTA_DEMO
 config AIC_LVGL_AI_EYES_DEMO
     bool "LVGL ai eyes demo"
     select AIC_LVGL_SPI_WIDGET
+    select AIC_QSPI_LCD_INTERFACE
 
 endchoice
 
@@ -408,7 +425,7 @@ choice
     default LV_SECOND_ROTATE_0
     depends on LPKG_USING_LVGL
     depends on LV_DISPLAY_ROTATE_EN
-    depends on AIC_LVGL_DOUBLE_DISP_DEMO
+    depends on AIC_LVGL_DOUBLE_DISP_DEMO || AIC_LVGL_FIVE_DISP_DEMO
 
 config LV_SECOND_ROTATE_0
     bool "0"
@@ -589,30 +606,53 @@ if AIC_LVGL_SPI_WIDGET
         bool
         default n
 
-    choice
-        prompt "extend spi controller driver"
-            default LV_SPI_ST77912
+    menu "SPI panel drivers"
 
         config LV_SPI_ST7789
             bool "ST7789"
             select LV_SPI_SCREEN_BUS_WIDTH_1
+
         config LV_SPI_ST77912
             bool "ST77912"
+            default y
             select LV_SPI_SCREEN_BUS_WIDTH_1
+
         config LV_SPI_ST77916
             bool "ST77916"
             select LV_SPI_SCREEN_BUS_WIDTH_1
             select LV_SPI_SCREEN_BUS_WIDTH_4
+
         config LV_SPI_ST77903
             bool "ST77903"
             select LV_SPI_SCREEN_BUS_WIDTH_4
+
         config LV_SPI_GC9D01N
             bool "GC9D01N"
             select LV_SPI_SCREEN_BUS_WIDTH_1
+
+        config LV_SPI_GC9A01
+            bool "GC9A01"
+            default y
+            select LV_SPI_SCREEN_BUS_WIDTH_1
+
         config LV_SPI_AXS15231B
             bool "AXS15231B"
             select LV_SPI_SCREEN_BUS_WIDTH_1
-    endchoice
+    endmenu
+
+    config LV_SPI_PANEL_NAME
+        string "Active LVGL SPI panel name"
+        depends on !AIC_LVGL_FIVE_DISP_DEMO
+        default "st77912"
+
+    config LV_SPI_HALF_RES_RENDER
+        bool "Half-resolution SPI render with GE 2x upscale"
+        default n
+        depends on AIC_LVGL_FIVE_DISP_DEMO
+        help
+          LVGL and direct-blit draw into half-size framebuffers (1/4 memory).
+          disp_thread upscales 2x via GE into the full-size SPI tx buffer.
+          Pre-scale JPG/PNG assets to half panel size for best results.
 
     choice
         prompt "spi bus width"
@@ -626,7 +666,7 @@ if AIC_LVGL_SPI_WIDGET
             depends on LV_SPI_SCREEN_BUS_WIDTH_4
     endchoice
 
-endif # AIC_LVGL_DOUBLE_DISP_DEMO
+endif # AIC_LVGL_SPI_WIDGET
 
 endif # AIC_LVGL_DEMO
 

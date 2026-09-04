@@ -19,9 +19,8 @@
 #define DVP_FIRST_BUF       0
 #define BUF_IS_INVALID(index)   (((index) < 0) || ((index) >= VIN_MAX_BUF_NUM))
 
-struct aic_dvp g_dvp = {0};
-static u32 g_dvp_full_cnt = 0;
-static bool g_dvp_resumed = false;
+static struct aic_dvp g_dvp = {0};
+static volatile bool g_dvp_resumed = false;
 
 static const struct {
     u32 fmt;
@@ -99,6 +98,8 @@ int aic_dvp_set_in_fmt(struct mpp_video_fmt *fmt)
 
     if (fmt->flags & MEDIA_SIGNAL_INTERLACED_MODE)
         cfg->interlaced = 1;
+    else
+        cfg->interlaced = 0;
 
     return 0;
 }
@@ -177,10 +178,45 @@ void aic_dvp_stream_resume(void)
     hal_dvp_enable_int(&g_dvp.cfg, 1);
 }
 
+#ifdef AIC_DVP_NO_SIGNAL_PATTERN
+static void dvp_fill_no_signal_pattern(struct vin_video_buf *vbuf,
+                                       struct aic_dvp_config *cfg)
+{
+    u32 width  = cfg->width;
+    u32 height = cfg->height;
+    u32 block_height = 100;
+    u32 r, c, i, p;
+    u8 *y, *uv;
+
+    if (aic_dvp_sfield_mode())
+        block_height /= 2;
+
+    for (i = 0; i < vbuf->num_buffers; i++) {
+        /* Y plane: checkerboard */
+        y = (u8 *)(ptr_t)vbuf->planes[i * vbuf->num_planes].buf;
+        if (y && vbuf->planes[i * vbuf->num_planes].len) {
+            for (r = 0; r < height; r++)
+                for (c = 0; c < width; c++)
+                    y[r * width + c] = ((r / block_height + c / 100) & 1) ? 0x1C : 0xA1;
+            aicos_dcache_clean_invalid_range(y, vbuf->planes[i * vbuf->num_planes].len);
+        }
+
+        /* UV plane: neutral gray (0x80) */
+        for (p = 1; p < vbuf->num_planes; p++) {
+            uv = (u8 *)(ptr_t)vbuf->planes[i * vbuf->num_planes + p].buf;
+            if (uv && vbuf->planes[i * vbuf->num_planes + p].len) {
+                memset(uv, 0x80, vbuf->planes[i * vbuf->num_planes + p].len);
+                aicos_dcache_clean_invalid_range(uv, vbuf->planes[i * vbuf->num_planes + p].len);
+            }
+        }
+    }
+}
+#endif
+
 int aic_dvp_req_buf(char *buf, u32 size, struct vin_video_buf *vbuf)
 {
     struct aic_dvp_config *cfg = &g_dvp.cfg;
-    int i;
+    int i, ret;
 
     if (!vbuf) {
         pr_err("Invalid parameter\n");
@@ -192,7 +228,14 @@ int aic_dvp_req_buf(char *buf, u32 size, struct vin_video_buf *vbuf)
     for (i = 0; i < DVP_PLANE_NUM; i++)
         vbuf->planes[i].len = cfg->sizeimage[i];
 
-    return vin_vb_req_buf(&g_dvp.queue, buf, size, vbuf);
+    ret = vin_vb_req_buf(&g_dvp.queue, buf, size, vbuf);
+
+#ifdef AIC_DVP_NO_SIGNAL_PATTERN
+    if (!ret)
+        dvp_fill_no_signal_pattern(vbuf, cfg);
+#endif
+
+    return ret;
 }
 
 int aic_dvp_q_buf(u32 index)
@@ -251,6 +294,8 @@ static int aic_dvp_top_field_done(struct aic_dvp *dvp, u32 err)
 {
     struct vb_buffer *cur_buf = NULL;
 
+    dvp->update_cnt++;
+
     if (list_empty(&dvp->active_list)) {
         pr_err("No buf available!\n");
         return 0;
@@ -282,6 +327,8 @@ static int aic_dvp_frame_done(struct aic_dvp *dvp, int err)
 {
     static bool need_skip = false;
     struct vb_buffer *cur_buf = NULL;
+
+    dvp->frame_cnt++;
 
     if (need_skip) {
         need_skip = false;
@@ -326,6 +373,8 @@ static int aic_dvp_update_addr(struct aic_dvp *dvp)
 {
     struct vb_buffer *cur_buf;
     struct vb_buffer *next_buf;
+
+    dvp->update_cnt++;
 
     if (!dvp->streaming)
         return 0;
@@ -400,11 +449,15 @@ static void aic_dvp_reclaim_all_buffers(struct aic_dvp *dvp,
 
 static int aic_dvp_start_streaming(struct vb_queue *q)
 {
-    struct vb_buffer *vb;
-    int ret = 0;
     struct aic_dvp *dvp = &g_dvp;
+    struct vb_buffer *vb;
 
     pr_debug("Starting capture\n");
+
+    if (list_empty(&dvp->active_list)) {
+        pr_err("Active list is empty, cannot start stream\n");
+        return -EINVAL;
+    }
 
     dvp->sequence = 0;
     hal_dvp_field_tag_clr();
@@ -421,19 +474,13 @@ static int aic_dvp_start_streaming(struct vb_queue *q)
 
     /* Prepare our active_uffers in hardware */
     vb = list_first_entry(&dvp->active_list, struct vb_buffer, active_entry);
-    ret = aic_dvp_buf_reload(dvp, vb);
-    if (ret)
-        goto err_disable_pipeline;
+    aic_dvp_buf_reload(dvp, vb);
 
     hal_dvp_capture_start();
     hal_dvp_update_ctl();
 
     dvp->streaming = 1;
     return 0;
-
-err_disable_pipeline:
-    aic_dvp_reclaim_all_buffers(dvp, VB_BUF_STATE_QUEUED);
-    return ret;
 }
 
 static void aic_dvp_wait_streaming(struct aic_dvp *dvp)
@@ -478,10 +525,10 @@ static irqreturn_t aic_dvp_isr(int irq, void *data)
     pr_debug("IRQ status 0x%x, sequence %d\n", sta, dvp->sequence);
 
     if (sta & DVP_IRQ_STA_BUF_FULL) {
-        g_dvp_full_cnt++;
+        g_dvp.full_cnt++;
         /* should tag the buf error, so APP can ignore it */
         err = 1;
-        pr_warn("DVP FIFO is full! Count %d (0x%x)\n", g_dvp_full_cnt, sta);
+        pr_warn("DVP FIFO is full! Count %d (0x%x)\n", g_dvp.full_cnt, sta);
     } else if (sta & DVP_IRQ_STA_XY_CODE_ERR) {
         err = 1;
         pr_warn("DVP checksum has error! (0x%x)\n", sta);
@@ -564,14 +611,14 @@ int aic_dvp_probe(void)
 {
     int ret = 0;
 
+    memset(&g_dvp, 0, sizeof(struct aic_dvp));
+    INIT_LIST_HEAD(&g_dvp.active_list);
+
     ret = aicos_request_irq(DVP_IRQn, aic_dvp_isr, 0, "AIC_DVP_NAME", NULL);
     if (ret < 0) {
         pr_err("Failed to request DVP IRQ\n");
         return -1;
     }
-
-    memset(&g_dvp, 0, sizeof(struct aic_dvp));
-    INIT_LIST_HEAD(&g_dvp.active_list);
 
     return ret;
 }
@@ -590,6 +637,11 @@ int aic_dvp_vb_init(void)
 
 void aic_dvp_vb_deinit(void)
 {
+    if (g_dvp.finished) {
+        aicos_sem_delete(g_dvp.finished);
+        g_dvp.finished = NULL;
+    }
+
     vin_vb_deinit(&g_dvp.queue);
 }
 
@@ -617,7 +669,9 @@ int aic_dvp_open(void)
     hal_dvp_qos_cfg(AIC_DVP_QOS_HIGH, AIC_DVP_QOS_LOW, 0x100, 0x80);
     hal_dvp_enable(&g_dvp.cfg, 1);
 
-    g_dvp_full_cnt = 0;
+    g_dvp.frame_cnt = 0;
+    g_dvp.update_cnt = 0;
+    g_dvp.full_cnt = 0;
     return 0;
 }
 
@@ -636,8 +690,12 @@ int aic_dvp_close(void)
         return -1;
     }
 
-    if (g_dvp_full_cnt)
-        pr_info("DVP FIFO full happened %d times\n", g_dvp_full_cnt);
+    if (g_dvp.full_cnt)
+        pr_info("DVP FIFO full happened %d times\n", g_dvp.full_cnt);
+
+    if (g_dvp.frame_cnt)
+        pr_info("DVP received %d frames, update %d times\n",
+                g_dvp.frame_cnt, g_dvp.update_cnt);
 
     return 0;
 }
@@ -645,6 +703,16 @@ int aic_dvp_close(void)
 void cmd_dvp_vb_info(int argc, char **argv)
 {
     struct vb_buffer *vb = NULL;
+
+    printf("\nDVP Driver info:\n");
+    printf("===========================================\n");
+    printf("Streaming Sequence Frame    Update     Full\n");
+    printf("--------- -------- -------- -------- ------\n");
+    printf("%9s %8d %8d %8d %6d\n",
+           g_dvp.streaming ? "yes" : "no",
+           g_dvp.sequence, g_dvp.frame_cnt,
+           g_dvp.update_cnt, g_dvp.full_cnt);
+    printf("===========================================\n");
 
     vin_vb_show_info(&g_dvp.queue);
 

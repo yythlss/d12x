@@ -457,6 +457,37 @@ static void shell_push_history(struct finsh_shell *shell)
 }
 #endif
 
+#if defined(FINSH_USING_WORD_OPERATION)
+static int find_prev_word_start(const char *line, int curpos)
+{
+    if (curpos <= 0) return 0;
+
+    /* Skip whitespace */
+    while (--curpos > 0 && (line[curpos] == ' ' || line[curpos] == '\t'));
+
+    /* Find word start */
+    while (curpos > 0 && !(line[curpos] == ' ' || line[curpos] == '\t'))
+        curpos--;
+
+    return (curpos <= 0) ? 0 : curpos + 1;
+}
+
+static int find_next_word_end(const char *line, int curpos, int max)
+{
+    if (curpos >= max) return max;
+
+    /* Skip to next word */
+    while (curpos < max && (line[curpos] == ' ' || line[curpos] == '\t'))
+        curpos++;
+
+    /* Find word end */
+    while (curpos < max && !(line[curpos] == ' ' || line[curpos] == '\t'))
+        curpos++;
+
+    return curpos;
+}
+#endif /* defined(FINSH_USING_WORD_OPERATION) */
+
 void finsh_thread_entry(void *parameter)
 {
     int ch;
@@ -505,11 +536,49 @@ void finsh_thread_entry(void *parameter)
 
         /*
          * handle control key
+         * Ctrl+A: 0x01  move cursor to beginning of line
+         * Ctrl+C: 0x03  cancel current line input
+         * Ctrl+E: 0x05  move cursor to end of line
          * up key  : 0x1b 0x5b 0x41
          * down key: 0x1b 0x5b 0x42
          * right key:0x1b 0x5b 0x43
          * left key: 0x1b 0x5b 0x44
+         * home    : 0x1b 0x5b 0x31 0x7e
+         * insert  : 0x1b 0x5b 0x32 0x7e
+         * del     : 0x1b 0x5b 0x33 0x7e
+         * end     : 0x1b 0x5b 0x34 0x7e
          */
+        if (ch == 0x01 || ch == 0x03 || ch == 0x05)
+        {
+            /* reset escape sequence state machine */
+            shell->stat = WAIT_NORMAL;
+
+            if (ch == 0x01) /* Ctrl+A: move cursor to beginning of line */
+            {
+                int i;
+                for (i = 0; i < shell->line_curpos; i++)
+                    rt_kprintf("\b");
+                shell->line_curpos = 0;
+            }
+            else if (ch == 0x05) /* Ctrl+E: move cursor to end of line */
+            {
+                while (shell->line_curpos < shell->line_position)
+                {
+                    if (shell->echo_mode)
+                        rt_kprintf("%c", shell->line[shell->line_curpos]);
+                    shell->line_curpos++;
+                }
+            }
+            else if (ch == 0x03) /* Ctrl+C: cancel current line input */
+            {
+                rt_kprintf("^C\n");
+                rt_memset(shell->line, 0, sizeof(shell->line));
+                shell->line_curpos = shell->line_position = 0;
+                rt_kprintf(FINSH_PROMPT);
+            }
+            continue;
+        }
+
         if (ch == 0x1b)
         {
             shell->stat = WAIT_SPEC_KEY;
@@ -517,7 +586,7 @@ void finsh_thread_entry(void *parameter)
         }
         else if (shell->stat == WAIT_SPEC_KEY)
         {
-            if (ch == 0x5b)
+            if (ch == 0x5b || ch == 0x41 || ch == 0x42 || ch == 0x43 || ch == 0x44)
             {
                 shell->stat = WAIT_FUNC_KEY;
                 continue;
@@ -591,7 +660,123 @@ void finsh_thread_entry(void *parameter)
 
                 continue;
             }
+#if defined(FINSH_USING_WORD_OPERATION)
+            /* Add Ctrl+Left/Right handling */
+            else if (ch == '1')
+            {
+                /* Read modifier sequence [1;5D/C] */
+                int next_ch = finsh_getchar();
+                if (next_ch == ';')
+                {
+                    next_ch = finsh_getchar();
+                    if (next_ch == '5')
+                    {
+                        next_ch = finsh_getchar();
+                        if (next_ch == 'D') /* Ctrl+Left */
+                        {
+                            int new_pos = find_prev_word_start(shell->line, shell->line_curpos);
+                            if (new_pos != shell->line_curpos)
+                            {
+                                rt_kprintf("\033[%dD", shell->line_curpos - new_pos);
+                                shell->line_curpos = new_pos;
+                            }
+                            continue;
+                        }
+                        else if (next_ch == 'C') /* Ctrl+Right */
+                        {
+                            int new_pos = find_next_word_end(shell->line, shell->line_curpos, shell->line_position);
+                            if (new_pos != shell->line_curpos)
+                            {
+                                rt_kprintf("\033[%dC", new_pos - shell->line_curpos);
+                                shell->line_curpos = new_pos;
+                            }
+                            continue;
+                        }
+                    }
+                }
+#if defined(FINSH_USING_FUNC_EXT)
+                else if (next_ch == '~') /* HOME key: ESC [ 1 ~ */
+                {
+                    /* ~ already consumed by finsh_getchar(), handle HOME directly */
+                    while (shell->line_curpos > 0)
+                    {
+                        rt_kprintf("\b");
+                        shell->line_curpos--;
+                    }
+                    continue;
+                }
+#endif
+            }
+#endif /* defined(FINSH_USING_WORD_OPERATION) */
+#if defined(FINSH_USING_FUNC_EXT)
+#if defined(FINSH_USING_WORD_OPERATION)
+            else if (ch >= 0x32 && ch <= 0x34) /* insert(0x32), del(0x33), end(0x34) */
+#else
+            else if (ch >= 0x31 && ch <= 0x34) /* home(0x31), insert(0x32), del(0x33), end(0x34) */
+#endif
+            {
+                shell->stat                           = WAIT_EXT_KEY;
+                shell->line[shell->line_position + 1] = ch;
+                continue;
+            }
+#endif /* defined(FINSH_USING_FUNC_EXT) */
         }
+#if defined(FINSH_USING_FUNC_EXT)
+        else if (shell->stat == WAIT_EXT_KEY)
+        {
+            shell->stat = WAIT_NORMAL;
+
+            if (ch == 0x7e) /* extended key terminator */
+            {
+                rt_uint8_t key_code = shell->line[shell->line_position + 1];
+
+                if (key_code == 0x31) /* home key */
+                {
+                    /* move cursor to beginning of line */
+                    while (shell->line_curpos > 0)
+                    {
+                        rt_kprintf("\b");
+                        shell->line_curpos--;
+                    }
+                }
+                else if (key_code == 0x32) /* insert key */
+                {
+                    /* toggle insert mode */
+                    shell->overwrite_mode = !shell->overwrite_mode;
+                }
+                else if (key_code == 0x33) /* del key */
+                {
+                    /* delete character at current cursor position */
+                    if (shell->line_curpos < shell->line_position)
+                    {
+                        int i;
+                        shell->line_position--;
+                        rt_memmove(&shell->line[shell->line_curpos],
+                                   &shell->line[shell->line_curpos + 1],
+                                   shell->line_position - shell->line_curpos);
+
+                        shell->line[shell->line_position] = 0;
+
+                        rt_kprintf("%s ", &shell->line[shell->line_curpos]);
+
+                        /* move cursor back to original position */
+                        for (i = shell->line_curpos; i <= shell->line_position; i++)
+                            rt_kprintf("\b");
+                    }
+                }
+                else if (key_code == 0x34) /* end key */
+                {
+                    /* move cursor to end of line */
+                    while (shell->line_curpos < shell->line_position)
+                    {
+                        rt_kprintf("%c", shell->line[shell->line_curpos]);
+                        shell->line_curpos++;
+                    }
+                }
+                continue;
+            }
+        }
+#endif /* defined(FINSH_USING_FUNC_EXT) */
 
         /* received null or error */
         if (ch == '\0' || ch == 0xFF) continue;
@@ -643,6 +828,43 @@ void finsh_thread_entry(void *parameter)
 
             continue;
         }
+#if defined(FINSH_USING_WORD_OPERATION)
+        /* Add Ctrl+Backspace handling */
+        else if (ch == 0x17) /* Ctrl+Backspace (typically ^W) */
+        {
+            if (shell->line_curpos == 0) continue;
+
+            int start = find_prev_word_start(shell->line, shell->line_curpos);
+            int del_count = shell->line_curpos - start;
+            int new_len = shell->line_position - del_count;
+
+            /* Delete characters and properly add RT_NULL termination */
+            rt_memmove(&shell->line[start],
+                       &shell->line[start + del_count],
+                       new_len - start + 1);
+
+            /* Clear residual data */
+            rt_memset(&shell->line[new_len], 0, shell->line_position - new_len);
+
+            /* Update positions */
+            shell->line_position = new_len;
+            shell->line_curpos = start;
+
+            /* Redraw the affected line section */
+            rt_kprintf("\033[%dD", del_count);
+            /* Rewrite the remaining content */
+            rt_kprintf("%.*s", shell->line_position - start, &shell->line[start]);
+            /* Clear trailing artifacts */
+            rt_kprintf("\033[K");
+            if (shell->line_position > start)
+            {
+                /* Reset cursor */
+                rt_kprintf("\033[%dD", shell->line_position - start);
+            }
+
+            continue;
+        }
+#endif /* defined(FINSH_USING_WORD_OPERATION) */
 
         /* handle end of line, break */
         if (ch == '\r' || ch == '\n')
@@ -668,17 +890,29 @@ void finsh_thread_entry(void *parameter)
         if (shell->line_curpos < shell->line_position)
         {
             int i;
+#if defined(FINSH_USING_FUNC_EXT)
+            if (shell->overwrite_mode) /* overwrite mode */
+            {
+                /* directly overwrite the character */
+                shell->line[shell->line_curpos] = ch;
+                if (shell->echo_mode)
+                    rt_kprintf("%c", ch);
+                shell->line_curpos++;
+            }
+            else /* insert mode */
+#endif /* defined(FINSH_USING_FUNC_EXT) */
+            {
+                rt_memmove(&shell->line[shell->line_curpos + 1],
+                           &shell->line[shell->line_curpos],
+                           shell->line_position - shell->line_curpos);
+                shell->line[shell->line_curpos] = ch;
+                if (shell->echo_mode)
+                    rt_kprintf("%s", &shell->line[shell->line_curpos]);
 
-            rt_memmove(&shell->line[shell->line_curpos + 1],
-                       &shell->line[shell->line_curpos],
-                       shell->line_position - shell->line_curpos);
-            shell->line[shell->line_curpos] = ch;
-            if (shell->echo_mode)
-                rt_kprintf("%s", &shell->line[shell->line_curpos]);
-
-            /* move the cursor to new position */
-            for (i = shell->line_curpos; i < shell->line_position; i++)
-                rt_kprintf("\b");
+                /* move the cursor to new position */
+                for (i = shell->line_curpos; i < shell->line_position; i++)
+                    rt_kprintf("\b");
+            }
         }
         else
         {
@@ -793,6 +1027,13 @@ int finsh_system_init(void)
     tid = rt_thread_create(FINSH_THREAD_NAME,
                            finsh_thread_entry, RT_NULL,
                            FINSH_THREAD_STACK_SIZE, FINSH_THREAD_PRIORITY, 10);
+    if (tid == RT_NULL)
+    {
+        rt_kprintf("no memory for finsh thread\n");
+        rt_free(shell);
+        shell = RT_NULL;
+        return -1;
+    }
 #else
     shell = &_shell;
     tid = &finsh_thread;

@@ -136,8 +136,10 @@ void hal_dvp_set_pol(u32 flags, u32 ch)
     href_pol = flags & MEDIA_SIGNAL_HSYNC_ACTIVE_HIGH ?
                 DVP_IN_CFG_HREF_POL_ACTIVE_HIGH : 0;
     pclk_pol = flags & MEDIA_SIGNAL_PCLK_SAMPLE_FALLING ?
-                DVP_IN_CFG_PCLK_POL_FALLING : 0;
-    dvp_writel(href_pol | vref_pol | pclk_pol | field_pol, DVP_IN_CFG(ch));
+                DVP_CTL_IN_CLK_POL : 0;
+
+    dvp_writel(href_pol | vref_pol | field_pol, DVP_IN_CFG(ch));
+    hal_dvp_reg_enable(DVP_CTL, DVP_CTL_IN_CLK_POL, pclk_pol);
 }
 
 void hal_dvp_set_cfg(struct aic_dvp_config *cfg, u32 ch)
@@ -168,11 +170,6 @@ void hal_dvp_set_cfg(struct aic_dvp_config *cfg, u32 ch)
         height  = cfg->height;
         stride0 = cfg->stride[0];
         stride1 = cfg->stride[1];
-    }
-
-    if (cfg->stitch_mode == MPP_STITCH_H_MODE) {
-        stride0 *= 2;
-        stride1 *= 2;
     }
 
     val = DVP_CTL_IN_FMT(cfg->input)
@@ -247,7 +244,7 @@ void hal_dvp_qos_cfg(u32 high, u32 low, u32 inc_thd, u32 dec_thd)
     dvp_writel(val, DVP_QOS_CFG);
 }
 
-static bool g_top_field[DVP_MAX_CH_NUM];
+static volatile bool g_top_field[DVP_MAX_CH_NUM];
 
 u32 hal_dvp_get_current_xy(u32 ch)
 {
@@ -273,5 +270,5 @@ u32 hal_dvp_is_bottom_field(u32 ch)
 
 void hal_dvp_field_tag_clr(u32 ch)
 {
-    memset(g_top_field, 0, sizeof(g_top_field));
+    memset((void *)g_top_field, 0, sizeof(g_top_field));
 }

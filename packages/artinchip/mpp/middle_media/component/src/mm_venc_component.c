@@ -25,6 +25,7 @@
 #include "mpp_list.h"
 #include "mpp_log.h"
 #include "mpp_mem.h"
+#include "mpp_thread.h"
 #include "mpp_encoder.h"
 #include "mpp_dec_type.h"
 
@@ -68,7 +69,7 @@ typedef struct mm_venc_data {
     mm_bind_info in_port_bind;
     mm_bind_info out_port_bind;
 
-    pthread_t thread_id;
+    mpp_thread_t thread_handle;
     struct aic_message_queue msg;
 
     struct aic_av_video_stream video_stream;
@@ -115,7 +116,7 @@ typedef struct mm_venc_data {
         (ret);                          \
     })
 
-static void *mm_venc_component_thread(void *p_thread_data);
+static void mm_venc_component_thread(void *p_thread_data);
 static void mm_venc_show_debug_info(mm_venc_data *p_venc_data);
 static void mm_venc_event_notify(mm_venc_data *p_venc_data, MM_EVENT_TYPE event,
     u32 data1, u32 data2, void *p_event_data);
@@ -605,7 +606,7 @@ s32 mm_venc_component_deinit(mm_handle h_component)
     msg.message_id = MM_COMMAND_STOP;
     msg.data_size = 0;
     aic_msg_put(&p_venc_data->msg, &msg);
-    pthread_join(p_venc_data->thread_id, (void *)&error);
+    mpp_thread_delete(p_venc_data->thread_handle);
 
     mm_venc_buffer_deinit(p_venc_data);
 
@@ -629,17 +630,6 @@ s32 mm_venc_component_deinit(mm_handle h_component)
     return error;
 }
 
-static int venc_thread_attr_init(pthread_attr_t *attr)
-{
-    if (attr == NULL) {
-        return EINVAL;
-    }
-    pthread_attr_init(attr);
-    attr->stacksize = 8 * 1024;
-    attr->schedparam.sched_priority = MM_COMPONENT_VENC_THREAD_PRIORITY;
-    return 0;
-}
-
 s32 mm_venc_component_init(mm_handle h_component)
 {
     mm_component *p_comp;
@@ -651,9 +641,6 @@ s32 mm_venc_component_init(mm_handle h_component)
     s8 state_lock_init = 0;
 
     logi("mm_venc_component_init....");
-
-    pthread_attr_t attr;
-    venc_thread_attr_init(&attr);
 
     p_comp = (mm_component *)h_component;
 
@@ -727,9 +714,11 @@ s32 mm_venc_component_init(mm_handle h_component)
     state_lock_init = 1;
 
     // Create the component thread
-    error = pthread_create(&p_venc_data->thread_id, &attr, mm_venc_component_thread, p_venc_data);
-    if (error) {
-        loge("pthread_create venc component fail!");
+    p_venc_data->thread_handle = mpp_thread_create("venc", 8 * 1024,
+                                               MM_COMPONENT_VENC_THREAD_PRIORITY,
+                                               mm_venc_component_thread, p_venc_data);
+    if (!p_venc_data->thread_handle) {
+        loge("mpp_thread_create venc comp thread fail!");
         error = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
@@ -986,7 +975,7 @@ static int mm_venc_component_process_snapshot(mm_venc_data *p_venc_data, mm_venc
     return MM_ERROR_NONE;
 }
 
-static void *mm_venc_component_thread(void *p_thread_data)
+static void mm_venc_component_thread(void *p_thread_data)
 {
     s32 ret = MM_ERROR_NONE;
     s32 cmd = MM_COMMAND_UNKNOWN;
@@ -1126,6 +1115,5 @@ static void *mm_venc_component_thread(void *p_thread_data)
         }
     }
 _EXIT:
-
-    return (void *)MM_ERROR_NONE;
+    return;
 }

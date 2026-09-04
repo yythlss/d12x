@@ -207,6 +207,8 @@ static int aic_akcipher_rsa_do_one_req(struct akcipher_request *req)
     if (DEBUG_CE)
         hal_crypto_dump_task(rctx->task, rctx->tasklen);
 
+    outbuf = rctx->wbuf + 3 * req->dst_len;
+    aicos_dcache_invalid_range((void *)(uintptr_t)outbuf, req->dst_len);
     hal_crypto_init();
     hal_crypto_irq_enable(ALG_AK_ACCELERATOR);
     hal_crypto_start_asym(rctx->task);
@@ -222,8 +224,6 @@ static int aic_akcipher_rsa_do_one_req(struct akcipher_request *req)
     }
 
     aicos_dma_sync();
-    outbuf = rctx->wbuf + 3 * req->dst_len;
-    aicos_dcache_invalid_range((void *)(uintptr_t)outbuf, req->dst_len);
     memcpy(req->dst, outbuf, req->dst_len);
     hal_crypto_bignum_byteswap(req->dst, req->dst_len);
 

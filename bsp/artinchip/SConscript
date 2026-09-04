@@ -151,15 +151,11 @@ if GetDepend('AIC_WDT_DRV'):
     if GetDepend('DRIVER_BARE_DRV_EN'):
         src += Glob('drv_bare/wdt/*.c')
 
-# mtop
+# mtop (per-chip tables: sys/<chip>/include/aic_mtop_id.h + hal/mtop/aic_hal_mtop_tables.c)
 if GetDepend('AIC_MTOP_DRV'):
-    ver = GetConfigValue('AIC_MTOP_DRV_VER')
-    ver = ver.replace('"','')
-    if GetDepend('DRIVER_DRV_EN'):
-        src += Glob('drv/mtop/*.c')
     if GetDepend('DRIVER_HAL_EN'):
-        src += Glob('hal/mtop/*.c', exclude=['hal/mtop/*_v*.c'])
-        src += Glob('hal/mtop/*_v%s.c' % ver)
+        src += Glob('drv/mtop/*.c')
+        src += Glob('hal/mtop/*.c')
 
 # SPINAND driver
 if GetDepend('AIC_SPINAND_DRV'):
@@ -489,13 +485,13 @@ if GetDepend('AIC_INPUTCAP_DRV'):
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/inputcap/*.c')
 
-if GetDepend('AIC_HRTIMER_DRV_V12'):
+if GetDepend('AIC_HRTIMER_DRV_V21'):
     if GetDepend('DRIVER_DRV_EN'):
         src += Glob('drv/hrtimer/drv_hrtimer_pwm.c')
     if GetDepend('DRIVER_HAL_EN'):
         src += Glob('hal/pwm/*.c')
 
-if GetDepend('AIC_HRTIMER_DRV_V10') or GetDepend('AIC_HRTIMER_DRV_V11'):
+if GetDepend('AIC_HRTIMER_DRV_V10') or GetDepend('AIC_HRTIMER_DRV_V11') or GetDepend('AIC_HRTIMER_DRV_V12'):
     if GetDepend('DRIVER_DRV_EN'):
         src += Glob('drv/hrtimer/drv_hrtimer.c')
     if GetDepend('DRIVER_HAL_EN'):

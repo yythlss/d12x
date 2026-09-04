@@ -10,6 +10,16 @@ group = []
 
 if GetDepend(['AIC_WIFI_TEST']):
     src += Glob('./test_wifi.c')
+    if GetDepend(['AIC_WLAN_AIC8800D40L']):
+        CPPPATH += [AIC_ROOT + '/bsp/peripheral/wireless/aic8800/host/driver/drv_wlan']
+        CPPPATH += [AIC_ROOT + '/bsp/peripheral/wireless/aic8800/host/driver/drv_fhost']
+        CPPPATH += [AIC_ROOT + '/bsp/peripheral/wireless/aic8800/fdrv/macif']
+        CPPPATH += [AIC_ROOT + '/bsp/peripheral/wireless/aic8800/fdrv/layer_abstract/inc']
+    if GetDepend(['AIC_WLAN_REALTEK']):
+        CPPPATH += [AIC_ROOT + '/bsp/peripheral/wireless/realtek/api/wifi']
+        CPPPATH += [AIC_ROOT + '/bsp/peripheral/wireless/realtek/include']
+        if GetDepend(['REALTEK_FULL_FNC_MODE']):
+            CPPPATH += [AIC_ROOT + '/bsp/peripheral/wireless/realtek/api/wifi/rtw_wpa_supplicant/wpa_supplicant']
 
 group = DefineGroup('wifi-test', src, depend = [''], CPPPATH = CPPPATH)
 Return('group')

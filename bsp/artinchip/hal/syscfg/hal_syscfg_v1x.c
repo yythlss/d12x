@@ -21,10 +21,12 @@
 #include "syscfg_hw_v1.0.h"
 #endif
 
-#define RES_CAL_VAL_DEF             0x60
-
 #define GMAC_INIT_NUM0              0
 #define GMAC_INIT_NUM1              1
+
+#ifndef AIC_USB_RES_CAL
+#define AIC_USB_RES_CAL             0x60
+#endif
 
 u32 hal_syscfg_read_ldo_cfg(void)
 {
@@ -55,7 +57,7 @@ void hal_syscfg_usb_pll_en(void)
 #ifndef AIC_SYSCFG_DRV_V12
 static s32 syscfg_usb_init(void)
 {
-    syscfg_hw_usb_init(RES_CAL_VAL_DEF);
+    syscfg_hw_usb_init(AIC_USB_RES_CAL);
 
     return 0;
 }
@@ -117,8 +119,10 @@ s32 hal_syscfg_probe(void)
         return -1;
 
     ret = hal_clk_enable_deassertrst(CLK_SYSCFG);
-    if (ret < 0)
-        return -1;
+    if (ret < 0) {
+        hal_clk_disable(CLK_SYSCFG);
+        return ret;
+    }
 
     syscfg_sip_flash_init();
 #ifndef AIC_SYSCFG_DRV_V12

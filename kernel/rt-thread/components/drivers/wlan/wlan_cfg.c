@@ -450,6 +450,12 @@ void rt_wlan_cfg_dump(void)
         case SECURITY_WPA2_MIXED_PSK:
             security = "WPA2_MIXED_PSK";
             break;
+        case SECURITY_WPA3_AES_PSK:
+            security = "WPA3_AES_PSK";
+            break;
+        case SECURITY_WPA3_MIXED_PSK:
+            security = "WPA3_MIXED_PSK";
+            break;
         case SECURITY_WPS_OPEN:
             security = "WPS_OPEN";
             break;

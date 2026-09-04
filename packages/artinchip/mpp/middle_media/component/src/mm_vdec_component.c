@@ -23,6 +23,7 @@
 #include "mpp_log.h"
 #include "mpp_list.h"
 #include "mpp_mem.h"
+#include "mpp_thread.h"
 #include "aic_message.h"
 #include "mpp_decoder.h"
 #include "mpp_dec_type.h"
@@ -74,7 +75,7 @@ typedef struct mm_vdec_data {
     s64 seek_pts;
     MM_BOOL seek_flag;
 
-    pthread_t thread_id;
+    mpp_thread_t thread_handle;
     struct aic_message_queue s_msg;
     struct aic_message_queue s_get_frame_msg;
     s32 flags;
@@ -99,7 +100,7 @@ typedef struct mm_vdec_data {
     u32 ready_packet_num;
 } mm_vdec_data;
 
-static void *mm_vdec_component_thread(void *p_thread_data);
+static void mm_vdec_component_thread(void *p_thread_data);
 static void mm_vdec_show_debug_info(mm_vdec_data *p_vdec_data);
 
 #ifdef AIC_MPP_PLAYER_VIDEO_EXT_RENDER
@@ -890,7 +891,7 @@ s32 mm_vdec_component_deinit(mm_handle h_component)
     s_msg.message_id = MM_COMMAND_STOP;
     s_msg.data_size = 0;
     aic_msg_put(&p_vdec_data->s_msg, &s_msg);
-    pthread_join(p_vdec_data->thread_id, (void *)&error);
+    mpp_thread_delete(p_vdec_data->thread_handle);
 
     pthread_mutex_destroy(&p_vdec_data->in_pkt_lock);
     pthread_mutex_destroy(&p_vdec_data->out_frame_lock);
@@ -913,24 +914,11 @@ s32 mm_vdec_component_deinit(mm_handle h_component)
     return error;
 }
 
-static int dec_thread_attr_init(pthread_attr_t *attr)
-{
-    // default stack size is 2K, it is not enough for decode thread
-    if (attr == NULL) {
-        return EINVAL;
-    }
-    pthread_attr_init(attr);
-    attr->stacksize = 16 * 1024;
-    attr->schedparam.sched_priority = MM_COMPONENT_VDEC_THREAD_PRIORITY;
-    return 0;
-}
-
 s32 mm_vdec_component_init(mm_handle h_component)
 {
     mm_component *p_comp;
     mm_vdec_data *p_vdec_data;
     s32 error = MM_ERROR_NONE;
-    u32 err;
 
     s8 msg_creat = 0;
     s8 pkt_lock_init = 0;
@@ -938,10 +926,9 @@ s32 mm_vdec_component_init(mm_handle h_component)
     s8 state_lock_init = 0;
     s8 process_lock_init = 0;
     s32 port_index = 0;
-
-    pthread_attr_t attr;
-    dec_thread_attr_init(&attr);
-
+#ifdef AIC_MPP_PLAYER_VIDEO_EXT_RENDER
+    s8 get_frame_msg_creat = 0;
+#endif
     logw("mm_vdec_component_init....");
 
     p_comp = (mm_component *)h_component;
@@ -1023,14 +1010,15 @@ s32 mm_vdec_component_init(mm_handle h_component)
         error = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
+    msg_creat = 1;
 #ifdef AIC_MPP_PLAYER_VIDEO_EXT_RENDER
     if (aic_msg_create(&p_vdec_data->s_get_frame_msg) < 0) {
         loge("aic_msg_create fail!");
         error = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
+    get_frame_msg_creat = 1;
 #endif
-    msg_creat = 1;
 
     if (pthread_mutex_init(&p_vdec_data->state_lock, NULL)) {
         loge("pthread_mutex_init fail!\n");
@@ -1040,10 +1028,11 @@ s32 mm_vdec_component_init(mm_handle h_component)
     state_lock_init = 1;
 
     // Create the component thread
-    err = pthread_create(&p_vdec_data->thread_id, &attr,
-                         mm_vdec_component_thread, p_vdec_data);
-    if (err) {
-        loge("pthread_create fail!");
+    p_vdec_data->thread_handle = mpp_thread_create("vdec", 16 * 1024,
+                                               MM_COMPONENT_VDEC_THREAD_PRIORITY,
+                                               mm_vdec_component_thread, p_vdec_data);
+    if (!p_vdec_data->thread_handle) {
+        loge("mpp_thread_create vdec comp thread fail!");
         error = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
@@ -1067,10 +1056,12 @@ _EXIT:
     }
     if (msg_creat) {
         aic_msg_destroy(&p_vdec_data->s_msg);
-#ifdef AIC_MPP_PLAYER_VIDEO_EXT_RENDER
-        aic_msg_destroy(&p_vdec_data->s_get_frame_msg);
-#endif
     }
+#ifdef AIC_MPP_PLAYER_VIDEO_EXT_RENDER
+    if (get_frame_msg_creat) {
+        aic_msg_destroy(&p_vdec_data->s_get_frame_msg);
+    }
+#endif
 
     if (p_vdec_data) {
         mpp_free(p_vdec_data);
@@ -1320,7 +1311,7 @@ static void mm_vdec_show_perf(mm_vdec_data *p_vdec_data, s64 time_diff)
     }
 }
 
-static void *mm_vdec_component_thread(void *p_thread_data)
+static void mm_vdec_component_thread(void *p_thread_data)
 {
     s32 cmd = MM_COMMAND_UNKNOWN;
     mm_vdec_data *p_vdec_data = (mm_vdec_data *)p_thread_data;
@@ -1441,5 +1432,4 @@ static void *mm_vdec_component_thread(void *p_thread_data)
     }
 _EXIT:
     mm_vdec_show_debug_info(p_vdec_data);
-    return (void *)MM_ERROR_NONE;
 }

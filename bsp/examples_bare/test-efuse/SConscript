@@ -9,6 +9,9 @@ src = []
 if GetDepend('KERNEL_BAREMETAL') and GetDepend('AIC_SID_BARE_TEST'):
     src += Glob('efuse_cmds.c')
 
+if GetDepend('KERNEL_BAREMETAL') and GetDepend('AIC_SID_BURN_SPIENC_HWAUTH_D12X_TEST'):
+    src += Glob('efuse_burn_spienc_hwauth_cmd_d12x.c')
+
 if GetDepend('KERNEL_BAREMETAL') and GetDepend('AIC_SID_BURN_SPIENC_KEY_TEST'):
     src += Glob('efuse_burn_spienc_key_cmd.c')
 

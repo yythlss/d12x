@@ -23,6 +23,8 @@ if GetDepend('REALTEK_FULL_FNC_MODE'):
     CPPPATH.append(cwd + '/api/wifi/rtw_wpa_supplicant/src/')
     CPPPATH.append(cwd + '/api/wifi/rtw_wpa_supplicant/wpa_supplicant/')
 
+CPPPATH.append(cwd + '/../../../artinchip_general_platform')
+
 if GetDepend('REALTEK_WLAN_INTF_SDIO'):
     CPPPATH.append(cwd + '/platform/sdio/include/')
     CPPPATH.append(cwd + '/platform/sdio/')

@@ -22,24 +22,24 @@
 #include "test_spienc_authorization.h"
 
 
-int app_hw_authorization_check(unsigned char *from, int flen,
+int app_hw_authorization_check(unsigned char *nonce, int nlen,
                                unsigned char *sign_key, int sign_key_len,
                                unsigned char *verify_key, int verify_key_len)
 {
-    uint8_t *inbuf = NULL, *outbuf = NULL;
+    uint8_t *nonce_sign = NULL, *nonce_veri = NULL;
     uint8_t sign_key_buf[sign_key_len];
     uint8_t verify_key_buf[verify_key_len];
     size_t pagesize = 4096;
     int ret = 0, rlen;
 
-    inbuf = aicos_malloc_align(0, pagesize, CACHE_LINE_SIZE);
-    if (inbuf == NULL) {
+    nonce_sign = aicos_malloc_align(0, pagesize, CACHE_LINE_SIZE);
+    if (nonce_sign == NULL) {
         printf("Failed to allocate inbuf.\n");
         ret = -ENOMEM;
         goto out;
     }
-    outbuf = aicos_malloc_align(0, pagesize, CACHE_LINE_SIZE);
-    if (outbuf == NULL) {
+    nonce_veri = aicos_malloc_align(0, pagesize, CACHE_LINE_SIZE);
+    if (nonce_veri == NULL) {
         printf("Failed to allocate outbuf.\n");
         ret = -ENOMEM;
         goto out;
@@ -49,38 +49,42 @@ int app_hw_authorization_check(unsigned char *from, int flen,
     memcpy(sign_key_buf, sign_key, sign_key_len);
     memcpy(verify_key_buf, verify_key, verify_key_len);
 
-    // 2. Nonce key encryption
-    rlen = aic_spie_sk_sign(flen, from, outbuf, sign_key_buf);
+    hexdump_msg("Nonce", (unsigned char *)nonce, nlen, 1);
+    // 2. Nonce process by sign key
+    rlen = aic_spie_sk_sign(nlen, nonce, nonce_sign, sign_key_buf);
     if (rlen < 0) {
-        printf("aic_spie_sign failed.\n");
+        printf("aic spie sign failed.\n");
         goto out;
     }
-    memcpy(inbuf, outbuf, rlen);
-    memset(outbuf, 0, pagesize);
+    hexdump_msg("Nonce sign", (unsigned char *)nonce_sign, nlen, 1);
+    memset(nonce_veri, 0, pagesize);
 
-    // 3. EncNonce key decryption
-    rlen = aic_spie_vk_verify(rlen, inbuf, outbuf, verify_key_buf);
+    // 3. Nonce process by verify key
+    rlen = aic_spie_vk_verify(nlen, nonce_sign, nonce_veri, verify_key_buf);
     if (rlen < 0) {
         printf("aic_spie_verify failed.\n");
         goto out;
     }
 
-    // 4. compare Nonce and DecNonce
-    if (memcmp(from, outbuf, rlen)) {
-        hexdump_msg("Expect", (unsigned char *)from, rlen, 1);
-        hexdump_msg("Got Result", (unsigned char *)outbuf, rlen, 1);
+    hexdump_msg("Nonce veri", (unsigned char *)nonce_veri, nlen, 1);
+    // 4. compare Nonce and nonce_veri
+    if (memcmp(nonce, nonce_veri, rlen)) {
+        hexdump_msg("Expect", (unsigned char *)nonce, nlen, 1);
+        hexdump_msg("Got Result", (unsigned char *)nonce_veri, nlen, 1);
         printf("App stop.\n");
+        printf("Authorization check is failure.\n");
         ret = -1;
     } else {
         printf("App running.\n");
+        printf("Authorization check is ok.\n");
         ret = 0;
     }
 
 out:
-    if (outbuf)
-        aicos_free_align(0, outbuf);
-    if (inbuf)
-        aicos_free_align(0, inbuf);
+    if (nonce_sign)
+        aicos_free_align(0, nonce_sign);
+    if (nonce_veri)
+        aicos_free_align(0, nonce_veri);
 
     return ret;
 }

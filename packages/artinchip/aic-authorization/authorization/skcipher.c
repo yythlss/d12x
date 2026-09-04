@@ -940,6 +940,11 @@ static int aic_skcipher_do_one_req(struct skcipher_request *req)
     if (DEBUG_CE)
         hal_crypto_dump_task(rctx->task, rctx->tasklen);
 
+    if (rctx->dst_cpy_buf) {
+        aicos_dcache_invalid_range((void *)(uintptr_t)rctx->dst_cpy_buf, req->cryptlen);
+    } else {
+        aicos_dcache_invalid_range((void *)(uintptr_t)req->dst, req->cryptlen);
+    }
     hal_crypto_init();
     hal_crypto_irq_enable(ALG_SK_ACCELERATOR);
     hal_crypto_start_symm(rctx->task);
@@ -959,10 +964,7 @@ static int aic_skcipher_do_one_req(struct skcipher_request *req)
 
     aicos_dma_sync();
     if (rctx->dst_cpy_buf) {
-        aicos_dcache_invalid_range((void *)(uintptr_t)rctx->dst_cpy_buf, req->cryptlen);
         memcpy(req->dst, rctx->dst_cpy_buf, req->cryptlen);
-    } else {
-        aicos_dcache_invalid_range((void *)(uintptr_t)req->dst, req->cryptlen);
     }
 
     if (DEBUG_CE)

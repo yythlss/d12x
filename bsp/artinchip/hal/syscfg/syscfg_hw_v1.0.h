@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2024-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -233,7 +233,8 @@ static inline void syscfg_hw_usb_init(u32 res_val)
 {
     s32 __attribute__((unused)) val;
 
-#if defined(AIC_USING_USB0_HOST) || defined(AIC_USING_USB0_OTG) || defined(AICUPG_UDISK_ENABLE)
+#if defined(AIC_USING_USB0_HOST) || defined(AIC_USING_USB0_OTG) || defined(AICUPG_UDISK_ENABLE) ||\
+    defined(AIC_USING_USB0_DEVICE)
     val = readl(USB0_REXT);
     val &= ~USB0_REXT_RES_CAL_VAL_MASK;
     val |= USB0_REXT_RES_EN_VAL(res_val);

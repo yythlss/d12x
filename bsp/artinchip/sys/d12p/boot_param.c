@@ -54,8 +54,9 @@ enum boot_device aic_get_boot_device(void)
 {
     enum boot_device dev;
 
-    /* clear boot_info */
-    BOOT_INFO_WRITEB(BD_NONE);
+    /* clear boot_info after reboot from sd card upgrade */
+    if ((readl(WRI_BOOT_INFO) & 0xF) == BD_SKIP_SD)
+        BOOT_INFO_WRITEB(BD_NONE);
     /* SPL use a0 */
     dev = get_boot_device(boot_params_stash.r.a[0]);
     show_boot_device(dev);

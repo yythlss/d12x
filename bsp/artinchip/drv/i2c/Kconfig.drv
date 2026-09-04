@@ -2,7 +2,3 @@
 #-----------------------------
 # i2c driver local parameter
 #-----------------------------
-
-config AIC_I2C_INTERRUPT_MODE
-    bool "Support I2c Dev Interrupt Mode"
-    default n

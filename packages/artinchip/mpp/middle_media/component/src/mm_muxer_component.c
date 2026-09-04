@@ -14,6 +14,7 @@
 #include "mpp_list.h"
 #include "mpp_log.h"
 #include "mpp_mem.h"
+#include "mpp_thread.h"
 #include <inttypes.h>
 #include <malloc.h>
 #include <pthread.h>
@@ -51,7 +52,7 @@ typedef struct mm_muxer_data {
     mm_param_port_def in_port_def[2];
     mm_bind_info in_port_bind[2];
 
-    pthread_t thread_id;
+    mpp_thread_t thread_handle;
     struct aic_message_queue msg;
 
     struct aic_av_media_info media_info;
@@ -84,7 +85,7 @@ typedef struct mm_muxer_data {
     MM_BOOL print_flag;
 } mm_muxer_data;
 
-static void *mm_muxer_component_thread(void *p_thread_data);
+static void mm_muxer_component_thread(void *p_thread_data);
 void mm_muxer_show_debug_info(mm_muxer_data *p_muxer_data);
 
 static s32 mm_muxer_set_command(mm_handle h_component, MM_COMMAND_TYPE cmd,
@@ -375,7 +376,7 @@ s32 mm_muxer_component_deinit(mm_handle h_component)
     msg.message_id = MM_COMMAND_STOP;
     msg.data_size = 0;
     aic_msg_put(&p_muxer_data->msg, &msg);
-    pthread_join(p_muxer_data->thread_id, (void *)&error);
+    mpp_thread_delete(p_muxer_data->thread_handle);
 
     pthread_mutex_lock(&p_muxer_data->in_pkt_lock);
     if (!mpp_list_empty(&p_muxer_data->in_empty_pkt)) {
@@ -402,24 +403,11 @@ s32 mm_muxer_component_deinit(mm_handle h_component)
     return error;
 }
 
-static int muxer_thread_attr_init(pthread_attr_t *attr)
-{
-    // default stack size is 2K, it is not enough for decode thread
-    if (attr == NULL) {
-        return EINVAL;
-    }
-    pthread_attr_init(attr);
-    attr->stacksize = 8 * 1024;
-    attr->schedparam.sched_priority = MM_COMPONENT_MUXER_THREAD_PRIORITY;
-    return 0;
-}
-
 s32 mm_muxer_component_init(mm_handle h_component)
 {
     mm_component *p_comp;
     mm_muxer_data *p_muxer_data;
     s32 error = MM_ERROR_NONE;
-    u32 err;
     u32 i;
     u32 cnt = 0;
     mm_param_port_def *p_audio_port, *p_video_port;
@@ -429,8 +417,6 @@ s32 mm_muxer_component_init(mm_handle h_component)
     s8 state_lock_init = 0;
 
     logd("mm_muxer_component_init....");
-    pthread_attr_t attr;
-    muxer_thread_attr_init(&attr);
 
     p_comp = (mm_component *)h_component;
 
@@ -507,9 +493,11 @@ s32 mm_muxer_component_init(mm_handle h_component)
     state_lock_init = 1;
 
     // Create the component thread
-    err = pthread_create(&p_muxer_data->thread_id, &attr, mm_muxer_component_thread, p_muxer_data);
-    if (err) {
-        loge("pthread_create fail %d\n", err);
+    p_muxer_data->thread_handle = mpp_thread_create("muxer", 8 * 1024,
+                                                MM_COMPONENT_MUXER_THREAD_PRIORITY,
+                                                mm_muxer_component_thread, p_muxer_data);
+    if (!p_muxer_data->thread_handle) {
+        loge("mpp_thread_create muxer comp thread fail\n");
         error = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
@@ -933,7 +921,7 @@ static s32 mm_muxer_component_process_write_packet(mm_muxer_data *p_muxer_data)
     return MM_ERROR_NONE;
 }
 
-static void *mm_muxer_component_thread(void *p_thread_data)
+static void mm_muxer_component_thread(void *p_thread_data)
 {
     s32 cmd = MM_COMMAND_UNKNOWN;
     mm_muxer_data *p_muxer_data = (mm_muxer_data *)p_thread_data;
@@ -981,5 +969,5 @@ static void *mm_muxer_component_thread(void *p_thread_data)
     }
 
 _EXIT:
-    return (void *)MM_ERROR_NONE;
+    return;
 }

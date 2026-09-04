@@ -25,6 +25,7 @@
 #include "frame_allocator.h"
 #include "backend_common.h"
 
+#define INVALID_AREA          -9527
 #define FRAME_TIMEOUT         200
 #define DECODER_NOT_CREATED   4099
 #define FRAME_CAPTURE_TIMEOUT 4100
@@ -106,7 +107,7 @@ static int aic_player_event_callback(void *ctx, int event_type, int param1, int 
 static void *player_decode_entry(void *ptr);
 
 /* Player command handlers */
-static lv_res_t player_handle_update_display_area(void *ctx);
+static lv_res_t player_handle_update_display_area(void *ctx, void* data);
 static lv_res_t player_handle_get_frame(void *ctx);
 
 const player_backend_ops_t aic_backend_ops_template  = {
@@ -282,7 +283,7 @@ static lv_res_t aic_player_backend_set_src(void *ctx, const char *src)
 
     /* here are the video related settings */
     if (aic_ctx->draw_layer == LV_AIC_PLAYER_LAYER_VIDEO) {
-        player_handle_update_display_area(ctx);
+        player_handle_update_display_area(ctx, NULL);
         if (!aic_ctx->keep_last_frame) {
             int enable = 1;
             aic_player_control(aic_ctx->player, AIC_PLAYER_CMD_SET_VIDEO_RENDER_KEEP_LAST_FRAME, &enable);
@@ -368,7 +369,7 @@ static lv_res_t aic_player_backend_control(void *ctx, player_cmd_t cmd, void *da
         case PLAYER_CMD_GET_FRAME:
             return player_handle_get_frame(ctx);
         case PLAYER_CMD_UPDATE_DISPLAY_AREA:
-            return player_handle_update_display_area(ctx);
+            return player_handle_update_display_area(ctx, data);
         case PLAYER_CMD_GET_IMAGE_SRC:
             if (!aic_ctx->image_src || !data) {
                 return LV_RES_INV;
@@ -554,9 +555,9 @@ static int player_select_layer(struct aic_player_ctx *aic_ctx)
 
 #ifdef PRJ_CHIP
     if (aic_ctx->media_info.has_video == 1) {
-        if (strcmp(PRJ_CHIP, "d12x") == 0) {
+        if (strncmp(PRJ_CHIP, "d12x", sizeof("d12x")) == 0) {
             draw_layer = LV_AIC_PLAYER_LAYER_UI_DOUBLE_BUF;
-        } else if ((strcmp(PRJ_CHIP, "d13x") == 0) || (strcmp(PRJ_CHIP, "d21x") == 0) || (strcmp(PRJ_CHIP, "d12p") == 0)) {
+        } else if ((strncmp(PRJ_CHIP, "d13x", sizeof("d13x")) == 0) || (strncmp(PRJ_CHIP, "d21x", sizeof("d21x")) == 0) || (strncmp(PRJ_CHIP, "d12p", sizeof("d12p")) == 0)) {
 #if defined(AIC_MPP_PLAYER_VIDEO_EXT_RENDER)
         draw_layer = LV_AIC_PLAYER_LAYER_UI_DOUBLE_BUF;
 #else
@@ -617,7 +618,7 @@ static int player_config_check(struct aic_player_ctx *aic_ctx)
     if (aic_ctx->draw_layer == LV_AIC_PLAYER_LAYER_UI_DOUBLE_BUF) {
 #ifdef PRJ_CHIP
 #ifndef AIC_MPP_PLAYER_VIDEO_EXT_RENDER
-        if (strcmp(PRJ_CHIP, "d12x") == 0) {
+        if (strncmp(PRJ_CHIP, "d12x", sizeof("d12x")) == 0) {
             LV_LOG_ERROR("D12 can't nor render video:\n"
                  "Please use command scons --menuconfig, and open the configuration according to the path:\n"
                  "-----------------ArtInChip Luban-Lite SDK Configuration------------ \n"
@@ -639,9 +640,9 @@ static int player_config_check(struct aic_player_ctx *aic_ctx)
 static int player_check_hw_capability(uint32_t rotate, uint32_t scale_x, uint32_t scale_y)
 {
 #ifdef PRJ_CHIP
-    if (strcmp(PRJ_CHIP, "d12x") == 0) {
+    if (strncmp(PRJ_CHIP, "d12x", sizeof("d12x")) == 0) {
         return true;
-    } else if (strcmp(PRJ_CHIP, "d13x") == 0) {
+    } else if (strncmp(PRJ_CHIP, "d13x", sizeof("d13x")) == 0) {
 #if LVGL_VERSION_MAJOR == 8
         bool scale_condition = (scale_x == 256);
 #elif LVGL_VERSION_MAJOR == 9
@@ -652,7 +653,7 @@ static int player_check_hw_capability(uint32_t rotate, uint32_t scale_x, uint32_
         } else {
             return true;
         }
-    } else if (strcmp(PRJ_CHIP, "d21x") == 0) {
+    } else if (strncmp(PRJ_CHIP, "d21x", sizeof("d21x")) == 0) {
         if (rotate == 0 || rotate == 900 || rotate == 1800 || rotate == 2700) {
             return false;
         } else {
@@ -1029,19 +1030,22 @@ static int calc_video_physical_display_rect(struct mpp_rect *disp_rect, lv_area_
     return 0;
 }
 
-static lv_res_t player_handle_update_display_area(void *ctx)
+static lv_res_t player_handle_update_display_area(void *ctx, void* data)
 {
     player_backend_ops_t *player_ctx = (player_backend_ops_t *)ctx;
     lv_obj_t *obj = (lv_obj_t *)player_ctx->obj;
     struct aic_player_ctx *aic_ctx = player_ctx->ctx;
-
-    int ret = -1;
     u32 video_rotate = MPP_ROTATION_0;
     lv_image_t *image = (lv_image_t *)obj;
     struct mpp_rect disp_rect = {0};
+    int ret = -1;
+    bool area_reset = false;
 
     if (!aic_ctx || aic_ctx->draw_layer != LV_AIC_PLAYER_LAYER_VIDEO)
         return LV_RES_INV;
+
+    if (data)
+        area_reset = true;
 
     lv_point_t pivot_px = {0};
     lv_image_get_pivot(obj, &pivot_px);
@@ -1068,6 +1072,10 @@ static lv_res_t player_handle_update_display_area(void *ctx)
                                        image->rotation, image->scale_x,
                                        image->scale_y, &pivot_px);
 #endif
+
+    if (area_reset)
+        memset(&aic_ctx->area, (unsigned char)INVALID_AREA, sizeof(lv_area_t));
+
     lv_area_move(&real_area, area.x1, area.y1);
     if (aic_ctx->image_rotation == lv_image_get_rotation(obj) &&
         aic_ctx->disp_rotation == lv_disp_get_rotation(lv_disp_get_default()) &&

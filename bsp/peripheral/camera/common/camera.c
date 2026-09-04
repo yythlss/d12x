@@ -20,15 +20,22 @@
 struct rt_i2c_bus_device *camera_i2c_get(void)
 {
     struct rt_i2c_bus_device *i2c = NULL;
-    char name[8] = "";
+    char name[12] = "";
 
-    snprintf(name, 8, "i2c%d", AIC_CAMERA_I2C_CHAN);
+    snprintf(name, 12, "i2c%d", AIC_CAMERA_I2C_CHAN);
     i2c = rt_i2c_bus_device_find(name);
     if (i2c == RT_NULL) {
         LOG_E("Failed to open %s", name);
-        return NULL;
+#ifdef AIC_USING_SOFT_I2C
+        snprintf(name, 12, "soft_i2c");
+        i2c = rt_i2c_bus_device_find(name);
+        if (i2c == RT_NULL)
+#endif
+        {
+            return NULL;
+        }
     }
-    LOG_I("Camera use I2C%d", AIC_CAMERA_I2C_CHAN);
+    LOG_I("Camera use %s", name);
 
     return i2c;
 }
@@ -233,7 +240,7 @@ int camera_set_whitebal(struct rt_device *dev, bool enable)
     if (!dev || !DEV_IOCTL)
         return -1;
 
-    return DEV_IOCTL(dev, CAMERA_CMD_SET_WHITEBAL, (void *)enable);
+    return DEV_IOCTL(dev, CAMERA_CMD_SET_WHITEBAL, &enable);
 }
 
 int camera_set_awb(struct rt_device *dev, bool enable)

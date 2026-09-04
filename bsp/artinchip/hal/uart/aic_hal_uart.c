@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2021-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -864,12 +864,12 @@ void hal_usart_irqhandler(int32_t idx)
     }
 }
 
-uint8_t hal_usart_get_irqstatus(int32_t idx)
+uint16_t hal_usart_get_irqstatus(int32_t idx)
 {
     aic_usart_priv_t *usart_priv = &usart_instance[idx];
     aic_usart_reg_t *addr = (aic_usart_reg_t *)(usart_priv->base);
 
-    uint8_t intr_state = addr->IIR & 0xf;
+    uint16_t intr_state = addr->IIR & 0x1f;
 
     return intr_state;
 }
@@ -1489,6 +1489,21 @@ inline int32_t hal_usart_rts_ctl_soft_mode_clr(usart_handle_t handle)
 
     while (addr->USR & USR_UART_BUSY) {};
     addr->MCR |= AIC_UART_MCR_RTS_CTRL;
+
+    return 0;
+}
+
+int32_t hal_uart_set_sree_int(usart_handle_t handle, int32_t flag)
+{
+    USART_NULL_PARAM_CHK(handle);
+
+    aic_usart_priv_t *usart_priv = handle;
+    aic_usart_reg_t *addr = (aic_usart_reg_t *)(usart_priv->base);
+
+    if (flag == 0)
+        addr->IER &= ~IER_SREE_INT_ENABLE;
+    else if (flag == 1)
+        addr->IER |= IER_SREE_INT_ENABLE;
 
     return 0;
 }

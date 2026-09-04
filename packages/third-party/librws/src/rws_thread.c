@@ -72,14 +72,18 @@ static void rws_threads_joiner_clean(void)
     _threads_joiner->thread = NULL;
 
 #if defined(RWS_OS_WINDOWS)
-    do
+    for (;;)
     {
         if (GetExitCodeThread(t->thread, &dwExitCode) == 0)
         {
             break; // fail
         }
+
+        if (dwExitCode != STILL_ACTIVE)
+        {
+            break;
+        }
     }
-    while (dwExitCode == STILL_ACTIVE);
 
     if (dwExitCode == STILL_ACTIVE)
     {
@@ -91,8 +95,13 @@ static void rws_threads_joiner_clean(void)
         t->thread = NULL;
     }
 #else
-    pthread_join(t->thread, &r);
-    assert(r == NULL);
+    /* Wait for thread exit and reclaim resources */
+    int result = pthread_join(t->thread, &r);
+    if (result != 0) {
+        /* If pthread_join fails, try to cancel then join again */
+        pthread_cancel(t->thread);
+        pthread_join(t->thread, &r);
+    }
 #endif
 
     rws_free(t);
@@ -138,8 +147,8 @@ static void *rws_thread_func_priv(void *some_pointer)
 rws_thread rws_thread_create(rws_thread_funct thread_function, void *user_object)
 {
     _rws_thread *t = NULL;
-    int res = -1;
 #if !defined(RWS_OS_WINDOWS)
+    int res = -1;
     pthread_attr_t attr;
 #endif
 
@@ -149,11 +158,17 @@ rws_thread rws_thread_create(rws_thread_funct thread_function, void *user_object
     }
     rws_threads_joiner_create_ifneed();
     t = (_rws_thread *)rws_malloc_zero(sizeof(_rws_thread));
+    if (!t) {
+        return NULL;
+    }
     t->user_object = user_object;
     t->thread_function = thread_function;
 #if defined(RWS_OS_WINDOWS)
     t->thread = CreateThread(NULL, 0, &rws_thread_func_priv, (LPVOID)t, 0, NULL);
-    assert(t->thread);
+    if (!t->thread) {
+        rws_free(t);
+        return NULL;
+    }
 #else
     if (pthread_attr_init(&attr) == 0)
     {
@@ -161,13 +176,17 @@ rws_thread rws_thread_create(rws_thread_funct thread_function, void *user_object
         {
             if (pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE) == 0)
             {
-                pthread_attr_setstacksize(&attr, 1024 * 8);
+                pthread_attr_setstacksize(&attr, 2048 * 8);
                 res = pthread_create(&t->thread, &attr, &rws_thread_func_priv, (void *)t);
             }
         }
         pthread_attr_destroy(&attr);
     }
-    assert(res == 0);
+    /* Avoid assert-on-failure path; return NULL instead of crashing */
+    if (res != 0) {
+        rws_free(t);
+        return NULL;
+    }
 #endif
     return t;
 }

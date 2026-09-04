@@ -53,4 +53,8 @@ menu "Wlan0 Parameter"
         bool "enable aic8800 debug messages"
         default y
 
+    config AIC_WIRELESS_DELAY_POWER_ON
+        int "wireless delay power on time (seconds)"
+        default 0
+
 endmenu

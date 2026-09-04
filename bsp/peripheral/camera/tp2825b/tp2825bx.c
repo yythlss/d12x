@@ -47,7 +47,7 @@ static int HDC_enable = 1;
 #endif
 static int mode = DEFAULT_FORMAT;
 static int chips = 1;
-static int output[] = {
+static int output[MAX_CHIPS] = {
 //  EMB422_16BIT, //for TP2825B
     SEP656_8BIT,  //for TP2850
 };
@@ -756,6 +756,11 @@ long tp2802_ioctl(struct tp2825_dev *sensor,
     tp2802_video_mode   *video_mode   = NULL;
     tp2802_PTZ_data     *PTZ_data     = NULL;
 
+    if (!sensor || !arg) {
+        LOG_E("Invalid argument\n");
+        return FAILURE;
+    }
+
     switch (cmd) {
     case TP2802_READ_REG:
     {
@@ -1020,6 +1025,11 @@ long tp2802_ioctl(struct tp2825_dev *sensor,
 
 static void TP2825B_Set_REG0X02(unsigned char chip, unsigned char data)
 {
+    if (chip >= MAX_CHIPS) {
+        LOG_E("Invalid chip No. %d", chip);
+        return;
+    }
+
     if (MUX656_8BIT == output[chip] || SEP656_8BIT == output[chip])
         tp28xx_byte_write(chip, 0x02, data);
     else
@@ -2557,7 +2567,7 @@ static rt_err_t tp2825_init(rt_device_t dev)
     fmt->height = DEFAULT_HEIGHT;
     fmt->bus_type = DEFAULT_BUS_TYPE;
     fmt->flags = MEDIA_SIGNAL_FIELD_ACTIVE_LOW |
-                 MEDIA_SIGNAL_VSYNC_ACTIVE_HIGH |
+                 MEDIA_SIGNAL_VSYNC_ACTIVE_LOW |
                  MEDIA_SIGNAL_HSYNC_ACTIVE_LOW |
                  MEDIA_SIGNAL_PCLK_SAMPLE_FALLING;
 
@@ -2578,8 +2588,10 @@ static rt_err_t tp2825_open(rt_device_t dev, rt_uint16_t oflag)
 
     tp2825_power_on(sensor);
 
-    if (tp2802_module_init())
+    if (tp2802_module_init()) {
+        tp2825_power_off(sensor);
         return -EINVAL;
+    }
 
     LOG_I("%s inited", DRV_NAME);
     return RT_EOK;

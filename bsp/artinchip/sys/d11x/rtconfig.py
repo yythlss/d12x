@@ -83,6 +83,7 @@ if PLATFORM == 'gcc':
     else:
         ISA_TAG = '_zifencei'
 
+    M_DEVICE = ''
     if CPUNAME == 'e906fdp' or CPUNAME == 'e907fdp':
         DEVICE = ' -march=rv32imafdcpzpsfoperand' + ISA_TAG + '_xtheade -mabi=ilp32d'
     if CPUNAME == 'e906fp' or CPUNAME == 'e907fp':
@@ -139,9 +140,9 @@ if PLATFORM == 'gcc':
     M_BIN_PATH = ''
 
 DUMP_ACTION = OBJDUMP + ' -D -S $TARGET > ' + prj_out_dir + SOC + '.asm\n'
-POST_ACTION = '@ls -og $TARGET\n@echo\n'
+POST_ACTION = '@echo\n'
 POST_ACTION += OBJCPY + ' -O binary -j .text -j .rodata $TARGET ' + prj_out_dir + SOC + '.text\n'
 POST_ACTION += OBJCPY + ' -O binary -j .data $TARGET ' + prj_out_dir + SOC + '.data\n'
-POST_ACTION += 'cat {} {} > {}\n'.format(prj_out_dir + SOC + '.text', prj_out_dir + SOC + '.data', prj_out_dir + SOC + '.bin')
+POST_ACTION += 'python3 ' + os.path.join(os.environ['AIC_SCRIPT_DIR'], 'merge_files.py') + ' -i ' + prj_out_dir + SOC + '.text ' + prj_out_dir + SOC + '.data' + ' -o ' + prj_out_dir + SOC + '.bin\n'
 POST_ACTION += SIZE + ' $TARGET \n'
 

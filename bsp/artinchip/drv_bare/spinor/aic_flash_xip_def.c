@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -7,8 +7,7 @@
  */
 
 #include "aic_flash_xip_def.h"
-
-#ifdef AIC_QSPI_DRV_V11
+#ifdef AIC_BOOTLOADER_CMD_XIP_BOOT
 
 static struct xip_device xip_flashs[] = {
     {
@@ -520,4 +519,4 @@ struct xip_device *get_xip_device_cfg(u32 flash_id, u32 support_msk, u32 support
     return NULL;
 }
 
-#endif // AIC_QSPI_DRV_V11
+#endif // AIC_BOOTLOADER_CMD_XIP_BOOT

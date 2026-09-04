@@ -11,6 +11,9 @@ if GetDepend('AIC_TSEN_TEST') and GetDepend('RT_USING_FINSH'):
 if GetDepend('AIC_TSEN_HIGH_TEMP_ALARM_TEST') and GetDepend('RT_USING_FINSH'):
     src = Glob('*test_tsen_htp.c')
 
+if GetDepend('AIC_TSEN_DVFS') and GetDepend('AIC_TSEN_TEST'):
+    src += Glob('*test_tsen_dvfs.c')
+
 group = DefineGroup('test-tsen', src, depend = [''], CPPPATH = CPPPATH)
 
 Return('group')

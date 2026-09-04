@@ -36,7 +36,7 @@ int vin_vb_req_buf(struct vb_queue *q,
     struct vin_video_plane *cur_plane = NULL;
 
     if (!q || !vbuf) {
-        pr_err("[VIN%d] Invalid parameter\n", q->ch);
+        pr_err("Invalid parameter. q 0x%lx, vbuf 0x%lx\n", (long)q, (long)vbuf);
         return -EINVAL;
     }
 
@@ -77,41 +77,6 @@ int vin_vb_req_buf(struct vb_queue *q,
     }
     vbuf->num_buffers = q->num_buffers;
     pr_debug("[VIN%d] Requested %d buffers(size %d)\n", q->ch, i, one_buf_size);
-    return 0;
-}
-
-/**
- * @brief Initialize the video buffer queue，only for stitch V&H mode
- * @param q The video buffer queue to initialize.
- * @param vbuf The video buffer structure of CH1
- * @return int 0 on success, -1 on error.
- */
-int vin_vb_req_stitch_buf(struct vb_queue *q, struct vin_video_buf *vbuf)
-{
-    struct vin_video_plane *cur_plane = NULL;
-    u32 i, j;
-
-    if (!q || !vbuf) {
-        pr_err("[VIN%d] Invalid parameter\n", q->ch);
-        return -EINVAL;
-    }
-
-    for (i = 0; i < vbuf->num_buffers; i++) {
-        if (i >= VIN_MAX_BUF_NUM)
-            break;
-
-        cur_plane = &vbuf->planes[i * vbuf->num_planes];
-        for (j = 0; j < vbuf->num_planes; j++, cur_plane++) {
-            q->bufs[i].planes[j].buf = cur_plane->buf;
-            q->bufs[i].planes[j].length = cur_plane->len;
-            q->bufs[i].planes[j].bytesused = cur_plane->len;
-        }
-        q->num_buffers++;
-        q->bufs[i].index = i;
-        q->bufs[i].queue = q;
-        q->bufs[i].num_planes = vbuf->num_planes;
-        q->bufs[i].state = VB_BUF_STATE_DEQUEUED;
-    }
     return 0;
 }
 
@@ -397,7 +362,7 @@ int vin_vb_stream_off(struct vb_queue *q)
 int vin_vb_init(struct vb_queue *q, const struct vb_ops *ops)
 {
     if (!q || !ops) {
-        pr_err("[VIN%d] Invalid parameter: q %#lx, ops %#lx\n", q->ch, (long)q, (long)ops);
+        pr_err("Invalid parameter: q 0x%lx, ops 0x%lx\n", (long)q, (long)ops);
         return -1;
     }
 
@@ -415,7 +380,7 @@ int vin_vb_init(struct vb_queue *q, const struct vb_ops *ops)
 void vin_vb_deinit(struct vb_queue *q)
 {
     if (!q) {
-        pr_err("[VIN%d] Invalid parameter: q %#lx\n", q->ch, (long)q);
+        pr_err("Invalid parameter: q 0x%lx\n", (long)q);
         return;
     }
 

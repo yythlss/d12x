@@ -8,6 +8,7 @@ CPPPATH = [cwd]
 
 if GetDepend('AIC_LVGL_SPI_WIDGET'):
     src += Glob('lv_aic_spi.c')
+    src += Glob('lv_spi_panel.c')
 
 if GetDepend('LV_SPI_ST77916'):
     src += Glob('lv_st77916.c')
@@ -23,6 +24,9 @@ if GetDepend('LV_SPI_ST77903'):
 
 if GetDepend('LV_SPI_GC9D01N'):
     src += Glob('lv_gc9d01n.c')
+
+if GetDepend('LV_SPI_GC9A01'):
+    src += Glob('lv_gc9a01.c')
 
 list = os.listdir(cwd)
 for d in list:

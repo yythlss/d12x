@@ -15,7 +15,7 @@
 
 #define GE2D_DEBUG_ENABLE 0
 
-#if defined(AIC_CHIP_D12X) ||defined(AIC_CHIP_D13X) || defined(AIC_CHIP_G73X)
+#if defined(AIC_CHIP_D12X) ||defined(AIC_CHIP_D13X) || defined(AIC_CHIP_G73X) || defined(AIC_CHIP_D12P)
 #define CONFIG_GE2D_SPLIT_OPT
 #endif
 
@@ -312,7 +312,7 @@ static int calculate_crop_area(int32_t *src_start_x_16, int32_t *src_start_y_16,
     *dest_crop_y = d_crop_y;
 
     /* Add starting position offset */
-#if defined(AIC_CHIP_D12X)
+#if defined(AIC_CHIP_D12X) || defined (AIC_CHIP_D12P)
     *needed_input_w += 1;
     *needed_input_h += 1;
 #else
@@ -364,7 +364,7 @@ static void calculate_split_params(int32_t dx_16, int32_t dest_w, int32_t src_st
             *adjusted_dest_w = dest_w - *dst_w_sec;
 
             *needed_input_w = ((src_start_x_16 & 0xffff) + (*adjusted_dest_w - 1) * dx_16 + 0xffff) >> 16;
-#if defined(AIC_CHIP_D12X)
+#if defined(AIC_CHIP_D12X) || defined (AIC_CHIP_D12P)
             *needed_input_w += 1;
 #else
             *needed_input_w += 2;
@@ -372,7 +372,7 @@ static void calculate_split_params(int32_t dx_16, int32_t dest_w, int32_t src_st
             *phase_x_sec = (src_start_x_16 + dx_16 * (*adjusted_dest_w)) & 0xffff;
             *offset_x_sec = (src_start_x_16 + dx_16 * (*adjusted_dest_w)) >> 16;
             *src_w_sec =  (((*phase_x_sec + dx_16 * (*dst_w_sec - 1)) + 0xffff) >> 16);
-#if defined(AIC_CHIP_D12X)
+#if defined(AIC_CHIP_D12X) || defined (AIC_CHIP_D12P)
             *src_w_sec += 1;
 #else
             *src_w_sec += 2;

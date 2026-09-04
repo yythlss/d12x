@@ -14,8 +14,15 @@ inc = inc + [cwd + '/inc']
 # add librws basic code
 src = src + Glob('src/*.c')
 
+# Check for configuration options from Kconfig
+# TLS support
+if GetDepend(['PKG_LIBRWS_MBEDTLS']):
+    CPPDEFINES = ['LIBRWS_USING_MBED_TLS']
+else:
+    CPPDEFINES = []
+
 # add group to IDE project
-objs = DefineGroup('librws', src, depend = ['PKG_USING_LIBRWS', 'RT_USING_PTHREADS'], CPPPATH = inc)
+objs = DefineGroup('librws', src, depend = ['PKG_USING_LIBRWS', 'RT_USING_PTHREADS'], CPPPATH = inc, CPPDEFINES = CPPDEFINES)
 
 # traversal subscript
 list = os.listdir(cwd)
@@ -26,4 +33,3 @@ if GetDepend(['PKG_USING_LIBRWS', 'RT_USING_PTHREADS']):
             objs = objs + SConscript(os.path.join(d, 'SConscript'))
 
 Return('objs')
-

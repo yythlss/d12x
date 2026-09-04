@@ -31,24 +31,8 @@ struct _psram_info {
     char *chip_name;
 };
 
-/* Type 	Mark ID	Package ID	PSRAM ID	Flash IOMAP	DIS_MIPI	DIS_CANFD	DIS_PWMCS */
-/* D125CBS	0x01	0xC	0x4	0x00	0x0	0x1	0x0 */
-/* D125CCS	0x02	0xC	0x2	0x00	0x0	0x1	0x0 */
-/* D125DDS	0x03	0xD	0x3	0x00	0x0	0x1	0x0 */
-/* D125EDS	0x04	0xE	0x3	0x00	0x0	0x1	0x0 */
-/* D126FBV	0x05	0xF	0x4	0x00	0x0	0x1	0x0 */
-/* D126FCV	0x06	0xF	0x2	0x00	0x0	0x1	0x0 */
-/* D125CCS-U	0x07	0xC	0x2	0x00	0x0	0x1	0x0 */
-/* G720ADU	0x21	0xA	0x0	0x55	0x1	0x1	0x0 */
-/* G720AFU	0x22	0xA	0x0	0x55	0x1	0x1	0x0 */
-
-/* PSRAM ID */
-/* 0x0:  APS3208K */
-/* 0x1:  SCKW18X128160AAE1 */
-/* 0x2:  APS12816O-OB9 */
-/* 0x3:  32MB, APS25616N-OBX9 */
-/* 0x4:  4MB x 2, APS3208K */
-/* 0xF:  No PSRAM" */
+/*
+ */
 
 enum psram_fuse {
     PSRAM_FUSE_APS3208K = 0x00,
@@ -96,7 +80,7 @@ u8 psram_get_mark_id(void)
     u32 fuse_218 = readl(EFUSE_218_REG);
     u8 mark_id = fuse_218 & 0xff;
 
-    pr_info("fuse_218(0x19010218)=0x%x, mark_id=0x%x\n", fuse_218, mark_id);
+    pr_debug("fuse_218(0x19010218)=0x%x, mark_id=0x%x\n", fuse_218, mark_id);
     return mark_id;
 }
 
@@ -105,7 +89,7 @@ u8 psram_get_psram_id(void)
     u32 fuse_21c = readl(EFUSE_21C_REG);
     u8 psram_id = (fuse_21c & 0xff) >> 4;
 
-    pr_info("fuse_21c(0x1901021c)=0x%x, psram_id=0x%x\n", fuse_21c, psram_id);
+    pr_debug("fuse_21c(0x1901021c)=0x%x, psram_id=0x%x\n", fuse_21c, psram_id);
     return psram_id;
 }
 
@@ -123,10 +107,14 @@ struct _psram_info *psram_get_info(u8 mark_id, u8 psram_fuse_id)
     return &psram_table_info[0]; //if not find anyone, return the default info.
 }
 
+static struct _psram_info *psram_info = NULL;
+
 u32 aic_get_ram_size(void)
 {
-    struct _psram_info *psram_info;
     u8 mark_id, psram_id;
+
+    if (psram_info)
+        return psram_info->psram_size;
 
     writel(0x1100, EFUSE_CMU_REG);
     mark_id = psram_get_mark_id();
@@ -135,4 +123,34 @@ u32 aic_get_ram_size(void)
     writel(0x0, EFUSE_CMU_REG);
 
     return psram_info->psram_size;
+}
+
+void aic_show_ram_size(void)
+{
+    const char *psram_name;
+
+    if (!psram_info)
+        aic_get_ram_size();
+
+    switch (psram_info->psram_id.psram_fuse_id) {
+    case PSRAM_FUSE_APS3208K:
+
+        psram_name = "APS32";
+        break;
+    case PSRAM_FUSE_APS12816O_OB9:
+        psram_name = "APS128";
+        break;
+    case PSRAM_FUSE_APS25616N_OBX9:
+        psram_name = "APS256";
+        break;
+    case PSRAM_FUSE_APS3208K_X2:
+        psram_name = "APS32x2";
+        break;
+    default:
+        psram_name = "Unknown";
+        break;
+    }
+
+    printf("PSRAM: %s, size %d MB\n",
+           psram_name, psram_info->psram_size / 1024 / 1024);
 }

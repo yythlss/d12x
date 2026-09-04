@@ -61,3 +61,12 @@ void rws_list_append(_rws_list *list, _rws_node_value value)
         cur->next->value = value;
     }
 }
+
+void rws_list_add(_rws_list *list, _rws_list *node)
+{
+    if (list && node)
+    {
+        node->next = list->next;
+        list->next = node;
+    }
+}

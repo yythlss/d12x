@@ -283,6 +283,21 @@ if AIC_USING_USB0
             select AIC_USB_HOST_EHCI_DRV
             select AIC_USB_OTG_DRV
     endchoice
+
+    menu "Usb parameter"
+
+    config AIC_USB_RES_CAL
+        hex "USB Calibration Resistance Value"
+        default 0x60
+
+    config AIC_USB_PHY_TXREF
+        hex "USB PHY tx ref tune"
+        default 0x8
+
+    config AIC_USB_TXPREEMPAMP
+        hex "USB PHY Transmitter Pre-Emphasis Current"
+        default 0
+    endmenu
 endif
 
 config AIC_USING_USB1

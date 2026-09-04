@@ -39,6 +39,9 @@ extern "C" {
 #define HAL_QSPI_DMA_MEM_MAXBURST    16
 #define HAL_QSPI_DMA_4BYTES_LINE     4
 
+#define HAL_QSPI_FIFO_DEPTH          64
+#define HAL_QSPI_FIFO_DEPTH_V3LITE   32
+
 struct qspi_master_state;
 struct qspi_slave_state;
 typedef struct qspi_master_state qspi_master_handle;
@@ -62,6 +65,9 @@ struct qspi_master_config {
     u32 tx_dlymode;
     u32 max_hz;
     bool slave_en;
+    u32 fifo_depth;
+    u32 dev_max_burst;
+    bool idma_en;
 };
 
 struct qspi_master_dma_config {
@@ -151,6 +157,8 @@ struct qspi_transfer {
 struct qspi_master_state {
     u32 idx;
     u32 fifo_depth;
+    u32 dev_max_burst;
+    bool idma_en;
     qspi_master_async_cb cb;
     void *cb_priv;
     volatile u32 status;
@@ -158,8 +166,8 @@ struct qspi_master_state {
     u32 bus_hz;
     u32 bus_width;
     struct qspi_master_dma_config dma_cfg;
-    void *dma_tx;
-    void *dma_rx;
+    void * volatile dma_tx;
+    void * volatile dma_rx;
     u8 * volatile async_tx; /* Used in Async Non-DMA mode */
     u8 * volatile async_rx; /* Used in Async Non-DMA mode */
     volatile u32 async_tx_remain; /* Used in Async Non-DMA mode */
@@ -173,19 +181,19 @@ struct qspi_slave_state {
     u32 idx;
     qspi_slave_async_cb cb;
     void *cb_priv;
-    u32 status;
+    volatile u32 status;
     u32 clk_id;
     u32 bus_hz;
     u32 bus_width;
-    u8 *async_tx; /* Used in Async Non-DMA mode */
-    u8 *async_rx; /* Used in Async Non-DMA mode */
+    u8 * volatile async_tx; /* Used in Async Non-DMA mode */
+    u8 * volatile async_rx; /* Used in Async Non-DMA mode */
     u32 async_tx_wcnt; /* Used in Async mode */
-    u32 async_tx_remain; /* Used in Async mode */
-    u32 async_rx_remain; /* Used in Async mode */
+    volatile u32 async_tx_remain; /* Used in Async mode */
+    volatile u32 async_rx_remain; /* Used in Async mode */
     u32 async_tx_count; /* Used in Async mode */
     u32 async_rx_count; /* Used in Async mode */
-    u32 work_mode;
-    u32 done_mask;
+    volatile u32 work_mode;
+    volatile u32 done_mask;
     bool bit_mode;
 };
 

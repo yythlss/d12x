@@ -332,7 +332,11 @@ int test_dhrystone (int argc, char *argv[])
     printf ("%d \n", (int)Dhrystones_Per_Second);
     printf ("VAX  MIPS rating:                           ");
     printf ("%d \n", (int)Vax_Mips);
-		printf ("\n");
+#ifdef CPU_FREQ
+    Vax_Mips = Dhrystones_Per_Second / 1757.0 / (float)CPU_FREQ;
+    printf ("Score(CPU: %ld MHz): %d.%02d DMIPS/MHz\n", CPU_FREQ, (int)Vax_Mips, (int)(Vax_Mips * 100) % 100);
+#endif
+    printf ("\n");
   }
 
   return 0;

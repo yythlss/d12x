@@ -450,6 +450,8 @@ static int aic_akcipher_sm2_do_one_req(struct akcipher_request *req)
     if (DEBUG_CE)
         hal_crypto_dump_task(rctx->task, rctx->tasklen);
 
+    outbuf = rctx->wbuf + (10 * SM2_KEY_SIZE);
+    aicos_dcache_invalid_range((void *)(uintptr_t)outbuf, req->dst_len);
     hal_crypto_init();
     hal_crypto_irq_enable(ALG_AK_ACCELERATOR);
     hal_crypto_start_asym(rctx->task);
@@ -466,18 +468,16 @@ static int aic_akcipher_sm2_do_one_req(struct akcipher_request *req)
 
     aicos_dma_sync();
 
-	outbuf = rctx->wbuf + (10 * SM2_KEY_SIZE);
-    aicos_dcache_invalid_range((void *)(uintptr_t)outbuf, req->dst_len);
-	if (rctx->flags & FLG_SIGN) {
-		hal_crypto_bignum_byteswap(outbuf, SM2_KEY_SIZE);
-		hal_crypto_bignum_byteswap(outbuf + 32, SM2_KEY_SIZE);
-		memcpy(outbuf, req->dst, req->dst_len);
-	} else if (rctx->flags & FLG_VERI) {
-		hal_crypto_bignum_byteswap(outbuf, SM2_KEY_SIZE);
-		memcpy(outbuf, req->dst, req->dst_len);
-	} else if (rctx->flags & FLG_ENC) {
-	} else if (rctx->flags & FLG_DEC) {
-	}
+    if (rctx->flags & FLG_SIGN) {
+        hal_crypto_bignum_byteswap(outbuf, SM2_KEY_SIZE);
+        hal_crypto_bignum_byteswap(outbuf + 32, SM2_KEY_SIZE);
+        memcpy(outbuf, req->dst, req->dst_len);
+    } else if (rctx->flags & FLG_VERI) {
+        hal_crypto_bignum_byteswap(outbuf, SM2_KEY_SIZE);
+        memcpy(outbuf, req->dst, req->dst_len);
+    } else if (rctx->flags & FLG_ENC) {
+    } else if (rctx->flags & FLG_DEC) {
+    }
 
     if (DEBUG_CE)
         hal_crypto_dump_reg();

@@ -988,9 +988,10 @@ static rt_size_t rt_serial_write(struct rt_device *dev,
 
     if (dev->open_flag & RT_DEVICE_FLAG_INT_TX)
     {
-        if (serial->config.function == RT_SERIAL_RS485_SIMULATION_MODE) {
-            serial->ops->control(serial, RT_SERIAL_RS485_RTS_HIGH, RT_NULL);
-        }
+        if (serial->config.function == RT_SERIAL_RS485_SIMULATION_MODE ||
+            serial->config.function == RT_SERIAL_RS232_SIMULATION_MODE)
+           serial->ops->control(serial, RT_SERIAL_ENABLE_SREE_INT, NULL);
+
         return _serial_int_tx(serial, (const rt_uint8_t *)buffer, size);
     }
 #ifdef RT_SERIAL_USING_DMA
@@ -1001,9 +1002,10 @@ static rt_size_t rt_serial_write(struct rt_device *dev,
 #endif /* RT_SERIAL_USING_DMA */
     else
     {
-        if (serial->config.function == RT_SERIAL_RS485_SIMULATION_MODE) {
-            serial->ops->control(serial, RT_SERIAL_RS485_RTS_HIGH, RT_NULL);
-        }
+        if (serial->config.function == RT_SERIAL_RS485_SIMULATION_MODE ||
+            serial->config.function == RT_SERIAL_RS232_SIMULATION_MODE)
+           serial->ops->control(serial, RT_SERIAL_ENABLE_SREE_INT, NULL);
+
         return _serial_poll_tx(serial, (const rt_uint8_t *)buffer, size);
     }
 }
@@ -1161,6 +1163,10 @@ static rt_err_t rt_serial_control(struct rt_device *dev,
             break;
 
         case RT_SERIAL_RS485_RTS_HIGH:
+            serial->ops->control(serial, cmd, args);
+            break;
+
+        case RT_SERIAL_ENABLE_SREE_INT:
             serial->ops->control(serial, cmd, args);
             break;
 

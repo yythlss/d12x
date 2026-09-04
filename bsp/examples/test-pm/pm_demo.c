@@ -48,7 +48,7 @@ void pm_key_irq_callback(void *args)
     rt_event_send(&pm_event, BUTTON_FLAG);
 }
 
-extern volatile uint32_t stress_test_running;
+RT_WEAK volatile uint32_t stress_test_running = 0;
 
 static void pm_thread(void *parameter)
 {

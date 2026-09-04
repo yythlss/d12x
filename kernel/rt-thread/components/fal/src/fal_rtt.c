@@ -22,10 +22,6 @@ struct fal_blk_device {
     struct rt_device                parent;
     struct rt_device_blk_geometry   geometry;
     const struct fal_partition     *fal_part;
-#ifdef AIC_FATFS_ENABLE_WRITE_IN_SPINOR
-    rt_uint32_t length;
-    rt_uint8_t *buf;
-#endif
 };
 
 /* RT-Thread device interface */
@@ -101,79 +97,13 @@ static rt_size_t blk_dev_read(rt_device_t dev, rt_off_t pos, void* buffer, rt_si
     return ret;
 }
 
-static rt_size_t __attribute__((unused)) blk_dev_cal_phy_len(rt_device_t dev, rt_off_t pos, rt_size_t size, rt_size_t cluster_size)
-{
-    rt_size_t phy_len = 0;
-    rt_uint8_t phy_sector_num = 0;
-    struct fal_blk_device *part = (struct fal_blk_device*) dev;
-
-    assert(part != RT_NULL);
-
-    phy_sector_num = roundup(pos % cluster_size + size, cluster_size);
-    phy_len = phy_sector_num * part->geometry.bytes_per_sector;
-
-    return phy_len;
-}
-
 static rt_size_t blk_dev_write(rt_device_t dev, rt_off_t pos, const void* buffer, rt_size_t sectors)
 {
-#ifndef AIC_FATFS_ENABLE_WRITE_IN_SPINOR
+    (void)dev;
+    (void)pos;
+    (void)buffer;
     log_e("This config only supports read!\n");
     return sectors;
-#else
-#define FATFS_CLUSTER_SIZE AIC_USING_FS_IMAGE_TYPE_FATFS_CLUSTER_SIZE
-    struct fal_blk_device *part = (struct fal_blk_device*) dev;
-    rt_size_t total_phy_len, total_copy_len;
-    rt_size_t do_phy_len, do_copy_len;
-    rt_off_t phy_pos, buf_pos;
-    int ret = 0;
-
-    assert(part != RT_NULL);
-
-    total_phy_len = blk_dev_cal_phy_len(dev, pos, sectors, FATFS_CLUSTER_SIZE);
-    buf_pos = pos % FATFS_CLUSTER_SIZE * part->geometry.bytes_per_sector;
-    phy_pos = (pos - pos % FATFS_CLUSTER_SIZE) * part->geometry.bytes_per_sector;
-    total_copy_len = sectors * part->geometry.bytes_per_sector;
-
-    while (total_copy_len != 0) {
-        if (total_phy_len > part->length) {
-            do_phy_len = part->length;
-            do_copy_len = part->length - pos % FATFS_CLUSTER_SIZE * part->geometry.bytes_per_sector;
-        } else {
-            do_phy_len = total_phy_len;
-            do_copy_len = total_copy_len;
-        }
-
-        memset(part->buf, 0xFF, part->length);
-        ret = fal_partition_read(part->fal_part, phy_pos, part->buf, do_phy_len);
-        if (ret != (int)(do_phy_len)) {
-            log_e("FAL partition read data size failed!\n");
-            return 0;
-        }
-
-        rt_memcpy(part->buf + buf_pos, buffer, do_copy_len);
-        ret = fal_partition_erase(part->fal_part, phy_pos, do_phy_len);
-        if (ret != (int)(do_phy_len)) {
-            log_e("FAL partition erase data size failed!\n");
-            return 0;
-        }
-
-        ret = fal_partition_write(part->fal_part, phy_pos, part->buf, do_phy_len);
-        if (ret != (int)(do_phy_len)) {
-            log_e("FAL partition write data size failed!\n");
-            return 0;
-        }
-
-        phy_pos += do_phy_len;
-        buffer += do_phy_len - buf_pos;
-        pos += do_copy_len / part->geometry.bytes_per_sector;
-        buf_pos = 0;
-        total_copy_len -= do_copy_len;
-        total_phy_len -= do_phy_len;
-    }
-
-    return sectors;
-#endif
 }
 
 #ifdef RT_USING_DEVICE_OPS
@@ -217,15 +147,6 @@ struct rt_device *fal_blk_device_create(const char *parition_name)
     blk_dev = (struct fal_blk_device*) rt_malloc(sizeof(struct fal_blk_device));
     if (blk_dev)
     {
-#ifdef AIC_FATFS_ENABLE_WRITE_IN_SPINOR
-        blk_dev->length = AIC_USING_FS_IMAGE_TYPE_FATFS_CLUSTER_SIZE * 512 * 2;
-        blk_dev->buf = (uint8_t *)rt_malloc(blk_dev->length);
-        if (!blk_dev->buf) {
-            log_e("Error: no memory for create SPI NOR block buf");
-            return NULL;
-        }
-#endif
-
         blk_dev->fal_part = fal_part;
 
         /*To solve the problem of space waste when the sector is set to 4096*/

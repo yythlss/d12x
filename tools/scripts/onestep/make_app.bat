@@ -24,8 +24,10 @@ if "%kernel%_%app%" == "baremetal_bootloader" (
 	goto exit_label
 )
 
-call checkout_binary.bat
-
+echo.
+echo --------------------------------------------------------------
+echo Build %defconfig%
+echo --------------------------------------------------------------
 call scons -C %SDK_PRJ_TOP_DIR% -j 8
 
 :exit_label

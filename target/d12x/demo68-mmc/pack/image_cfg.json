@@ -11,7 +11,7 @@
             "rodata_r":   { "size": "12m" },
             "data":       { "size": "20m" },
             "data_r":     { "size": "20m" }
-        },
+        }
     },
     "image": {
         "info": { // Header information about image
@@ -20,7 +20,8 @@
             "version": "1.0.0",
             "media": {
                 "type": "mmc",
-                "device_id": 0,  // sdmc index
+                // sdmc index
+                "device_id": 0
             }
         },
         "updater": { // Image writer which is downloaded to RAM by USB
@@ -38,7 +39,7 @@
                 "file": "env.bin",
                 "attr": ["required"],
                 "ram": "0x40140000"
-            },
+            }
         },
         "target": { // Image components which will be burn to device's partitions
             "spl": {
@@ -70,26 +71,50 @@
                 "file": "data.fatfs",
                 "attr": ["block", "optional"],
                 "part": ["data"]
-            },
-        },
+            }
+        }
     },
     "pre-process": { // Pre-proccess to generate image components from raw data
+	// "spienctool": {
+	//     "spl_chacha20_key_encrypted.bin": {
+	// 	    "operation": "enckey",
+	// 	    "seedver": "1",
+	// 	    "spienckey": "keys/spi_enc_key.bin",
+	// 	    "file": "keys/spl_chacha20_key.bin"
+	//     },
+	//     "app_chacha20_key_encrypted.bin": {
+	// 	    "operation": "enckey",
+	// 	    "seedver": "1",
+	// 	    "spienckey": "keys/spi_enc_key.bin",
+	// 	    "file": "keys/app_chacha20_key.bin"
+	//     },
+	// },
+        "aicprivate": { // Create aic boot image private data
+            "pbp_cfg.bin": {
+                "cfg": ["pbp_cfg.json", "partition.json",
+			// "pbp_security.json"
+		]
+            },
+            // "spl_cfg.bin": {
+            //     "cfg": ["spl_security.json"],
+            // },
+        },
         "aicimage": { // Create aic boot image
             "uartupg-psram-init.aic": { // No loader, only PreBootProgram to initialize PSRAM
                 "head_ver": "0x00010001",
                 "resource": {
                     "private": "pbp_cfg.bin",
-                    "pbp": "d12x.pbp",
-                },
+                    "pbp": "d12x.pbp"
+                }
             },
             "pbp_ext.aic": {
                 "head_ver": "0x00010001",
                 "resource": {
                     "pbp": "d12x.pbp",
-                    "private": "pbp_cfg.bin",
+                    "private": "pbp_cfg.bin"
                 },
                 // combine to use with loader.aic
-                "with_ext": "true",
+                "with_ext": "true"
             },
             "loader.aic": {
                 "head_ver": "0x00010001",
@@ -99,24 +124,34 @@
                     "entry point": "CONFIG_AIC_BOOTLOADER_TEXT_BASE", // 256 byte aic header
                 },
                 "resource": {
-                    "private": "pbp_cfg.bin",
+                    // "private": "spl_cfg.bin",  // For security
+                    "private": "pbp_cfg.bin"
                 },
-            },
+                // "encryption": { // Encrypt bootloader.bin
+                //     "algo": "chacha20",
+                //     "key": "keys/spl_chacha20_key.bin",
+                // },
+            }
         },
         "concatenate": { // cat files in order
-            "bootloader.aic": ["pbp_ext.aic", "loader.aic"],
+            "bootloader.aic": ["pbp_ext.aic", "loader.aic"]
         },
-        "itb": { // Create itb image from its
+        "elf2itb": { // Create itb image from elf
             "d12x_os.itb": {
-                "its": "d12x_os.its"
-            },
+                "elf": "d12x.elf",
+                "hash": ["crc32"],
+                // "encryption": { // Encrypt APP
+                //     "algo": "chacha20",
+                //     "key": "keys/app_chacha20_key.bin",
+                // }
+            }
         },
         "uboot_env": { // Create env data from txt
             "env.bin": {
                 "file": "env.txt",
                 "size": "4096",
-                "redundant": "enable",
-            },
-        },
-    },
+                "redundant": "enable"
+            }
+        }
+    }
 }

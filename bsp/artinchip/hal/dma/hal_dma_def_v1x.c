@@ -532,6 +532,12 @@ irqreturn_t hal_dma_irq(int irq, void *arg)
         if ((!chan->used) || !(status & chan->irq_type))
             continue;
 
+        /* Only trigger callback on completion interrupt */
+        if (!(status & DMA_IRQ_TASK_DONE)) {
+            pr_err("DMA ch%d unexpected irq, status: 0x%x\n", i, status);
+            continue;
+        }
+
         cb = chan->callback;
         cb_data = chan->callback_param;
         if (cb)

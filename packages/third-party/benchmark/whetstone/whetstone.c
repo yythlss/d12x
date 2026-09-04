@@ -60,10 +60,10 @@ C**********************************************************************
 /* the following is optional depending on the timing function used */
 #include <time.h>
 #include <aic_core.h>
-#include <aic_hal.h>
-#include <rtthread.h>
 
-#define CPU_FREQ (hal_clk_get_freq(CLK_CPU)/1000000)
+#include "rtthread.h"
+
+#define CPU_FREQ    (long)(AIC_CLK_CPU_FREQ / 1000000)
 
 /* map the FORTRAN math functions, etc. to the C versions */
 #ifdef ARCH_RISCV_FPU_S
@@ -419,7 +419,7 @@ C--------------------------------------------------------------------
 #ifndef AIC_PRINT_FLOAT_CUSTOM
 	if (KIPS >= 1000.0) {
 		printf("C Converted %s Precision Whetstones: %.1f MIPS\n", STR_REAL, KIPS/1000.0);
-		printf("Score(CPU %ldMHz): %.2f\n", CPU_FREQ, KIPS/1000.0/CPU_FREQ);
+		printf("Score(CPU %ldMHz): %.2f MFLOPS/MHz\n", CPU_FREQ, KIPS/1000.0/CPU_FREQ);
 	}
 	else {
 		printf("C Converted %s Precision Whetstones: %.1f KIPS\n", STR_REAL, KIPS);
@@ -439,7 +439,7 @@ C--------------------------------------------------------------------
 		p_f = KIPS/1000.0/CPU_FREQ;
 		p_i1 = (unsigned int)p_f;
 		p_i2 = (unsigned int)((p_f-p_i1)*100.0);
-		printf("Score(CPU %ldMHz): %d.%d\n", CPU_FREQ, p_i1, p_i2);
+		printf("Score(CPU %ldMHz): %d.%d MFLOPS/MHz\n", CPU_FREQ, p_i1, p_i2);
 	}
 	else {
 		p_f = KIPS;

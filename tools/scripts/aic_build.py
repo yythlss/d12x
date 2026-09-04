@@ -14,6 +14,7 @@ import shutil
 import tarfile
 import hashlib
 import operator
+import subprocess
 from SCons.Script import *
 from collections import namedtuple
 from collections import OrderedDict
@@ -182,26 +183,31 @@ def update_project_env(aic_root):
     os.environ['RTT_DIR'] = os.path.join(aic_root, 'kernel', 'rt-thread/')
 
 
-def apply_defconfig(aic_root, defconfig):
+def apply_defconfig(aic_root, defconfig, verbose=True):
     src = os.path.join(aic_root, 'target', 'configs', defconfig)
     if not os.path.exists(src):
         print('defconfig file {} is not exists!'.format(src))
         sys.exit(110)
 
-    print('Load config from {}'.format(os.path.join('target', 'configs', defconfig)))
+    if verbose:
+        print('Load config from {}'.format(os.path.join('target', 'configs', defconfig)))
     os.system('echo ' + defconfig.replace('_defconfig', '') + ' > ' +
               os.path.join(aic_root, '.defconfig'))
 
     dst = os.path.join(aic_root, '.config')
     shutil.copy(src, dst)
-    sys.path.append(os.path.join(aic_root, 'kernel/rt-thread/tools'))
+    sys.path.insert(0, os.path.join(aic_root, 'kernel/rt-thread/tools'))
 
     # Should generate .Kconfig.prj before apply defconfig, because project depends on this file.
     mk_kconfig_prj(aic_root, src)
     update_project_env(aic_root)
     pydefconfig = os.path.join(aic_root, 'kernel', 'rt-thread', 'tools',  'defconfig.py')
-    defconf_cmd = 'python3 {} {}'.format(pydefconfig, src)
-    os.system(defconf_cmd)
+    defconf_cmd = ['python3', pydefconfig, src]
+    if verbose:
+        subprocess.call(defconf_cmd)
+    else:
+        with open(os.devnull, 'w') as devnull:
+            subprocess.call(defconf_cmd, stdout=devnull, stderr=devnull)
     from menuconfig import mk_rtconfig
     mk_rtconfig('.config')
 
@@ -223,7 +229,7 @@ def save_defconfig(aic_root):
 def update_defconfig(aic_root):
     defconfig = get_prj_defconfig(aic_root)
     if defconfig:
-        apply_defconfig(aic_root, defconfig)
+        apply_defconfig(aic_root, defconfig, verbose=False)
 
 
 # cmd-option: list defconfig without bootloader
@@ -339,7 +345,11 @@ def show_info_cmd(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defcon
             sys.path.append(chip_path)
             import rtconfig
             toolchain = os.path.join(toolchain, rtconfig.PREFIX)
-        toolchain_ver = get_config(config_file, 'CONFIG_PRJ_TOOLCHAIN_VER').replace('"', '')
+        toolchain_ver = get_config(config_file, 'CONFIG_PRJ_TOOLCHAIN_VER')
+        if toolchain_ver:
+            toolchain_ver = toolchain_ver.replace('"', '')
+        else:
+            toolchain_ver = ''
 
         # summary
         print('    Target app: application/{}/{}'.format(prj_kernel, prj_app))
@@ -1114,9 +1124,15 @@ def distclean_cmd(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defcon
     distclean = GetOption('distclean')
     if distclean:
         prj_name = prj_defconfig.replace('_defconfig', '')
-        os.system('rm -rf ' + aic_root + '/output/' + prj_name)
-        os.system('rm -rf ' + aic_root + '/toolchain')
-        os.system('rm -f ' + aic_root + '/.config')
+        out_dir = os.path.join(aic_root, 'output', prj_name)
+        tc_dir = os.path.join(aic_root, 'toolchain')
+        cfg_file = os.path.join(aic_root, '.config')
+        if os.path.isdir(out_dir):
+            shutil.rmtree(out_dir)
+        if os.path.isdir(tc_dir):
+            shutil.rmtree(tc_dir)
+        if os.path.isfile(cfg_file):
+            os.remove(cfg_file)
         exit(0)
 
 
@@ -1362,6 +1378,13 @@ def mkimage_gen_mkfs_action(img_id):
     littlefs_enable = 'CONFIG_AIC_USING_FS_IMAGE_TYPE_LITTLEFS_FOR_{}'.format(img_id)
     uffs_enable = 'CONFIG_AIC_USING_FS_IMAGE_TYPE_UFFS_FOR_{}'.format(img_id)
     mkfscmd = ''
+
+    reserved_blks = 50
+    reserved_opt = 'CONFIG_AIC_NFTL_MINI_RESERVED_BLOCK'
+    if get_config(prj_root_dir + '.config', reserved_opt):
+        reserved_blks = get_config(prj_root_dir + '.config', reserved_opt).replace('"', '')
+
+    srcdir = ''
     if get_config(prj_root_dir + '.config', fatfs_enable) == 'y':
         imgname_opt = 'CONFIG_AIC_FS_IMAGE_NAME_{}'.format(img_id)
         imgname = get_config(prj_root_dir + '.config', imgname_opt).replace('"', '')
@@ -1390,11 +1413,6 @@ def mkimage_gen_mkfs_action(img_id):
 
         cluster_size = 'CONFIG_AIC_USING_FS_IMAGE_TYPE_FATFS_CLUSTER_SIZE'
         cluster = int(get_config(prj_root_dir + '.config', cluster_size))
-
-        reserved_blks = 50
-        reserved_opt = 'CONFIG_AIC_NFTL_MINI_RESERVED_BLOCK'
-        if get_config(prj_root_dir + '.config', reserved_opt):
-            reserved_blks = get_config(prj_root_dir + '.config', reserved_opt).replace('"', '')
 
         cmdstr = 'python3 ' + aic_script_dir + 'makefatfs.py '
         if auto_siz == 'y':
@@ -1435,7 +1453,8 @@ def mkimage_gen_mkfs_action(img_id):
         cmdstr += '--blocksize {} '.format(blksiz)
         cmdstr += '--tooldir {} '.format(aic_script_dir)
         cmdstr += '--inputdir {} '.format(srcdir)
-        cmdstr += '--outfile {}\n'.format(outimg)
+        cmdstr += '--outfile {} '.format(outimg)
+        cmdstr += '--reserved {}\n'.format(reserved_blks)
         mkfscmd += cmdstr
     if get_config(prj_root_dir + '.config', uffs_enable) == 'y':
         nand_list = mkimage_get_nand_params()
@@ -1757,7 +1776,7 @@ def chk_prj_config(aic_root):
     update_defconfig(aic_root)
 
     # update 'rtconfig.h'
-    sys.path.append(os.path.join(aic_root, 'kernel/rt-thread/tools'))
+    sys.path.insert(0, os.path.join(aic_root, 'kernel/rt-thread/tools'))
     from menuconfig import mk_rtconfig
     mk_rtconfig(".config")
 
@@ -1930,6 +1949,8 @@ def get_prj_config(aic_root):
     PRJ_CUSTOM_LDS = custom_lds
 
     PRJ_TOOLCHAIN_VER = get_config(config_file, 'CONFIG_PRJ_TOOLCHAIN_VER')
+    if PRJ_TOOLCHAIN_VER is None:
+        PRJ_TOOLCHAIN_VER = ''
 
     # cmd-option: save defconfig
     save_def_cmd(aic_root, PRJ_CHIP, PRJ_BOARD, PRJ_KERNEL, PRJ_APP, PRJ_DEFCONFIG_NAME)

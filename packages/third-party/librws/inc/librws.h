@@ -157,7 +157,7 @@ RWS_API(rws_socket) rws_socket_create(void);
  rws_socket_set_url(socket, "ws", "echo.websocket.org", 80, "/");
  @endcode
  */
-RWS_API(void) rws_socket_set_url(rws_socket socket,
+RWS_API(void) rws_socket_set_url(rws_socket socket,  // NOLINT(readability/fname)
                                  const char *scheme,
                                  const char *host,
                                  const int port,
@@ -382,7 +382,9 @@ RWS_API(void) rws_thread_sleep(const unsigned int millisec);
 /* RT-Thread Team add */
 RWS_API(void) rws_socket_set_custom_mode(rws_socket socket);
 
-#define RWS_RECEIVE_HEADER_BUFF_SIZE  (  14)
+RWS_API(void) rws_socket_add_header(rws_socket socket, const char *key, const char *value);
+
+#define RWS_RECEIVE_HEADER_BUFF_SIZE  (14)
 #define RWS_RECEIVE_PAYLOAD_BUFF_SIZE (2048)
 
 #endif

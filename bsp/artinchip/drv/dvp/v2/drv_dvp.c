@@ -12,6 +12,7 @@
 #include "aic_list.h"
 #include "aic_hal_clk.h"
 #include "mpp_types.h"
+#include "aic_iopoll.h"
 
 #include "hal_dvp.h"
 #include "drv_dvp.h"
@@ -107,6 +108,8 @@ int aic_dvp_set_in_fmt(struct mpp_video_fmt *fmt)
 
     if (fmt->flags & MEDIA_SIGNAL_INTERLACED_MODE)
         cfg->interlaced = 1;
+    else
+        cfg->interlaced = 0;
 
     return 0;
 }
@@ -152,7 +155,6 @@ int aic_dvp_set_out_fmt(struct dvp_out_fmt *fmt)
     g_dvp.cfg.height = g_dvp.fmt.height;
     g_dvp.cfg.crop_x = g_dvp.fmt.crop_x;
     g_dvp.cfg.crop_y = g_dvp.fmt.crop_y;
-    g_dvp.cfg.stitch_mode = fmt->stitch_mode;
 
     for (i = 0; i < DVP_PLANE_NUM; i++) {
         g_dvp.cfg.stride[i] = g_dvp.fmt.plane_fmt[i].bytesperline;
@@ -179,14 +181,27 @@ int aic_dvp_stream_off(u32 ch)
 
 void aic_dvp_stream_pause(u32 ch)
 {
+    u32 val;
+    int ret;
+
     hal_dvp_enable_int(&g_dvp.cfg, ch, 0);
+    hal_dvp_capture_stop(ch);
+
+    ret = read_poll_timeout(hal_dvp_irq_sta_get, ch, val,
+                            val & DVP_IRQ_STA_CLOSE_DONE,
+                            0, 100000);
+    if (ret < 0) {
+        pr_err("[DVP%d] Wait CLOSE_DONE timeout!\n", ch);
+    }
+
+    hal_dvp_clr_int(ch);
 }
 
 void aic_dvp_stream_resume(u32 ch)
 {
     hal_dvp_clr_fifo();
     hal_dvp_clr_int(ch);
-    g_dvp.ch[ch].resumed = true;
+    hal_dvp_capture_start(ch);
     hal_dvp_enable_int(&g_dvp.cfg, ch, 1);
 }
 
@@ -195,48 +210,10 @@ void aic_dvp_stream_resume(u32 ch)
 #define PLANE_S_SIZE    sizeof(struct vin_video_plane)
 #define VBUF_S_SIZE     (PLANE_S_SIZE * vbuf->num_planes)
 
-/* Split the plane for stitch mode */
-static void aic_dvp_split_plane(struct vin_video_buf *vbuf,
-                                enum mpp_stitch_mode stitch,
-                                struct aic_dvp_config *cfg)
-{
-    struct vin_video_plane planes1[VIN_MAX_BUF_NUM] = {0};
-    int i;
-
-    /**
-    * Buffer layout for stitch mode:
-    *
-    *    MPP_STITCH_V_MODE              MPP_STITCH_H_MODE
-    *    +-----------+                  +-----------+-----------+
-    *    | CH0       |                  | CH0       | CH1       | Y
-    *    +-----------+ Y                +-----------+-----------+
-    *    | CH1       |                  | CH0       | CH1       | UV
-    *    +-----------+                  +-----------+-----------+
-    *    | CH0       |
-    *    +-----------+ UV
-    *    | CH1       |
-    *    +-----------+
-    */
-
-    if (stitch == MPP_STITCH_V_MODE) {
-        for (i = 0; i < PLANE_NUM * VBUF_NUM; i++) {
-            planes1[i].buf = vbuf->planes[i].buf + vbuf->planes[i].len;
-            planes1[i].len = vbuf->planes[i].len;
-        }
-    }
-
-    if (stitch == MPP_STITCH_H_MODE) {
-        for (i = 0; i < PLANE_NUM * VBUF_NUM; i++) {
-            planes1[i].buf = vbuf->planes[i].buf + cfg->width;
-            planes1[i].len = vbuf->planes[i].len;
-        }
-    }
-    memcpy(&vbuf->planes[PLANE_NUM * VBUF_NUM], planes1, VBUF_S_SIZE * VBUF_NUM);
-}
 
 #ifdef AIC_DVP_NO_SIGNAL_PATTERN
 static void dvp_fill_no_signal_pattern(struct vin_video_buf *vbuf,
-                                       struct aic_dvp_config *cfg, bool stitch)
+                                       struct aic_dvp_config *cfg)
 {
     u32 nf = vbuf->num_buffers;
     u32 width  = cfg->width;
@@ -247,9 +224,6 @@ static void dvp_fill_no_signal_pattern(struct vin_video_buf *vbuf,
 
     if (aic_dvp_sfield_mode())
         block_height /= 2;
-
-    if (stitch)
-        nf *= 2;
 
     for (i = 0; i < nf; i++) {
         /* Y plane: checkerboard */
@@ -276,7 +250,6 @@ static void dvp_fill_no_signal_pattern(struct vin_video_buf *vbuf,
 int aic_dvp_req_buf(char *buf, u32 size, struct vin_video_buf *vbuf, u32 ch)
 {
     struct aic_dvp_config *cfg = &g_dvp.cfg;
-    enum mpp_stitch_mode stitch = cfg->stitch_mode;
     int i, ret = 0;
 
     if (!vbuf || !buf || size == 0) {
@@ -288,29 +261,12 @@ int aic_dvp_req_buf(char *buf, u32 size, struct vin_video_buf *vbuf, u32 ch)
     for (i = 0; i < PLANE_NUM; i++)
         vbuf->planes[i].len = cfg->sizeimage[i];
 
-    if (MPP_IS_STITCH(stitch)) {
-        if (ch > 0)
-            return vin_vb_req_stitch_buf(&g_dvp.ch[ch].queue, vbuf);
-
-        /* Request the buffer with the double size */
-        for (i = 0; i < PLANE_NUM; i++)
-            vbuf->planes[i].len *= 2;
-    }
-
     ret = vin_vb_req_buf(&g_dvp.ch[ch].queue, buf, size, vbuf);
     if (ret < 0)
         return ret;
 
-    if (MPP_IS_STITCH(stitch)) { /* It's surely CH0 */
-        /* Revert the size of all planes */
-        for (i = 0; i < PLANE_NUM * VBUF_NUM; i++)
-            vbuf->planes[i].len /= 2;
-
-        aic_dvp_split_plane(vbuf, stitch, cfg);
-    }
-
 #ifdef AIC_DVP_NO_SIGNAL_PATTERN
-    dvp_fill_no_signal_pattern(vbuf, cfg, MPP_IS_STITCH(stitch));
+    dvp_fill_no_signal_pattern(vbuf, cfg);
 #endif
 
     return ret;
@@ -416,9 +372,8 @@ static int aic_dvp_frame_done(struct aic_dvp *dvp, int err, u32 ch)
     }
 
     if (list_empty(&dvp_ch->active_list)) {
-#ifndef AIC_DVP_IGNORE_LOSS
-        pr_err("No buf available!\n");
-#endif
+        if (!g_dvp.ignore_loss)
+            pr_err("No buf available!\n");
         return 0;
     }
 
@@ -457,9 +412,8 @@ static int aic_dvp_update_addr(struct aic_dvp *dvp, u32 ch)
         return 0;
 
     if (list_empty(&dvp_ch->active_list)) {
-#ifndef AIC_DVP_IGNORE_LOSS
-        pr_warn("[DVP%d] No buf available!\n", ch);
-#endif
+        if (!g_dvp.ignore_loss)
+            pr_warn("[DVP%d] No buf available!\n", ch);
         return -1;
     }
 
@@ -470,11 +424,9 @@ static int aic_dvp_update_addr(struct aic_dvp *dvp, u32 ch)
         return -1;
     }
 
-    if (cur_buf == list_last_entry(&dvp_ch->active_list, struct vb_buffer,
-                                   active_entry)) {
-#ifndef AIC_DVP_IGNORE_LOSS
-        pr_warn("[DVP%d] It's the last buf!\n", ch);
-#endif
+    if (cur_buf == list_last_entry(&dvp_ch->active_list, struct vb_buffer, active_entry)) {
+        if (!g_dvp.ignore_loss)
+            pr_info("[DVP%d] It's the last buf!\n", ch);
         return 0;
     }
 
@@ -533,6 +485,12 @@ static int aic_dvp_start_streaming(struct vb_queue *q)
     int ret = 0;
 
     pr_debug("[DVP%d] Starting capture\n", ch);
+
+    if (list_empty(&dvp->ch[ch].active_list)) {
+        pr_err("[DVP%d] Active list is empty!\n", ch);
+        return -EINVAL;
+    }
+
     dvp->ch[ch].sequence = 0;
     hal_dvp_field_tag_clr(ch);
 
@@ -600,7 +558,6 @@ static void aic_dvp_ch_isr(u32 ch, u32 sta)
     struct aic_dvp *dvp = &g_dvp;
     struct aic_dvp_config *dvp_cfg = &dvp->cfg;
     struct aic_dvp_ch *dvp_ch = &dvp->ch[ch];
-    static u32 all_ch_done = 0;
     u32 err = 0;
 
     pr_debug("[DVP%d] IRQ status 0x%x, sequence %d\n",
@@ -655,21 +612,7 @@ static void aic_dvp_ch_isr(u32 ch, u32 sta)
             }
         }
 #endif
-
-        if (MPP_IS_STITCH(dvp_cfg->stitch_mode)) {
-            all_ch_done |= BIT(ch);
-            if ((ch != 0) && (all_ch_done == DVP_CH_IRQ_ALL_PENDING))
-                all_ch_done &= ~BIT(0); // SO, wait for next CH0 done
-
-            /* Only consider frame done when CH0 is done */
-            if ((all_ch_done == DVP_CH_IRQ_ALL_PENDING) && (ch == 0)) {
-                for (int i = DVP_MAX_CH_NUM - 1; i >= 0; i--)
-                    aic_dvp_frame_done(dvp, err, i);
-                all_ch_done = 0;
-            }
-        } else {
-            aic_dvp_frame_done(dvp, err, ch);
-        }
+        aic_dvp_frame_done(dvp, err, ch);
     }
 
     if (sta & DVP_IRQ_STA_HNUM) {
@@ -713,7 +656,7 @@ static irqreturn_t aic_dvp_isr(int irq, void *data)
         }
 
         if (!hal_dvp_int_is_enabled(ch)) {
-            pr_warn("[DVP%d] IRQ is not enabled! sta 0x%x\n", ch, sta);
+            pr_debug("[DVP%d] IRQ is not enabled! sta 0x%x\n", ch, sta);
             continue;
         }
 
@@ -783,6 +726,11 @@ void aic_dvp_vb_deinit(u32 ch)
     }
 }
 
+void aic_dvp_ignore_loss(void)
+{
+    g_dvp.ignore_loss = true;
+}
+
 int aic_dvp_open(void)
 {
     int ret = 0;
@@ -808,6 +756,10 @@ int aic_dvp_open(void)
     hal_dvp_enable(&g_dvp.cfg, 1);
 
     memset(g_dvp.ch, 0, sizeof(struct aic_dvp_ch) * DVP_MAX_CH_NUM);
+
+#ifdef AIC_DVP_IGNORE_LOSS
+    aic_dvp_ignore_loss();
+#endif
     g_dvp.inited = true;
     return 0;
 }

@@ -14,6 +14,11 @@ extern irqreturn_t usbd_irq_handler(int irq, void * data);
 
 uint32_t usbd_clk;
 static unsigned char dma_sync_buffer[CACHE_LINE_SIZE] __attribute__((aligned(CACHE_LINE_SIZE)));
+#define USB_PHY_TUNE_REG                0x8018
+#define USB_PHY_TUNE_TXREF_OFFSET       8
+#define USB_PHY_TUNE_TXREF_MASK         (0xF << USB_PHY_TUNE_TXREF_OFFSET)
+#define USB_PHY_TUNE_TXPREEMPAMP_OFFSET 0
+#define USB_PHY_TUNE_TXPREEMPAMP_MASK   3
 
 void usb_dc_sync_dma(void)
 {
@@ -34,6 +39,27 @@ int usbd_wait_pll_locked(void)
     return 0;
 }
 #endif
+
+void usbd_dc_set_phytune(void)
+{
+    uint32_t reg_val;
+
+    /* Register default value is 0x8 */
+    if (AIC_USB_PHY_TXREF != 0x8) {
+        reg_val = readl((volatile void *)(USB_DEV_BASE + USB_PHY_TUNE_REG));
+        reg_val &= ~USB_PHY_TUNE_TXREF_MASK;
+        reg_val |= AIC_USB_PHY_TXREF << USB_PHY_TUNE_TXREF_OFFSET;
+        writel(reg_val, (volatile void *)(USB_DEV_BASE + USB_PHY_TUNE_REG));
+    }
+
+    /* Register default value is 0 */
+    if (AIC_USB_TXPREEMPAMP != 0) {
+        reg_val = readl((volatile void *)(USB_DEV_BASE + USB_PHY_TUNE_REG));
+        reg_val &= ~USB_PHY_TUNE_TXPREEMPAMP_MASK;
+        reg_val |= AIC_USB_TXPREEMPAMP << USB_PHY_TUNE_TXPREEMPAMP_OFFSET;
+        writel(reg_val, (volatile void *)(USB_DEV_BASE + USB_PHY_TUNE_REG));
+    }
+}
 
 void usb_dc_low_level_init(void)
 {
@@ -62,6 +88,9 @@ void usb_dc_low_level_init(void)
         USB_LOG_ERR("usb pll unlock :%#lx \n", (long)(readl(PLL_COM)));
 
 #endif
+
+    /* Set USB PHY tune, default params are usually sufficient */
+    usbd_dc_set_phytune();
 
     usbd_clk = hal_clk_get_freq(CONFIG_USB_AIC_DC_CLK);
 

@@ -147,6 +147,16 @@
 #define TSEN_THS_ENV_TEMP_LOW_MASK      0Xff
 #define TSEN_THS_ENV_TEMP_LOW_SHIFT     24
 #define TSEN_SINGLE_POINT_CALI_K_CPU    950
+#elif defined(AIC_SID_DRV_V17)
+#define TSEN_CP_VERSION_OFFSET          0x08
+#define TSEN_CP_VERSION_MASK            0x3f
+#define TSEN_CP_VERSION_SHIFT           16
+#define TSEN_THS0_ADC_VAL_LOW_OFFSET    0x0c
+#define TSEN_THS_ENV_TEMP_LOW_OFFSET    0x0c
+#define TSEN_THS0_ADC_VAL_LOW_MASK      0xfff
+#define TSEN_THS_ENV_TEMP_LOW_MASK      0xf
+#define TSEN_THS_ENV_TEMP_LOW_SHIFT     24
+#define TSEN_SINGLE_POINT_CALI_K_CPU    993
 #endif
 
 #define TSEN_ORIGIN_STANDARD_VOLTAGE    3000 // = 3 * 1000
@@ -398,7 +408,7 @@ void hal_tsen_single_point_cali_for_correct(struct aic_tsen_ch *chan)
 /* For temperature's slope and offset calculated by y=kx+b equation.
  * THS0_ADC_VAL as y, THS_ENV_TEMP as x.
  */
-#ifndef AIC_SID_DRV_V12
+#if !defined(AIC_SID_DRV_V12) && !defined(AIC_SID_DRV_V17)
 static void hal_tsen_get_cali_param(int y1, int y2, int x1, int x2,
                    struct aic_tsen_ch *chan)
 {
@@ -467,8 +477,7 @@ void hal_tsen_curve_fitting(struct aic_tsen_ch *chan)
     } else {
         hal_tsen_single_point_cali_for_correct(chan);
     }
-#endif
-#ifdef AIC_TSEN_DRV_V20
+#else
     hal_tsen_single_point_cali(chan);
 #endif
 

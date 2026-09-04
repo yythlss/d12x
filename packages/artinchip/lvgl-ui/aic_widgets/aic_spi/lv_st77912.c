@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025, ArtInChip Technology Co., Ltd
+ * Copyright (C) 2025-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -9,9 +9,9 @@
 #include <rtdevice.h>
 #include "lv_aic_spi.h"
 
-#define ST77912_RST_PIN  "PD.19"
+#define ST77912_RST_PIN  "PD.10"
 
-void lv_spi_panel_enable(struct lv_spi_dev *dev)
+static void lv_spi_panel(struct lv_spi_dev *dev)
 {
     u32 rst_pin;
 
@@ -277,3 +277,10 @@ void lv_spi_panel_enable(struct lv_spi_dev *dev)
     lv_spi_write_seq(dev, 0x29);
     rt_thread_mdelay(20);
 }
+
+struct lv_spi_panel_driver lv_spi_st77912 = {
+    .name = "st77912",
+    .enable = lv_spi_panel,
+    .width = 240,
+    .height = 240,
+};

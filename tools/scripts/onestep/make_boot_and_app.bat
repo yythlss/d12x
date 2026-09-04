@@ -31,9 +31,19 @@ set boot_defconfig=!chip!_!board!_baremetal_bootloader_defconfig
 
 set LOG_DIR=%SDK_PRJ_TOP_DIR%\.log
 if not exist %LOG_DIR% mkdir %LOG_DIR%
-del %LOG_DIR%\*.log /f /q
+del %LOG_DIR%\*.log /f /q 2>nul
 
 :: (1) Build bootloader
+if not exist "%SDK_PRJ_TOP_DIR%\target\configs\%boot_defconfig%" (
+	echo %boot_defconfig% does not exist!
+	goto build_app
+)
+
+set boot_solution=!boot_defconfig:~0,-10!
+echo.
+echo --------------------------------------------------------------
+echo Build !boot_solution!
+echo --------------------------------------------------------------
 call scons --apply-def=%boot_defconfig% -C %SDK_PRJ_TOP_DIR%
 
 if "%clean_flag%" == "clean" (
@@ -45,24 +55,19 @@ if "%kernel%_%app%" == "baremetal_bootloader" (
 	goto exit_label
 )
 
-:: Two cases:
-:: 1. Git bash is not included in ENV, use DOS find
-:: 2. Git bash is included in ENV, use grep, otherwise it will use find in the bash, but parameter
-::    is wrong
-where grep > nul 2>&1
-if not %errorlevel% equ 0 (
-	find "Luban-Lite is built successfully" %LOG_DIR%\%boot_defconfig%.log > nul
-) else (
-	grep "Luban-Lite is built successfully" %LOG_DIR%\%boot_defconfig%.log > nul
-)
+:: Use findstr to check build result (always available on Windows)
+findstr /c:"Luban-Lite is built successfully" /c:"is up to date" %LOG_DIR%\%boot_defconfig%.log > nul
 if not %errorlevel% equ 0 (
 	call scons --apply-def=%app_defconfig% -C %SDK_PRJ_TOP_DIR%
 	goto exit_label
 )
 
-call checkout_binary.bat
-
+:build_app
 :: (2) Build app
+echo.
+echo --------------------------------------------------------------
+echo Build %defconfig%
+echo --------------------------------------------------------------
 call scons --apply-def=%app_defconfig% -C %SDK_PRJ_TOP_DIR%
 
 if "%clean_flag%" == "clean" (

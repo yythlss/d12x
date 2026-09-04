@@ -33,6 +33,12 @@
 
 #include "rtconfig.h"
 
+#ifdef AIC_USING_PM
+    #define AIC_PM_SRAM_RESERVE_SIZE 0x400
+#else
+    #define AIC_PM_SRAM_RESERVE_SIZE 0
+#endif
+
 MEMORY
 {
     BROM      : ORIGIN = 0x30000000                                            , LENGTH = 32K
@@ -47,6 +53,9 @@ MEMORY
 
 PROVIDE (__sram_start              = 0x30040000);
 PROVIDE (__sram_end                = 0x30040000 + AIC_SRAM_SIZE);
+
+PROVIDE (__sram_pm_start           = __sram_pm_heap_start);
+PROVIDE (__sram_pm_end             = __sram_pm_heap_end);
 
 PROVIDE (__sram_cma_start          = __sram_cma_heap_start);
 PROVIDE (__sram_cma_end            = 0x30040000 + AIC_SRAM_SIZE - AIC_SRAM_SW_SIZE);
@@ -276,6 +285,16 @@ SECTIONS
   end = . ;
   __bss_end__ = .;
  } > REGION_BSS
+
+#ifdef AIC_PM_SRAM_RESERVE_SIZE
+ ._sram_pm_heap : {
+  . = ALIGN(0x4) ;
+  __sram_pm_heap_start = .;
+  . += AIC_PM_SRAM_RESERVE_SIZE;
+  . = ALIGN(0x4) ;
+  __sram_pm_heap_end = .;
+ } > REGION_SRAM_CMA AT > REGION_SRAM_CMA
+#endif
 
  .psram_cma : {
   . = ALIGN(0x4) ;

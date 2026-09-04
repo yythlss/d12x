@@ -100,7 +100,14 @@ class Win32Spawn:
 
         import subprocess
 
-        newargs = ' '.join(args[1:])
+        # Convert backslashes to forward slashes for GCC on Windows
+        # to avoid path separator issues
+        normalized_args = []
+        for arg in args[1:]:
+            if '\\' in arg:
+                arg = arg.replace('\\', '/')
+            normalized_args.append(arg)
+        newargs = ' '.join(normalized_args)
         cmdline = cmd + " " + newargs
 
         # Make sure the env is constructed by strings
@@ -615,7 +622,7 @@ def DefineGroup(name, src, depend, **parameters):
     group['path'] = group_path
     if isinstance(src, list):
         # remove duplicate elements from list
-        src = list(set(src))
+        src = sorted(set(src), key=lambda f: str(f))
         group['src'] = File(src)
     else:
         group['src'] = src

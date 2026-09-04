@@ -2,6 +2,7 @@
 #define _CPU_LOAD_H_
 
 #include <rtthread.h>
+#include <rthw.h>
 #include <stdio.h>
 #include <string.h>
 #include <rtdevice.h>

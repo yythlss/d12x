@@ -12,6 +12,9 @@
 #if defined(AIC_CHIP_D12X)
 #include "xip_ramcode_d12x_bin.h"
 #endif
+#if defined(AIC_CHIP_D12P)
+#include "xip_ramcode_d12p_bin.h"
+#endif
 #include "aic_core.h"
 #define XIP_RAMCODE_API_INIT     (XIP_RAMCODE_LINK_ADDRESS + 0x0)
 #define XIP_RAMCODE_API_READ     (XIP_RAMCODE_LINK_ADDRESS + 0x10)

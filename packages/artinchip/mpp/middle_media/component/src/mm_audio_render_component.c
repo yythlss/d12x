@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020-2025 ArtInChip Technology Co. Ltd
+ * Copyright (C) 2020-2026 ArtInChip Technology Co. Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -21,6 +21,7 @@
 #include "mpp_log.h"
 #include "mpp_list.h"
 #include "mpp_mem.h"
+#include "mpp_thread.h"
 #include "aic_message.h"
 #include "mpp_decoder.h"
 #include "aic_audio_render_manager.h"
@@ -50,7 +51,7 @@ typedef struct mm_audio_render_data {
     mm_bind_info in_port_bind[2];
     mm_bind_info out_port_bind[2];
 
-    pthread_t thread_id;
+    mpp_thread_t thread_handle;
     struct aic_message_queue s_msg;
 
     struct aic_audio_render *render;
@@ -90,7 +91,7 @@ typedef struct mm_audio_render_data {
 
 } mm_audio_render_data;
 
-static void *mm_audio_render_component_thread(void *p_thread_data);
+static void mm_audio_render_component_thread(void *p_thread_data);
 static void mm_audio_render_show_debug_info(mm_audio_render_data *p_audio_render_data);
 
 
@@ -383,7 +384,7 @@ s32 mm_audio_render_component_deinit(mm_handle h_component)
     s_msg.message_id = MM_COMMAND_STOP;
     s_msg.data_size = 0;
     aic_msg_put(&p_audio_render_data->s_msg, &s_msg);
-    pthread_join(p_audio_render_data->thread_id, (void *)&error);
+    mpp_thread_delete(p_audio_render_data->thread_handle);
 
     pthread_mutex_destroy(&p_audio_render_data->state_lock);
 
@@ -396,30 +397,14 @@ s32 mm_audio_render_component_deinit(mm_handle h_component)
     return error;
 }
 
-static int audio_thread_attr_init(pthread_attr_t *attr)
-{
-    // default stack size is 2K, it is not enough for decode thread
-    if (attr == NULL) {
-        return EINVAL;
-    }
-    pthread_attr_init(attr);
-    attr->stacksize = 32 * 1024;
-    attr->schedparam.sched_priority = MM_COMPONENT_AUDIO_RENDER_THREAD_PRIORITY;
-    return 0;
-}
-
 s32 mm_audio_render_component_init(mm_handle h_component)
 {
     mm_component *p_comp;
     mm_audio_render_data *p_audio_render_data;
     s32 error = MM_ERROR_NONE;
-    u32 err = MM_ERROR_NONE;
     s32 port_index = 0;
     s8 msg_create = 0;
     s8 state_lock_init = 0;
-
-    pthread_attr_t attr;
-    audio_thread_attr_init(&attr);
 
     logi("mm_audio_render_component_init....\n");
 
@@ -475,10 +460,12 @@ s32 mm_audio_render_component_init(mm_handle h_component)
     state_lock_init = 1;
 
     // Create the component thread
-    err = pthread_create(&p_audio_render_data->thread_id, &attr,
-                         mm_audio_render_component_thread, p_audio_render_data);
-    if (err) {
-        loge("pthread_create fail!\n");
+    p_audio_render_data->thread_handle =
+        mpp_thread_create("arender", 32 * 1024,
+                          MM_COMPONENT_AUDIO_RENDER_THREAD_PRIORITY,
+                          mm_audio_render_component_thread, p_audio_render_data);
+    if (!p_audio_render_data->thread_handle) {
+        loge("mpp_thread_create arender comp thread fail!\n");
         error = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
@@ -896,7 +883,7 @@ static void mm_audio_render_show_debug_info(mm_audio_render_data *p_audio_render
 }
 
 
-static void *mm_audio_render_component_thread(void *p_thread_data)
+static void mm_audio_render_component_thread(void *p_thread_data)
 {
     s32 ret = MM_ERROR_NONE;
     s32 cmd = MM_COMMAND_UNKNOWN;
@@ -1069,5 +1056,4 @@ _EXIT:
         p_audio_render_data->render = NULL;
     }
     mm_audio_render_show_debug_info(p_audio_render_data);
-    return (void *)MM_ERROR_NONE;
 }

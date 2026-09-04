@@ -426,9 +426,9 @@ void lv_port_disp_init(void)
     }
 #endif
 
-#if defined(AIC_LVGL_DOUBLE_DISP_DEMO) || defined(LV_USE_SPI_REPLACE_MIPI_DBI)
+#if defined(AIC_LVGL_DOUBLE_DISP_DEMO) || defined(LV_USE_SPI_REPLACE_MIPI_DBI) || defined(AIC_LVGL_AI_EYES_DEMO)  || defined(AIC_LVGL_FIVE_DISP_DEMO)
     int use_frame_buffer = 0;
-#ifdef LV_USE_SPI_REPLACE_MIPI_DBI
+#if defined(LV_USE_SPI_REPLACE_MIPI_DBI) && !defined(AIC_LVGL_FIVE_DISP_DEMO)
     use_frame_buffer = 1;
 #endif
     extern int lv_spi_display_init(int use_frame_buffer);

@@ -8,6 +8,15 @@
 #include <rtthread.h>
 #include "cpuport.h"
 
+/* Compat RT-Thread 4.x uses direct members, 5.2.x nests them */
+#if RT_VERSION_MAJOR >= 5
+#define THREAD_NAME(t)   ((t)->parent.name)
+#define THREAD_STAT(t)   ((t)->sched_thread_ctx.stat)
+#else
+#define THREAD_NAME(t)   ((t)->name)
+#define THREAD_STAT(t)   ((t)->stat)
+#endif
+
 #ifdef RT_USING_FINSH
 #include <finsh.h>
 
@@ -374,7 +383,7 @@ long trace_thread_stack(int argc, char *argv[])
 
             obj = rt_list_entry(obj_list[i], struct rt_object, list);
             thread = (struct rt_thread *)obj;
-            if (rt_strncmp(argv[1], thread->name, (unsigned int)RT_NAME_MAX))
+            if (rt_strncmp(argv[1], THREAD_NAME(thread), (unsigned int)RT_NAME_MAX))
                 continue;
 
             level = rt_hw_interrupt_disable();
@@ -388,13 +397,13 @@ long trace_thread_stack(int argc, char *argv[])
             rt_memcpy(&thread_info, obj, sizeof thread_info);
             rt_hw_interrupt_enable(level);
 
-            stat = (thread->stat & RT_THREAD_STAT_MASK);
+            stat = (THREAD_STAT(thread) & RT_THREAD_STAT_MASK);
             if (stat != RT_THREAD_SUSPEND) {
-                rt_kprintf("thread: [%s] is not suspend, exit\n", thread->name);
+                rt_kprintf("thread: [%s] is not suspend, exit\n", THREAD_NAME(thread));
                 continue;
             }
 
-            rt_kprintf("-----------------[%s] thread stack trace-----------------\n", thread->name);
+            rt_kprintf("-----------------[%s] thread stack trace-----------------\n", THREAD_NAME(thread));
             frame = thread->sp;
             print_reg_stack_frame(frame);
 
@@ -407,7 +416,7 @@ long trace_thread_stack(int argc, char *argv[])
                     rt_kprintf("\n");
                 rt_kprintf("0x%08x ", *sp);
             }
-            rt_kprintf("\n----------------------[%s] trace end----------------------\n", thread->name);
+            rt_kprintf("\n----------------------[%s] trace end----------------------\n", THREAD_NAME(thread));
         }
 
     } while ((next != (rt_list_t *)RT_NULL) && (j++ < RT_THREAD_PRIORITY_MAX));

@@ -32,7 +32,7 @@
 #define DBG_SECTION_NAME "LIBRWS"
 #endif
 #define DBG_ENABLE
-#define DBG_LEVEL DBG_WARNING
+#define DBG_LEVEL DBG_LOG
 #define DBG_COLOR
 #include <rtdbg.h>
 #define DBG_FUNCTION_NUM 20

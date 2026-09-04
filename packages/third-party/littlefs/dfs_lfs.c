@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2026, ArtInChip Technology Co., Ltd
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <rtdevice.h>
 #include <rtthread.h>
 
@@ -41,6 +47,12 @@
     #define LFS_LOOKAHEAD_MAX 128
 #endif
 
+#ifndef LFS_BLOCK_DEVICE_MIN_BLOCK_SIZE
+    #define LFS_BLOCK_DEVICE_MIN_BLOCK_SIZE 4096
+#endif
+
+#define LFS_ALIGN_UP(value, align) (((value) + (align) - 1) / (align) * (align))
+
 typedef struct _dfs_lfs_s
 {
     struct lfs lfs;
@@ -59,6 +71,46 @@ typedef struct _dfs_lfs_fd_s
 } dfs_lfs_fd_t;
 
 static struct _dfs_lfs_s* _lfs_mount_tbl[RT_DEF_LFS_DRIVERS] = {0};
+
+static int _lfs_open_device(rt_device_t dev_id, rt_bool_t *opened)
+{
+    int result;
+
+    if (opened != RT_NULL)
+    {
+        *opened = RT_FALSE;
+    }
+
+    if (dev_id->type != RT_Device_Class_Block)
+    {
+        return RT_EOK;
+    }
+
+    result = rt_device_open(dev_id, RT_DEVICE_OFLAG_RDWR);
+    if (result == RT_EOK)
+    {
+        if (opened != RT_NULL)
+        {
+            *opened = RT_TRUE;
+        }
+        return RT_EOK;
+    }
+
+    if (dev_id->ref_count > 0)
+    {
+        return RT_EOK;
+    }
+
+    return result;
+}
+
+static void _lfs_close_device(rt_device_t dev_id, rt_bool_t opened)
+{
+    if ((dev_id->type == RT_Device_Class_Block) && opened)
+    {
+        rt_device_close(dev_id);
+    }
+}
 
 #ifdef LFS_THREADSAFE
 // Lock the underlying block device. Negative error codes
@@ -92,6 +144,7 @@ int _lfs_unlock(const struct lfs_config *c)
 
 // Read a region in a block. Negative error codes are propogated
 // to the user.
+#ifdef RT_USING_MTD_NOR
 static int _lfs_flash_read(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, void* buffer, lfs_size_t size)
 {
     struct rt_mtd_nor_device* mtd_nor;
@@ -151,6 +204,105 @@ static int _lfs_flash_erase(const struct lfs_config* c, lfs_block_t block)
 // are propogated to the user.
 static int _lfs_flash_sync(const struct lfs_config* c)
 {
+    return LFS_ERR_OK;
+}
+#endif
+
+static int _lfs_blk_read(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, void* buffer, lfs_size_t size)
+{
+    rt_device_t blk_dev;
+    rt_uint64_t addr;
+    rt_uint64_t sector;
+    rt_size_t sector_count;
+
+    RT_ASSERT(c != RT_NULL);
+    RT_ASSERT(c->context != RT_NULL);
+
+    if ((off % c->read_size) || (size % c->read_size))
+    {
+        return LFS_ERR_INVAL;
+    }
+
+    blk_dev = (rt_device_t)c->context;
+    addr = (rt_uint64_t)block * c->block_size + off;
+    sector = addr / c->read_size;
+    sector_count = size / c->read_size;
+    if (sector_count == 0)
+    {
+        return LFS_ERR_OK;
+    }
+
+    if (rt_device_read(blk_dev, sector, buffer, sector_count) != sector_count)
+    {
+        rt_kprintf("lfs block read failed: dev=%s block=%lu off=%lu size=%lu sector=%llu count=%lu\n",
+                   blk_dev->parent.name,
+                   (unsigned long)block,
+                   (unsigned long)off,
+                   (unsigned long)size,
+                   (unsigned long long)sector,
+                   (unsigned long)sector_count);
+        return LFS_ERR_IO;
+    }
+
+    return LFS_ERR_OK;
+}
+
+static int _lfs_blk_prog(const struct lfs_config* c, lfs_block_t block, lfs_off_t off, const void* buffer, lfs_size_t size)
+{
+    rt_device_t blk_dev;
+    rt_uint64_t addr;
+    rt_uint64_t sector;
+    rt_size_t sector_count;
+
+    RT_ASSERT(c != RT_NULL);
+    RT_ASSERT(c->context != RT_NULL);
+
+    if ((off % c->prog_size) || (size % c->prog_size))
+    {
+        return LFS_ERR_INVAL;
+    }
+
+    blk_dev = (rt_device_t)c->context;
+    addr = (rt_uint64_t)block * c->block_size + off;
+    sector = addr / c->prog_size;
+    sector_count = size / c->prog_size;
+    if (sector_count == 0)
+    {
+        return LFS_ERR_OK;
+    }
+
+    if (rt_device_write(blk_dev, sector, buffer, sector_count) != sector_count)
+    {
+        rt_kprintf("lfs block prog failed: dev=%s block=%lu off=%lu size=%lu sector=%llu count=%lu\n",
+                   blk_dev->parent.name,
+                   (unsigned long)block,
+                   (unsigned long)off,
+                   (unsigned long)size,
+                   (unsigned long long)sector,
+                   (unsigned long)sector_count);
+        return LFS_ERR_IO;
+    }
+
+    return LFS_ERR_OK;
+}
+
+static int _lfs_blk_erase(const struct lfs_config* c, lfs_block_t block)
+{
+    RT_UNUSED(c);
+    RT_UNUSED(block);
+
+    /* Block device handles erase internally (SD/MMC FTL, NAND NFTL) */
+    return LFS_ERR_OK;
+}
+
+static int _lfs_blk_sync(const struct lfs_config* c)
+{
+#ifdef RT_DEVICE_CTRL_BLK_SYNC
+    rt_device_control((rt_device_t)c->context, RT_DEVICE_CTRL_BLK_SYNC, RT_NULL);
+#else
+    RT_UNUSED(c);
+#endif
+
     return LFS_ERR_OK;
 }
 
@@ -247,7 +399,21 @@ static int _lfs_result_to_dfs(int result)
     return status;
 }
 
-static void _lfs_load_config(struct lfs_config* lfs_cfg, struct rt_mtd_nor_device* mtd_nor)
+static void _lfs_apply_common_config(struct lfs_config* lfs_cfg)
+{
+    lfs_cfg->lookahead_size = 32 * ((lfs_cfg->block_count + 31) / 32);
+    if (lfs_cfg->lookahead_size > LFS_LOOKAHEAD_MAX)
+    {
+        lfs_cfg->lookahead_size = LFS_LOOKAHEAD_MAX;
+    }
+#ifdef LFS_THREADSAFE
+    lfs_cfg->lock = _lfs_lock;
+    lfs_cfg->unlock = _lfs_unlock;
+#endif
+}
+
+#ifdef RT_USING_MTD_NOR
+static int _lfs_load_mtd_nor_config(struct lfs_config* lfs_cfg, struct rt_mtd_nor_device* mtd_nor)
 {
     uint64_t mtd_size;
 
@@ -269,19 +435,83 @@ static void _lfs_load_config(struct lfs_config* lfs_cfg, struct rt_mtd_nor_devic
     mtd_size *= mtd_nor->block_size;
     lfs_cfg->block_count = mtd_size / lfs_cfg->block_size;
 
-    lfs_cfg->lookahead_size = 32 * ((lfs_cfg->block_count + 31) / 32);
-    if (lfs_cfg->lookahead_size > LFS_LOOKAHEAD_MAX)
-    {
-        lfs_cfg->lookahead_size = LFS_LOOKAHEAD_MAX;
-    }
-#ifdef LFS_THREADSAFE
-    lfs_cfg->lock = _lfs_lock;
-    lfs_cfg->unlock = _lfs_unlock;
-#endif
+    _lfs_apply_common_config(lfs_cfg);
     lfs_cfg->read = _lfs_flash_read;
     lfs_cfg->prog = _lfs_flash_prog;
     lfs_cfg->erase = _lfs_flash_erase;
     lfs_cfg->sync = _lfs_flash_sync;
+
+    return LFS_ERR_OK;
+}
+#endif
+
+static int _lfs_load_blk_config(struct lfs_config* lfs_cfg, rt_device_t blk_dev)
+{
+    struct rt_device_blk_geometry geometry;
+    rt_uint32_t sector_size;
+
+    if (rt_device_control(blk_dev, RT_DEVICE_CTRL_BLK_GETGEOME, &geometry) != RT_EOK)
+    {
+        return LFS_ERR_IO;
+    }
+
+    sector_size = geometry.bytes_per_sector ? geometry.bytes_per_sector : 512;
+
+    lfs_cfg->context = (void*)blk_dev;
+    lfs_cfg->read_size = sector_size;
+    lfs_cfg->prog_size = sector_size;
+    lfs_cfg->block_size = LFS_ALIGN_UP(LFS_BLOCK_SIZE, sector_size);
+    if (lfs_cfg->block_size < LFS_BLOCK_DEVICE_MIN_BLOCK_SIZE)
+    {
+        lfs_cfg->block_size = LFS_ALIGN_UP(LFS_BLOCK_DEVICE_MIN_BLOCK_SIZE, sector_size);
+    }
+    lfs_cfg->cache_size = LFS_ALIGN_UP(LFS_CACHE_SIZE, sector_size);
+    if (lfs_cfg->cache_size > lfs_cfg->block_size)
+    {
+        lfs_cfg->cache_size = lfs_cfg->block_size;
+    }
+    lfs_cfg->block_cycles = LFS_BLOCK_CYCLES;
+    lfs_cfg->block_count = ((rt_uint64_t)geometry.sector_count * sector_size) / lfs_cfg->block_size;
+
+    if (lfs_cfg->block_count == 0)
+    {
+        return LFS_ERR_INVAL;
+    }
+
+    rt_kprintf("lfs block config: dev=%s read=%lu prog=%lu block=%lu cache=%lu count=%lu\n",
+               blk_dev->parent.name,
+               (unsigned long)lfs_cfg->read_size,
+               (unsigned long)lfs_cfg->prog_size,
+               (unsigned long)lfs_cfg->block_size,
+               (unsigned long)lfs_cfg->cache_size,
+               (unsigned long)lfs_cfg->block_count);
+
+    _lfs_apply_common_config(lfs_cfg);
+    lfs_cfg->read = _lfs_blk_read;
+    lfs_cfg->prog = _lfs_blk_prog;
+    lfs_cfg->erase = _lfs_blk_erase;
+    lfs_cfg->sync = _lfs_blk_sync;
+
+    return LFS_ERR_OK;
+}
+
+static int _lfs_load_config(struct lfs_config* lfs_cfg, rt_device_t dev_id)
+{
+    if (dev_id->type == RT_Device_Class_MTD)
+    {
+#ifdef RT_USING_MTD_NOR
+        return _lfs_load_mtd_nor_config(lfs_cfg, (struct rt_mtd_nor_device*)dev_id);
+#else
+        return LFS_ERR_INVAL;
+#endif
+    }
+
+    if (dev_id->type == RT_Device_Class_Block)
+    {
+        return _lfs_load_blk_config(lfs_cfg, dev_id);
+    }
+
+    return LFS_ERR_INVAL;
 }
 
 static int _dfs_lfs_mount(struct dfs_filesystem* dfs, unsigned long rwflag, const void* data)
@@ -291,9 +521,10 @@ static int _dfs_lfs_mount(struct dfs_filesystem* dfs, unsigned long rwflag, cons
     dfs_lfs_t* dfs_lfs;
 
     /* Check Device Type */
-    if (dfs->dev_id->type != RT_Device_Class_MTD)
+    if ((dfs->dev_id->type != RT_Device_Class_MTD) &&
+        (dfs->dev_id->type != RT_Device_Class_Block))
     {
-        rt_kprintf("The flash device type must be MTD!\n");
+        rt_kprintf("The flash device type must be MTD or Block!\n");
         return -EINVAL;
     }
 
@@ -313,7 +544,13 @@ static int _dfs_lfs_mount(struct dfs_filesystem* dfs, unsigned long rwflag, cons
     }
     rt_memset(dfs_lfs, 0, sizeof(dfs_lfs_t));
     rt_mutex_init(&dfs_lfs->lock, "lfslock", RT_IPC_FLAG_PRIO);
-    _lfs_load_config(&dfs_lfs->cfg, (struct rt_mtd_nor_device*)dfs->dev_id);
+    result = _lfs_load_config(&dfs_lfs->cfg, dfs->dev_id);
+    if (result != LFS_ERR_OK)
+    {
+        rt_mutex_detach(&dfs_lfs->lock);
+        rt_free(dfs_lfs);
+        return _lfs_result_to_dfs(result);
+    }
 
     /* mount lfs*/
     result = lfs_mount(&dfs_lfs->lfs, &dfs_lfs->cfg);
@@ -323,7 +560,7 @@ static int _dfs_lfs_mount(struct dfs_filesystem* dfs, unsigned long rwflag, cons
         /* release memory */
         rt_free(dfs_lfs);
 
-        return -EIO;
+        return _lfs_result_to_dfs(result);
     }
 
     /* mount succeed! */
@@ -365,6 +602,7 @@ static int _dfs_lfs_mkfs(rt_device_t dev_id)
     int result;
     int index;
     dfs_lfs_t* dfs_lfs;
+    rt_bool_t dev_opened = RT_FALSE;
 
     if (dev_id == RT_NULL)
     {
@@ -372,9 +610,10 @@ static int _dfs_lfs_mkfs(rt_device_t dev_id)
     }
 
     /* Check Device Type */
-    if (dev_id->type != RT_Device_Class_MTD)
+    if ((dev_id->type != RT_Device_Class_MTD) &&
+        (dev_id->type != RT_Device_Class_Block))
     {
-        rt_kprintf("The flash device type must be MTD!\n");
+        rt_kprintf("The flash device type must be MTD or Block!\n");
         return -EINVAL;
     }
 
@@ -390,10 +629,26 @@ static int _dfs_lfs_mkfs(rt_device_t dev_id)
         }
         rt_memset(dfs_lfs, 0, sizeof(dfs_lfs_t));
         rt_mutex_init(&dfs_lfs->lock, "lfslock", RT_IPC_FLAG_PRIO);
-        _lfs_load_config(&dfs_lfs->cfg, (struct rt_mtd_nor_device*)dev_id);
+        result = _lfs_open_device(dev_id, &dev_opened);
+        if (result != RT_EOK)
+        {
+            rt_mutex_detach(&dfs_lfs->lock);
+            rt_free(dfs_lfs);
+            return -EIO;
+        }
+
+        result = _lfs_load_config(&dfs_lfs->cfg, dev_id);
+        if (result != LFS_ERR_OK)
+        {
+            _lfs_close_device(dev_id, dev_opened);
+            rt_mutex_detach(&dfs_lfs->lock);
+            rt_free(dfs_lfs);
+            return _lfs_result_to_dfs(result);
+        }
 
         /* format flash device */
         result = lfs_format(&dfs_lfs->lfs, &dfs_lfs->cfg);
+        _lfs_close_device(dev_id, dev_opened);
         rt_mutex_detach(&dfs_lfs->lock);
         rt_free(dfs_lfs);
         return _lfs_result_to_dfs(result);
@@ -414,16 +669,29 @@ static int _dfs_lfs_mkfs(rt_device_t dev_id)
     result = lfs_format(&dfs_lfs->lfs, &dfs_lfs->cfg);
     if (result != LFS_ERR_OK)
     {
+        rt_mutex_detach(&dfs_lfs->lock);
+        rt_free(dfs_lfs);
         return _lfs_result_to_dfs(result);
     }
 
-    _lfs_load_config(&dfs_lfs->cfg, (struct rt_mtd_nor_device*)dev_id);
+    result = _lfs_load_config(&dfs_lfs->cfg, dev_id);
+    if (result != LFS_ERR_OK)
+    {
+        rt_mutex_detach(&dfs_lfs->lock);
+        rt_free(dfs_lfs);
+        return _lfs_result_to_dfs(result);
+    }
 
     /* mount lfs*/
     result = lfs_mount(&dfs_lfs->lfs, &dfs_lfs->cfg);
     if (result == LFS_ERR_OK)
     {
         _lfs_mount_tbl[index] = dfs_lfs;
+    }
+    else
+    {
+        rt_mutex_detach(&dfs_lfs->lock);
+        rt_free(dfs_lfs);
     }
 
     return _lfs_result_to_dfs(result);

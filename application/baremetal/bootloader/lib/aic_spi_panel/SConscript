@@ -1,0 +1,19 @@
+# RT-Thread building script for SPI LCD panel library
+
+from building import *
+
+Import('rtconfig')
+
+cwd     = GetCurrentDir()
+src     = []
+
+if GetDepend('AIC_BOOTLOADER_SPI_LCD'):
+    src += Glob('spi_lcd.c')
+    src += Glob('spi_lcd_panel.c')
+
+CPPPATH = [cwd, cwd + '/../../include']
+
+group = DefineGroup('AIC_SPI_PANEL', src, depend = ['AIC_BOOTLOADER_SPI_LCD'],
+                    CPPPATH = CPPPATH)
+
+Return('group')

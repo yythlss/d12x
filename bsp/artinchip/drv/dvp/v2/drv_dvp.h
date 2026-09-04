@@ -19,7 +19,7 @@
 
 #define AIC_DVP_NAME    "aic-dvp"
 
-#define AIC_DVP_CLK_RATE    200000000   /* 200MHz */
+#define AIC_DVP_CLK_RATE    150000000   /* 150MHz */
 #define AIC_DVP_QOS_HIGH    0xB
 #define AIC_DVP_QOS_LOW     0x7
 
@@ -38,15 +38,15 @@ struct aic_dvp_ch {
     /* Videobuf */
     struct vb_queue  queue;
     struct list_head active_list;
-    bool             streaming;
-    bool             resumed;
-    bool             recv_first_field;
+    volatile bool    streaming;
+    volatile bool    resumed;
+    volatile bool    recv_first_field;
     aicos_sem_t      finished;
 
-    u32              sequence;
-    u32              frame_cnt;
-    u32              update_cnt;
-    u32              full_cnt;
+    volatile u32     sequence;
+    volatile u32     frame_cnt;
+    volatile u32     update_cnt;
+    volatile u32     full_cnt;
 };
 
 struct aic_dvp {
@@ -54,6 +54,7 @@ struct aic_dvp {
     struct aic_dvp_config   cfg; /* The configuration of DVP HW */
     struct dvp_out_fmt      fmt; /* The format of output data */
     bool                    inited;
+    bool                    ignore_loss;
 
     struct aic_dvp_ch       ch[DVP_MAX_CH_NUM];
 };
@@ -77,6 +78,7 @@ int aic_dvp_open(void);
 int aic_dvp_close(void);
 
 bool aic_dvp_sfield_mode(void);
+void aic_dvp_ignore_loss(void);
 
 #endif /* _ARTINCHIP_DRV_DVP_V2_H_ */
 

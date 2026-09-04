@@ -474,6 +474,19 @@ static rt_err_t spi_hw_init(struct aic_qspi *qspi)
     cfg.rx_dlymode = qspi->rxd_dlymode;
     cfg.tx_dlymode = aic_convert_tx_dlymode(qspi->txc_dlymode, qspi->txd_dlymode);
 
+#ifdef AIC_CHIP_D12P
+    if (cfg.idx >= 3) {
+        cfg.fifo_depth = HAL_QSPI_FIFO_DEPTH_V3LITE;
+        cfg.dev_max_burst = HAL_QSPI_DMA_DEV_BURST_ONE;
+    } else {
+        cfg.fifo_depth = HAL_QSPI_FIFO_DEPTH;
+        cfg.dev_max_burst = HAL_QSPI_DMA_DEV_MAXBURST;
+    }
+#else
+    cfg.fifo_depth = HAL_QSPI_FIFO_DEPTH;
+    cfg.dev_max_burst = HAL_QSPI_DMA_DEV_MAXBURST;
+#endif
+
     if (qspi->slave_en) {
         cfg.slave_en = true;
 #ifdef AIC_CHIP_D13X
@@ -610,11 +623,12 @@ static rt_err_t spi_nonblock_set(struct rt_spi_device *device,
     qspi = (struct aic_qspi *)device->bus;
 
     if (nonblock) {
-        qspi->nonblock = true;
-        if (!qspi->completion)
+        if (!qspi->completion) {
             qspi->completion = (struct rt_completion *)rt_malloc(sizeof(struct rt_completion));
-        if (!qspi->completion)
-            return -RT_ERROR;
+            if (!qspi->completion)
+                return -RT_ERROR;
+        }
+        qspi->nonblock = true;
     } else {
         qspi->nonblock = false;
         if (qspi->completion) {
@@ -660,11 +674,13 @@ rt_err_t aic_spi_bus_attach_device(const char *bus_name,
 
     spi_device =
         (struct rt_spi_device *)rt_malloc(sizeof(struct rt_spi_device));
+    if (!spi_device)
+        return -RT_ENOMEM;
 
     result = rt_spi_bus_attach_device(spi_device, device_name,
                                       bus_name, RT_NULL);
 
-    if (result != RT_EOK && spi_device != NULL)
+    if (result != RT_EOK)
         rt_free(spi_device);
 
     return result;

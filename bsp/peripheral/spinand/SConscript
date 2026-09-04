@@ -58,6 +58,9 @@ if GetDepend('SPI_NAND_FUDANMICRO'):
 if GetDepend('SPI_NAND_UNIM'):
     src += ['unim.c']
 
+if GetDepend('SPI_NAND_MK'):
+    src += Glob('mk.c')
+
 if GetDepend('LPKG_USING_SPINAND'):
     src += Glob('spinand.c')
     src += Glob('bbt.c')

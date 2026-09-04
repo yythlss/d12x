@@ -30,6 +30,8 @@ int fit_image_get_cipher_key(const char *algo, const char *key_name_hint,
     }
 
     memcpy(key, key_data->key_enc, 32);
+    /* Destroy key in memory */
+    memset(key_data->key_enc, 0, 32);
     return 0;
 }
 

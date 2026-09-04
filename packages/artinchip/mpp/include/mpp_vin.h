@@ -13,6 +13,7 @@
 #include "hal_dvp.h"
 #include "mpp_types.h"
 
+#define VIN_MAX_CHANNELS        2
 #define VIN_MAX_BUF_NUM         8
 #define VIN_MAX_PLANE_NUM       2
 
@@ -178,13 +179,13 @@ struct vin_dev_ctx {
     struct mpp_video_fmt src_fmt;
     struct vin_video_fmt dst_fmt;
     struct mpp_rect src_size;
-    void *vin_buf;
+    void *vin_buf[VIN_MAX_CHANNELS];
 };
 
 /* ioctl command of DVP */
 
-#define DVP_IN_G_FMT        _IOWR('V',  4, struct dvp_in_fmt)
-#define DVP_IN_S_FMT        _IOWR('V',  5, struct dvp_in_fmt)
+#define DVP_IN_G_FMT        _IOWR('V',  4, struct mpp_video_fmt)
+#define DVP_IN_S_FMT        _IOWR('V',  5, struct mpp_video_fmt)
 #define DVP_OUT_S_FMT       _IOWR('V',  6, struct dvp_out_fmt)
 
 #define DVP_STREAM_PAUSE    _IO('V', 10)
@@ -197,6 +198,9 @@ struct vin_dev_ctx {
 #define DVP_GET_TIMESTAMP   _IOR('V', 20, int)
 
 /* ioctl command of VIN 2.0 */
+
+#define VIN_CAM_S_FMT       _IOWR('V',  3, struct mpp_video_fmt)
+#define VIN_CAM_G_FMT       VIN_IN_G_FMT
 
 #define VIN_IN_G_FMT        DVP_IN_G_FMT
 #define VIN_IN_S_FMT        DVP_IN_S_FMT

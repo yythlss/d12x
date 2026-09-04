@@ -22,6 +22,7 @@
 #include "mpp_log.h"
 #include "mpp_list.h"
 #include "mpp_mem.h"
+#include "mpp_thread.h"
 #include "aic_message.h"
 #include "aic_parser.h"
 #include "aic_stream.h"
@@ -58,7 +59,7 @@ typedef struct mm_demuxer_data {
     MM_BOOL extra_video_pkt_flag;
     MM_BOOL extra_audio_pkt_flag;
 
-    pthread_t thread_id;
+    mpp_thread_t thread_handle;
     struct aic_message_queue s_msg;
     struct aic_parser *p_parser;
 
@@ -81,7 +82,7 @@ typedef struct mm_demuxer_data {
     MM_BOOL debug_en;
 } mm_demuxer_data;
 
-static void *mm_demuxer_component_thread(void *p_thread_data);
+static void mm_demuxer_component_thread(void *p_thread_data);
 static void mm_demuxer_show_debug_info(mm_demuxer_data *p_demuxer_data);
 static void mm_demuxer_show_media_info(mm_demuxer_data *p_demuxer_data);
 static s32 mm_demuxer_send_command(mm_handle h_component, MM_COMMAND_TYPE cmd,
@@ -117,6 +118,9 @@ static s32 mm_demuxer_get_parameter(mm_handle h_component, MM_INDEX_TYPE index,
     mm_param_u32 *p_aud_stream_num, *p_vid_stream_num;
     s32 *p_aud_stream_idx, *p_vid_stream_idx;
 
+    if (!p_param)
+        return MM_ERROR_BAD_PARAMETER;
+
     p_demuxer_data =
         (mm_demuxer_data *)(((mm_component *)h_component)->p_comp_private);
     p_audio_port = &p_demuxer_data->out_port_def[DEMUX_PORT_AUDIO_INDEX];
@@ -135,7 +139,7 @@ static s32 mm_demuxer_get_parameter(mm_handle h_component, MM_INDEX_TYPE index,
         case MM_INDEX_CONFIG_TIME_SEEK_MODE:
             break;
         case MM_INDEX_PARAM_CONTENT_URI:
-            memcpy(p_param, &p_demuxer_data->p_contenturi,
+            memcpy(p_param, p_demuxer_data->p_contenturi,
                    ((mm_param_content_uri *)p_param)->size);
             break;
         case MM_INDEX_PARAM_PORT_DEFINITION: { //mm_bind_info
@@ -684,7 +688,7 @@ s32 mm_demuxer_component_deinit(mm_handle h_component)
     s_msg.message_id = MM_COMMAND_STOP;
     s_msg.data_size = 0;
     aic_msg_put(&p_demuxer_data->s_msg, &s_msg);
-    pthread_join(p_demuxer_data->thread_id, (void *)&error);
+    mpp_thread_delete(p_demuxer_data->thread_handle);
 
     pthread_mutex_destroy(&p_demuxer_data->state_lock);
 
@@ -708,34 +712,17 @@ s32 mm_demuxer_component_deinit(mm_handle h_component)
     return error;
 }
 
-static int demuxer_thread_attr_init(pthread_attr_t *attr)
-{
-    // default stack size is 2K, it is not enough for decode thread
-    if (attr == NULL) {
-        return EINVAL;
-    }
-    pthread_attr_init(attr);
-    attr->stacksize = 16 * 1024;
-    attr->schedparam.sched_priority = MM_COMPONENT_DEMUXER_THREAD_PRIORITY;
-    return 0;
-}
-
 s32 mm_demuxer_component_init(mm_handle h_component)
 {
     mm_component *p_comp;
     mm_demuxer_data *p_demuxer_data;
     s32 error = MM_ERROR_NONE;
-    u32 err;
 
     mm_param_port_def *p_audio_port, *p_video_port;
     mm_param_u32 *p_aud_stream_num, *p_vid_stream_num;
 
     MM_BOOL b_msg_creat = MM_FALSE;
     MM_BOOL b_state_lock_init = MM_FALSE;
-
-    pthread_attr_t attr;
-
-    demuxer_thread_attr_init(&attr);
 
     logd("mm_demuxer_ComponentInit....");
 
@@ -808,11 +795,12 @@ s32 mm_demuxer_component_init(mm_handle h_component)
     b_state_lock_init = MM_TRUE;
 
     // Create the component thread
-    err = pthread_create(&p_demuxer_data->thread_id, &attr,
-                         mm_demuxer_component_thread, p_demuxer_data);
-    //if (err || !p_demuxer_data->thread_id)
-    if (err) {
-        loge("pthread_create fail!\n");
+    p_demuxer_data->thread_handle =
+        mpp_thread_create("demuxer", 16 * 1024,
+                          MM_COMPONENT_DEMUXER_THREAD_PRIORITY,
+                          mm_demuxer_component_thread, p_demuxer_data);
+    if (!p_demuxer_data->thread_handle) {
+        loge("mpp_thread_create demuxer comp thread fail!\n");
         error = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
@@ -1049,7 +1037,7 @@ static void mm_demuxer_show_video_perf(mm_demuxer_data *p_demuxer_data, int size
 
     s64 time_diff = p_demuxer_data->tm_video_read_end - p_demuxer_data->tm_video_read_start;
     if (time_diff > 50000) //50ms
-        printf("\tdemuxer:read one video packet cost too much time %lld ms\n", time_diff);
+        printf("\tdemuxer:read one video packet cost too much time %lld ms\n", time_diff / 1000);
 
     if (!p_demuxer_data->debug_en)
         return;
@@ -1402,7 +1390,7 @@ static s32 mm_demuxer_delay_decode_sync(mm_demuxer_data *p_demuxer_data)
 }
 #endif
 
-static void *mm_demuxer_component_thread(void *p_thread_data)
+static void mm_demuxer_component_thread(void *p_thread_data)
 {
     s32 ret = MM_ERROR_NONE;
     s32 cmd = MM_COMMAND_UNKNOWN;
@@ -1500,6 +1488,4 @@ static void *mm_demuxer_component_thread(void *p_thread_data)
 
 _EXIT:
     mm_demuxer_show_debug_info(p_demuxer_data);
-
-    return (void *)MM_ERROR_NONE;
 }

@@ -191,7 +191,7 @@ unsigned char jy6311_i2c_read_byte(unsigned char i2c_addr, unsigned char reg);
 signed char jy6311_i2c_write_byte(unsigned char i2c_addr, unsigned char reg, unsigned char val);
 
 
-void jy6311_i2c_get_client(void);
+int jy6311_i2c_get_client(void);
 /**
   * @}
   */

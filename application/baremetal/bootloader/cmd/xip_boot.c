@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2024, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -23,7 +23,7 @@
 #include "fitimage.h"
 #include "of.h"
 
-#if defined(AIC_BOOTLOADER_CMD_XIP_BOOT) && defined(AIC_QSPI_DRV_V11)
+#ifdef AIC_BOOTLOADER_CMD_XIP_BOOT
 
 #define APPLICATION_PART "os"
 #define AIC_HEAD_SIZE    0x100

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2024-2025 ArtInChip Technology Co.,Ltd
+ * Copyright (C) 2024-2026 ArtInChip Technology Co.,Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -16,6 +16,7 @@
 #define DDR2_64MB 0xB
 #define DDR3_128MB 0xC
 #define DDR3_256MB 0xD
+#define RTC_DDRINFO_REG (RTC_BASE + 0x104)
 
 static u32 efuse_get_ddr_size(void)
 {
@@ -43,14 +44,35 @@ static u32 efuse_get_ddr_size(void)
             size = 0x10000000;
             break;
         default:
-            pr_info("No DDR info\n");
+            pr_info("No DDR info in eFuse\n");
     }
     writel(0x0, EFUSE_CMU_REG);
 
     return size;
 }
 
+static u32 rtc_get_ddr_size(void)
+{
+    return ((readl(RTC_DDRINFO_REG) & 0x3F) << 5) * 0x100000;
+}
+
+static u32 ram_size = 0;
+
 u32 aic_get_ram_size(void)
 {
-    return efuse_get_ddr_size();
+    if (ram_size)
+        return ram_size;
+
+    ram_size = efuse_get_ddr_size();
+    if (ram_size == 0)
+        ram_size = rtc_get_ddr_size();
+    return ram_size;
+}
+
+void aic_show_ram_size(void)
+{
+    if (ram_size == 0)
+        ram_size = aic_get_ram_size();
+
+    printf("DDR: size %d MB\n", ram_size / 1024 / 1024);
 }

@@ -6,6 +6,7 @@
  * Authors: weilin.peng@artinchip.com
  */
 #include <aic_core.h>
+#include <ram_param.h>
 #include "board.h"
 
 extern void aic_board_pinmux_init(void);
@@ -109,13 +110,24 @@ void aic_memheap_free(int type, void *rmem)
 }
 #endif
 
+u32 aic_get_sys_heap_size(void)
+{
+#if AIC_PSRAM_SIZE
+#ifdef AIC_PSRAM_SW_EN
+    if (aic_get_ram_size() > AIC_PSRAM_SIZE)
+        return aic_get_ram_size() - AIC_PSRAM_SIZE;
+#endif
+#endif
+    return 0;
+}
+
 /**
  * This function will initial smart-evb board.
  */
 void rt_hw_board_init(void)
 {
 #ifdef RT_USING_HEAP
-    rt_system_heap_init((void *)&__heap_start, (void *)&__heap_end);
+    rt_system_heap_init((void *)&__heap_start, (void *)((u8 *)&__heap_end + aic_get_sys_heap_size()));
 #if (!defined(QEMU_RUN) && defined(RT_USING_MEMHEAP))
     aic_memheap_init();
 #endif

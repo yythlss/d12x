@@ -345,6 +345,16 @@ static void sc03_power_off(struct sc03_dev *sensor)
     sensor->on = false;
 }
 
+static void sc03_set_sleep(struct sc03_dev *sensor, int enable)
+{
+    sc03_write_reg(sensor->i2c, 0xf0, 0x31);
+
+    if (enable)
+        sc03_write_reg(sensor->i2c, 0x03, 0);
+    else
+        sc03_write_reg(sensor->i2c, 0x03, 1);
+}
+
 static rt_err_t sc03_ops_init(rt_device_t dev)
 {
     struct sc03_dev *sensor = (struct sc03_dev *)dev;
@@ -419,6 +429,22 @@ static int sc03_stop(rt_device_t dev)
     return 0;
 }
 
+static int sc03_pause(rt_device_t dev)
+{
+    struct sc03_dev *sensor = (struct sc03_dev *)dev;
+
+    sc03_set_sleep(sensor, 1);
+    return 0;
+}
+
+static int sc03_resume(rt_device_t dev)
+{
+    struct sc03_dev *sensor = (struct sc03_dev *)dev;
+
+    sc03_set_sleep(sensor, 0);
+    return 0;
+}
+
 static rt_err_t sc03_ops_control(rt_device_t dev, int cmd, void *args)
 {
     switch (cmd) {
@@ -426,7 +452,13 @@ static rt_err_t sc03_ops_control(rt_device_t dev, int cmd, void *args)
         return sc03_start(dev);
     case CAMERA_CMD_STOP:
         return sc03_stop(dev);
+    case CAMERA_CMD_PAUSE:
+        return sc03_pause(dev);
+    case CAMERA_CMD_RESUME:
+        return sc03_resume(dev);
     case CAMERA_CMD_GET_FMT:
+        if (!args)
+            return -RT_EINVAL;
         return sc03_get_fmt(dev, (struct mpp_video_fmt *)args);
     default:
         LOG_I("Unsupported cmd: 0x%x", cmd);

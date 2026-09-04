@@ -33,6 +33,10 @@ extern void aic_img_usage(void);
 extern void swipe_v1_init(void);
 #endif
 
+#ifdef AIC_LVGL_CAMERA_DUAL_TEST
+extern void camera_dual_test_init(void);
+#endif
+
 void ui_init(void)
 {
 #ifdef AIC_IMG_ROLLER_DEMO
@@ -57,6 +61,10 @@ void ui_init(void)
 
 #ifdef AIC_SWIPE_V1_DEMO
     swipe_v1_init();
+#endif
+
+#ifdef AIC_LVGL_CAMERA_DUAL_TEST
+    camera_dual_test_init();
 #endif
     // you can add more demo here
 

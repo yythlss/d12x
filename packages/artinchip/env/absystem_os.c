@@ -280,27 +280,43 @@ aic_get_data_to_mount_err:
 }
 
 #ifdef RT_USING_DFS_MNTTABLE
+extern const struct dfs_mount_tbl mount_table[];
+
+static const char *aic_absystem_get_fs_type(const char *path)
+{
+    const struct dfs_mount_tbl *entry;
+
+    for (entry = mount_table; entry->path; entry++) {
+        if (!strcmp(entry->path, path))
+            return entry->filesystemtype;
+    }
+    return "elm";
+}
+
 int aic_absystem_mount_fs(unsigned int prio)
 {
     char target[MOUNT_POINT_NAME_MAX] = {0};
     enum boot_device boot_dev = aic_get_boot_device();
+    const char *fs_type;
 
     if (boot_dev != BD_SDMC0 && boot_dev != BD_SDMC1) {
         aic_ota_status_update();
 
         if (prio == 0) {
             aic_get_rodata_to_mount(target);
-            printf("Mount APP in blk %s\n", target);
+            fs_type = aic_absystem_get_fs_type("/rodata");
+            printf("Mount APP in blk %s as %s\n", target, fs_type);
 
-            if (dfs_mount(target, "/rodata", "elm", MS_RDONLY, 0) < 0)
-                printf("Failed to mount elm\n");
+            if (dfs_mount(target, "/rodata", fs_type, MS_RDONLY, 0) < 0)
+                printf("Failed to mount %s on /rodata\n", fs_type);
 
         } else {
             aic_get_data_to_mount(target);
-            printf("Mount APP in blk %s\n", target);
+            fs_type = aic_absystem_get_fs_type("/data");
+            printf("Mount APP in blk %s as %s\n", target, fs_type);
 
-            if (dfs_mount(target, "/data", "elm", 0, 0) < 0)
-                printf("Failed to mount elm\n");
+            if (dfs_mount(target, "/data", fs_type, 0, 0) < 0)
+                printf("Failed to mount %s on /data\n", fs_type);
         }
     }
 

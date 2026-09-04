@@ -31,6 +31,7 @@
  */
 
 #include <string.h>
+#include <inttypes.h>
 #include "../inc/sfud.h"
 #include "sfud_qe.h"
 
@@ -183,7 +184,7 @@ static bool read_basic_header(const sfud_flash *flash, sfdp_para_header *basic_h
         return false;
     }
     SFUD_DEBUG("Check JEDEC basic flash parameter header is OK. The table id is %d, reversion is V%d.%d,"
-            " length is %d, parameter table pointer is 0x%06lX.", basic_header->id, basic_header->major_rev,
+            " length is %d, parameter table pointer is 0x%06" PRIX32 ".", basic_header->id, basic_header->major_rev,
             basic_header->minor_rev, basic_header->len, basic_header->ptp);
 
     return true;
@@ -382,7 +383,7 @@ static bool read_basic_table(sfud_flash *flash, sfdp_para_header *basic_header) 
         break;
     case 1:
         table2_temp &= 0x7FFFFFFF;
-        if (table2_temp > sizeof(sfdp->capacity) * 8 + 3) {
+        if (table2_temp >= sizeof(sfdp->capacity) * 8 + 3) {
             sfdp->capacity = 0;
             SFUD_INFO("Error: The flash capacity is grater than 32 Gb/ 4 GB! Not Supported.");
             return false;
@@ -390,16 +391,21 @@ static bool read_basic_table(sfud_flash *flash, sfdp_para_header *basic_header) 
         sfdp->capacity = 1L << (table2_temp - 3);
         break;
     }
-    SFUD_DEBUG("Capacity is %ld Bytes.", sfdp->capacity);
+    SFUD_DEBUG("Capacity is %" PRIu32 " Bytes.", sfdp->capacity);
     /* some nor erase parameter offset is incorrect  */
     if (table[erase_param_off] == 0xFF)
         erase_param_off = 28;
     /* get erase size and erase command  */
     for (i = 0, j = 0; i < SFUD_SFDP_ERASE_TYPE_MAX_NUM; i++) {
         if (table[erase_param_off + 2 * i] != 0x00) {
-            sfdp->eraser[j].size = 1L << table[erase_param_off + 2 * i];
+            uint8_t size_code = table[erase_param_off + 2 * i];
+            if (size_code >= sizeof(sfdp->capacity) * 8) {
+                SFUD_DEBUG("Warning: Erase size code %d too large, skip.", size_code);
+                continue;
+            }
+            sfdp->eraser[j].size = 1L << size_code;
             sfdp->eraser[j].cmd = table[erase_param_off + 2 * i + 1];
-            SFUD_DEBUG("Flash device supports %ldKB block erase. Command is 0x%02X.", sfdp->eraser[j].size / 1024,
+            SFUD_DEBUG("Flash device supports %" PRIu32 "KB block erase. Command is 0x%02X.", sfdp->eraser[j].size / 1024,
                     sfdp->eraser[j].cmd);
             j++;
         }

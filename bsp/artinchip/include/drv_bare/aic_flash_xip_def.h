@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -15,7 +15,7 @@ extern "C" {
 
 #include <hal_qspi.h>
 #include <mtd.h>
-#ifdef AIC_QSPI_DRV_V11
+#ifdef AIC_BOOTLOADER_CMD_XIP_BOOT
 
 #ifdef AIC_SPINOR_DRV
 #include <sfud.h>
@@ -46,7 +46,8 @@ struct xip_device {
 
 struct xip_device *get_xip_device_cfg(u32 flash_id, u32 support_msk, u32
         support_val);
-#endif // AIC_QSPI_DRV_V11
+#endif  // AIC_BOOTLOADER_CMD_XIP_BOOT
+
 #ifdef __cplusplus
 }
 #endif

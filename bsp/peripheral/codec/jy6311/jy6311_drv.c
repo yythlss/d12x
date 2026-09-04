@@ -474,7 +474,9 @@ int rt_hw_jy6311_init(void)
 {
     JY6311_LOG_I("--->%s\n", __FUNCTION__);
 
-    jy6311_i2c_get_client();
+    if (jy6311_i2c_get_client() < 0)
+        return -1;
+
     codec_register(&jy6311_drv);
 
     jy6311_play_vol_cfg(JY6311_I2C_ADDR, 0xBF);     // DAC Digital Volume 0dB

@@ -57,6 +57,7 @@ if GetDepend(['AIC_MPP_RECORDER_INTERFACE']):
 
     #recoder
     path += [cwd + '/middle_media/recorder/include']
+    path += [cwd + '/middle_media/recorder/test']
 
 
 src = []
@@ -208,7 +209,7 @@ if GetDepend(['AIC_MPP_RECORDER_INTERFACE']):
     #recoder
     src += Glob('middle_media/recorder/aic_recorder.c')
     src += Glob('middle_media/recorder/recorder_demo.c')
-
+    src += Glob('middle_media/recorder/test/recorder_cam.c')
 
 
 if GetDepend(['AIC_MPP_VIN']):

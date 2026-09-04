@@ -86,15 +86,42 @@
 #define AIC_UART7_RTS_NAME "no_pin"
 #endif
 
+#ifndef AIC_UART0_RS232_CTRL_NAME
+#define AIC_UART0_RS232_CTRL_NAME "no_pin"
+#endif
+#ifndef AIC_UART1_RS232_CTRL_NAME
+#define AIC_UART1_RS232_CTRL_NAME "no_pin"
+#endif
+#ifndef AIC_UART2_RS232_CTRL_NAME
+#define AIC_UART2_RS232_CTRL_NAME "no_pin"
+#endif
+#ifndef AIC_UART3_RS232_CTRL_NAME
+#define AIC_UART3_RS232_CTRL_NAME "no_pin"
+#endif
+#ifndef AIC_UART4_RS232_CTRL_NAME
+#define AIC_UART4_RS232_CTRL_NAME "no_pin"
+#endif
+#ifndef AIC_UART5_RS232_CTRL_NAME
+#define AIC_UART5_RS232_CTRL_NAME "no_pin"
+#endif
+#ifndef AIC_UART6_RS232_CTRL_NAME
+#define AIC_UART6_RS232_CTRL_NAME "no_pin"
+#endif
+#ifndef AIC_UART7_RS232_CTRL_NAME
+#define AIC_UART7_RS232_CTRL_NAME "no_pin"
+#endif
+
 struct aic_uart_rts_cts_dev
 {
     unsigned int uart_rts_pin;
     unsigned int uart_cts_pin;
+    unsigned int uart_ctrl_pin;
     usart_handle_t handle;
 };
 
 volatile struct aic_uart_rts_cts_dev uart_rts_dev[AIC_UART_DEV_NUM];
 volatile struct aic_uart_rts_cts_dev uart_cts_dev[AIC_UART_DEV_NUM];
+volatile struct aic_uart_rts_cts_dev uart_ctrl_dev[AIC_UART_DEV_NUM];
 
 void drv_usart_irqhandler(int irq, void * data);
 void drv_usart_set_freq(uint32_t baudrate, int u);
@@ -135,7 +162,7 @@ struct aic_uart_info {
 };
 static volatile struct aic_uart_info g_info[AIC_UART_DEV_NUM] = {0};
 
-char uart_sem_name[][9] = {
+static char uart_sem_name[][9] = {
     "uart_tx0",
     "uart_tx1",
     "uart_tx2",
@@ -156,28 +183,7 @@ struct uart_freq_baud
 
 struct uart_freq_baud uart_freq_baud_list[] =
 {
-#if defined(AIC_CHIP_D13X) || defined(AIC_CHIP_D21X) || defined(AIC_CHIP_G73X)
-    {300, 48000000},
-    {600, 48000000},
-    {1200, 48000000},
-    {2400, 48000000},
-    {4800, 48000000},
-    {9600, 48000000},
-    {14400, 48000000},
-    {19200, 48000000},
-    {38400, 48000000},
-    {57600, 48000000},
-    {115200, 48000000},
-    {230400, 48000000},
-    {380400, 54545454},
-    {460800, 44444444},
-    {921600, 44444444},
-    {1000000, 48000000},
-    {1152000, 54545454},
-    {1500000, 48000000},
-    {2500000, 40000000},
-    {3000000, 48000000},
-#elif defined(AIC_CHIP_D12X)
+#if defined(AIC_CHIP_D12X) // PLL 588 MHz
     {300, 53454545},
     {600, 53454545},
     {1200, 53454545},
@@ -201,8 +207,27 @@ struct uart_freq_baud uart_freq_baud_list[] =
     {2450000, 39200000},
     {2500000, 39200000},
     {3000000, 49000000},
-#else
-    {0, 0},
+#else // PLL 1200 MHz
+    {300, 48000000},
+    {600, 48000000},
+    {1200, 48000000},
+    {2400, 48000000},
+    {4800, 48000000},
+    {9600, 48000000},
+    {14400, 48000000},
+    {19200, 48000000},
+    {38400, 48000000},
+    {57600, 48000000},
+    {115200, 48000000},
+    {230400, 48000000},
+    {380400, 54545454},
+    {460800, 44444444},
+    {921600, 44444444},
+    {1000000, 48000000},
+    {1152000, 54545454},
+    {1500000, 48000000},
+    {2500000, 40000000},
+    {3000000, 48000000},
 #endif
 };
 
@@ -253,7 +278,7 @@ void drv_usart_cb_event(int32_t index, usart_event_e event)
 void drv_usart_irqhandler(int irq, void * data)
 {
     int index = irq - UART_IRQn(0);
-    uint8_t status= 0;
+    uint16_t status= 0;
     usart_handle_t uart;
 
     if (index < 0 || index >= AIC_UART_DEV_NUM)
@@ -264,12 +289,15 @@ void drv_usart_irqhandler(int irq, void * data)
 
     status = hal_usart_get_irqstatus(index);
 
+    if (g_serial[index].config.function != USART_FUNC_RS232_SIMULATION &&
+        g_serial[index].config.function != USART_FUNC_RS485_SIMULATION)
+        status &= 0xf;
+
     if (g_serial[index].config.flag == AIC_UART_DMA_FLAG) {
 #if defined (AIC_SERIAL_USING_DMA)
-
         RT_ASSERT(uart != RT_NULL);
         hal_usart_set_interrupt(uart, USART_INTR_READ, 0);
-        switch (status)
+        switch (status & 0x0f)
         {
         case AIC_IIR_RECV_DATA:
         case AIC_IIR_CHAR_TIMEOUT:
@@ -287,8 +315,18 @@ void drv_usart_irqhandler(int irq, void * data)
         }
 #endif
     } else {
-        switch (status)
-        {
+        if (AIC_IIR_SR_EMPTY & status) {
+            hal_uart_set_sree_int(uart, 0);
+            if (g_serial[index].config.function == USART_FUNC_RS232_SIMULATION) {
+                if (uart_ctrl_dev[index].uart_ctrl_pin)
+                    rt_pin_write(uart_ctrl_dev[index].uart_ctrl_pin, PIN_LOW);
+            } else if (g_serial[index].config.function == USART_FUNC_RS485_SIMULATION) {
+                hal_usart_rts_ctl_soft_mode_clr(uart);
+                rt_pin_write(uart_rts_dev[index].uart_rts_pin, PIN_LOW);
+            }
+        }
+
+        switch (status & 0x0f) {
         case AIC_IIR_RECV_DATA:
         case AIC_IIR_CHAR_TIMEOUT:
         {
@@ -322,7 +360,6 @@ void drv_usart_irqhandler(int irq, void * data)
             hal_usart_intr_recv_line(index, (aic_usart_priv_t *)g_serial[index].parent.user_data);
             hal_usart_set_interrupt(uart, USART_INTR_READ, 1);
             break;
-
         default:
             break;
         }
@@ -430,14 +467,15 @@ static rt_err_t drv_uart_control(struct rt_serial_device *serial, int cmd, void 
 {
     usart_handle_t uart;
     aic_usart_priv_t *uart_data;
+    char off = AIC_UART_XOFF;
+    char on = AIC_UART_XON;
+    u32 index = 0;
 
 
     RT_ASSERT(serial != RT_NULL);
     uart = (usart_handle_t)serial->parent.user_data;
     uart_data = serial->parent.user_data;
     RT_ASSERT(uart != RT_NULL);
-    char off = AIC_UART_XOFF;
-    char on = AIC_UART_XON;
 
     switch (cmd)
     {
@@ -510,6 +548,19 @@ static rt_err_t drv_uart_control(struct rt_serial_device *serial, int cmd, void 
         hal_uart_reset_fifo(uart);
         hal_usart_config_baudrate(uart, *(uint32_t *)arg);
         hal_usart_set_loopback(uart, 0);
+        break;
+
+    case AIC_UART_ENABLE_SREE_INT:
+        index = serial->config.uart_index;
+        if (g_serial[index].config.function == USART_FUNC_RS232_SIMULATION) {
+            hal_uart_set_sree_int(uart, 1);
+            if (uart_ctrl_dev[index].uart_ctrl_pin)
+                rt_pin_write(uart_ctrl_dev[index].uart_ctrl_pin, PIN_HIGH);
+        } else if (g_serial[index].config.function == USART_FUNC_RS485_SIMULATION) {
+            hal_uart_set_sree_int(uart, 1);
+            hal_usart_rts_ctl_soft_mode_set(uart);
+            rt_pin_write(uart_rts_dev[uart_data->idx].uart_rts_pin, PIN_HIGH);
+        }
         break;
     }
 
@@ -647,41 +698,50 @@ struct drv_uart_dev_para
     char * name;
     char * uart_rts_name;
     char * uart_cts_name;
+    char * rs232_ctrl_name;
 };
 
-const struct drv_uart_dev_para uart_dev_paras[] =
+static const struct drv_uart_dev_para uart_dev_paras[] =
 {
 #ifdef AIC_USING_UART0
     {0, AIC_DEV_UART0_DATABITS, AIC_DEV_UART0_STOPBITS, AIC_DEV_UART0_PARITY, AIC_UART0_FLAG,
-     AIC_DEV_UART0_BAUDRATE, AIC_CLK_UART0_FREQ, AIC_DEV_UART0_MODE, "uart0", AIC_UART0_RTS_NAME, AIC_UART0_CTS_NAME},
+     AIC_DEV_UART0_BAUDRATE, AIC_CLK_UART0_FREQ, AIC_DEV_UART0_MODE, "uart0", AIC_UART0_RTS_NAME,
+    AIC_UART0_CTS_NAME, AIC_UART0_RS232_CTRL_NAME},
 #endif
 #ifdef AIC_USING_UART1
     {1, AIC_DEV_UART1_DATABITS, AIC_DEV_UART1_STOPBITS, AIC_DEV_UART1_PARITY, AIC_UART1_FLAG,
-     AIC_DEV_UART1_BAUDRATE, AIC_CLK_UART1_FREQ, AIC_DEV_UART1_MODE, "uart1", AIC_UART1_RTS_NAME, AIC_UART1_CTS_NAME},
+     AIC_DEV_UART1_BAUDRATE, AIC_CLK_UART1_FREQ, AIC_DEV_UART1_MODE, "uart1", AIC_UART1_RTS_NAME,
+     AIC_UART1_CTS_NAME, AIC_UART1_RS232_CTRL_NAME},
 #endif
 #ifdef AIC_USING_UART2
     {2, AIC_DEV_UART2_DATABITS, AIC_DEV_UART2_STOPBITS, AIC_DEV_UART2_PARITY, AIC_UART2_FLAG,
-     AIC_DEV_UART2_BAUDRATE, AIC_CLK_UART2_FREQ, AIC_DEV_UART2_MODE, "uart2", AIC_UART2_RTS_NAME, AIC_UART2_CTS_NAME},
+     AIC_DEV_UART2_BAUDRATE, AIC_CLK_UART2_FREQ, AIC_DEV_UART2_MODE, "uart2", AIC_UART2_RTS_NAME,
+     AIC_UART2_CTS_NAME, AIC_UART2_RS232_CTRL_NAME},
 #endif
 #ifdef AIC_USING_UART3
     {3, AIC_DEV_UART3_DATABITS, AIC_DEV_UART3_STOPBITS, AIC_DEV_UART3_PARITY, AIC_UART3_FLAG,
-     AIC_DEV_UART3_BAUDRATE, AIC_CLK_UART3_FREQ, AIC_DEV_UART3_MODE, "uart3", AIC_UART3_RTS_NAME, AIC_UART3_CTS_NAME},
+     AIC_DEV_UART3_BAUDRATE, AIC_CLK_UART3_FREQ, AIC_DEV_UART3_MODE, "uart3", AIC_UART3_RTS_NAME,
+     AIC_UART3_CTS_NAME, AIC_UART3_RS232_CTRL_NAME},
 #endif
 #ifdef AIC_USING_UART4
     {4, AIC_DEV_UART4_DATABITS, AIC_DEV_UART4_STOPBITS, AIC_DEV_UART4_PARITY, AIC_UART4_FLAG,
-     AIC_DEV_UART4_BAUDRATE, AIC_CLK_UART4_FREQ, AIC_DEV_UART4_MODE, "uart4", AIC_UART4_RTS_NAME, AIC_UART4_CTS_NAME},
+     AIC_DEV_UART4_BAUDRATE, AIC_CLK_UART4_FREQ, AIC_DEV_UART4_MODE, "uart4", AIC_UART4_RTS_NAME,
+     AIC_UART4_CTS_NAME, AIC_UART4_RS232_CTRL_NAME},
 #endif
 #ifdef AIC_USING_UART5
     {5, AIC_DEV_UART5_DATABITS, AIC_DEV_UART5_STOPBITS, AIC_DEV_UART5_PARITY, AIC_UART5_FLAG,
-     AIC_DEV_UART5_BAUDRATE, AIC_CLK_UART5_FREQ, AIC_DEV_UART5_MODE, "uart5", AIC_UART5_RTS_NAME, AIC_UART5_CTS_NAME},
+     AIC_DEV_UART5_BAUDRATE, AIC_CLK_UART5_FREQ, AIC_DEV_UART5_MODE, "uart5", AIC_UART5_RTS_NAME,
+     AIC_UART5_CTS_NAME, AIC_UART5_RS232_CTRL_NAME},
 #endif
 #ifdef AIC_USING_UART6
     {6, AIC_DEV_UART6_DATABITS, AIC_DEV_UART6_STOPBITS, AIC_DEV_UART6_PARITY, AIC_UART6_FLAG,
-     AIC_DEV_UART6_BAUDRATE, AIC_CLK_UART6_FREQ, AIC_DEV_UART6_MODE, "uart6", AIC_UART6_RTS_NAME, AIC_UART6_CTS_NAME},
+     AIC_DEV_UART6_BAUDRATE, AIC_CLK_UART6_FREQ, AIC_DEV_UART6_MODE, "uart6", AIC_UART6_RTS_NAME,
+     AIC_UART6_CTS_NAME, AIC_UART6_RS232_CTRL_NAME},
 #endif
 #ifdef AIC_USING_UART7
     {7, AIC_DEV_UART7_DATABITS, AIC_DEV_UART7_STOPBITS, AIC_DEV_UART7_PARITY, AIC_UART7_FLAG,
-     AIC_DEV_UART7_BAUDRATE, AIC_CLK_UART7_FREQ, AIC_DEV_UART7_MODE, "uart7", AIC_UART7_RTS_NAME, AIC_UART7_CTS_NAME},
+     AIC_DEV_UART7_BAUDRATE, AIC_CLK_UART7_FREQ, AIC_DEV_UART7_MODE, "uart7", AIC_UART7_RTS_NAME,
+     AIC_UART7_CTS_NAME, AIC_UART7_RS232_CTRL_NAME},
 #endif
 };
 
@@ -728,6 +788,13 @@ void drv_usart_function_init(int i, int u)
         g_serial[u].config.flowctrl_cts_enable = 1;
     }
 
+    if ((rt_strncmp(uart_dev_paras[i].rs232_ctrl_name, "no_pin", sizeof("no_pin")) != 0) &&
+        (uart_dev_paras[i].function == USART_FUNC_RS232_SIMULATION)) {
+        uart_ctrl_dev[u].uart_ctrl_pin = rt_pin_get(uart_dev_paras[i].rs232_ctrl_name);
+        rt_pin_mode(uart_ctrl_dev[u].uart_ctrl_pin, PIN_MODE_OUTPUT);
+        rt_pin_write(uart_ctrl_dev[u].uart_ctrl_pin, PIN_LOW);
+    }
+
     if (uart_dev_paras[i].function == USART_MODE_RS232_SW_FLOW_CTRL) {
         g_serial[u].config.flowctrl_cts_enable = 1;
         g_serial[u].config.flowctrl_rts_enable = 1;
@@ -737,7 +804,7 @@ void drv_usart_function_init(int i, int u)
 void drv_usart_set_freq(uint32_t baudrate, int u)
 {
     int uart_freq;
-    int config_num = sizeof(uart_freq_baud_list)/sizeof(uart_freq_baud);
+    int config_num = sizeof(uart_freq_baud_list)/sizeof(uart_freq_baud_list[0]);
 
     for (int x = 0; x < config_num; x++) {
         if (baudrate == uart_freq_baud_list[x].baud) {
@@ -773,7 +840,7 @@ static int aic_usart_suspend(const struct rt_device *device, rt_uint8_t mode)
     case PM_SLEEP_MODE_DEEP:
         hal_usart_flush(uart, USART_FLUSH_WRITE);
         hal_clk_disable(CLK_UART0 + uart_data->idx);
-#ifdef AIC_PM_DRV_V15
+#if defined(AIC_PM_DRV_V15) || defined(AIC_PM_DRV_V14)
         hal_reset_assert(RESET_UART0 + uart_data->idx);
 #endif
         break;
@@ -787,7 +854,7 @@ static int aic_usart_suspend(const struct rt_device *device, rt_uint8_t mode)
 static void aic_usart_resume(const struct rt_device *device, rt_uint8_t mode)
 {
     aic_usart_priv_t *uart_data = device->user_data;
-#ifdef AIC_PM_DRV_V15
+#if defined(AIC_PM_DRV_V15) || defined(AIC_PM_DRV_V14)
     struct rt_serial_device *serial = (struct rt_serial_device *)device;
     int i = 0;
 #endif
@@ -805,7 +872,7 @@ static void aic_usart_resume(const struct rt_device *device, rt_uint8_t mode)
         hal_clk_enable(CLK_UART0 + uart_data->idx);
         break;
     case PM_SLEEP_MODE_DEEP:
-#ifdef AIC_PM_DRV_V15
+#if defined(AIC_PM_DRV_V15) || defined(AIC_PM_DRV_V14)
         hal_reset_deassert(RESET_UART0 + uart_data->idx);
         hal_clk_enable(CLK_UART0 + uart_data->idx);
         drv_uart_configure(serial, &serial->config);
@@ -889,8 +956,8 @@ int drv_usart_init(void)
 
             g_info[u].uart_rx_fifo = (uint32_t *)aicos_malloc_align(0, AIC_UART_RX_FIFO_SIZE, UART_ALIGN_SIZE);
             g_info[u].uart_tx_fifo = (uint32_t *)aicos_malloc_align(0, AIC_UART_TX_FIFO_SIZE, UART_ALIGN_SIZE);
-            RT_ASSERT(g_info[u].uart_rx_fifo != RT_NULL);
-            RT_ASSERT(g_info[u].uart_tx_fifo != RT_NULL);
+            if (!g_info[u].uart_rx_fifo || !g_info[u].uart_tx_fifo)
+                return -RT_ENOMEM;
 
             g_info[u].tx_semaphore = rt_sem_create(uart_sem_name[u], 0, RT_IPC_FLAG_FIFO);
             if (!g_info[u].tx_semaphore)

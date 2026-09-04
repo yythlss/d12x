@@ -81,6 +81,7 @@ extern "C" {
 #define DMA_IRQ_HALF_TASK   BIT(0)
 #define DMA_IRQ_ONE_TASK    BIT(1)
 #define DMA_IRQ_LINK_TASK   BIT(2)
+#define DMA_IRQ_TASK_DONE   (DMA_IRQ_HALF_TASK | DMA_IRQ_ONE_TASK | DMA_IRQ_LINK_TASK)
 #define DMA_IRQ_ID_ERR      BIT(3)
 #define DMA_IRQ_ADDR_ERR    BIT(4)
 #define DMA_IRQ_RD_AHB_ERR  BIT(5)
@@ -125,7 +126,7 @@ extern "C" {
 #define DMA_S_WAIT_D_HANDSHAKE  (DMA_HANDSHAKE_MODE << DMA_DST_MODE_SHIFT)
 #define DMA_S_HANDSHAKE_D_WAIT  (DMA_HANDSHAKE_MODE << DMA_SRC_MODE_SHIFT)
 #define DMA_S_WAIT_D_WAIT   (DMA_WAIT_MODE)
-#define DMA_FIFO_SIZE       0x200
+#define DMA_FIFO_SIZE       0x100
 
 /*
  * define bit index in channel pause register

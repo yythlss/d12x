@@ -14,7 +14,7 @@
 #include <private_param.h>
 #include <aic_image.h>
 
-char private_params_stash[1024] __attribute__((section(".data")));
+char private_params_stash[1280] __attribute__((section(".data")));
 
 void reloc_private_params(void)
 {

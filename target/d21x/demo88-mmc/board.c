@@ -116,7 +116,7 @@ u32 aic_get_sys_heap_size(void)
 void rt_hw_board_init(void)
 {
 #ifdef RT_USING_HEAP
-    rt_system_heap_init((void *)&__heap_start, (void *)&__heap_end + aic_get_sys_heap_size());
+    rt_system_heap_init((void *)&__heap_start, (void *)((u8 *)&__heap_end + aic_get_sys_heap_size()));
 #if (!defined(QEMU_RUN) && defined(RT_USING_MEMHEAP))
     aic_memheap_init();
 #endif
@@ -194,6 +194,12 @@ const struct romfs_dirent romfs_root =
 };
 #endif
 
+#ifdef AIC_USING_FS_IMAGE_TYPE_LITTLEFS_FOR_1
+#define FS_DATA_TYPE "lfs"
+#else
+#define FS_DATA_TYPE "elm"
+#endif
+
 const struct dfs_mount_tbl mount_table[] = {
 #ifdef RT_USING_DFS_ROMFS
     {RT_NULL, "/", "rom", 0, &romfs_root, DFS_MOUNT_PRIO_EARLY},
@@ -204,7 +210,10 @@ const struct dfs_mount_tbl mount_table[] = {
 #ifdef AIC_USING_SDMC0
 #ifndef AIC_AB_SYSTEM_INTERFACE
     {"mmc0p5", "/rodata", "elm", MS_RDONLY, 0, DFS_MOUNT_PRIO_EARLY},
-    {"mmc0p7", "/data",   "elm", 0, 0, DFS_MOUNT_PRIO_EARLY},
+    {"mmc0p7", "/data",   FS_DATA_TYPE, 0, 0, DFS_MOUNT_PRIO_EARLY},
+#else
+    {"rodata", "/rodata", "elm", MS_RDONLY, 0, 0xFF},
+    {"data",   "/data",   FS_DATA_TYPE, 0, 0, 0xFF},
 #endif
 #endif
 #ifdef AIC_USING_SDMC1
@@ -215,4 +224,5 @@ const struct dfs_mount_tbl mount_table[] = {
 #endif
     {0}
 };
+#undef FS_DATA_TYPE
 #endif

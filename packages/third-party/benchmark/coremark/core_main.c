@@ -314,6 +314,10 @@ MAIN_RETURN_TYPE test_coremark(int argc, char *argv[]) {
 		ee_printf("ERROR! Must execute for at least 10 secs for a valid result!\n");
 		total_errors++;
 	}
+#ifdef CPU_FREQ
+    float temp = (float)default_num_contexts*results[0].iterations/time_in_secs(total_time)/(float)CPU_FREQ;
+    ee_printf("Score(%d MHz)   : %d.%02d Coremark/MHz\n", CPU_FREQ, (int)temp, ((int)(temp * 100)) % 100);
+#endif
 
 	ee_printf("Iterations       : %lu\n", (long unsigned) default_num_contexts*results[0].iterations);
 	ee_printf("Compiler version : %s\n",COMPILER_VERSION);

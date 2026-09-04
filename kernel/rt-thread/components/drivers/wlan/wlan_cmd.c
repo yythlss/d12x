@@ -365,6 +365,12 @@ static void print_ap_info(struct rt_wlan_info *info,int index)
             case SECURITY_WPA2_MIXED_PSK:
                 security = "WPA2_MIXED_PSK";
                 break;
+            case SECURITY_WPA3_AES_PSK:
+                security = "WPA3_AES_PSK";
+                break;
+            case SECURITY_WPA3_MIXED_PSK:
+                security = "WPA3_MIXED_PSK";
+                break;
             case SECURITY_WPS_OPEN:
                 security = "WPS_OPEN";
                 break;

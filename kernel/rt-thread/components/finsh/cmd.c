@@ -618,6 +618,31 @@ MSH_CMD_EXPORT(list_msgqueue, list message queue in system);
 #endif
 
 #ifdef RT_USING_MEMHEAP
+
+struct memheap_stats {
+    rt_size_t pool_size;
+    rt_size_t max_used;
+    rt_size_t available;
+};
+
+static void memheap_get_stats(struct rt_memheap *mh, struct memheap_stats *st)
+{
+    rt_base_t level;
+
+    /* Read heap stats atomically with interrupt disabled */
+    level = rt_hw_interrupt_disable();
+    st->pool_size = mh->pool_size;
+    st->max_used  = mh->max_used_size;
+    st->available = mh->available_size;
+    rt_hw_interrupt_enable(level);
+
+    /* Defensive clamp: guard against corrupted metadata */
+    if (st->max_used > st->pool_size)
+        st->max_used = st->pool_size;
+    if (st->available > st->pool_size)
+        st->available = st->pool_size;
+}
+
 long list_memheap(void)
 {
     rt_base_t level;
@@ -644,6 +669,7 @@ long list_memheap(void)
             {
                 struct rt_object *obj;
                 struct rt_memheap *mh;
+                struct memheap_stats st = {0};
 
                 obj = rt_list_entry(obj_list[i], struct rt_object, list);
                 level = rt_hw_interrupt_disable();
@@ -656,14 +682,13 @@ long list_memheap(void)
                 rt_hw_interrupt_enable(level);
 
                 mh = (struct rt_memheap *)obj;
-
-                rt_kprintf("%-*.*s %-010d %-013d %-05d\n",
-                           maxlen, RT_NAME_MAX,
-                           mh->parent.name,
-                           mh->pool_size,
-                           mh->max_used_size,
-                           mh->available_size);
-
+                memheap_get_stats(mh, &st);
+                rt_kprintf("%-*.*s %-010u %-013u %-05u\n",
+                            maxlen, RT_NAME_MAX,
+                            mh->parent.name,
+                            st.pool_size,
+                            st.max_used,
+                            st.available);
             }
         }
     }
@@ -693,6 +718,7 @@ long get_mem_used(void)
             {
                 struct rt_object *obj;
                 struct rt_memheap *mh;
+                struct memheap_stats st = {0};
 
                 obj = rt_list_entry(obj_list[i], struct rt_object, list);
                 level = rt_hw_interrupt_disable();
@@ -705,7 +731,8 @@ long get_mem_used(void)
                 rt_hw_interrupt_enable(level);
 
                 mh = (struct rt_memheap *)obj;
-                mem_used += mh->max_used_size;
+                memheap_get_stats(mh, &st);
+                mem_used += st.max_used;
             }
         }
     }

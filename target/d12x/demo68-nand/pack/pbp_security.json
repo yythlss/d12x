@@ -1,0 +1,8 @@
+{
+	"security": {
+		"keydata": {
+			"version": "1",
+			"file": "spl_chacha20_key_encrypted.bin"
+		}
+	}
+}

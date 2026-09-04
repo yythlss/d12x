@@ -141,7 +141,7 @@ config AIC_UART_DRV_VER
 
 config AIC_UART_DEV_NUM
     int
-    default 4 if AIC_UART_DRV
+    default 5 if AIC_UART_DRV
 
 #--------------------------------------------
 # i2c driver global option
@@ -281,13 +281,13 @@ config AIC_RTC_DRV
     select RT_USING_RTC   if DRIVER_DRV_EN
     select RT_USING_ALARM if DRIVER_DRV_EN
 
-config AIC_RTC_DRV_V12
+config AIC_RTC_DRV_V121
     bool
     default y if AIC_RTC_DRV
 
 config AIC_RTC_DRV_VER
     string
-    default "12" if AIC_RTC_DRV_V12
+    default "121" if AIC_RTC_DRV_V121
 
 #--------------------------------------------
 # WDT driver global option
@@ -606,17 +606,17 @@ config AIC_HRTIMER_DRV
     default n
     select RT_USING_HWTIMER if DRIVER_DRV_EN
 
-config AIC_HRTIMER_DRV_V12
+config AIC_HRTIMER_DRV_V21
     bool
     default y if AIC_HRTIMER_DRV
 
 config AIC_HRTIMER_DRV_VER
     string
-    default "12" if AIC_HRTIMER_DRV_V12
+    default "12" if AIC_HRTIMER_DRV_V21
 
 config AIC_HRTIMER_CH_NUM
     int
-    default 2 if AIC_HRTIMER_DRV_V12
+    default 2 if AIC_HRTIMER_DRV_V21
 
 #--------------------------------------------
 # sid driver global option
@@ -657,14 +657,6 @@ config AIC_DCE_DRV_VER
 config AIC_MTOP_DRV
     bool
     default n
-
-config AIC_MTOP_DRV_V21
-    bool
-    default y if AIC_MTOP_DRV
-
-config AIC_MTOP_DRV_VER
-    string
-    default "21" if AIC_MTOP_DRV_V21
 
 #--------------------------------------------
 # CAN driver global option

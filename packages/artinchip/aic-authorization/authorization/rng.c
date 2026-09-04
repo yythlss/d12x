@@ -166,6 +166,11 @@ static int aic_rng_do_one_req(struct rng_request *req)
     if (DEBUG_CE)
         hal_crypto_dump_task(rctx->task, rctx->tasklen);
 
+    if (rctx->dst_cpy_buf) {
+        aicos_dcache_invalid_range((void *)(uintptr_t)rctx->dst_cpy_buf, req->dst_len);
+    } else {
+        aicos_dcache_invalid_range((void *)(uintptr_t)req->dst, req->dst_len);
+    }
     hal_crypto_init();
     hal_crypto_irq_enable(ALG_HASH_ACCELERATOR);
     hal_crypto_start_hash(rctx->task);
@@ -182,10 +187,7 @@ static int aic_rng_do_one_req(struct rng_request *req)
 
     aicos_dma_sync();
     if (rctx->dst_cpy_buf) {
-        aicos_dcache_invalid_range((void *)(uintptr_t)rctx->dst_cpy_buf, req->dst_len);
         memcpy(req->dst, rctx->dst_cpy_buf, req->dst_len);
-    } else {
-        aicos_dcache_invalid_range((void *)(uintptr_t)req->dst, req->dst_len);
     }
 
     if (DEBUG_CE)

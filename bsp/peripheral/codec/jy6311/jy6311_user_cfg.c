@@ -65,11 +65,12 @@ signed char jy6311_i2c_write_byte(unsigned char i2c_addr, unsigned char reg, uns
     return RT_EOK;
 }
 
-void jy6311_i2c_get_client(void)
+int jy6311_i2c_get_client(void)
 {
     g_jy6311_client = rt_i2c_bus_device_find(AIC_I2S_CODEC_JY6311_I2C);
     if (g_jy6311_client == RT_NULL) {
         rt_kprintf("Can't find %s device", AIC_I2S_CODEC_JY6311_I2C);
-        return;
+        return -1;
     }
+    return 0;
 }

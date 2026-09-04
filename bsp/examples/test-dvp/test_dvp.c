@@ -47,6 +47,9 @@
 #error "MUST and ONLY enable one: DE_SCALE_ENABLE, DE_CROP_ENABLE, DVP_CROP_ENABLE"
 #endif
 
+/* 0=proportional (preserve aspect ratio), 1=fullscreen (stretch to fill) */
+#define SCALE_MODE_FULLSCREEN   0
+
 /* Global macro and variables */
 
 #define VID_BUF_NUM             (3 + VID_BUF_FOR_ROTATION)
@@ -62,7 +65,7 @@ enum dvp_state {
     DVP_STATUS_PAUSE
 };
 
-static enum dvp_state g_dvp_status = DVP_STATUS_INIT;
+static volatile enum dvp_state g_dvp_status = DVP_STATUS_INIT;
 
 static const char sopts[] = "f:c:a:wh";
 static const struct option lopts[] = {
@@ -79,7 +82,7 @@ struct aic_dvp_data {
     int h;
     int frame_size;
     int frame_cnt;
-    int fresh_frame;
+    volatile int fresh_frame;
     int rotation;
     struct mpp_rect dst_pos;        // position in DE video player
 
@@ -93,6 +96,7 @@ static struct aic_dvp_data g_vdata = {0};
 #ifdef AIC_DISPLAY_DRV
 static struct mpp_fb *g_fb = NULL;
 static struct aicfb_screeninfo g_fb_info = {0};
+static struct aicfb_layer_data g_cached_layer = {0};
 #endif
 #ifdef SUPPORT_ROTATION
 static struct mpp_ge *g_ge_dev = NULL;
@@ -116,14 +120,14 @@ static void usage(char *program)
 int get_fb_info(void)
 {
     int ret = 0;
-#ifdef AIC_DISPLAY_DRV
 
+#ifdef AIC_DISPLAY_DRV
     ret = mpp_fb_ioctl(g_fb, AICFB_GET_SCREENINFO, &g_fb_info);
     if (ret < 0)
         pr_err("Failed to get screen info! errno: -%d\n", -ret);
+
+    pr_info("Screen width: %d, height %d\n", g_fb_info.width, g_fb_info.height);
 #endif
-    pr_info("Screen width: %d, height %d\n",
-            g_fb_info.width, g_fb_info.height);
     return ret;
 }
 
@@ -189,20 +193,20 @@ int dvp_cfg(void)
     int ret = 0;
 
 #if DVP_CROP_ENABLE
+    dst->width = src->width;
+    dst->height = src->height;
+#ifdef AIC_DISPLAY_DRV
     /* Crop the camera image in center-aligned way */
     if (src->width > g_fb_info.width) {
         dst->width = g_fb_info.width;
         dst->crop_x = (src->width - g_fb_info.width) / 2;
-    } else {
-        dst->width = src->width;
     }
 
     if (src->height > g_fb_info.height) {
         dst->height = g_fb_info.height;
         dst->crop_y = (src->height - g_fb_info.height) / 2;
-    } else {
-        dst->height = src->height;
     }
+#endif
     pr_info("DVP crop: x %d, y %d, w %d, h %d\n",
             dst->crop_x, dst->crop_y, dst->width, dst->height);
 #else
@@ -396,10 +400,17 @@ int do_rotate(struct aic_dvp_data *vdata, int index)
 
 int dvp_set_output_pos(u32 x, u32 y, u32 width, u32 height)
 {
-    if (!width || !height || x > g_fb_info.width || y > g_fb_info.height) {
+    if (!width || !height) {
         pr_err("Invalid position: [%d, %d] %d x %d\n", x, y, width, height);
         return -1;
     }
+
+#ifdef AIC_DISPLAY_DRV
+    if (x > g_fb_info.width || y > g_fb_info.height) {
+        pr_err("Invalid size: [%d, %d] %d x %d\n", x, y, width, height);
+        return -1;
+    }
+#endif
 
     g_vdata.dst_pos.x = x;
     g_vdata.dst_pos.y = y;
@@ -408,85 +419,151 @@ int dvp_set_output_pos(u32 x, u32 y, u32 width, u32 height)
     return 0;
 }
 
-int video_layer_set(struct aic_dvp_data *vdata, int index)
+/*
+ * Static init: compute layer size, position, format, crop, and stride.
+ * Only needs to be called once before streaming starts.
+ */
+int video_layer_init(struct aic_dvp_data *vdata)
 {
 #ifdef AIC_DISPLAY_DRV
     int i;
-#if DE_SCALE_ENABLE
-    u32 min_side = 0, max_side = 0;
-#endif
-    struct aicfb_layer_data layer = {0};
-    struct vin_video_buf *binfo = &vdata->binfo;
+    struct aicfb_layer_data *layer = &g_cached_layer;
 
-    layer.layer_id = AICFB_LAYER_TYPE_VIDEO;
-    layer.enable = 1;
+    memset(layer, 0, sizeof(*layer));
+    layer->layer_id = AICFB_LAYER_TYPE_VIDEO;
+    layer->enable = 1;
 
     /* Dst image */
-    layer.pos.x = vdata->dst_pos.x;
-    layer.pos.y = vdata->dst_pos.y;
+    layer->pos.x = vdata->dst_pos.x;
+    layer->pos.y = vdata->dst_pos.y;
 #if DE_SCALE_ENABLE
-    min_side = min(vdata->dst_pos.width, vdata->dst_pos.height);
-    max_side = max(vdata->dst_pos.width, vdata->dst_pos.height);
-    if (max_side > (min_side * 2)) {
-        /* When the aspect ratio is too high, stretch it to a square */
-        layer.scale_size.width = min_side;
-        layer.scale_size.height = min_side;
-        if (vdata->dst_pos.width > vdata->dst_pos.height)
-            layer.pos.x = min_side;
-        else
-            layer.pos.y = min_side;
-    } else {
-        layer.scale_size.width = vdata->dst_pos.width;
-        layer.scale_size.height = vdata->dst_pos.height;
-    }
+#if SCALE_MODE_FULLSCREEN
+    /* Fullscreen scaling: stretch to fill entire dst_pos, ignore aspect ratio */
+    layer->scale_size.width = ALIGN_DOWN(vdata->dst_pos.width, 2);
+    layer->scale_size.height = ALIGN_DOWN(vdata->dst_pos.height, 2);
 #else
-    layer.scale_size.width = vdata->dst_pos.width;
-    layer.scale_size.height = vdata->dst_pos.height;
+    /* Proportional scaling: fit source into dst_pos while preserving aspect ratio */
+    float ratio_w = (float)vdata->dst_pos.width / vdata->dst_fmt.width;
+    float ratio_h = (float)vdata->dst_pos.height / vdata->dst_fmt.height;
+    float scale = (ratio_w < ratio_h) ? ratio_w : ratio_h;
+
+    layer->scale_size.width = ALIGN_DOWN((u32)(vdata->dst_fmt.width * scale), 2);
+    layer->scale_size.height = ALIGN_DOWN((u32)(vdata->dst_fmt.height * scale), 2);
+    /* Center within dst_pos */
+    layer->pos.x = vdata->dst_pos.x + (vdata->dst_pos.width - layer->scale_size.width) / 2;
+    layer->pos.y = vdata->dst_pos.y + (vdata->dst_pos.height - layer->scale_size.height) / 2;
+#endif
+#else
+    layer->scale_size.width = vdata->dst_pos.width;
+    layer->scale_size.height = vdata->dst_pos.height;
     /* Be center-aligned if screen size is bigger than DVP output */
     if (g_fb_info.width > vdata->dst_pos.width)
-        layer.pos.x = (g_fb_info.width - vdata->dst_pos.width) / 2;
+        layer->pos.x = (g_fb_info.width - vdata->dst_pos.width) / 2;
     if (g_fb_info.height > vdata->dst_pos.height)
-        layer.pos.y = (g_fb_info.height - vdata->dst_pos.height) / 2;
+        layer->pos.y = (g_fb_info.height - vdata->dst_pos.height) / 2;
 #endif
 
 #if DE_CROP_ENABLE
-    layer.buf.crop_en = 1;
-    layer.buf.crop.x = 0;
-    layer.buf.crop.y = 0;
-    layer.buf.crop.width = min(vdata->dst_fmt.width, g_fb_info.width);
-    layer.buf.crop.height = min(vdata->dst_fmt.height, g_fb_info.height);
+    layer->buf.crop_en = 1;
+    layer->buf.crop.x = 0;
+    layer->buf.crop.y = 0;
+    layer->buf.crop.width = min(vdata->dst_fmt.width, g_fb_info.width);
+    layer->buf.crop.height = min(vdata->dst_fmt.height, g_fb_info.height);
 #endif
 
     /* Src image */
     if (vdata->rotation == MPP_ROTATION_0
         || vdata->rotation == MPP_ROTATION_180) {
-        layer.buf.size.width = vdata->dst_fmt.width;
+        layer->buf.size.width = vdata->dst_fmt.width;
         if (aic_dvp_sfield_mode())
-            layer.buf.size.height = vdata->dst_fmt.height / 2;
+            layer->buf.size.height = vdata->dst_fmt.height / 2;
         else
-            layer.buf.size.height = vdata->dst_fmt.height;
+            layer->buf.size.height = vdata->dst_fmt.height;
     } else {
         if (aic_dvp_sfield_mode())
-            layer.buf.size.width = vdata->dst_fmt.height / 2;
+            layer->buf.size.width = vdata->dst_fmt.height / 2;
         else
-            layer.buf.size.width = vdata->dst_fmt.height;
-        layer.buf.size.height = vdata->dst_fmt.width;
+            layer->buf.size.width = vdata->dst_fmt.height;
+        layer->buf.size.height = vdata->dst_fmt.width;
     }
 
-    layer.buf.format = vdata->dst_fmt.pixelformat;
-    layer.buf.buf_type = MPP_PHY_ADDR;
+    layer->buf.format = vdata->dst_fmt.pixelformat;
+    layer->buf.buf_type = MPP_PHY_ADDR;
 
-    for (i = 0; i < VID_BUF_PLANE_NUM; i++) {
-        layer.buf.stride[i] = layer.buf.size.width;
-        layer.buf.phy_addr[i] = binfo->planes[index * VID_BUF_PLANE_NUM + i].buf;
-    }
+    for (i = 0; i < VID_BUF_PLANE_NUM; i++)
+        layer->buf.stride[i] = layer->buf.size.width;
+#endif
+    return 0;
+}
 
-    if (mpp_fb_ioctl(g_fb, AICFB_UPDATE_LAYER_CONFIG, &layer) < 0) {
+/*
+ * Per-frame update: only refresh buffer physical addresses and push to FB.
+ * Must be called after video_layer_init().
+ */
+int video_layer_update_buf(struct aic_dvp_data *vdata, int index)
+{
+#ifdef AIC_DISPLAY_DRV
+    int i;
+    struct vin_video_buf *binfo = &vdata->binfo;
+    struct aicfb_layer_data *layer = &g_cached_layer;
+
+    for (i = 0; i < VID_BUF_PLANE_NUM; i++)
+        layer->buf.phy_addr[i] = binfo->planes[index * VID_BUF_PLANE_NUM + i].buf;
+
+    if (mpp_fb_ioctl(g_fb, AICFB_UPDATE_LAYER_CONFIG, layer) < 0) {
         pr_err("Failed to update layer config!\n");
         return -1;
     }
 #endif
     return 0;
+}
+
+static void dvp_show_fmt(void)
+{
+    struct mpp_video_fmt *src_fmt = &g_vdata.src_fmt;
+    struct dvp_out_fmt *dst_fmt = &g_vdata.dst_fmt;
+
+    printf("\nThe stream format:\n");
+    printf("\t[Camera] (0x%x - 0x%x)\n"
+           "\t\t└─> [DVP] %s (0x%x)\n"
+           "\t\t\t└─>[Panel] (0x%x)\n",
+           src_fmt->code, src_fmt->bus_type,
+           "DVP", dst_fmt->pixelformat, dst_fmt->pixelformat);
+}
+
+static void dvp_show_size(void)
+{
+    struct mpp_video_fmt *src_fmt = &g_vdata.src_fmt;
+    struct dvp_out_fmt *dst_fmt = &g_vdata.dst_fmt;
+#ifdef AIC_DISPLAY_DRV
+    struct aicfb_layer_data *layer = &g_cached_layer;
+#endif
+
+    printf("The stream size:\n");
+    printf("\t[Camera] %d x %d\n"
+           "\t\t└─> [DVP] %d x %d (Crop: [%d, %d] %d x %d)\n",
+           src_fmt->width, src_fmt->height,
+           dst_fmt->width, dst_fmt->height,
+           dst_fmt->crop_x, dst_fmt->crop_y, dst_fmt->width, dst_fmt->height);
+
+#ifdef AIC_DISPLAY_DRV
+#if DE_SCALE_ENABLE
+    printf("\t\t\t└─>[Panel] %d x %d (Pos: [%d, %d] Scale: %d x %d)\n\n",
+           g_fb_info.width, g_fb_info.height,
+           layer->pos.x, layer->pos.y,
+           layer->scale_size.width, layer->scale_size.height);
+#elif DE_CROP_ENABLE
+    printf("\t\t\t└─>[Panel] %d x %d (Pos: [%d, %d] Crop: %d x %d)\n\n",
+           g_fb_info.width, g_fb_info.height,
+           layer->buf.crop.x, layer->buf.crop.y,
+           layer->buf.crop.width, layer->buf.crop.height);
+#else
+    printf("\t\t\t└─>[Panel] %d x %d (Pos: [%d, %d] %d x %d)\n\n",
+           g_fb_info.width, g_fb_info.height,
+           layer->pos.x, layer->pos.y,
+           layer->buf.size.width, layer->buf.size.height);
+#endif
+#endif
 }
 
 static int dvp_pause(void)
@@ -577,6 +654,15 @@ static void test_dvp_thread(void *arg)
     pr_info("DE crop is enable\n");
 #endif
 
+    video_layer_init(&g_vdata);
+
+    dvp_show_fmt();
+    dvp_show_size();
+
+#ifdef AIC_DVP_NO_SIGNAL_PATTERN
+    video_layer_update_buf(&g_vdata, g_vdata.num_buffers - 1);
+#endif
+
     gettimespec(&begin);
     i = 0;
     g_dvp_status = DVP_STATUS_PLAY;
@@ -607,11 +693,11 @@ static void test_dvp_thread(void *arg)
             if (do_rotate(&g_vdata, index) < 0)
                 break;
 
-            if (video_layer_set(&g_vdata, g_vdata.num_buffers) < 0)
+            if (video_layer_update_buf(&g_vdata, g_vdata.num_buffers) < 0)
                 break;
 #endif
         } else {
-            if (video_layer_set(&g_vdata, index) < 0)
+            if (video_layer_update_buf(&g_vdata, index) < 0)
                 break;
         }
 
@@ -686,10 +772,14 @@ static int cmd_test_dvp(int argc, char **argv)
     while ((c = getopt_long(argc, argv, sopts, lopts, NULL)) != -1) {
         switch (c) {
         case 'f':
-            if (strncasecmp("nv12", optarg, strlen(optarg)) == 0)
+            if (strncasecmp("nv12", optarg, strlen(optarg)) == 0) {
                 g_vdata.dst_fmt.pixelformat = MPP_FMT_NV12;
-            if (strncasecmp("yuv400", optarg, strlen(optarg)) == 0)
+            } else if (strncasecmp("yuv400", optarg, strlen(optarg)) == 0) {
                 g_vdata.dst_fmt.pixelformat = MPP_FMT_YUV400;
+            } else {
+                pr_err("Invalid format: %s\n", optarg);
+                return -1;
+            }
             break;
 
         case 'c':
@@ -757,7 +847,7 @@ static int cmd_test_dvp(int argc, char **argv)
         thid = aicos_thread_create("test_dvp", 4096, 0, test_dvp_thread, NULL);
         if (thid == NULL) {
             pr_err("Failed to create DVP thread\n");
-            return -1;
+            goto error_out;
         }
     }
     return 0;

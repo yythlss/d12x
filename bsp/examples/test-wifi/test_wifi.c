@@ -13,6 +13,75 @@
 #include <math.h>
 #include "aic_core.h"
 
+#if defined(AIC_WLAN_AIC8800D40L)
+/*
+ * aic8800 headers conflict with common SDK headers (struct list_head,
+ * container_of, cpu_to_le32, etc.), so we declare the P2P API locally
+ * instead of including wlan_if.h / fhost_api.h.
+ */
+
+/* From fdrv/macif/lmac_mac.h */
+#define MAC_SSID_LEN  32
+
+struct mac_ssid {
+    uint8_t length;
+    uint8_t array[MAC_SSID_LEN];
+};
+
+enum {
+    PHY_BAND_2G4 = 0,
+    PHY_BAND_5G = 1,
+};
+
+enum {
+    PHY_CHNL_BW_20 = 0,
+    PHY_CHNL_BW_40 = 1,
+};
+
+struct mac_chan_op {
+    uint8_t band;
+    uint8_t type;
+    uint16_t prim20_freq;
+    uint16_t center1_freq;
+    uint16_t center2_freq;
+    int8_t tx_power;
+    uint8_t flags;
+};
+
+/* From host/driver/drv_fhost/fhost_api.h */
+struct fhost_vif_p2p_cfg {
+    struct mac_ssid ssid;
+    struct mac_chan_op chan;
+    char key[64 + 1];
+    uint8_t enable_he;
+    uint8_t enable_acs;
+    const char *vendor_ie;
+};
+
+/* From host/driver/drv_wlan/wlan_if.h */
+extern int wlan_start_p2p(int fvif_idx, struct fhost_vif_p2p_cfg *p2p_cfg_in);
+extern int wlan_stop_p2p(int fvif_idx);
+#elif defined(AIC_WLAN_REALTEK)
+#ifdef IFNAMSIZ
+#define __TEST_WIFI_IFNAMSIZ IFNAMSIZ
+#undef IFNAMSIZ
+#endif
+#include "wifi_conf.h"
+#include "wifi_constants.h"
+#if defined(CONFIG_ENABLE_P2P) && CONFIG_ENABLE_P2P
+/* wifi_p2p_supplicant.h uses enum p2p_wps_method, must declare it first */
+enum p2p_wps_method {
+    WPS_NOT_READY, WPS_PIN_DISPLAY, WPS_PIN_KEYPAD, WPS_PBC
+};
+#include "wifi_p2p_supplicant.h"
+#endif
+#ifdef __TEST_WIFI_IFNAMSIZ
+#undef IFNAMSIZ
+#define IFNAMSIZ __TEST_WIFI_IFNAMSIZ
+#undef __TEST_WIFI_IFNAMSIZ
+#endif
+#endif
+
 #if defined(RT_USING_SAL) && defined(SAL_INTERNET_CHECK)
 #error "SAL_INTERNET_CHECK should disabled in test-wifi when RT_USING_SAL"
 #endif
@@ -26,12 +95,15 @@ typedef enum {
     ERR_WIFI_DISC,
     ERR_WIFI_START_AP,
     ERR_WIFI_STOP_AP,
+    ERR_WIFI_P2P_INIT,
+    ERR_WIFI_P2P_START,
+    ERR_WIFI_P2P_STOP,
     ERR_UNKNOWN
 } WifiErrorCode;
 
 extern rt_err_t ping(char* target_name, rt_uint32_t times, rt_size_t size);
 
-static const char sopts[] = "s::a::p::t::b::c::xdlkh";
+static const char sopts[] = "s::a::p::t::b::c::xdlkhg::";
 static const struct option lopts[] = {
     {"sta_test",    optional_argument, NULL, 's'},
     {"ap_test",     optional_argument, NULL, 'a'},
@@ -43,6 +115,7 @@ static const struct option lopts[] = {
     {"delete",            no_argument, NULL, 'd'},
     {"load",              no_argument, NULL, 'l'},
     {"del_load",          no_argument, NULL, 'k'},
+    {"p2p_test",    optional_argument, NULL, 'g'},
     {"usage",             no_argument, NULL, 'h'},
     {0, 0, 0, 0}
 };
@@ -60,6 +133,7 @@ static void usage(char *program)
     rt_kprintf("\t -d, --del_stress\t\tDelete the stress test thread.\n");
     rt_kprintf("\t -l, --load\t\tCreating load thread increases CPU burden.\n");
     rt_kprintf("\t -k, --del_load\t\tDeleet the load thread.\n");
+    rt_kprintf("\t -g, --p2p_test\t\tP2P GO basic function test. Start P2P GO and verify.\n");
     rt_kprintf("\t -h, --usage \n");
     rt_kprintf("\n");
     rt_kprintf("Example: %s -s / %s -swlan0\n", program, program);
@@ -515,6 +589,190 @@ static int aic_wifi_ap_basic_test(char *dev_name)
     return ret;
 }
 
+#if defined(AIC_WLAN_AIC8800D40L)
+static int aic_wifi_p2p_basic_test(void)
+{
+    int fvif_idx = 0;
+    struct fhost_vif_p2p_cfg p2p_cfg;
+    int ssid_len, pass_len;
+    int ret;
+    int channel = P2P_TEST_CHANNEL;
+
+    memset(&p2p_cfg, 0, sizeof(p2p_cfg));
+
+    /* Init wlan1 to AP mode via RTT framework (same as "wifi -d mode ap wlan1") */
+    ret = aic_wifi_init("wlan1", "ap");
+    if (ret < 0) {
+        pr_err("P2P wifi init failed!\n");
+        g_wifi_errcode[ERR_WIFI_P2P_INIT]++;
+        return ERR_WIFI_P2P_INIT;
+    }
+
+    /* SSID */
+    ssid_len = strlen(P2P_TEST_SSID);
+    memcpy(p2p_cfg.ssid.array, P2P_TEST_SSID, ssid_len);
+    p2p_cfg.ssid.length = ssid_len;
+    p2p_cfg.ssid.array[ssid_len] = '\0';
+
+    /* Password */
+    pass_len = strlen(P2P_TEST_PASSWORD);
+    memcpy(p2p_cfg.key, P2P_TEST_PASSWORD, pass_len);
+    p2p_cfg.key[pass_len] = '\0';
+
+    /* Channel setup */
+    if (channel <= 13) {
+        p2p_cfg.chan.band = PHY_BAND_2G4;
+        p2p_cfg.chan.type = PHY_CHNL_BW_20;
+        p2p_cfg.chan.prim20_freq = 2412 + (channel - 1) * 5;
+        p2p_cfg.chan.center1_freq = p2p_cfg.chan.prim20_freq;
+    } else {
+        p2p_cfg.chan.band = PHY_BAND_5G;
+        p2p_cfg.chan.type = PHY_CHNL_BW_40;
+        p2p_cfg.chan.prim20_freq = 5000 + channel * 5;
+        p2p_cfg.chan.center1_freq = p2p_cfg.chan.prim20_freq + 10;
+    }
+    p2p_cfg.chan.tx_power = 20;
+    p2p_cfg.enable_he = 1;
+    p2p_cfg.enable_acs = 0;
+
+    /* Start P2P GO */
+    rt_kprintf("Starting P2P GO (SSID: %s, ch: %d)...\n",
+               P2P_TEST_SSID, channel);
+    ret = wlan_start_p2p(fvif_idx, &p2p_cfg);
+    if (ret != 0) {
+        pr_err("P2P GO start failed, ret=%d\n", ret);
+        g_wifi_errcode[ERR_WIFI_P2P_START]++;
+        return ERR_WIFI_P2P_START;
+    }
+    rt_kprintf("P2P GO started successfully\n");
+
+    /* Wait to verify stability */
+    rt_thread_mdelay(3000);
+
+    /* Stop P2P GO */
+    rt_kprintf("Stopping P2P GO...\n");
+    ret = wlan_stop_p2p(fvif_idx);
+    if (ret != 0) {
+        pr_err("P2P GO stop failed, ret=%d\n", ret);
+        g_wifi_errcode[ERR_WIFI_P2P_STOP]++;
+        return ERR_WIFI_P2P_STOP;
+    }
+    rt_kprintf("P2P GO stopped successfully\n");
+
+    return ERR_NONE;
+}
+
+#elif defined(AIC_WLAN_REALTEK)
+/* WPS config method values from wps/wps_defs.h */
+#define WPS_CFG_DISPLAY     0x0008
+#define WPS_CFG_PUSHBUTTON  0x0080
+#define WPS_CFG_KEYPAD      0x0100
+
+#define P2P_GO_RESULT_SIZE  376
+
+/* RTT adapter P2P GO callbacks (defined in rt_realtek_api.c) */
+extern void rtw_wlan_p2p_go_started(void);
+extern void rtw_wlan_p2p_go_stopped(void);
+
+static int aic_wifi_p2p_basic_test(void)
+{
+    u8 mac[6] = {0};
+    u8 res[P2P_GO_RESULT_SIZE] = {0};
+    u8 passphrase[64] = {0};
+    int ret;
+    struct netdev *dev;
+
+#if !defined(CONFIG_ENABLE_P2P) || (CONFIG_ENABLE_P2P == 0)
+    pr_err("P2P not available, please set REALTEK_FULL_FNC_MODE=y\n");
+    g_wifi_errcode[ERR_WIFI_P2P_INIT]++;
+    return ERR_WIFI_P2P_INIT;
+#endif
+
+    /* Init wlan1 to AP mode via RTT framework (same as "wifi -d mode ap wlan1") */
+    ret = aic_wifi_init("wlan1", "ap");
+    if (ret < 0) {
+        pr_err("P2P wifi init failed!\n");
+        g_wifi_errcode[ERR_WIFI_P2P_INIT]++;
+        return ERR_WIFI_P2P_INIT;
+    }
+
+    wifi_off();
+    rt_thread_mdelay(20);
+    wifi_on(RTW_MODE_P2P);
+
+    /* Get MAC address from netdev */
+    dev = netdev_get_by_name("w0");
+    if (dev) {
+        memcpy(mac, dev->hwaddr, 6);
+    }
+
+    /* Initialize P2P protocol stack */
+    ret = wifi_p2p_init(mac, P2P_TEST_GO_INTENT,
+                        P2P_TEST_CHANNEL, P2P_TEST_CHANNEL);
+    if (ret != 0) {
+        pr_err("wifi_p2p_init failed, ret=%d\n", ret);
+        g_wifi_errcode[ERR_WIFI_P2P_INIT]++;
+        aic_wifi_init("wlan1", "none");
+        return ERR_WIFI_P2P_INIT;
+    }
+
+    if (!is_wifi_p2p_initialized()) {
+        pr_err("P2P not initialized after wifi_p2p_init\n");
+        g_wifi_errcode[ERR_WIFI_P2P_INIT]++;
+        wifi_p2p_deinit();
+        aic_wifi_init("wlan1", "none");
+        return ERR_WIFI_P2P_INIT;
+    }
+
+    /* Set P2P device info (same as cmd_wifi_p2p_auto_go_start) */
+    {
+        const u8 pri_dev_type[8] = {
+            0x00, 0x0A, 0x00, 0x50, 0xF2, 0x04, 0x00, 0x01
+        };
+        wifi_p2p_set_dev_name("AIC-P2P-Test");
+        wifi_p2p_set_manufacturer("by customer");
+        wifi_p2p_set_model_name("customer");
+        wifi_p2p_set_model_number("v2.0");
+        wifi_p2p_set_serial_number("9");
+        wifi_p2p_set_pri_dev_type(pri_dev_type);
+        wifi_p2p_set_ssid(P2P_TEST_SSID);
+        wifi_p2p_set_config_methods(WPS_CFG_DISPLAY | WPS_CFG_KEYPAD | WPS_CFG_PUSHBUTTON);
+    }
+
+    /* Start Auto GO */
+    rt_kprintf("Starting P2P GO (SSID: %s, ch: %d)...\n",
+               P2P_TEST_SSID, P2P_TEST_CHANNEL);
+
+    strncpy((char *)passphrase, P2P_TEST_PASSWORD, sizeof(passphrase) - 1);
+    wifi_p2p_init_auto_go_params(res, passphrase, P2P_TEST_CHANNEL);
+    ret = wifi_p2p_start_auto_go(res);
+    if (ret != 0) {
+        pr_err("wifi_p2p_start_auto_go failed, ret=%d\n", ret);
+        g_wifi_errcode[ERR_WIFI_P2P_START]++;
+        wifi_p2p_deinit();
+        aic_wifi_init("wlan1", "none");
+        return ERR_WIFI_P2P_START;
+    }
+    rt_kprintf("P2P GO started successfully\n");
+
+    /* Notify RTT framework that AP started (P2P GO is an AP from RTT's view) */
+    rtw_wlan_p2p_go_started();
+
+    /* Wait to verify stability */
+    rt_thread_mdelay(3000);
+
+    /* Stop P2P GO */
+    rt_kprintf("Stopping P2P GO...\n");
+    rtw_wlan_p2p_go_stopped();
+    wifi_p2p_deinit();
+    wifi_off();
+    aic_wifi_init("wlan1", "none");
+    rt_kprintf("P2P GO stopped successfully\n");
+
+    return ERR_NONE;
+}
+#endif /* AIC_WLAN_AIC8800D40L / AIC_WLAN_REALTEK */
+
 static void aic_wifi_report_err(void)
 {
     rt_kprintf("\n=== WiFi Test Status ===\n");
@@ -526,6 +784,9 @@ static void aic_wifi_report_err(void)
     rt_kprintf("  Disc Failures: %d\n", g_wifi_errcode[ERR_WIFI_DISC]);
     rt_kprintf("  StartAP Failures: %d\n", g_wifi_errcode[ERR_WIFI_START_AP]);
     rt_kprintf("  StopAP Failures: %d\n", g_wifi_errcode[ERR_WIFI_STOP_AP]);
+    rt_kprintf("  P2PInit Failures: %d\n", g_wifi_errcode[ERR_WIFI_P2P_INIT]);
+    rt_kprintf("  P2PStart Failures: %d\n", g_wifi_errcode[ERR_WIFI_P2P_START]);
+    rt_kprintf("  P2PStop Failures: %d\n", g_wifi_errcode[ERR_WIFI_P2P_STOP]);
     rt_kprintf("=======================\n");
 
     if (g_sta_test_flag && g_ap_test_flag)
@@ -539,6 +800,8 @@ static void aic_wifi_stress_test()
         aic_wifi_sta_basic_test(RT_WLAN_DEVICE_STA_NAME);
         rt_thread_mdelay(200);
         aic_wifi_ap_basic_test(RT_WLAN_DEVICE_AP_NAME);
+        rt_thread_mdelay(200);
+        aic_wifi_p2p_basic_test();
         rt_thread_mdelay(200);
 
         /* check the heap */
@@ -769,6 +1032,11 @@ static int cmd_test_wifi(int argc, char *argv[])
             break;
         case 'k':
             delete_load_thread();
+            break;
+        case 'g':
+            ret = aic_wifi_p2p_basic_test();
+            if (ret != 0)
+                ret = -RT_ERROR;
             break;
         case 'h':
             usage(argv[0]);

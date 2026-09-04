@@ -14,6 +14,10 @@
 #include "wlan_dev.h"
 #include <dfs_posix.h>
 
+#ifdef RT_USING_PM
+#include "general_wireless_pm.h"
+#endif
+
 #include "wifi/wifi_conf.h"
 #include "net_stack_intf.h"
 
@@ -32,9 +36,47 @@ static struct rt_wlan_device *s_current_dev = NULL;
 static char rtw_mac[6];
 
 extern int realtek_init(void);
+#ifdef RT_USING_PM
+static bool g_rtk_wifi_inited = false;
+
+static struct rt_mmcsd_host *realtek_pm_get_host(void)
+{
+    return aic_sdmc_get_rthost(AIC_WIFI_SDMC_ID);
+}
+
+
+static int realtek_pm_suspend(rt_uint8_t mode)
+{
+    return 0;
+}
+
+static int realtek_pm_resume(rt_uint8_t mode)
+{
+    if (!g_rtk_wifi_inited)
+        return 0;
+
+    realtek_deinit();
+
+    g_rtk_wifi_inited = false;
+
+    return 0;
+}
+
+static struct aic_wlan_chip_pm_ops g_realtek_pm_ops = {
+    .suspend   = realtek_pm_suspend,
+    .resume    = realtek_pm_resume,
+    .get_host  = realtek_pm_get_host,
+};
+#endif /* RT_USING_PM */
+
 rt_err_t aic_realtek_init(struct rt_wlan_device *wlan)
 {
-    return realtek_init();
+    int ret = realtek_init();
+#ifdef RT_USING_PM
+    if (ret == RT_EOK)
+        g_rtk_wifi_inited = true;
+#endif
+    return ret;
 }
 
 #if defined(CONFIG_ENABLE_WPS_AP) && CONFIG_ENABLE_WPS_AP
@@ -528,6 +570,10 @@ int aic_realtek_wifi_device_reg(void)
         return -1;
     }
     rt_wlan_dev_register(s_ap_dev, RT_WLAN_DEVICE_AP_NAME, &wlan_ops, RT_WLAN_FLAG_AP_ONLY, NULL);
+
+#ifdef RT_USING_PM
+    aic_wlan_pm_register(&s_wlan_dev->device, &g_realtek_pm_ops);
+#endif
 
     return 0;
 }

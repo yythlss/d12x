@@ -545,7 +545,6 @@ static void _pm_change_sleep_mode(struct rt_pm *pm)
     /* module busy request check */
     if (_pm_device_check_idle() == RT_FALSE)
     {
-        rt_kprintf("Device stays active.\n");
         sleep_mode = PM_BUSY_SLEEP_MODE;
         if (sleep_mode < pm->sleep_mode)
         {

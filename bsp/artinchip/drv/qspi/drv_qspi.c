@@ -455,6 +455,20 @@ static rt_err_t qspi_hw_init(struct aic_qspi *qspi)
     cfg.rx_dlymode = qspi->rxd_dlymode;
     cfg.tx_dlymode = aic_convert_tx_dlymode(qspi->txc_dlymode, qspi->txd_dlymode);
 
+#ifdef AIC_CHIP_D12P
+    if (cfg.idx >= 3) {
+        cfg.fifo_depth = HAL_QSPI_FIFO_DEPTH_V3LITE;
+        cfg.dev_max_burst = HAL_QSPI_DMA_DEV_BURST_ONE;
+    } else {
+        cfg.fifo_depth = HAL_QSPI_FIFO_DEPTH;
+        cfg.dev_max_burst = HAL_QSPI_DMA_DEV_MAXBURST;
+        cfg.idma_en = true;
+    }
+#else
+    cfg.fifo_depth = HAL_QSPI_FIFO_DEPTH;
+    cfg.dev_max_burst = HAL_QSPI_DMA_DEV_MAXBURST;
+#endif
+
     ret = hal_qspi_master_init(&qspi->handle, &cfg);
     if (ret) {
         pr_err("qspi init failed.\n");
@@ -620,17 +634,16 @@ static rt_err_t spi_nonblock_set(struct rt_spi_device *device,
     struct aic_qspi *qspi;
 
     qspi = (struct aic_qspi *)device->bus;
-    if (nonblock)
-        qspi->nonblock = true;
-    else
-        qspi->nonblock = false;
 
     if (nonblock) {
-        if (!qspi->completion)
+        if (!qspi->completion) {
             qspi->completion = (struct rt_completion *)rt_malloc(sizeof(struct rt_completion));
-
-        if (!qspi->completion)
-            return -RT_ERROR;
+            if (!qspi->completion)
+                return -RT_ERROR;
+        }
+        qspi->nonblock = true;
+    } else {
+        qspi->nonblock = false;
     }
 
     return RT_EOK;
@@ -650,7 +663,7 @@ static void qspi_set_rxdelay_mode(struct rt_spi_device *device, rt_uint32_t mode
     struct aic_qspi *qspi;
 
     qspi = (struct aic_qspi *)device->bus;
-
+    qspi->rxd_dlymode = mode;
     hal_qspi_master_set_rxdelay_mode(&qspi->handle, mode);
 }
 

@@ -11,6 +11,8 @@ if GetDepend('AIC_XIP_FLASH_WRITE') and GetDepend('AIC_CHIP_D13X'):
     src += Glob('xip_ramcode_d13x_bin.c')
 if GetDepend('AIC_XIP_FLASH_WRITE') and GetDepend('AIC_CHIP_D12X'):
     src += Glob('xip_ramcode_d12x_bin.c')
+if GetDepend('AIC_XIP_FLASH_WRITE') and GetDepend('AIC_CHIP_D12P'):
+    src += Glob('xip_ramcode_d12p_bin.c')
 
 group = DefineGroup('xip', src, depend = [''], CPPPATH = CPPPATH)
 

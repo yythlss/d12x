@@ -158,10 +158,12 @@ static int aic_platform_wireless_pin_init(void)
         gpio_pm_register(pin, RT_NULL, RT_NULL);
     #endif
 
+    #if AIC_WIRELESS_DELAY_POWER_ON == 0
         hal_gpio_set_value(g, p, 0);
         aicos_msleep(10);
         hal_gpio_set_value(g, p, 1);
         aicos_msleep(10);
+    #endif
     } else {
         rt_kprintf("wifi wk host pin not configured, invalid GPIO: %s, pin[%d]\n",
                   AIC_WIRELESS_WIFI_WK_HOST_GPIO, pin);
@@ -178,10 +180,12 @@ static int aic_platform_wireless_pin_init(void)
         gpio_pm_register(pin, RT_NULL, RT_NULL);
     #endif
 
+    #if AIC_WIRELESS_DELAY_POWER_ON == 0
         hal_gpio_set_value(g, p, 0);
         aicos_msleep(10);
         hal_gpio_set_value(g, p, 1);
         aicos_msleep(10);
+    #endif
     } else {
         rt_kprintf("wifi pwr pin not configured, invalid GPIO: %s, pin[%d]\n",
                   AIC_WIRELESS_PWR_GPIO, pin);
@@ -198,10 +202,12 @@ static int aic_platform_wireless_pin_init(void)
         gpio_pm_register(pin, RT_NULL, RT_NULL);
     #endif
 
+    #if AIC_WIRELESS_DELAY_POWER_ON == 0
         hal_gpio_set_value(g, p, 0);
         aicos_msleep(10);
         hal_gpio_set_value(g, p, 1);
         aicos_msleep(10);
+    #endif
     } else {
         rt_kprintf("BT pwr pin not configured, invalid GPIO: %s, pin[%d]\n",
                   AIC_WIRELESS_BT_PWR_GPIO, pin);

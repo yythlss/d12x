@@ -78,29 +78,44 @@ void rws_socket_disconnect_and_release(rws_socket socket)
     {
         return;
     }
-
     rws_mutex_lock(s->work_mutex);
-
     rws_socket_delete_all_frames_in_list(s->send_frames);
     rws_list_delete_clean(&s->send_frames);
-
     if (s->is_connected)
     {
         // connected in loop
         s->command = COMMAND_DISCONNECT;
         rws_mutex_unlock(s->work_mutex);
+        /* Wait for work thread to process COMMAND_DISCONNECT */
+        int wait_count = 0;
+        while (s->command != COMMAND_END && wait_count < 100) {  /* up to ~500 ms (100 * 5 ms) */
+            rws_thread_sleep(5);
+            wait_count++;
+        }
     }
     else if (s->work_thread)
     {
         // disconnected in loop
         s->command = COMMAND_END;
         rws_mutex_unlock(s->work_mutex);
+        /* Wait for work thread to exit */
+        int wait_count = 0;
+        while (s->work_thread != NULL && wait_count < 200) {  /* up to ~1000 ms (200 * 5 ms) */
+            rws_thread_sleep(5);
+            wait_count++;
+        }
+        /* If thread did not exit in time, drop the handle (best-effort cleanup) */
+        s->work_thread = NULL;
     }
     else if (s->command != COMMAND_END)
     {
         // not in loop
         rws_mutex_unlock(s->work_mutex);
         rws_socket_delete(s);
+    }
+    else
+    {
+        rws_mutex_unlock(s->work_mutex);
     }
 }
 
@@ -211,6 +226,24 @@ void rws_socket_delete(_rws_socket *s)
 
     rws_free(s->header_buff);
     rws_free(s->payload_buff);
+
+    /* Free custom HTTP header list */
+    if (s->custom_headers)
+    {
+        _rws_node *cur = s->custom_headers;
+        while (cur)
+        {
+            _rws_custom_header *header = (_rws_custom_header *)cur->value.object;
+            if (header)
+            {
+                rws_string_delete(header->key);
+                rws_string_delete(header->value);
+                rws_free(header);
+            }
+            cur = cur->next;
+        }
+        rws_list_delete_clean(&s->custom_headers);
+    }
 
     rws_free(s);
 }
@@ -425,4 +458,36 @@ void rws_socket_set_custom_mode(rws_socket socket)
     }
 
     LOG_I("[%s:%d, tick:%d] end.", __FUNCTION__, __LINE__, rt_tick_get());
+}
+
+/* Append a custom HTTP header to the WebSocket handshake request */
+void rws_socket_add_header(rws_socket socket, const char *key, const char *value)
+{
+    _rws_socket *s = (_rws_socket *)socket;
+    if (!s || !key || !value)
+        return;
+    _rws_list *header_node = rws_list_create();
+    if (!header_node)
+        return;
+    _rws_custom_header *header = (_rws_custom_header *)rws_malloc(sizeof(_rws_custom_header));
+    if (!header)
+    {
+        rws_list_delete(header_node);
+        return;
+    }
+    header->key = rws_string_copy(key);
+    header->value = rws_string_copy(value);
+    if (!header->key || !header->value)
+    {
+        rws_string_delete(header->key);
+        rws_string_delete(header->value);
+        rws_free(header);
+        rws_list_delete(header_node);
+        return;
+    }
+    header_node->value.object = header;
+    if (!s->custom_headers)
+        s->custom_headers = header_node;
+    else
+        rws_list_add(s->custom_headers, header_node);
 }

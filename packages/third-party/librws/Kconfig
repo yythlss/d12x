@@ -1,0 +1,18 @@
+menuconfig PKG_USING_LIBRWS
+    bool "Enable librws websocket client"
+    default n
+if PKG_USING_LIBRWS
+    choice
+        prompt "Select TLS support"
+        default PKG_LIBRWS_MBEDTLS
+        config PKG_LIBRWS_MBEDTLS
+            bool "mbedTLS"
+            #select PKG_USING_MBEDTLS
+        config PKG_LIBRWS_NO_TLS
+            bool "No TLS support"
+    endchoice
+
+    config LIBRWS_USING_EXAMPLE
+        bool "Enable example"
+        default n
+endif

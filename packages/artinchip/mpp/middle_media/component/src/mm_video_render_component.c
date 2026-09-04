@@ -21,6 +21,7 @@
 #include "mpp_log.h"
 #include "mpp_list.h"
 #include "mpp_mem.h"
+#include "mpp_thread.h"
 #include "aic_message.h"
 #include "mpp_decoder.h"
 #include "mpp_dec_type.h"
@@ -47,7 +48,7 @@ typedef struct mm_video_render_data {
     mm_bind_info in_port_bind[2];
     mm_bind_info out_port_bind[2];
 
-    pthread_t thread_id;
+    mpp_thread_t thread_handle;
     struct aic_message_queue s_msg;
 
     struct aic_video_render *render;
@@ -100,7 +101,7 @@ typedef struct mm_video_render_data {
     s64 tm_rot_end;
 } mm_video_render_data;
 
-static void *mm_video_render_component_thread(void *p_thread_data);
+static void mm_video_render_component_thread(void *p_thread_data);
 static void mm_video_render_show_debug_info(mm_video_render_data *p_video_render_data);
 
 static int mm_video_render_calloc_frame_buffer(struct mpp_frame *p_frame)
@@ -956,7 +957,7 @@ s32 mm_video_render_component_deinit(mm_handle h_component)
     s_msg.message_id = MM_COMMAND_STOP;
     s_msg.data_size = 0;
     aic_msg_put(&p_video_render_data->s_msg, &s_msg);
-    pthread_join(p_video_render_data->thread_id, (void *)&error);
+    mpp_thread_delete(p_video_render_data->thread_handle);
 
     pthread_mutex_destroy(&p_video_render_data->in_frame_lock);
     pthread_mutex_destroy(&p_video_render_data->state_lock);
@@ -978,30 +979,15 @@ s32 mm_video_render_component_deinit(mm_handle h_component)
     return error;
 }
 
-static int video_thread_attr_init(pthread_attr_t *attr)
-{
-    if (attr == NULL) {
-        return EINVAL;
-    }
-    pthread_attr_init(attr);
-    attr->stacksize = 16 * 1024;
-    attr->schedparam.sched_priority = MM_COMPONENT_VIDEO_RENDER_THREAD_PRIORITY;
-    return 0;
-}
-
 s32 mm_video_render_component_init(mm_handle h_component)
 {
     s32 error = MM_ERROR_NONE;
-    u32 err = MM_ERROR_NONE;
     mm_component *p_comp;
     mm_video_render_data *p_video_render_data;
     s32 port_index = 0;
     s8 msg_create = 0;
     s8 state_lock_init = 0;
     s8 in_frame_lock_init = 0;
-
-    pthread_attr_t attr;
-    video_thread_attr_init(&attr);
 
     logw("mm_video_render_component_init....");
 
@@ -1070,10 +1056,12 @@ s32 mm_video_render_component_init(mm_handle h_component)
     state_lock_init = 1;
 
     // Create the component thread
-    err = pthread_create(&p_video_render_data->thread_id, &attr,
-                         mm_video_render_component_thread, p_video_render_data);
-    if (err) {
-        loge("pthread_create fail!");
+    p_video_render_data->thread_handle =
+        mpp_thread_create("vrender", 16 * 1024,
+                          MM_COMPONENT_VIDEO_RENDER_THREAD_PRIORITY,
+                          mm_video_render_component_thread, p_video_render_data);
+    if (!p_video_render_data->thread_handle) {
+        loge("mpp_thread_create vrender comp thread fail!");
         error = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
@@ -1815,7 +1803,7 @@ static int mm_video_render_process_first_frame(mm_video_render_data *p_video_ren
     return MM_ERROR_NONE;
 }
 
-static void *mm_video_render_component_thread(void *p_thread_data)
+static void mm_video_render_component_thread(void *p_thread_data)
 {
     s32 ret = MM_ERROR_NONE;
     s32 cmd = MM_COMMAND_UNKNOWN;
@@ -1904,6 +1892,4 @@ static void *mm_video_render_component_thread(void *p_thread_data)
 
 _EXIT:
     mm_video_render_show_debug_info(p_video_render_data);
-
-    return (void *)MM_ERROR_NONE;
 }

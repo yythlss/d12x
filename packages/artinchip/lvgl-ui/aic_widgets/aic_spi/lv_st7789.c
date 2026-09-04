@@ -11,7 +11,7 @@
 
 #define ST7789_RESET_PIN "PB.10"
 
-void lv_spi_panel_enable(struct lv_spi_dev *dev)
+static void lv_spi_panel(struct lv_spi_dev *dev)
 {
     u32 rst_pin;
 
@@ -47,3 +47,10 @@ void lv_spi_panel_enable(struct lv_spi_dev *dev)
     lv_spi_write_seq(dev, 0x29);
     rt_thread_mdelay(10);
 }
+
+struct lv_spi_panel_driver lv_spi_st7789 = {
+    .name = "st7789",
+    .enable = lv_spi_panel,
+    .width = 320,
+    .height = 320,
+};

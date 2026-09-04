@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2024-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -539,6 +539,220 @@ struct panel_dsi tft050bp071_dsi = {
     .lane_num = 2,
 };
 
+#define ILI9881C_04_RESET_GPIO  "PD.14"
+
+static struct gpio_desc ili9881c_04_reset;
+
+static void panel_gpio_init(void)
+{
+    panel_get_gpio(&ili9881c_04_reset, ILI9881C_04_RESET_GPIO);
+
+    panel_gpio_set_value(&ili9881c_04_reset, 1);
+    aic_delay_ms(120);
+    panel_gpio_set_value(&ili9881c_04_reset, 0);
+    aic_delay_ms(120);
+    panel_gpio_set_value(&ili9881c_04_reset, 1);
+    aic_delay_ms(400);
+}
+
+static int ili9881c_04_enable(struct aic_panel *panel)
+{
+    int ret;
+
+    panel_di_enable(panel, 0);
+    panel_gpio_init();
+    panel_dsi_send_perpare(panel);
+
+    /* page 0 */
+    panel_dsi_dcs_send_seq(panel, 0xF0, 0x55, 0xAA, 0x52, 0x08, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xB1, 0x68, 0x01);
+    panel_dsi_dcs_send_seq(panel, 0xB6, 0x08);
+    panel_dsi_dcs_send_seq(panel, 0x6F, 0x02);
+    panel_dsi_dcs_send_seq(panel, 0xB8, 0x08);
+    panel_dsi_dcs_send_seq(panel, 0xBB, 0x54, 0x44);
+    panel_dsi_dcs_send_seq(panel, 0xBC, 0x05, 0x05);
+    panel_dsi_dcs_send_seq(panel, 0xC7, 0x01);
+    panel_dsi_dcs_send_seq(panel, 0xBD, 0x02, 0xB0, 0x1E, 0x1E, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xC5, 0x01, 0x07);
+    panel_dsi_dcs_send_seq(panel, 0xC8, 0x83);
+
+    /* page 1 */
+    panel_dsi_dcs_send_seq(panel, 0xF0, 0x55, 0xAA, 0x52, 0x08, 0x01);
+    panel_dsi_dcs_send_seq(panel, 0xB0, 0x05, 0x05);
+    panel_dsi_dcs_send_seq(panel, 0xB1, 0x05, 0x05);
+    panel_dsi_dcs_send_seq(panel, 0xBC, 0x90, 0x01);
+    panel_dsi_dcs_send_seq(panel, 0xBD, 0x90, 0x01);
+    panel_dsi_dcs_send_seq(panel, 0xCA, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xC0, 0x04);
+    panel_dsi_dcs_send_seq(panel, 0xBE, 0x29);
+    panel_dsi_dcs_send_seq(panel, 0xB3, 0x28, 0x28);
+    panel_dsi_dcs_send_seq(panel, 0xB4, 0x12, 0x12);
+    panel_dsi_dcs_send_seq(panel, 0xB9, 0x34, 0x34);
+    panel_dsi_dcs_send_seq(panel, 0xBA, 0x24, 0x24);
+
+    /* page 2, gamma */
+    panel_dsi_dcs_send_seq(panel, 0xF0, 0x55, 0xAA, 0x52, 0x08, 0x02);
+    panel_dsi_dcs_send_seq(panel, 0xEE, 0x01);
+    panel_dsi_dcs_send_seq(panel, 0xEF, 0x09, 0x06, 0x15, 0x18);
+    panel_dsi_dcs_send_seq(panel, 0xB0, 0x00, 0x00, 0x00, 0x19, 0x00, 0x35);
+    panel_dsi_dcs_send_seq(panel, 0x6F, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB0, 0x00, 0x48, 0x00, 0x59, 0x00, 0x77);
+    panel_dsi_dcs_send_seq(panel, 0x6F, 0x0C);
+    panel_dsi_dcs_send_seq(panel, 0xB0, 0x00, 0x9A, 0x00, 0xCF);
+    panel_dsi_dcs_send_seq(panel, 0xB1, 0x00, 0xFC, 0x01, 0x43, 0x01, 0x7C);
+    panel_dsi_dcs_send_seq(panel, 0x6F, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB1, 0x01, 0xD2, 0x02, 0x1A, 0x02, 0x1C);
+    panel_dsi_dcs_send_seq(panel, 0x6F, 0x0C);
+    panel_dsi_dcs_send_seq(panel, 0xB1, 0x02, 0x5F, 0x02, 0xA9);
+    panel_dsi_dcs_send_seq(panel, 0xB2, 0x02, 0xD9, 0x03, 0x1C, 0x03, 0x4B);
+    panel_dsi_dcs_send_seq(panel, 0x6F, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB2, 0x03, 0x86, 0x03, 0x9E, 0x03, 0xBF);
+    panel_dsi_dcs_send_seq(panel, 0x6F, 0x0C);
+    panel_dsi_dcs_send_seq(panel, 0xB2, 0x03, 0xD3, 0x03, 0xEA);
+    panel_dsi_dcs_send_seq(panel, 0xB3, 0x03, 0xFD, 0x03, 0xF3);
+
+    /* page 6, GOA */
+    panel_dsi_dcs_send_seq(panel, 0xF0, 0x55, 0xAA, 0x52, 0x08, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB0, 0x0B, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xB1, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xB2, 0x2E, 0x09);
+    panel_dsi_dcs_send_seq(panel, 0xB3, 0x2A, 0x29);
+    panel_dsi_dcs_send_seq(panel, 0xB4, 0x1B, 0x19);
+    panel_dsi_dcs_send_seq(panel, 0xB5, 0x17, 0x15);
+    panel_dsi_dcs_send_seq(panel, 0xB6, 0x13, 0x11);
+    panel_dsi_dcs_send_seq(panel, 0xB7, 0x01, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xB8, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xB9, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xBA, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xBB, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xBC, 0x2E, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xBD, 0x10, 0x12);
+    panel_dsi_dcs_send_seq(panel, 0xBE, 0x14, 0x16);
+    panel_dsi_dcs_send_seq(panel, 0xBF, 0x18, 0x1A);
+    panel_dsi_dcs_send_seq(panel, 0xC0, 0x29, 0x2A);
+    panel_dsi_dcs_send_seq(panel, 0xC1, 0x08, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xC2, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xC3, 0x2E, 0x0A);
+    panel_dsi_dcs_send_seq(panel, 0xE5, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xC4, 0x0A, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xC5, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xC6, 0x2E, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xC7, 0x2A, 0x29);
+    panel_dsi_dcs_send_seq(panel, 0xC8, 0x10, 0x12);
+    panel_dsi_dcs_send_seq(panel, 0xC9, 0x14, 0x16);
+    panel_dsi_dcs_send_seq(panel, 0xCA, 0x18, 0x1A);
+    panel_dsi_dcs_send_seq(panel, 0xCB, 0x08, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xCC, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xCD, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xCE, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xCF, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xD0, 0x2E, 0x09);
+    panel_dsi_dcs_send_seq(panel, 0xD1, 0x1B, 0x19);
+    panel_dsi_dcs_send_seq(panel, 0xD2, 0x17, 0x15);
+    panel_dsi_dcs_send_seq(panel, 0xD3, 0x13, 0x11);
+    panel_dsi_dcs_send_seq(panel, 0xD4, 0x29, 0x2A);
+    panel_dsi_dcs_send_seq(panel, 0xD5, 0x01, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xD6, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xD7, 0x2E, 0x0B);
+    panel_dsi_dcs_send_seq(panel, 0xE6, 0x2E, 0x2E);
+    panel_dsi_dcs_send_seq(panel, 0xD8, 0x00, 0x00, 0x00, 0x00, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xD9, 0x00, 0x00, 0x00, 0x00, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xE7, 0x00);
+
+    /* page 3 */
+    panel_dsi_dcs_send_seq(panel, 0xF0, 0x55, 0xAA, 0x52, 0x08, 0x03);
+    panel_dsi_dcs_send_seq(panel, 0xB0, 0x20, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xB1, 0x20, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xB2, 0x05, 0x00, 0x00, 0x00, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xB6, 0x05, 0x00, 0x00, 0x00, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xB7, 0x05, 0x00, 0x00, 0x00, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xBA, 0x57, 0x00, 0x00, 0x00, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xBB, 0x57, 0x00, 0x00, 0x00, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xC0, 0x00, 0x00, 0x00, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xC1, 0x00, 0x00, 0x00, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xC4, 0x60);
+    panel_dsi_dcs_send_seq(panel, 0xC5, 0x40);
+
+    /* page 5 */
+    panel_dsi_dcs_send_seq(panel, 0xF0, 0x55, 0xAA, 0x52, 0x08, 0x05);
+    panel_dsi_dcs_send_seq(panel, 0xBD, 0x03, 0x01, 0x03, 0x03, 0x03);
+    panel_dsi_dcs_send_seq(panel, 0xB0, 0x17, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB1, 0x17, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB2, 0x17, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB3, 0x17, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB4, 0x17, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB5, 0x17, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xB8, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xB9, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xBA, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xBB, 0x02);
+    panel_dsi_dcs_send_seq(panel, 0xBC, 0x00);
+    panel_dsi_dcs_send_seq(panel, 0xC0, 0x07);
+    panel_dsi_dcs_send_seq(panel, 0xC4, 0x80);
+    panel_dsi_dcs_send_seq(panel, 0xC5, 0xA4);
+    panel_dsi_dcs_send_seq(panel, 0xC8, 0x05, 0x30);
+    panel_dsi_dcs_send_seq(panel, 0xC9, 0x01, 0x31);
+    panel_dsi_dcs_send_seq(panel, 0xCC, 0x00, 0x00, 0x3C);
+    panel_dsi_dcs_send_seq(panel, 0xCD, 0x00, 0x00, 0x3C);
+    panel_dsi_dcs_send_seq(panel, 0xD1, 0x00, 0x05, 0x09, 0x07, 0x10);
+    panel_dsi_dcs_send_seq(panel, 0xD2, 0x00, 0x05, 0x0E, 0x07, 0x10);
+    panel_dsi_dcs_send_seq(panel, 0xE5, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xE6, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xE7, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xE8, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xE9, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xEA, 0x06);
+    panel_dsi_dcs_send_seq(panel, 0xED, 0x30);
+    panel_dsi_dcs_send_seq(panel, 0x35, 0x00);
+
+    ret = panel_dsi_dcs_exit_sleep_mode(panel);
+    if (ret < 0) {
+        pr_err("Failed to exit sleep mode: %d\n", ret);
+        return ret;
+    }
+    aic_delay_ms(120);
+
+    ret = panel_dsi_dcs_set_display_on(panel);
+    if (ret < 0) {
+        pr_err("Failed to set display on: %d\n", ret);
+        return ret;
+    }
+    aic_delay_ms(5);
+
+    panel_dsi_setup_realmode(panel);
+
+    panel_de_timing_enable(panel, 0);
+    panel_backlight_enable(panel, 0);
+
+    return 0;
+}
+
+static struct aic_panel_funcs ili9881c_04_funcs = {
+    .disable = panel_default_disable,
+    .unprepare = panel_default_unprepare,
+    .prepare = panel_default_prepare,
+    .enable = ili9881c_04_enable,
+    .register_callback = panel_register_callback,
+};
+
+static struct display_timing ili9881c_04_timing = {
+    .pixelclock = 95000000,
+    .hactive = 800,
+    .hfront_porch = 200,
+    .hback_porch = 200,
+    .hsync_len = 10,
+    .vactive = 1280,
+    .vfront_porch = 12,
+    .vback_porch = 12,
+    .vsync_len = 3,
+};
+
+static struct panel_dsi ili9881c_04_dsi = {
+    .mode = DSI_MOD_VID_BURST | DSI_MOD_NO_EOT_PACKET | DSI_CLOCK_NON_CONTINUOUS,
+    .format = DSI_FMT_RGB888,
+    .lane_num = 4,
+};
+
 static struct panel_desc desc[] = {
     [0] = {
         .name = "ili9881c-default",
@@ -551,6 +765,12 @@ static struct panel_desc desc[] = {
         .dsi = &tft050bp071_dsi,
         .timings = &tft050bp071_timing,
         .funcs = &tft050bp071_funcs,
+    },
+    [2] = {
+        .name = "ili9881c-04",
+        .dsi = &ili9881c_04_dsi,
+        .timings = &ili9881c_04_timing,
+        .funcs = &ili9881c_04_funcs,
     },
 };
 

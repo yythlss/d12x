@@ -1,0 +1,70 @@
+menu "WLAN Configuration"
+
+if !KERNEL_BAREMETAL
+
+menuconfig AIC_WIRELESS_LAN
+        bool "Using Wireless LAN"
+        default n
+
+if AIC_WIRELESS_LAN
+    config AIC_WLAN_AIC8800D40L
+        bool
+        default y
+        select LPKG_USING_MBEDTLS
+
+    config AIC_WIRELESS_PWR_GPIO
+        string
+        default "PE.20"
+
+    config AIC_WIRELESS_BT_PWR_GPIO
+        string
+        default "PE.18"
+
+    config AIC_WIRELESS_WIFI_WK_HOST_GPIO
+        string
+        default "PE.19"
+
+    config AIC_WIFI_SDMC_ID
+        int
+        default 1
+
+    config CHIP_SELECT_AIC8800DL
+        bool
+        default y
+
+    config CONFIG_AIC8800_VRF_DCDC_MODE
+        bool
+        default y
+
+    choice
+        prompt "Select wifi work mode"
+        default CONFIG_AIC8800_NORMAL_MODE
+        config CONFIG_AIC8800_NORMAL_MODE
+            bool "normal mode"
+        config CONFIG_AIC8800_RFTEST_MODE
+            bool "rftest mode"
+        config CONFIG_AIC8800_FTTEST_MODE
+            bool "fttest mode"
+    endchoice
+
+    config CONFIG_AIC8800_MAC_USE_CHIP_ID
+        bool "enable wifi mac use chip id"
+        default n
+        select AIC_USING_SID
+        select AIC_MAC_CHIPID_DRV
+
+    config CONFIG_AIC8800_BT_SUPPORT
+        bool "enable BT support"
+        default n
+
+    config AIC_DEV_AIC8800_DEBUG_LOG
+        bool "enable wifi debug messages"
+        default n
+
+    config AIC_WIRELESS_DELAY_POWER_ON
+        int "wireless delay power on time (seconds)"
+        default 0
+endif
+
+endif
+endmenu

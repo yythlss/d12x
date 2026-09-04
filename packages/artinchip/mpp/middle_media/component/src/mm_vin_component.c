@@ -21,6 +21,7 @@
 #include "mpp_list.h"
 #include "mpp_log.h"
 #include "mpp_mem.h"
+#include "mpp_thread.h"
 #include "mpp_vin.h"
 #ifdef AIC_USING_CAMERA
 #include "drv_camera.h"
@@ -59,7 +60,7 @@ typedef struct mm_vin_data {
 
     mm_bind_info in_port_bind;
     mm_bind_info out_port_bind;
-    pthread_t thread_id;
+    mpp_thread_t thread_handle;
     struct aic_message_queue msg;
 
     MM_VIDEO_IN_SOURCE_TYPE vin_source_type;
@@ -103,7 +104,7 @@ typedef struct mm_vin_data {
         (ret);                          \
     })
 
-static void *mm_vin_component_thread(void *p_thread_data);
+static void mm_vin_component_thread(void *p_thread_data);
 static void mm_vin_show_debug_info(mm_vin_data *p_vin_data);
 
 static s32 mm_vin_dvp_init(mm_vin_data *p_vin_data)
@@ -547,7 +548,7 @@ s32 mm_vin_component_deinit(mm_handle h_component)
     msg.message_id = MM_COMMAND_STOP;
     msg.data_size = 0;
     aic_msg_put(&p_vin_data->msg, &msg);
-    pthread_join(p_vin_data->thread_id, (void *)&ret);
+    mpp_thread_delete(p_vin_data->thread_handle);
 
     pthread_mutex_destroy(&p_vin_data->state_lock);
     pthread_mutex_destroy(&p_vin_data->vin_lock);
@@ -577,32 +578,16 @@ s32 mm_vin_component_deinit(mm_handle h_component)
     return ret;
 }
 
-static int vin_thread_attr_init(pthread_attr_t *attr)
-{
-    // default stack size is 2K, it is not enough for decode thread
-    if (attr == NULL) {
-        return EINVAL;
-    }
-    pthread_attr_init(attr);
-    attr->stacksize = 8 * 1024;
-    attr->schedparam.sched_priority = MM_COMPONENT_VIN_THREAD_PRIORITY;
-    return 0;
-}
-
 s32 mm_vin_component_init(mm_handle h_component)
 {
     mm_component *p_comp;
     mm_vin_data *p_vin_data;
     s32 ret = MM_ERROR_NONE;
-    u32 err;
     s8 msg_create = 0;
     s8 state_lock_init = 0;
     s8 vin_lock_init = 0;
 
     logi("mm_vin_component_init....");
-
-    pthread_attr_t attr;
-    vin_thread_attr_init(&attr);
 
     p_comp = (mm_component *)h_component;
 
@@ -676,9 +661,11 @@ s32 mm_vin_component_init(mm_handle h_component)
     }
     vin_lock_init = 1;
     // Create the component thread
-    err = pthread_create(&p_vin_data->thread_id, &attr, mm_vin_component_thread, p_vin_data);
-    if (err) {
-        loge("pthread_create venc component fail!");
+    p_vin_data->thread_handle = mpp_thread_create("vin", 8 * 1024,
+                                              MM_COMPONENT_VIN_THREAD_PRIORITY,
+                                              mm_vin_component_thread, p_vin_data);
+    if (!p_vin_data->thread_handle) {
+        loge("mpp_thread_create vin comp thread fail!");
         ret = MM_ERROR_INSUFFICIENT_RESOURCES;
         goto _EXIT;
     }
@@ -945,7 +932,7 @@ void mm_vin_show_debug_info(mm_vin_data *p_vin_data)
     printf("\nstate: %s\n\n", mm_component_sta_to_str(p_vin_data->state));
 }
 
-static void *mm_vin_component_thread(void *p_thread_data)
+static void mm_vin_component_thread(void *p_thread_data)
 {
     s32 ret = MM_ERROR_NONE;
     s32 cmd = MM_COMMAND_UNKNOWN;
@@ -1037,5 +1024,5 @@ static void *mm_vin_component_thread(void *p_thread_data)
         usleep(5000);
     }
 _EXIT:
-    return (void *)MM_ERROR_NONE;
+    return;
 }

@@ -283,15 +283,21 @@ void *rt_memheap_alloc(struct rt_memheap *heap, rt_size_t size)
                 heap->available_size = heap->available_size -
                                        size -
                                        RT_MEMHEAP_SIZE;
-                if (heap->pool_size - heap->available_size > heap->max_used_size)
-                    heap->max_used_size = heap->pool_size - heap->available_size;
+                if (heap->available_size <= heap->pool_size) {
+                    rt_size_t used = heap->pool_size - heap->available_size;
+                    if (used > heap->max_used_size)
+                        heap->max_used_size = used;
+                }
             }
             else
             {
                 /* decrement the entire free size from the available bytes count. */
                 heap->available_size = heap->available_size - free_size;
-                if (heap->pool_size - heap->available_size > heap->max_used_size)
-                    heap->max_used_size = heap->pool_size - heap->available_size;
+                if (heap->available_size <= heap->pool_size) {
+                    rt_size_t used = heap->pool_size - heap->available_size;
+                    if (used > heap->max_used_size)
+                        heap->max_used_size = used;
+                }
 
                 /* remove header_ptr from free list */
                 RT_DEBUG_LOG(RT_DEBUG_MEMHEAP,
@@ -431,8 +437,11 @@ void *rt_memheap_realloc(struct rt_memheap *heap, void *ptr, rt_size_t newsize)
             {
                 /* decrement the entire free size from the available bytes count. */
                 heap->available_size = heap->available_size - (newsize - oldsize);
-                if (heap->pool_size - heap->available_size > heap->max_used_size)
-                    heap->max_used_size = heap->pool_size - heap->available_size;
+                if (heap->available_size <= heap->pool_size) {
+                    rt_size_t used = heap->pool_size - heap->available_size;
+                    if (used > heap->max_used_size)
+                        heap->max_used_size = used;
+                }
 
                 /* remove next_ptr from free list */
                 RT_DEBUG_LOG(RT_DEBUG_MEMHEAP,

@@ -16,8 +16,8 @@ Luban-Lite 是匠芯创(ArtInChip)的 RTOS SDK：
 |------|------|
 | `scons --menuconfig` | 打开配置菜单，选择芯片、板卡、应用 |
 | `scons --list-def` | 列出当前支持的所有方案配置 |
-| `scons --apply-def xx_defconfig/No.` | 加载指定方案的 defconfig 文件，应用到当前SDK配置 |
-| `scons` | 编译当前项目 |
+| `scons --apply-def=xx_defconfig/No.` | 加载指定方案的 defconfig 文件，应用到当前SDK配置 |
+| `scons -jN` | 编译当前项目，可以根据编译主机的核心数，使用 -jN 参数，其中N表示N个线程 |
 | `scons -c` | 清理编译产物 |
 | `scons --info` | 查看当前项目配置信息 |
 
@@ -26,6 +26,10 @@ Luban-Lite 是匠芯创(ArtInChip)的 RTOS SDK：
 - `CONFIG_PRJ_BOARD="demo68-nand"` — 板卡名称
 - `CONFIG_PRJ_KERNEL="rt-thread"` — 内核类型
 - `CONFIG_PRJ_APP="baremetal/helloworld"` — 应用名称
+**编译错误处理**
+
+- **缺失 Bootloader**：若报错提示缺少 `bootloader.bin` 或 `bootloader.elf`，需先编译对应的 Bootloader 项目（defconfig 格式：`{chip}_{board}_baremetal_bootloader_defconfig`）。
+- **构建环境异常**：若遇到非代码逻辑导致的编译错误，请执行 `scons -c` 清理中间产物（如 `*.o`、`*.sconsign.dblite` 等）后重新构建。
 
 ## 烧录与调试
 

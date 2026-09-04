@@ -17,9 +17,15 @@ extern "C" {
 #include <aic_arch.h>
 
 /* Luban-Lite version information */
+#ifdef LUBAN_LITE_2_0
 #define LL_VERSION      1
 #define LL_SUBVERSION   3
-#define LL_REVISION     1
+#define LL_REVISION     2
+#else
+#define LL_VERSION      1
+#define LL_SUBVERSION   3
+#define LL_REVISION     2
+#endif
 
 typedef __signed__ char     s8;
 typedef unsigned char       u8;
@@ -93,11 +99,12 @@ typedef unsigned long ptr_t;
     } while (0)
 #endif
 
+/* NOTE: pr_err() from aic_log.h is required */
 #ifndef CHECK_RET_WITH_GOTO
 #define CHECK_RET_WITH_GOTO(x, label) \
     do { \
         if (!(x)) { \
-            pr_err(__FILE__, ", %s()%d failed.", __FUNCTION__, __LINE__); \
+            pr_err("%s, %s()%d failed.", __FILE__, __FUNCTION__, __LINE__); \
             goto label; \
         } \
     } while (0)
@@ -107,7 +114,7 @@ typedef unsigned long ptr_t;
 #define CHECK_RET_WITH_RET(x, ret) \
     do { \
         if (!(x)) { \
-            pr_err(__FILE__, ", %s()%d failed.", __FUNCTION__, __LINE__); \
+            pr_err("%s, %s()%d failed.", __FILE__, __FUNCTION__, __LINE__); \
             return ret; \
         } \
     } while (0)
@@ -116,7 +123,7 @@ typedef unsigned long ptr_t;
 /* Exception Dealt With */
 #define BUG() do {                                                            \
         printf("BUG: failure at %s:%d/%s()!\n", __FILE__, __LINE__, __func__); \
-        while (1) {};                                                         \
+        while (1) {}                                                          \
     } while (0)
 
 #if (!defined(likely))
@@ -166,7 +173,7 @@ typedef unsigned long ptr_t;
 
 #define container_of(ptr, type, member) \
     ({ \
-        const typeof(((type *)0)->member) *__mptr = (ptr); \
+        const __typeof__(((type *)0)->member) *__mptr = (ptr); \
         (type *)((char *)__mptr - offsetof(type, member)); \
     })
 
@@ -178,16 +185,16 @@ typedef unsigned long ptr_t;
 
 #ifndef max
 #define max(x, y) ({				\
-	typeof(x) _max1 = (x);			\
-	typeof(y) _max2 = (y);			\
+	__typeof__(x) _max1 = (x);			\
+	__typeof__(y) _max2 = (y);			\
 	(void) (&_max1 == &_max2);		\
 	_max1 > _max2 ? _max1 : _max2; })
 #endif
 
 #ifndef min
 #define min(x, y) ({				\
-	typeof(x) _min1 = (x);			\
-	typeof(y) _min2 = (y);			\
+	__typeof__(x) _min1 = (x);			\
+	__typeof__(y) _min2 = (y);			\
 	(void) (&_min1 == &_min2);		\
 	_min1 < _min2 ? _min1 : _min2; })
 #endif
@@ -209,9 +216,9 @@ typedef unsigned long ptr_t;
  */
 #define DIV_ROUND_CLOSEST(x, divisor) \
     ({ \
-        typeof(x) __x       = x; \
-        typeof(divisor) __d = divisor; \
-        (((typeof(x))-1) > 0 || ((typeof(divisor))-1) > 0 || \
+        __typeof__(x) __x       = x; \
+        __typeof__(divisor) __d = divisor; \
+        (((__typeof__(x))-1) > 0 || ((__typeof__(divisor))-1) > 0 || \
          (((__x) > 0) == ((__d) > 0))) ? \
                 (((__x) + ((__d) / 2)) / (__d)) : \
                 (((__x) - ((__d) / 2)) / (__d)); \
@@ -222,7 +229,7 @@ typedef unsigned long ptr_t;
  */
 #define DIV_ROUND_CLOSEST_ULL(x, divisor) \
     ({ \
-        typeof(divisor) __d     = divisor; \
+        __typeof__(divisor) __d     = divisor; \
         unsigned long long _tmp = (x) + (__d) / 2; \
         do_div(_tmp, __d); \
         _tmp; \
@@ -235,18 +242,18 @@ typedef unsigned long ptr_t;
 
 #define roundup(x, y) (                 \
 {                           \
-    const typeof(y) __y = y;            \
+    const __typeof__(y) __y = y;            \
     (((x) + (__y - 1)) / __y) * __y;        \
 }                           \
 )
 #define rounddown(x, y) (               \
 {                           \
-    typeof(x) __x = (x);                \
+    __typeof__(x) __x = (x);                \
     __x - (__x % (y));              \
 }                           \
 )
 
-/* NOT thread-safe */
+/* NOTE: memset() from <string.h> is required */
 #define EXPAND_BCD_VER(v)    ({ \
     static char ver[8]; \
     int i = 0; \
@@ -264,10 +271,10 @@ typedef unsigned long ptr_t;
 #undef ALIGN
 #endif
 #define __ALIGN_MASK(x,mask)    (((x)+(mask))&~(mask))
-#define ALIGN_UP(x,a)           __ALIGN_MASK((x),(typeof(x))(a)-1)
-#define ALIGN_DOWN(x, a)        ((x) & (~((typeof(x))(a)-1)))
+#define ALIGN_UP(x,a)           __ALIGN_MASK((x),(__typeof__(x))(a)-1)
+#define ALIGN_DOWN(x, a)        ((x) & (~((__typeof__(x))(a)-1)))
 
-#define IS_ALIGNED(x, a) (((x) & ((typeof(x))(a)-1)) == 0)
+#define IS_ALIGNED(x, a) (((x) & ((__typeof__(x))(a)-1)) == 0)
 
 #define PAD_COUNT(s, pad)   (((s) - 1) / (pad) + 1)
 #define PAD_SIZE(s, pad)    (PAD_COUNT(s, pad) * pad)
@@ -388,7 +395,7 @@ typedef enum {
 #ifdef AIC_SRAM_SW_EN
     MEM_SRAM_SW,
 #endif
-#ifdef AIC_SRAM0_SW_EN
+#if defined(AIC_SRAM0_SW_EN) && !defined(AIC_DEFAULT_SYS_HEAP_SRAM)
     MEM_SRAM0_SW,
 #endif
 #ifdef AIC_SRAM1_CMA_EN
@@ -400,7 +407,7 @@ typedef enum {
 #ifdef AIC_PSRAM_CMA_EN
     MEM_PSRAM_CMA,
 #endif
-#ifdef AIC_PSRAM_SW_EN
+#if defined(AIC_PSRAM_SW_EN) && !defined(AIC_DEFAULT_SYS_HEAP_PSRAM)
     MEM_PSRAM_SW,
 #endif
 #ifdef AIC_DRAM_CMA_EN

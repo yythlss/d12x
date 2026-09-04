@@ -16,9 +16,9 @@
 #include <aic_log.h>
 #include <aic_osal.h>
 
-#define IMAGE_BACKUP_BLOCK_CNT 4
+#define IMAGE_BACKUP_BLOCK_CNT 2
 #define PAGE_CNT_PER_BLOCK     64
-#define PAGE_TABLE_MAX_ENTRY   101
+#define PAGE_TABLE_MAX_ENTRY     (PAGE_CNT_PER_BLOCK * 2 - 1) // 127 * 2k = 254k
 #define PAGE_DEFAULT_SIZE      2048
 #define FSBL_CANDIDATE_BLK_CNT 18
 
@@ -38,13 +38,13 @@
 #define ROUNDUP(a, b) ((((a)-1) / (b) + 1) * (b))
 
 struct nand_page_table_head {
-    char magic[4]; /* "AICP": AIC Page table */
-    u32 entry_cnt;
+    char magic[4]; /* AICP: AIC Page table */
+    u16 entry_cnt;
     u16 page_size;
-    u8 pages_per_block;
-    u8 blocks; /* Block number in SPI NAND */
-    u8 planes; /* Plane number in SPI NAND: Max 2 in market avaialbe devices */
-    u8 pad[7]; /* Padding it to fit size 20 bytes */
+    u8  pages_per_block;
+    u8  blocks; /* Block number in SPI NAND */
+    u8  planes; /* Plane number in SPI NAND: Max 2 in market avaialbe devices */
+    u8  pad; /* Padding it to fit size 12 bytes */
 };
 
 struct nand_page_table_entry {

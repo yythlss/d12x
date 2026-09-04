@@ -1177,7 +1177,7 @@ static rt_err_t tp9951_init(rt_device_t dev)
     fmt->height = DEFAULT_HEIGHT;
     fmt->bus_type = DEFAULT_BUS_TYPE;
     fmt->flags = MEDIA_SIGNAL_FIELD_ACTIVE_LOW |
-                 MEDIA_SIGNAL_VSYNC_ACTIVE_HIGH |
+                 MEDIA_SIGNAL_VSYNC_ACTIVE_LOW |
                  MEDIA_SIGNAL_HSYNC_ACTIVE_LOW |
                  MEDIA_SIGNAL_PCLK_SAMPLE_FALLING;
 

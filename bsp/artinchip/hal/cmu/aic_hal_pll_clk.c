@@ -82,10 +82,42 @@ static inline void clk_pll_bypass(struct aic_clk_pll_cfg *pll, unsigned int bypa
 #endif
 }
 
+static void clk_pll_enable_sdm(struct aic_clk_pll_cfg *pll)
+{
+    u32 reg_val, ppm_max, sdm_amp, factor_n;
+    u64 sdm_step;
+
+    factor_n = (readl(cmu_reg(pll->offset_gen)) >> PLL_FACTORN_BIT) &
+               PLL_FACTORN_MASK;
+
+    ppm_max = 1000000 / (factor_n + 1);
+    /* 1% spread */
+    if (ppm_max < PLL_SDM_SPREAD_PPM)
+        sdm_amp = 0;
+    else
+        sdm_amp = PLL_SDM_AMP_MAX -
+                  PLL_SDM_SPREAD_PPM * PLL_SDM_AMP_MAX / ppm_max;
+
+    /* SDM uses triangular wave, 33KHz by default  */
+    sdm_step = (u64)(PLL_SDM_AMP_MAX - sdm_amp) * 2 * PLL_SDM_SPREAD_FREQ;
+    /* PLL parent clock freq is a fixed 24MHz */
+    do_div(sdm_step, CLOCK_24M);
+    if (sdm_step > 511)
+        sdm_step = 511;
+
+    reg_val = (1UL << PLL_SDM_EN_BIT) |
+              (2 << PLL_SDM_MODE_BIT) |
+              (sdm_step << PLL_SDM_STEP_BIT) |
+              (3 << PLL_SDM_FREQ_BIT) |
+              (sdm_amp << PLL_SDM_AMP_BIT);
+
+    PLL_WRITE(reg_val, cmu_reg(pll->offset_sdm));
+}
+
 static int clk_pll_enable(struct aic_clk_comm_cfg *comm_cfg)
 {
     struct aic_clk_pll_cfg *pll = to_clk_pll(comm_cfg);
-    u32 val;
+    u32 val, sdm_en, sdm_bot;
 #ifdef AIC_CMU_DRV_V30
     u64 timeout = 0;
 #endif
@@ -116,6 +148,21 @@ static int clk_pll_enable(struct aic_clk_comm_cfg *comm_cfg)
 #ifndef AIC_CMU_DRV_V30
     clk_pll_wait_lock();
 #endif
+
+    if (pll->type == AIC_PLL_SDM) {
+        val = readl(cmu_reg(pll->offset_sdm));
+        sdm_en = val >> 31;
+        sdm_bot = val & 0xFFFF;
+
+        /*
+         * When the PLL is fractional PLL, SDM_EN will also be set to 1,
+         * so SDM_BOT is needed to help determine whether the spreading function
+         * has been enabled.
+         */
+        if (!sdm_en || !sdm_bot)
+            clk_pll_enable_sdm(pll);
+    }
+
     return 0;
 }
 
@@ -142,34 +189,6 @@ static int clk_pll_is_enable(struct aic_clk_comm_cfg *comm_cfg)
     return 0;
 }
 
-static void clk_pll_enable_sdm(struct aic_clk_pll_cfg *pll, unsigned long parent_rate, u32 factor_n)
-{
-    u32 reg_val, ppm_max, sdm_amp;
-    u64 sdm_step;
-
-    ppm_max = 1000000 / (factor_n + 1);
-    /* 1% spread */
-    if (ppm_max < PLL_SDM_SPREAD_PPM)
-        sdm_amp = 0;
-    else
-        sdm_amp = PLL_SDM_AMP_MAX -
-                  PLL_SDM_SPREAD_PPM * PLL_SDM_AMP_MAX / ppm_max;
-
-    /* SDM uses triangular wave, 33KHz by default  */
-    sdm_step = (u64)(PLL_SDM_AMP_MAX - sdm_amp) * 2 * PLL_SDM_SPREAD_FREQ;
-    do_div(sdm_step, parent_rate);
-    if (sdm_step > 511)
-        sdm_step = 511;
-
-    reg_val = (1UL << PLL_SDM_EN_BIT) |
-              (2 << PLL_SDM_MODE_BIT) |
-              (sdm_step << PLL_SDM_STEP_BIT) |
-              (3 << PLL_SDM_FREQ_BIT) |
-              (sdm_amp << PLL_SDM_AMP_BIT);
-
-    PLL_WRITE(reg_val, cmu_reg(pll->offset_sdm));
-}
-
 static unsigned long clk_pll_recalc_rate(struct aic_clk_comm_cfg *comm_cfg,
                                          unsigned long parent_rate)
 {
@@ -177,7 +196,6 @@ static unsigned long clk_pll_recalc_rate(struct aic_clk_comm_cfg *comm_cfg,
     u32 factor_n, factor_m, factor_p, fra_in;
     u64 rate, rate_int, rate_fra;
     u8 fra_en = 0;
-    u32 reg_val, sdm_en, sdm_bot;
 
 #ifndef AIC_CMU_DRV_V30
     /* PLL output mux is CLK_24M */
@@ -205,19 +223,6 @@ static unsigned long clk_pll_recalc_rate(struct aic_clk_comm_cfg *comm_cfg,
         rate = rate_int + rate_fra;
     }
 
-    if (pll->type == AIC_PLL_SDM) {
-        reg_val = readl(cmu_reg(pll->offset_sdm));
-        sdm_en = reg_val >> 31;
-        sdm_bot = reg_val & 0xFFFF;
-
-        /*
-         * When the PLL is fractional PLL, SDM_EN will also be set to 1,
-         * so SDM_BOT is needed to help determine whether the spreading function
-         * has been enabled.
-         */
-        if (!sdm_en || !sdm_bot)
-            clk_pll_enable_sdm(pll, parent_rate, factor_n);
-    }
 #ifdef FPGA_BOARD_ARTINCHIP
     rate = fpga_board_rate[pll->id];
 #endif
@@ -349,8 +354,6 @@ static int clk_pll_set_rate(struct aic_clk_comm_cfg *comm_cfg,
         /* when using decimal divsion, do not configure spreading parameters */
         sdm_en = (1UL << PLL_SDM_EN_BIT) | (2UL << PLL_SDM_MODE_BIT);
         PLL_WRITE(sdm_en, cmu_reg(pll->offset_sdm));
-    } else if (pll->type == AIC_PLL_SDM) {
-        clk_pll_enable_sdm(pll, parent_rate, factor_n);
     }
 
 #ifndef AIC_CMU_DRV_V30

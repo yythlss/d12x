@@ -473,6 +473,10 @@ menu "PSRAM parameter"
         hex "Software size in PSRAM"
         range 0 AIC_PSRAM_SIZE
         default 0x100000
+
+    config AIC_PSRAM_SW_EN
+        bool
+        default y if AIC_PSRAM_SW_SIZE > 0
 endmenu
 
 # 3. XIP
@@ -491,8 +495,8 @@ config AIC_XIP_FLASH_WRITE
     bool "Enable XIP Flash Write"
     default n
     help
-        Write Flash during XIP, but it will cause system low performence. Every time flash erasing
-	and writing need to work in critical section, system disable interrupt and scheduling.
+        Write Flash during XIP, but it will cause system low performance. Every time flash erasing
+	and writing need to work in critical section, system disables interrupts and scheduling.
 
 endmenu
 

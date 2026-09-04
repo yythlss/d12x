@@ -152,7 +152,7 @@ void rt_hw_board_init(void)
     aic_board_pinmux_init();
 
 #ifdef RT_USING_HEAP
-    rt_system_heap_init((void *)&__heap_start, (void *)&__heap_end + aic_get_sys_heap_size());
+    rt_system_heap_init((void *)&__heap_start, (void *)((u8 *)&__heap_end + aic_get_sys_heap_size()));
 #if (!defined(QEMU_RUN) && defined(RT_USING_MEMHEAP))
     aic_memheap_init();
 #endif

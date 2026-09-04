@@ -352,7 +352,7 @@ static int test_spi_async_send(int argc, char **argv)
 
 static int test_spi_async_transfer_spi_device(uint32_t data_len)
 {
-    uint8_t *tx_data, *rx_data;
+    uint8_t *tx_data = NULL, *rx_data = NULL;
     uint32_t align_len, count = 0;
     rt_size_t ret;
 
@@ -482,7 +482,16 @@ void spi_thread_entry(void *parameter)
     g_spi = (struct rt_spi_device *)rt_device_find(dev_name);
     if (!g_spi) {
         printf("try to attach bus:%s dev: %s\n", bus_name, dev_name);
+#if WORK_IN_SPI_MODE
         test_spi_attach_spi_device(bus_name, dev_name);
+#else
+        test_spi_attach_qspi_device(bus_name, dev_name);
+#endif
+        g_spi = (struct rt_spi_device *)rt_device_find(dev_name);
+        if (!g_spi) {
+            printf("ERROR: failed to find device %s\n", dev_name);
+            return;
+        }
     }
 #if WORK_IN_SPI_MODE
     test_spi_init_spi_device(dev_name, non_block);
@@ -491,6 +500,10 @@ void spi_thread_entry(void *parameter)
 #endif
 
     data = aicos_malloc_align(MEM_DEFAULT, 65536, CACHE_LINE_SIZE);
+    if (!data) {
+        printf("ERROR: data malloc failed\n");
+        return;
+    }
 
     rt_spi_take_bus((struct rt_spi_device *)g_spi);
     start_ms = aic_get_time_ms();

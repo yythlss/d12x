@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2024-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -64,7 +64,7 @@ int spinand_ooblayout_map_user(struct aic_spinand *flash, u8 *oobbuf,
 
     while (!ret)
     {
-        pr_debug("docopy: sect: %u, src0x%lu, dstoff:%u\n", section, (buf-spare), oobregion.offset);
+        pr_debug("docopy: sect: %u, src0x%lx, dstoff:%u\n", section, (unsigned long)(buf-spare), oobregion.offset);
 
         cnt = MIN(nbytes, oobregion.length);
         memcpy(oobbuf + oobregion.offset, buf, cnt);
@@ -92,7 +92,7 @@ int spinand_ooblayout_unmap_user(struct aic_spinand *flash, u8 *dst,
 
     while (!ret)
     {
-        pr_debug("docopy: sect: %u, srcoff%u, dstoff:%lu\n", section, oobregion.offset, (buf-dst));
+        pr_debug("docopy: sect: %u, srcoff%u, dstoff:%ld\n", section, oobregion.offset, (long)(buf-dst));
 
         cnt = MIN(nbytes, oobregion.length);
         memcpy(buf, (src + oobregion.offset), cnt);

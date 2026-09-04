@@ -47,8 +47,6 @@ struct rt_sdio_driver realtek_drv = {
     realtex_id,
 };
 
-
-
 int realtek_init(void)
 {
     printf("wifi device id == 0x%x\n", realtek_drv.id->product);
@@ -57,4 +55,10 @@ int realtek_init(void)
     return 0;
 }
 
+int realtek_deinit(void)
+{
+    sdio_unregister_driver(&realtek_drv);
+
+    return 0;
+}
 

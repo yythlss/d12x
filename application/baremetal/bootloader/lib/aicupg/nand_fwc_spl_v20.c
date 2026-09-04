@@ -31,7 +31,7 @@ struct nand_page_table_head {
 	u8  pages_per_block;
 	u8  blocks; /* Block number in SPI NAND */
 	u8  planes; /* Plane number in SPI NAND: Max 2 in market avaialbe devices */
-	u8  pad; /* Padding it to fit size 20 bytes */
+	u8  pad; /* Padding it to fit size 12 bytes */
 };
 
 /*
@@ -356,7 +356,7 @@ static s32 spl_build_page_table(struct aicupg_nand_spl *spl,
         p += data_size;
 
         sumval = calc_page_checksum(page_data, slice_size);
-		pt->entry[pgidx].checksum = sumval;
+		pt->entry[pgidx].checksum = ~sumval;
 
 		for (i = 0; i < SPL_NAND_IMAGE_BACKUP_NUM; i++) {
             if (pgidx < PAGE_CNT_PER_BLOCK)
@@ -598,7 +598,7 @@ static s32 verify_image_page(struct aicupg_nand_spl *spl,
             goto out;
         }
         sumval = calc_page_checksum(page_data, slice_size);
-        sumval += ~cksum;
+        sumval += cksum;
         if (sumval != 0xFFFFFFFF) {
             pr_err("Page %d, pa 0x%x checksum 0x%x is wrong.\n", i, pa, sumval);
             ret = -1;

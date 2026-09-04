@@ -19,9 +19,11 @@
 
 #define AIC_DVP_NAME    "aic-dvp"
 
-#define AIC_DVP_CLK_RATE    200000000   /* 200MHz */
+#define AIC_DVP_CLK_RATE    150000000   /* 150MHz */
 #define AIC_DVP_QOS_HIGH    0xB
 #define AIC_DVP_QOS_LOW     0x7
+
+#define AIC_DVP_NO_SIGNAL_PATTERN
 
 #if defined(AIC_USING_BARCODE_DEMO) || defined(AIC_MPP_RECORDER_INTERFACE) \
     || defined(LPKG_CHERRYUSB_DEVICE_VIDEO_DVP_TEMPLATE)
@@ -37,8 +39,11 @@ struct aic_dvp {
     /* Videobuf */
     struct vb_queue         queue;
     struct list_head        active_list;
-    unsigned int            sequence;
-    unsigned int            streaming;
+    volatile unsigned int   sequence;
+    volatile unsigned int   streaming;
+    volatile u32            frame_cnt;
+    volatile u32            update_cnt;
+    volatile u32            full_cnt;
     aicos_sem_t             finished;
 };
 

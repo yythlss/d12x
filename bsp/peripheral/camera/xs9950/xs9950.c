@@ -78,9 +78,9 @@ struct xs9950_dev {
     u32 pwdn_pin;
     u32 irq_pin;  // New interrupt pin
     struct mpp_video_fmt fmt;
-    enum tp_vin_ch curr_ch;
-    enum tp_fmt curr_fmt;
-    enum tp_std curr_std;
+    enum tp_vin_ch cur_ch;
+    enum tp_fmt cur_fmt;
+    enum tp_std cur_std;
     struct xs9950_bt656_cfg bt656_cfg;
     bool on;
     bool streaming;
@@ -369,54 +369,66 @@ static void xs9950_adjust_blank(enum tp_fmt fmt)
     }
 }
 
+static void xs9950_adjust_pol(struct xs9950_dev *sensor)
+{
+    if (sensor->cur_fmt <= CVBS_960H_N) {
+        LOG_I("Interlace mode enabled");
+        sensor->fmt.flags &= ~MEDIA_SIGNAL_FIELD_ACTIVE_HIGH;
+        sensor->fmt.flags |= MEDIA_SIGNAL_FIELD_ACTIVE_LOW | MEDIA_SIGNAL_INTERLACED_MODE;
+        return;
+    }
+    sensor->fmt.flags &= ~MEDIA_SIGNAL_INTERLACED_MODE;
+
+    if (sensor->free_run) {
+        sensor->fmt.flags &= ~MEDIA_SIGNAL_FIELD_ACTIVE_HIGH;
+        sensor->fmt.flags |= MEDIA_SIGNAL_FIELD_ACTIVE_LOW;
+    } else {
+        sensor->fmt.flags &= ~MEDIA_SIGNAL_FIELD_ACTIVE_LOW;
+        sensor->fmt.flags |= MEDIA_SIGNAL_FIELD_ACTIVE_HIGH;
+    }
+}
+
+/* Video format parameters lookup table */
+static const struct {
+    u16 width;
+    u16 height;
+    u32 fps;
+} g_xs9950_fmts[] = {
+    /* SD CVBS formats */
+    [CVBS_PAL]     = { 720,  576, 25 },
+    [CVBS_NTSC]    = { 720,  480, 30 },
+    [CVBS_960H_P]  = { 960,  576, 25 },
+    [CVBS_960H_N]  = { 960,  480, 30 },
+    /* HD formats */
+    [HD720P25]     = { 1280, 720, 25 },
+    [HD720P30]     = { 1280, 720, 30 },
+    [HD720P50]     = { 1280, 720, 50 },
+    [HD720P60]     = { 1280, 720, 60 },
+    [HD960P25]     = { 1280, 960, 25 },
+    [HD960P30]     = { 1280, 960, 30 },
+    [FHD1080P15]   = { 1920, 1080, 15 },
+    [FHD1080P25]   = { 1920, 1080, 25 },
+    [FHD1080P30]   = { 1920, 1080, 30 },
+};
+
+
 /**
  * @brief Set video resolution (new: associate format with resolution)
  */
 static void xs9950_set_resolution(enum tp_fmt fmt)
 {
     u16 h_active, v_active;
+    u32 fps;
 
-    switch (fmt) {
-        case CVBS_PAL:
-            h_active = 720;
-            v_active = 576;
-            break;
-        case CVBS_NTSC:
-            h_active = 720;
-            v_active = 480;
-            break;
-        case CVBS_960H_P:
-            h_active = 960;
-            v_active = 576;
-            break;
-        case CVBS_960H_N:
-            h_active = 960;
-            v_active = 480;
-            break;
-        case HD720P25:
-            h_active = 1280;
-            v_active = 720;
-            break;
-        case HD720P30:
-        case HD720P50:
-        case HD720P60:
-            h_active = 1280;
-            v_active = 720;
-            break;
-        case HD960P25:
-        case HD960P30:
-            h_active = 1280;
-            v_active = 960;
-            break;
-        case FHD1080P15:
-        case FHD1080P25:
-        case FHD1080P30:
-            h_active = 1920;
-            v_active = 1080;
-            break;
-        default:
-            h_active = 1280;
-            v_active = 720; // Default 720P
+    if (fmt < ARRAY_SIZE(g_xs9950_fmts)) {
+        h_active = g_xs9950_fmts[fmt].width;
+        v_active = g_xs9950_fmts[fmt].height;
+        fps = g_xs9950_fmts[fmt].fps;
+    } else {
+        LOG_E("Invalid format: %d", fmt);
+        h_active = g_xs9950_fmts[DEFAULT_FORMAT].width;
+        v_active = g_xs9950_fmts[DEFAULT_FORMAT].height;
+        fps = g_xs9950_fmts[DEFAULT_FORMAT].fps;
     }
 
     // Configure horizontal/vertical active pixel registers (manual 4.2.2)
@@ -428,7 +440,8 @@ static void xs9950_set_resolution(enum tp_fmt fmt)
     // Update device format information
     g_xs_dev.fmt.width = h_active;
     g_xs_dev.fmt.height = v_active;
-    LOG_I("Set resolution: %dx%d", h_active, v_active);
+    g_xs_dev.fmt.fps = fps;
+    LOG_I("Set resolution: %dx%d@%d", h_active, v_active, fps);
 }
 
 static void xs9950_bt656_init_sk(void)
@@ -1248,7 +1261,7 @@ static void xs9950_afe_init(enum tp_vin_ch ch)
     default:
         ch_val = 0x02;
     }
-    xs9950_write_reg(0x4200, (xs9950_read_reg(0x4200) & 0xFC) | ch_val);
+    xs9950_write_reg(0x4200, (xs9950_read_reg(0x4200) & 0xF0) | ch_val);
 
     // 2. Configure EQ (signal equalization, compensate transmission attenuation)
     xs9950_write_reg(0x4700, 0x03);    // EQ strength configuration (medium)
@@ -1267,13 +1280,16 @@ static void xs9950_afe_init(enum tp_vin_ch ch)
  * @param ch Video channel (VIN1~VIN4)
  * @param fmt Video format (std is derived from fmt)
  */
-static void xs9950_sensor_init(struct xs9950_dev *sensor, enum tp_vin_ch ch, enum tp_fmt fmt)
+static int xs9950_sensor_init(struct xs9950_dev *sensor, enum tp_vin_ch ch, enum tp_fmt fmt)
 {
     enum tp_std std = xs9950_fmt_to_std(fmt);
 
-    sensor->curr_ch = ch;
-    sensor->curr_fmt = fmt;
-    sensor->curr_std = std;
+    if (fmt >= ARRAY_SIZE(g_xs9950_fmts)) {
+        LOG_E("Invalid format: %d", fmt);
+        return -EINVAL;
+    }
+
+    sensor->cur_std = std;
 
     // 1. Global reset
     xs9950_write_reg(0x0000, 0x01);    // Software reset
@@ -1302,6 +1318,46 @@ static void xs9950_sensor_init(struct xs9950_dev *sensor, enum tp_vin_ch ch, enu
     // auto detect
     xs9950_write_reg(0x010c, 0x00);
     LOG_I("XS9950 sensor init done: ch=%d, fmt=%d, std=%d", ch, fmt, std);
+    return 0;
+}
+
+/**
+ * @brief Switch video input channel at runtime
+ * @param sensor Device handle
+ * @param ch Target channel (VIN1~VIN4)
+ * @return RT_EOK on success, -RT_EINVAL on invalid channel
+ */
+static rt_err_t xs9950_switch_channel(struct xs9950_dev *sensor, u32 ch)
+{
+    if (ch > VIN4) {
+        LOG_E("Invalid channel: %d (max: %d)", ch, VIN4);
+        return -RT_EINVAL;
+    }
+
+    if (ch == sensor->cur_ch) {
+        LOG_D("Already on channel %d, skip switch", ch);
+        return RT_EOK;
+    }
+
+    LOG_I("Switching channel: %d -> %d", sensor->cur_ch, ch);
+
+    // Stop streaming before switch
+    bool was_streaming = sensor->streaming;
+    if (was_streaming) {
+        xs9950_write_reg(0x4000, 0x00);
+        sensor->streaming = false;
+    }
+
+    // Re-initialize sensor with new channel (keeps current format)
+    sensor->cur_ch = ch;
+    xs9950_afe_init(ch);
+
+    // Restore streaming state
+    if (was_streaming) {
+        xs9950_write_reg(0x4000, 0x01);
+        sensor->streaming = true;
+    }
+    return RT_EOK;
 }
 
 /**
@@ -1381,12 +1437,6 @@ static rt_err_t xs9950_init(rt_device_t dev)
                  MEDIA_SIGNAL_HSYNC_ACTIVE_HIGH |
                  MEDIA_SIGNAL_PCLK_SAMPLE_FALLING;
 
-    if ((DEFAULT_FORMAT == CVBS_PAL) || (DEFAULT_FORMAT == CVBS_NTSC)) {
-        LOG_I("Interlace mode enabled");
-        sensor->fmt.flags &= ~MEDIA_SIGNAL_FIELD_ACTIVE_HIGH;
-        sensor->fmt.flags |= MEDIA_SIGNAL_FIELD_ACTIVE_LOW | MEDIA_SIGNAL_INTERLACED_MODE;
-    }
-
     // 4. BT656 default configuration (enable according to bus type)
     sensor->bt656_cfg.mode = 0;
     sensor->bt656_cfg.edge = 0;
@@ -1416,7 +1466,10 @@ static rt_err_t xs9950_open(rt_device_t dev, rt_uint16_t oflag)
     }
 
     // 3. Sensor initialization
-    xs9950_sensor_init(sensor, DEFAULT_VIN_CH, DEFAULT_FORMAT);
+    if (xs9950_sensor_init(sensor, sensor->cur_ch, sensor->cur_fmt) < 0) {
+        xs9950_power_off(sensor);
+        return -RT_ERROR;
+    }
 
 #ifdef XS9950_INTERRUPT
     // 4. Register interrupt (fix: enable interrupt)
@@ -1426,18 +1479,10 @@ static rt_err_t xs9950_open(rt_device_t dev, rt_uint16_t oflag)
         LOG_I("IRQ enabled on pin %d", sensor->irq_pin);
     }
 #endif
-    sensor->streaming = true;
 
     xs9950_wait_lock();
     xs9950_status(0, NULL);
-
-    if (sensor->free_run) {
-        sensor->fmt.flags &= ~MEDIA_SIGNAL_FIELD_ACTIVE_HIGH;
-        sensor->fmt.flags |= MEDIA_SIGNAL_FIELD_ACTIVE_LOW;
-    } else {
-        sensor->fmt.flags &= ~MEDIA_SIGNAL_FIELD_ACTIVE_LOW;
-        sensor->fmt.flags |= MEDIA_SIGNAL_FIELD_ACTIVE_HIGH;
-    }
+    xs9950_adjust_pol(sensor);
 
     LOG_D("XS9950 device open done");
     return RT_EOK;
@@ -1476,11 +1521,109 @@ static rt_err_t xs9950_close(rt_device_t dev)
 static int xs9950_get_fmt(rt_device_t dev, struct mpp_video_fmt *cfg)
 {
     struct xs9950_dev *sensor = (struct xs9950_dev *)dev;
-    cfg->code = sensor->fmt.code;
-    cfg->width = sensor->fmt.width;
-    cfg->height = sensor->fmt.height;
-    cfg->flags = sensor->fmt.flags;
-    cfg->bus_type = sensor->fmt.bus_type;
+
+    memcpy(cfg, &sensor->fmt, sizeof(*cfg));
+    return RT_EOK;
+}
+
+/**
+ * @brief Map width/height/fps to tp_fmt (for dynamic format switch)
+ *
+ * For HD formats that share the same resolution at different frame rates,
+ * fps is used to select the exact variant. If the requested fps is not
+ * supported, the nearest valid value is chosen.
+ */
+static enum tp_fmt xs9950_size_to_fmt(unsigned int width, unsigned int height,
+                                      unsigned int fps)
+{
+    enum tp_fmt best = g_xs_dev.cur_fmt;
+    u32 i;
+
+    for (i = 0; i < ARRAY_SIZE(g_xs9950_fmts); i++) {
+        if (g_xs9950_fmts[i].width != width ||
+            g_xs9950_fmts[i].height != height)
+            continue;
+
+        /* Exact fps match: return immediately */
+        if (fps && g_xs9950_fmts[i].fps == fps)
+            return (enum tp_fmt)i;
+
+        /* First resolution match as fallback */
+        if (best == g_xs_dev.cur_fmt)
+            best = (enum tp_fmt)i;
+    }
+
+    if (best == g_xs_dev.cur_fmt)
+        LOG_W("Unknown resolution %ux%u@%ufps, fallback to %d",
+              width, height, fps, g_xs_dev.cur_fmt);
+
+    return best;
+}
+
+/**
+ * @brief Set video format (dynamic resolution switch)
+ *
+ * Re-initialises the sensor with the new format. Returns -RT_EBUSY if
+ * streaming is active — the caller must stop streaming first.
+ */
+static int xs9950_set_fmt(struct xs9950_dev *sensor, struct mpp_video_fmt *fmt)
+{
+    enum tp_fmt new_fmt;
+
+    if (!fmt) {
+        LOG_E("Invalid parameters");
+        return -RT_EINVAL;
+    }
+
+    /* Reject format change while streaming to avoid hardware instability */
+    if (sensor->streaming) {
+        LOG_E("Cannot set format while streaming, stop first");
+        return -RT_EBUSY;
+    }
+
+    new_fmt = xs9950_size_to_fmt(fmt->width, fmt->height, fmt->fps);
+    if (new_fmt == sensor->cur_fmt) {
+        LOG_I("Format unchanged (%dx%d@%u), skip",
+              fmt->width, fmt->height, fmt->fps);
+        return RT_EOK;
+    }
+
+    LOG_I("Set fmt: %d -> %d, %dx%d@%u",
+          sensor->cur_fmt, new_fmt, fmt->width, fmt->height, fmt->fps);
+
+    /* Update current format and re-init sensor */
+    sensor->cur_fmt = new_fmt;
+    xs9950_sensor_init(sensor, sensor->cur_ch, new_fmt);
+    xs9950_wait_lock();
+    xs9950_status(0, NULL);
+    xs9950_adjust_pol(sensor);
+
+    return RT_EOK;
+}
+
+/**
+ * @brief Set frame rate (record only)
+ *
+ * Only updates sensor->fmt.fps; the actual format switch and sensor reinit
+ * happen in xs9950_set_fmt(). This avoids double initialization
+ * when the caller sequences set_fps() + set_fmt().
+ *
+ * Returns -RT_EBUSY if streaming is active.
+ */
+static int xs9950_set_fps(struct xs9950_dev *sensor, u32 fps)
+{
+    if (fps == 0) {
+        LOG_E("Invalid fps: 0");
+        return -RT_EINVAL;
+    }
+
+    if (sensor->streaming) {
+        LOG_E("Cannot set FPS while streaming, stop first");
+        return -RT_EBUSY;
+    }
+
+    LOG_I("Set fps: %u -> %u (call set_fmt to apply)", sensor->fmt.fps, fps);
+    sensor->fmt.fps = fps;
     return RT_EOK;
 }
 
@@ -1528,6 +1671,12 @@ static rt_err_t xs9950_control(rt_device_t dev, int cmd, void *args)
         return RT_EOK;
     case CAMERA_CMD_GET_FMT:
         return xs9950_get_fmt(dev, (struct mpp_video_fmt *)args);
+    case CAMERA_CMD_SET_FMT:
+        return xs9950_set_fmt(sensor, (struct mpp_video_fmt *)args);
+    case CAMERA_CMD_SET_FPS:
+        if (args)
+            return xs9950_set_fps(sensor, *(u32 *)args);
+        return -RT_EINVAL;
     case CAMERA_CMD_SET_CONTRAST:
         return xs9950_set_contrast(sensor, *(u32 *)args);
     case CAMERA_CMD_SET_BRIGHTNESS:
@@ -1536,13 +1685,11 @@ static rt_err_t xs9950_control(rt_device_t dev, int cmd, void *args)
         return xs9950_set_hue(sensor, *(u32 *)args);
     case CAMERA_CMD_SET_SATURATION:
         return xs9950_set_saturation(sensor, *(u32 *)args);
-#ifdef XS9950_INTERRUPT
-    case CAMERA_CMD_SET_CH: // Switch video channel
-        if (args && *(u8 *)args < 4) {
-            xs9950_sensor_init(sensor, *(u8 *)args, sensor->curr_fmt);
-            return RT_EOK;
-        }
+    case CAMERA_CMD_SET_CHANNEL: // Switch video channel
+        if (args)
+            return xs9950_switch_channel(sensor, *(u32 *)args);
         return -RT_EINVAL;
+#ifdef XS9950_INTERRUPT
     case CAMERA_CMD_GET_IRQ_STATUS: // Get interrupt status
         if (args) {
             *(u8 *)args = sensor->irq_status;
@@ -1609,6 +1756,9 @@ int rt_hw_xs9950_init(void)
     g_xs_dev.dev.control = xs9950_control;
 #endif
 
+    g_xs_dev.cur_ch = DEFAULT_VIN_CH;
+    g_xs_dev.cur_fmt = DEFAULT_FORMAT;
+    g_xs_dev.fmt.fps = g_xs9950_fmts[DEFAULT_FORMAT].fps;
     g_xs_dev.dev.type = RT_Device_Class_CAMERA;
     rt_device_register(&g_xs_dev.dev, CAMERA_DEV_NAME, 0);
 

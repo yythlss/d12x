@@ -2,10 +2,22 @@
 # Kconfig file for package littlefs
 menuconfig LPKG_USING_LITTLEFS
     bool "Littlefs: A high-integrity embedded file system"
-    select RT_USING_MTD_NOR
     default n
 
 if LPKG_USING_LITTLEFS
+
+    choice
+        prompt "Storage backend"
+        default LPKG_LITTLEFS_USING_MTD_NOR
+
+        config LPKG_LITTLEFS_USING_MTD_NOR
+            bool "MTD NOR device"
+            select RT_USING_MTD_NOR
+
+        config LPKG_LITTLEFS_USING_BLOCK_DEVICE
+            bool "Block device"
+            select AIC_NFTL_SUPPORT if AIC_SPINAND_DRV
+    endchoice
 
     config LPKG_LITTLEFS_PATH
         string

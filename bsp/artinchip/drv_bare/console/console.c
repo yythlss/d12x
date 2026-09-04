@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -49,6 +49,9 @@ struct tiny_console {
     char usrname[MAX_NAME_LENGTH + 1];
     char sysname[MAX_NAME_LENGTH + 1];
     char *bootcmd;
+#ifdef AIC_CONSOLE_USING_AUTH
+    char password[AIC_CONSOLE_PASSWORD_MAX];
+#endif
 };
 
 static struct tiny_console *g_console = NULL;
@@ -100,13 +103,12 @@ static void console_clear_line(char *cmdstr, int l, int cursor)
             putnchar(" ", 1);
     }
     for (i = 0; i < l; i++)
-        cmdstr[i] = '\b';
-    for (; i < l * 2; i++)
-        cmdstr[i] = ' ';
-    for (; i < l * 3; i++)
-        cmdstr[i] = '\b';
-    putnchar(cmdstr, i);
-    memset(cmdstr, 0, i);
+        putnchar("\b", 1);
+    for (i = 0; i < l; i++)
+        putnchar(" ", 1);
+    for (i = 0; i < l; i++)
+        putnchar("\b", 1);
+    memset(cmdstr, 0, l);
     l = cursor = 0;
 }
 
@@ -114,6 +116,7 @@ static void console_set_sysname(struct tiny_console *cons, char *name)
 {
     if (name && *name) {
         strncpy(cons->sysname, name, MAX_NAME_LENGTH);
+        cons->sysname[MAX_NAME_LENGTH] = '\0';
         cons->sysname_len = strlen(name);
     }
 }
@@ -127,8 +130,11 @@ void console_set_usrname(const char *name)
 {
     struct tiny_console *cons = g_console;
 
+    if (!cons)
+        return;
     if (name && *name) {
         strncpy(cons->usrname, name, MAX_NAME_LENGTH);
+        cons->usrname[MAX_NAME_LENGTH] = '\0';
         cons->usrname_len = strlen(name);
     }
 }
@@ -202,13 +208,78 @@ static int dummy_proc(MAYBE_UNUSED(int argc), MAYBE_UNUSED(char *argv[]))
     return CONSOLE_OK;
 }
 
+#ifdef AIC_CONSOLE_USING_AUTH
+int console_set_password(const char *password)
+{
+    size_t pw_len;
+
+    if (!password || !g_console)
+        return CONSOLE_ERROR;
+
+    pw_len = strlen(password);
+    if (pw_len < AIC_CONSOLE_PASSWORD_MIN || pw_len > AIC_CONSOLE_PASSWORD_MAX)
+        return CONSOLE_ERROR;
+
+    strncpy(g_console->password, password, AIC_CONSOLE_PASSWORD_MAX);
+    g_console->password[AIC_CONSOLE_PASSWORD_MAX - 1] = '\0';
+    return CONSOLE_OK;
+}
+
+const char *console_get_password(void)
+{
+    if (!g_console)
+        return "";
+    return g_console->password;
+}
+
+static void console_wait_auth(struct tiny_console *cons)
+{
+    int ch;
+    char password[AIC_CONSOLE_PASSWORD_MAX];
+    size_t cur_pos;
+
+    if (!cons || strlen(cons->password) == 0)
+        return;
+
+    while (1) {
+        printf("Password for login: ");
+        cur_pos = 0;
+        memset(password, 0, sizeof(password));
+
+        while (1) {
+            ch = getchar();
+            if (ch <= 0)
+                continue;
+
+            if (ch >= ' ' && ch <= '~' && cur_pos < AIC_CONSOLE_PASSWORD_MAX - 1) {
+                printf("*");
+                password[cur_pos++] = (char)ch;
+            } else if ((ch == '\b' || ch == 0x7f) && cur_pos > 0) {
+                cur_pos--;
+                password[cur_pos] = '\0';
+                printf("\b \b");
+            } else if (ch == '\r' || ch == '\n') {
+                printf("\n");
+                break;
+            }
+        }
+
+        if (strncmp(cons->password, password, AIC_CONSOLE_PASSWORD_MAX) == 0)
+            return;
+
+        aicos_msleep(2000);
+        printf("Sorry, try again.\n");
+    }
+}
+#endif /* AIC_CONSOLE_USING_AUTH */
+
 static int console_add_history(struct tiny_console *cons, char *cmdstr)
 {
     int i;
 
     for (i = 0; i < CONSOLE_MAX_HISTORY; i++) {
         if (!cons->history[i]) {
-            if (i == 0 || strcasecmp(cons->history[i - 1], cmdstr))
+            if (i == 0 || strncasecmp(cons->history[i - 1], cmdstr, CONSOLE_MAX_CMD_BUFFER_LEN))
                 if (!(cons->history[i] = strdup(cmdstr)))
                     return CONSOLE_ERROR;
             return CONSOLE_OK;
@@ -277,7 +348,10 @@ console_register_cmd_internal(struct tiny_console *cons, const char *cmdname,
         insert = NULL;
         /* Insert and sort in alphabet */
         for (p = cons->cmds_head; p; p = p->next) {
-            if (strncmp(cmd->cmdname, p->cmdname, strlen(cmd->cmdname)) > 0)
+            int len_a = strlen(cmd->cmdname);
+            int len_b = strlen(p->cmdname);
+            int max_len = (len_a > len_b) ? len_a : len_b;
+            if (strncmp(cmd->cmdname, p->cmdname, max_len + 1) > 0)
                 insert = p;
         }
         if (insert == NULL) {
@@ -314,8 +388,15 @@ static int console_parse_opts(const char *line, char *args[], int max_argc)
             (word_start && !inquote && (isspace((int)*p) || *p == '|'))) {
             if (word_start) {
                 int len = p - word_start;
+                int k;
 
-                memcpy(args[argc] = malloc(len + 1), word_start, len);
+                args[argc] = malloc(len + 1);
+                if (!args[argc]) {
+                    for (k = 0; k < argc; k++)
+                        free(args[k]);
+                    return 0;
+                }
+                memcpy(args[argc], word_start, len);
                 args[argc++][len] = 0;
             }
 
@@ -333,8 +414,12 @@ static int console_parse_opts(const char *line, char *args[], int max_argc)
         } else {
             if (!word_start) {
                 if (*p == '|') {
-                    if (!(args[argc++] = strdup("|")))
+                    if (!(args[argc++] = strdup("|"))) {
+                        int k;
+                        for (k = 0; k < argc - 1; k++)
+                            free(args[k]);
                         return 0;
+                    }
                 } else {
                     if (!isspace((int)*p))
                         word_start = p;
@@ -441,8 +526,11 @@ struct console_cmd *console_find_cmd_by_name(const char *name)
 {
     struct console_cmd *p;
 
+    if (!g_console)
+        return NULL;
+
     for (p = g_console->cmds_head; p; p = p->next) {
-        if (strcmp(p->cmdname, name) == 0)
+        if (strncmp(p->cmdname, name, MAX_NAME_LENGTH) == 0)
             return p;
     }
 
@@ -451,6 +539,9 @@ struct console_cmd *console_find_cmd_by_name(const char *name)
 
 int console_set_bootcmd(const char *cmdstr)
 {
+    if (!g_console)
+        return CONSOLE_ERROR;
+
     if (g_console->bootcmd) {
         free(g_console->bootcmd);
         g_console->bootcmd = NULL;
@@ -467,6 +558,8 @@ int console_run_cmd(const char *cmdstr)
     int r;
 
     cons = g_console;
+    if (!cons)
+        return CONSOLE_ERROR;
 
     if (!cmdstr)
         return CONSOLE_ERROR;
@@ -616,6 +709,8 @@ static int _console_loop(struct tiny_console *cons)
             if (c == CTRL('C')) {
                 putnchar("\n", 1);
                 strncpy(cmd, "\n", CONSOLE_MAX_CMD_BUFFER_LEN);
+                l = 1;
+                cursor = 0;
                 lastchar = c;
                 break;
             }
@@ -718,7 +813,10 @@ static int _console_loop(struct tiny_console *cons)
                 if (l)
                     continue;
 
-                strcpy(cmd, "quit");
+                strncpy(cmd, "quit", CONSOLE_MAX_CMD_BUFFER_LEN - 1);
+                cmd[CONSOLE_MAX_CMD_BUFFER_LEN - 1] = '\0';
+
+
                 l = cursor = strlen(cmd);
                 putnchar("quit\n", l + 1);
                 break;
@@ -757,7 +855,7 @@ static int _console_loop(struct tiny_console *cons)
                             break;
                         putnchar("\b", 1);
                     }
-                    strcpy((cmd + l), completions[0]);
+                    strncpy((cmd + l), completions[0], CONSOLE_MAX_CMD_BUFFER_LEN - l - 1);
                     l += strlen(completions[0]);
                     cmd[l++] = ' ';
                     cursor = l;
@@ -927,7 +1025,7 @@ static int _console_loop(struct tiny_console *cons)
         if (l == 0)
             continue;
         if (lastchar != CTRL('C') && cmd[l - 1] != '?' &&
-            strcasecmp(cmd, "history") != 0)
+            strncasecmp(cmd, "history", CONSOLE_MAX_CMD_BUFFER_LEN) != 0)
             console_add_history(cons, cmd);
 
         if (console_run_cmd(cmd) == CONSOLE_QUIT)
@@ -949,6 +1047,8 @@ struct console_cmd *console_register_cmd(const char *cmd,
                                          int (*proc)(int, char **),
                                          const char *help)
 {
+    if (!g_console)
+        return NULL;
     return console_register_cmd_internal(g_console, cmd, proc, help);
 }
 
@@ -957,6 +1057,8 @@ int console_unregister_cmd(const char *cmd)
     struct tiny_console *cons = g_console;
     struct console_cmd *c;
 
+    if (!cons)
+        return -1;
     if (!cmd)
         return -1;
     if (!cons->cmds_head)
@@ -980,7 +1082,7 @@ static void console_register_init_cmds(const char *name)
     struct console_init_cmd *p;
 
     for (p = cmd_start; p < cmd_end; p++) {
-        if (strcmp(p->cmdname, name))
+        if (strncmp(p->cmdname, name, MAX_NAME_LENGTH))
             continue;
 
         if (p->initialized)
@@ -1023,11 +1125,25 @@ void console_init(void)
 
 int console_loop(void)
 {
+    if (!g_console)
+        return CONSOLE_ERROR;
+
     if (g_console->bootcmd && console_run_cmd(g_console->bootcmd) == CONSOLE_QUIT) {
         free(g_console->bootcmd);
         g_console->bootcmd = NULL;
         return CONSOLE_QUIT;
     }
+
+#ifdef AIC_CONSOLE_USING_AUTH
+    /* set the default password when the password isn't setting */
+    if (strlen(console_get_password()) == 0) {
+        if (console_set_password(AIC_CONSOLE_DEFAULT_PASSWORD) != CONSOLE_OK) {
+            printf("Console password set failed.\n");
+        }
+    }
+    /* waiting authenticate success */
+    console_wait_auth(g_console);
+#endif
 
     return _console_loop(g_console);
 }

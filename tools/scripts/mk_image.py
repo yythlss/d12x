@@ -1590,6 +1590,31 @@ def spienc_create_image(imgcfg, script_dir):
         sys.exit(1)
 
 
+def spienctool_key_encrypt(imgcfg, script_dir):
+    mkcmd = os.path.join(script_dir, "spienctool")
+    if os.path.exists(mkcmd) is False:
+        mkcmd = "spienctool"
+    if sys.platform == "win32":
+        mkcmd += ".exe"
+    cmd = [mkcmd]
+    cmd.append(imgcfg["operation"])
+    cmd.append("--seedver")
+    cmd.append(imgcfg["seedver"])
+    cmd.append("--spienckey")
+    spienckeypath = get_file_path(imgcfg["spienckey"], imgcfg["keydir"])
+    if spienckeypath is None:
+        spienckeypath = get_file_path(imgcfg["spienckey"], imgcfg["datadir"])
+    cmd.append("{}".format(spienckeypath))
+    cmd.append("--key")
+    cmd.append("{}".format(imgcfg["input"]))
+    cmd.append("--out")
+    cmd.append("{}".format(imgcfg["output"]))
+    ret = subprocess.run(cmd, stdout=subprocess.PIPE)
+    if ret.returncode != 0:
+        print(ret.stdout.decode("utf-8"))
+        sys.exit(1)
+
+
 def data_crypt_create_image(imgcfg, script_dir):
     keypath = get_file_path(imgcfg["key"], imgcfg["keydir"])
     if keypath is None:
@@ -1912,9 +1937,13 @@ def img_write_fw_header(imgfile, cfg, meta_area_size, file_area_size):
 struct artinchip_fwc_meta {
     char magic[8];
     char name[64];
-    char partition[64];
-    u32  offset;
-    u32  size;
+    char partition[32];
+    u32  part_offset;
+    u32  part_size;
+    char dev_name[20];
+    u32  dev_id;
+    u32  offset_in_img;
+    u32  size_in_img;
     u32  crc;
     u32  ram;
     char attr[64]
@@ -1923,7 +1952,8 @@ struct artinchip_fwc_meta {
 """
 
 
-def img_gen_fwc_meta(name, part, offset, size, crc, ram, attr, filename):
+def img_gen_fwc_meta(name, dev_name, dev_id, part, part_offset, part_size,
+                     offset_in_img, size_in_img, crc, ram, attr, filename):
     """ Generate Firmware component's meta data
     Args:
         cfg: Dict from JSON
@@ -1931,17 +1961,21 @@ def img_gen_fwc_meta(name, part, offset, size, crc, ram, attr, filename):
     """
     buff = str_to_nbytes("META", 8)
     buff = buff + str_to_nbytes(name, 64)
-    buff = buff + str_to_nbytes(part, 64)
-    buff = buff + int_to_uint32_bytes(offset)
-    buff = buff + int_to_uint32_bytes(size)
+    buff = buff + str_to_nbytes(part, 32)
+    buff = buff + int_to_uint32_bytes(part_offset)
+    buff = buff + int_to_uint32_bytes(part_size)
+    buff = buff + str_to_nbytes(dev_name, 20)
+    buff = buff + int_to_uint32_bytes(dev_id)
+    buff = buff + int_to_uint32_bytes(offset_in_img)
+    buff = buff + int_to_uint32_bytes(size_in_img)
     buff = buff + int_to_uint32_bytes(crc)
     buff = buff + int_to_uint32_bytes(ram)
     buff = buff + str_to_nbytes(attr, 64)
     buff = buff + str_to_nbytes(filename, 64)
 
     if VERBOSE:
-        print("\t\tMeta for {:<25} offset {:<10} size {} ({})".format(
-              name, hex(offset), hex(size), size))
+        print("\t\tMeta for {:<25} offset in file {:<10} size in file {} ({})".format(
+              name, hex(offset_in_img), hex(size_in_img), size_in_img))
     return buff
 
 
@@ -2136,18 +2170,27 @@ def img_write_fwc_meta_section(imgfile, cfg, sect, meta_off, file_off, datadir):
     # Build partition lookup table across all devices for validation
     media_list = _extract_media_info(cfg)
     all_partitions = {}
+    ctrl_map = {}
     for media in media_list:
         device_name = media["name"]
+        ctrl_map[device_name] = media["controller"]
         if device_name in cfg and "partitions" in cfg[device_name]:
             all_partitions.update(cfg[device_name]["partitions"])
 
     for fwc in fwcset:
         file_size = fwcset[fwc]["filesize"]
+        part_offset = 0
+        part_size = 0
+        dev_name = "ram"
+        dev_id = 0
         if sect == "target":
             if "part_size" not in fwcset[fwc]:
                 print("There is no partition for component '{}', please remove it.".format(fwc))
                 continue
             part_size = fwcset[fwc]["part_size"]
+            part_offset = fwcset[fwc]["part_offset"]
+            dev_name = fwcset[fwc]["media_type"]
+            dev_id = ctrl_map.get(fwcset[fwc]["device_name"], 0)
             if file_size > part_size:
                 part_name = fwcset[fwc]["part"]
                 if isinstance(part_name, list):
@@ -2185,7 +2228,8 @@ def img_write_fwc_meta_section(imgfile, cfg, sect, meta_off, file_off, datadir):
         else:
             part = ""
         file_name = fwcset[fwc]["file"]
-        meta = img_gen_fwc_meta(name, part, file_off, file_size, crc, ram, attr, file_name)
+        meta = img_gen_fwc_meta(name, dev_name, dev_id, part, part_offset, part_size,
+                                file_off, file_size, crc, ram, attr, file_name)
         imgfile.write(meta)
         fwcset[fwc]["meta_off"] = meta_off
         fwcset[fwc]["file_off"] = file_off
@@ -2217,16 +2261,17 @@ def img_write_fwc_meta_to_imgfile(imgfile, cfg, meta_start, file_start, datadir)
         return -1
     # 2, Image Info(The same with image header)
     imgfile.seek(meta_offset, 0)
-    img_fn = datadir + img_gen_fw_file_name(cfg);
+    img_fn = datadir + img_gen_fw_file_name(cfg)
     crc = calc_crc32(img_fn, DATA_ALIGNED_SIZE)
-    info_offset = 0 # Image info is the image header, start from 0
+    # Image info is the image header, start from 0
+    info_offset = 0
     info_size = DATA_ALIGNED_SIZE
     part = ""
     name = "image.info"
     ram = 0xFFFFFFFF
     attr = "required"
     file_name = "info.bin"
-    meta = img_gen_fwc_meta(name, part, info_offset, info_size, crc, ram, attr, file_name)
+    meta = img_gen_fwc_meta(name, "ram", 0, part, 0, 0, info_offset, info_size, crc, ram, attr, file_name)
     imgfile.write(meta)
     # Only meta offset increase
     meta_offset += META_ALIGNED_SIZE
@@ -2334,13 +2379,15 @@ def _fill_padding(binfile, size, fill_byte=0xFF, step=1024 * 1024):
         size -= write_size
 
 
-def img_write_fwc_file_to_binfile(binfile, cfg, datadir):
+def img_write_fwc_file_to_binfile(binfile, cfg, datadir, device_name=None,
+                                  part_table_file=None):
     """ Write FW component's file data
     Args:
-        imgfile: Image bin file handle
+        binfile: Image bin file handle
         cfg: Dict from JSON
-        file_start: file data area start offset
         datadir: working directory
+        device_name: Only write file data of this device, default is the first device
+        part_table_file: Output part table file path, default is burner dir's part table
     """
     page_size = 0
     block_size = 0
@@ -2352,8 +2399,9 @@ def img_write_fwc_file_to_binfile(binfile, cfg, datadir):
             block_size = int(re.sub(r"[^0-9]", "", item["block"]))
 
     media_list = _extract_media_info(cfg)
-    first_device_name = media_list[0]["name"]
-    media_size = size_str_to_int(cfg[first_device_name]["size"])
+    if device_name is None:
+        device_name = media_list[0]["name"]
+    media_size = size_str_to_int(cfg[device_name]["size"])
 
     if (media_size > BIN_FILE_MAX_SIZE):
         media_size = BIN_FILE_MAX_SIZE
@@ -2381,13 +2429,13 @@ def img_write_fwc_file_to_binfile(binfile, cfg, datadir):
             if VERBOSE:
                 print("\t\t" + os.path.split(path)[1])
 
-            device_name = fwcset[fwc].get("device_name", media_list[0]["name"])
+            fwc_device_name = fwcset[fwc].get("device_name", media_list[0]["name"])
             media_type = fwcset[fwc].get("media_type", media_list[0]["type"])
 
-            if device_name != first_device_name:
+            if fwc_device_name != device_name:
                 if VERBOSE:
                     msg = "\t\tSkipping " + os.path.split(path)[1]
-                    msg += " (belongs to " + device_name + ")"
+                    msg += " (belongs to " + fwc_device_name + ")"
                     print(msg)
                 continue
 
@@ -2444,7 +2492,8 @@ def img_write_fwc_file_to_binfile(binfile, cfg, datadir):
     binfile.flush()
 
     buff = buff + gen_bytes(0xFF, 16)
-    part_table_file = datadir + "burner/" + "{}".format(cfg["image"]["part_table"])
+    if part_table_file is None:
+        part_table_file = datadir + "burner/" + cfg["image"]["part_table"]
     with open(part_table_file, "wb") as partfile:
         partfile.write(buff)
         partfile.flush()
@@ -2522,11 +2571,13 @@ def img_get_part_size(cfg, datadir):
             if "offset" in partitions[part]:
                 part_offs = size_str_to_int(partitions[part]["offset"])
 
+            # Handle UBI volumes
             if "ubi" in partitions[part]:
                 volumes = partitions[part]["ubi"]
                 if len(volumes) == 0:
                     print("Volume of {} is empty".format(part))
                     return -1
+                vol_offs = part_offs
                 for vol in volumes:
                     if "size" not in volumes[vol]:
                         print("No size value for ubi volume: {}".format(vol))
@@ -2536,8 +2587,6 @@ def img_get_part_size(cfg, datadir):
                         vol_size = part_size
                     if "offset" in volumes[vol]:
                         vol_offs = size_str_to_int(volumes[vol]["offset"])
-                    else:
-                        vol_offs = 0
                     vol_name = part + ":" + vol
                     partition_table[vol_name] = {
                         "size": vol_size,
@@ -2546,6 +2595,8 @@ def img_get_part_size(cfg, datadir):
                         "media_type": media_type,
                         "total_size": total_siz
                     }
+                    vol_offs += vol_size
+                part_offs = vol_offs
             else:
                 partition_table[part] = {
                     "size": part_size,
@@ -2554,7 +2605,7 @@ def img_get_part_size(cfg, datadir):
                     "media_type": media_type,
                     "total_size": total_siz
                 }
-            part_offs += part_size
+                part_offs += part_size
 
     # Match targets with partitions
     for fwc in fwcset:
@@ -2909,6 +2960,21 @@ def firmware_component_preproc_spienc(cfg, datadir, keydir, bindir):
         spienc_create_image(imgcfg, bindir)
 
 
+def firmware_component_preproc_spienctool(cfg, datadir, keydir, bindir):
+    preproc_cfg = get_pre_process_cfg(cfg)
+    imgnames = preproc_cfg["spienctool"].keys()
+    for name in imgnames:
+        imgcfg = preproc_cfg["spienctool"][name]
+        imgcfg["keydir"] = keydir
+        imgcfg["datadir"] = datadir
+        outname = datadir + name
+        imgcfg["input"] = datadir + imgcfg["file"]
+        imgcfg["output"] = outname
+        if VERBOSE:
+            print("\tCreating {} ...".format(outname))
+        spienctool_key_encrypt(imgcfg, bindir)
+
+
 def firmware_component_preproc_data_crypt(cfg, datadir, keydir, bindir):
     preproc_cfg = get_pre_process_cfg(cfg)
     imgnames = preproc_cfg["data_crypt"].keys()
@@ -2980,25 +3046,29 @@ def firmware_component_preproc(cfg, datadir, keydir, bindir):
     preproc_cfg = get_pre_process_cfg(cfg)
     if preproc_cfg is None:
         return None
-    if "aicprivate" in preproc_cfg:
-        firmware_component_preproc_aicprivate(cfg, datadir, keydir, bindir)
-    if "itb" in preproc_cfg:
-        firmware_component_preproc_itb(cfg, datadir, keydir, bindir)
-    if "elf2itb" in preproc_cfg:
-        firmware_component_preproc_elf2itb(cfg, datadir, keydir, bindir)
-    if "uboot_env" in preproc_cfg:
-        firmware_component_preproc_uboot_env(cfg, datadir, keydir, bindir)
-    if "aicboot" in preproc_cfg:
-        # Legacy code
-        firmware_component_preproc_aicboot(cfg, datadir, keydir, bindir)
-    if "aicimage" in preproc_cfg:
-        firmware_component_preproc_aicimage(cfg, datadir, keydir, bindir)
-    if "concatenate" in preproc_cfg:
-        firmware_component_preproc_concatenate(cfg, datadir, keydir, bindir)
-    if "spienc" in preproc_cfg:
-        firmware_component_preproc_spienc(cfg, datadir, keydir, bindir)
-    if "data_crypt" in preproc_cfg:
-        firmware_component_preproc_data_crypt(cfg, datadir, keydir, bindir)
+    preprocs = preproc_cfg.keys()
+    for proc in preprocs:
+        if proc == "aicprivate":
+            firmware_component_preproc_aicprivate(cfg, datadir, keydir, bindir)
+        if proc == "itb":
+            firmware_component_preproc_itb(cfg, datadir, keydir, bindir)
+        if proc == "elf2itb":
+            firmware_component_preproc_elf2itb(cfg, datadir, keydir, bindir)
+        if proc == "uboot_env":
+            firmware_component_preproc_uboot_env(cfg, datadir, keydir, bindir)
+        if proc == "aicboot":
+            # Legacy code
+            firmware_component_preproc_aicboot(cfg, datadir, keydir, bindir)
+        if proc == "aicimage":
+            firmware_component_preproc_aicimage(cfg, datadir, keydir, bindir)
+        if proc == "concatenate":
+            firmware_component_preproc_concatenate(cfg, datadir, keydir, bindir)
+        if proc == "spienc":
+            firmware_component_preproc_spienc(cfg, datadir, keydir, bindir)
+        if proc == "spienctool":
+            firmware_component_preproc_spienctool(cfg, datadir, keydir, bindir)
+        if proc == "data_crypt":
+            firmware_component_preproc_data_crypt(cfg, datadir, keydir, bindir)
 
 
 def generate_bootcfg(bcfgfile, cfg):
@@ -3339,26 +3409,38 @@ def build_firmware_image(cfg, datadir, outdir):
 
     if BURNER:
         os.makedirs(outdir + "burner/", exist_ok=True)
-        img_bin_fn = outdir + "burner/" + img_gen_fw_file_name(cfg).replace(".img", ".bin")
-        with open(img_bin_fn, 'wb') as binfile:
-            # Get media info
-            media_list = _extract_media_info(cfg)
-            media_type = media_list[0]["type"]
+        # Get media info
+        media_list = _extract_media_info(cfg)
+        img_bin_name = img_gen_fw_file_name(cfg).replace(".img", ".bin")
+        part_table_name = cfg["image"]["part_table"]
 
-            # Only spi-nand need gen page table
-            if media_type == "spi-nand":
-                ret = img_gen_page_table(binfile, cfg, datadir)
+        for idx, media in enumerate(media_list):
+            # One bin file for each flash device
+            if len(media_list) > 1 and idx > 0:
+                suffix = "_{}".format(media["name"])
+            else:
+                suffix = ""
+            img_bin_fn = outdir + "burner/" + img_bin_name.replace(".bin",
+                                                                   suffix + ".bin")
+            part_table_fn = outdir + "burner/" + part_table_name.replace(".bin",
+                                                                         suffix + ".bin")
+
+            with open(img_bin_fn, 'wb') as binfile:
+                # Only spi-nand need gen page table
+                if media["type"] == "spi-nand":
+                    ret = img_gen_page_table(binfile, cfg, datadir)
+                    if ret != 0:
+                        return ret
+
+                ret = img_write_fwc_file_to_binfile(binfile, cfg, datadir,
+                                                    media["name"], part_table_fn)
                 if ret != 0:
                     return ret
 
-            ret = img_write_fwc_file_to_binfile(binfile, cfg, datadir)
-            if ret != 0:
-                return ret
-
-        abspath = "{}".format(img_bin_fn)
-        (img_path, img_name) = os.path.split(abspath)
-        if VERBOSE:
-            print("\tImage bin file is generated: {}/{}\n\n".format(img_path, img_name))
+            abspath = "{}".format(img_bin_fn)
+            (img_path, img_name) = os.path.split(abspath)
+            if VERBOSE:
+                print("\tImage bin file is generated: {}/{}\n".format(img_path, img_name))
 
     bootcfg_fn = datadir + cfg["image"]["bootcfg"]
     with open(bootcfg_fn, 'wb') as bcfgfile:

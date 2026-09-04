@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -21,6 +21,7 @@ extern "C" {
 #define USR_UART_RFNE           0x08
 #define LSR_DATA_READY          0x01
 #define LSR_THR_EMPTY           0x20
+#define LSR_TEMT_EMPTY          0x40
 #define IER_RDA_INT_ENABLE      0x01
 #define IER_THRE_INT_ENABLE     0x02
 #define IER_SREE_INT_ENABLE     0x20
@@ -69,6 +70,7 @@ extern "C" {
 #define AIC_IIR_RECV_DATA       0x04    /* received data available */
 #define AIC_IIR_RECV_LINE       0x06    /* receiver line status */
 #define AIC_IIR_CHAR_TIMEOUT    0x0c    /* character timeout */
+#define AIC_IIR_SR_EMPTY        0x10    /* shifter reg empty */
 
 /* ArtInChip specific register fields */
 #define AIC_UART_MCR_SIRE       0x40
@@ -81,9 +83,9 @@ extern "C" {
 #define AIC_UART_MCR_LOOPBACK   0x10
 
 #define AIC_UART_EXREG          0xB8    /* RS485 DE Time */
-#define AIC_UART_RS485_CTL_MODE 0x80;
-#define AIC_UART_RS485_RXBFA    0x08;
-#define AIC_UART_RS485_RXAFA    0x04;
+#define AIC_UART_RS485_CTL_MODE 0x80
+#define AIC_UART_RS485_RXBFA    0x08
+#define AIC_UART_RS485_RXAFA    0x04
 
 #define AIC_USART_SET_RS485_NORMAL          0x20            /**< set rs485 normal enable */
 #define AIC_USART_SET_RS485_COMPACT_IO      0x21            /**< set rs485 compact-io enable */
@@ -96,6 +98,7 @@ extern "C" {
 #define AIC_UART_SW_FLOW_CTRL       0x85
 #define AIC_UART_SW_RECEIVE_ON_OFF  0x86
 #define AIC_UART_SET_BAUDRATE       0x87
+#define AIC_UART_ENABLE_SREE_INT    0x89
 
 #define AIC_UART_DEV_MODE_RS485     0x1
 
@@ -117,6 +120,7 @@ extern "C" {
 #define AIC_UART_RX_FIFO_SIZE      2048
 /* DMA_FLAG: RDWR(0x3) | INT_RX(0x100) | DMA_RX(0x200) | DMA_TX(0x800) */
 #define AIC_UART_DMA_FLAG       2819
+#define AIC_UART_TX_RX_INT_FLAG 1283
 /* definition for usart handle. */
 typedef void *usart_handle_t;
 
@@ -136,6 +140,7 @@ typedef enum
     USART_MODE_RS232_SW_FLOW_CTRL       = 5,   ///< RS232 software flow conctrol
     USART_MODE_RS232_SW_HW_FLOW_CTRL    = 6,   ///< RS232 software and hardware flow conctrol
     USART_FUNC_RS485_SIMULATION         = 7,   ///< RS485 simulation
+    USART_FUNC_RS232_SIMULATION         = 8,   ///< RS232 simulation
 } usart_func_e;
 
 /****** USART specific error codes *****/
@@ -381,7 +386,7 @@ int32_t hal_usart_uninitialize(usart_handle_t handle);
 */
 usart_capabilities_t hal_usart_get_capabilities(int32_t idx);
 
-uint8_t hal_usart_get_irqstatus(int32_t idx);
+uint16_t hal_usart_get_irqstatus(int32_t idx);
 
 /**
   \brief       config usart mode.
@@ -632,6 +637,7 @@ int32_t hal_usart_halt_tx_enable(usart_handle_t handle, uint8_t halt_tx_enable);
 uint32_t hal_usart_get_cur_baudrate(usart_handle_t handle);
 void hal_usart_intr_recv_line(int32_t idx, aic_usart_priv_t *usart_priv);
 void hal_usart_clear_rxfifo(usart_handle_t handle);
+int32_t hal_uart_set_sree_int(usart_handle_t handle, int32_t flag);
 
 #if defined(RT_SERIAL_USING_DMA) || defined(AIC_SERIAL_USING_DMA)
 int32_t hal_uart_set_fifo(usart_handle_t handle);

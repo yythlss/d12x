@@ -30,11 +30,19 @@ set boot_defconfig=!chip!_!board!_baremetal_bootloader_defconfig
 
 set LOG_DIR=%SDK_PRJ_TOP_DIR%\.log
 if not exist %LOG_DIR% mkdir %LOG_DIR%
-del %LOG_DIR%\*.log /f /q
-
-call checkout_binary.bat
+del %LOG_DIR%\*.log /f /q 2>nul
 
 :: Build bootloader
+if not exist "%SDK_PRJ_TOP_DIR%\target\configs\%boot_defconfig%" (
+	echo %boot_defconfig% does not exist!
+	goto exit_label
+)
+
+set boot_solution=!boot_defconfig:~0,-10!
+echo.
+echo --------------------------------------------------------------
+echo Build !boot_solution!
+echo --------------------------------------------------------------
 call scons --apply-def=%boot_defconfig% -C %SDK_PRJ_TOP_DIR%
 call scons -C %SDK_PRJ_TOP_DIR%	 -j 8 2>&1 | tee %LOG_DIR%\%boot_defconfig%.log
 

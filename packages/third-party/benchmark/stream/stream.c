@@ -182,8 +182,13 @@
 # endif
 
 #if defined(ARCH_RISCV_FPU_S) || defined(ARCH_CSKY)
-#define double	float
+#define double	    float
+#define REAL_TYPE   "float"
+#else
+#define REAL_TYPE   "double"
 #endif
+
+#define CPU_FREQ    (long)(AIC_CLK_CPU_FREQ / 1000000)
 
 #define USE_MALLOC	1
 
@@ -271,8 +276,9 @@ test_stream(int argc, char *argv[])
     printf("STREAM version $Revision: 5.10 $\n");
     printf(HLINE);
     BytesPerWord = sizeof(STREAM_TYPE);
-    printf("This system uses %d bytes per array element.\n",
-	BytesPerWord);
+    printf("CPU Frequency: %ld MHz\n", CPU_FREQ);
+    printf("This system uses %d bytes per array element(%s).\n",
+           BytesPerWord, REAL_TYPE);
 
 #ifdef USE_PSRAM
     if (psram_malloc())

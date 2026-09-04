@@ -19,41 +19,18 @@
 
 #define LOG_DEBUG
 #include "aic_recorder.h"
-#include "cJSON.h"
 #include "mpp_list.h"
 #include "mpp_log.h"
 #include "mpp_mem.h"
-#include "drv_dvp.h"
-#include "mpp_vin.h"
-#ifdef AIC_USING_CAMERA
-#include "drv_camera.h"
-#endif
 #include "aic_render.h"
+#include "recorder_cam.h"
 #include "artinchip_fb.h"
 #ifdef LPKG_USING_CPU_USAGE
 #include "cpu_usage.h"
 #endif
 
-#define RECORDER_VID_BUF_NUM        3
-#define RECORDER_VID_BUF_PLANE_NUM  2
-#define RECORDER_DEMO_DEFAULT_RECORD_TIME 0x7FFFFFFF
-
-
-struct recorder_dvp_data {
-    int w;
-    int h;
-    int frame_size;
-    int frame_cnt;
-    int fresh_frame;
-    int rotation;
-    struct mpp_rect dst_pos;        // position in DE video player
-
-    struct mpp_video_fmt src_fmt;   // format of DVP input, i.e. camera output
-    struct dvp_out_fmt   dst_fmt;   // format of DVP output
-    uint32_t num_buffers;
-    struct vin_video_buf binfo;
-    bool dvp_init;
-};
+#define RECORDER_RECORD_TIME 0x7FFFFFFF
+#define RECORDER_OUTPUT_PATH "/sdcard/"
 
 struct recorder_render_data {
     struct aic_video_render *render;
@@ -66,24 +43,18 @@ struct recorder_render_data {
 struct recorder_context {
     struct aic_recorder *recorder;
     enum aic_recorder_vin_type  vin_source_type;
-    union {
-        struct recorder_dvp_data dvp_data;
-    };
+    struct recorder_cam_data cam_data;
+    struct recorder_render_data render_data;
+    struct aic_recorder_config config;
 
-    char config_file_path[256];
-    char video_in_file_path[256];
-    char audio_in_file_path[256];
     char output_file_path[256];
     char capture_file_path[256];
-    struct aic_recorder_config config;
     unsigned int record_time;
-    struct recorder_render_data render_data;
     bool render_flag;
     bool record_flag;
     bool recorder_stop;
     unsigned int snapshot_count;
-    int quality;
-    struct mpp_frame frame[RECORDER_VID_BUF_NUM];
+    struct mpp_frame frame[RECORDER_CAM_BUF_NUM];
 };
 
 
@@ -95,13 +66,12 @@ static void print_help(const char* prog)
     printf("Usage: recoder_demo [options]:\n"
         "\t-i                             video input source\n"
         "\t-t                             recoder time(s)\n"
-        "\t-c                             recoder config file\n"
         "\t-d                             display to screen\n"
         "\t-q                             set pic quality\n"
         "\t-r                             record data\n"
         "\t-h                             help\n\n"
-        "Example1: recoder_demo -i dvp -t 60 -c /sdcard/recorder.config\n"
-        "Example2: recoder_demo -i file -t 60 -c /sdcard/recorder.config\n");
+        "Example1: recoder_demo -i dvp -t 60\n"
+        "Example2: recoder_demo -i file -t 60\n");
 }
 
 static void print_cmd_help(const char* prog)
@@ -113,71 +83,6 @@ static void print_cmd_help(const char* prog)
         "\t-d                             get debug info\n"
         "\t-h                             help\n\n");
 }
-
-char *read_file(const char *filename)
-{
-    FILE *file = NULL;
-    long length = 0;
-    char *content = NULL;
-    size_t read_chars = 0;
-
-    /* open in read binary mode */
-    file = fopen(filename, "rb");
-    if (file == NULL) {
-        goto cleanup;
-    }
-
-    /* get the length */
-    if (fseek(file, 0, SEEK_END) != 0) {
-        goto cleanup;
-    }
-    length = ftell(file);
-    if (length < 0) {
-        goto cleanup;
-    }
-    if (fseek(file, 0, SEEK_SET) != 0) {
-        goto cleanup;
-    }
-
-    /* allocate content buffer */
-    content = (char *)malloc((size_t)length + sizeof(""));
-    if (content == NULL) {
-        goto cleanup;
-    }
-
-    /* read the file into memory */
-    read_chars = fread(content, sizeof(char), (size_t)length, file);
-    if ((long)read_chars != length) {
-        free(content);
-        content = NULL;
-        goto cleanup;
-    }
-    content[read_chars] = '\0';
-
-cleanup:
-    if (file != NULL) {
-        fclose(file);
-    }
-
-    return content;
-}
-
-static cJSON *parse_file(const char *filename)
-{
-    cJSON *parsed = NULL;
-    char *content = read_file(filename);
-
-    parsed = cJSON_Parse(content);
-
-    if (content != NULL) {
-        free(content);
-    }
-
-    return parsed;
-}
-
-
-static int dvp_queue_buf(int index);
 
 static s32 event_handle(void *app_data, s32 event, s32 data1, s32 data2)
 {
@@ -233,122 +138,6 @@ static s32 giveback_buf(void *app_data, s32 event, void *buffer)
     return 0;
 }
 
-int parse_config_file(char *config_file, struct recorder_context *recorder_cxt)
-{
-    int ret = 0;
-    cJSON *cjson = NULL;
-    cJSON *root = NULL;
-    if (!config_file || !recorder_cxt) {
-        ret = -1;
-        goto _EXIT;
-    }
-    root = parse_file(config_file);
-    if (!root) {
-        loge("parse_file error %s!!!", config_file);
-        ret = -1;
-        goto _EXIT;
-    }
-
-    cjson = cJSON_GetObjectItem(root, "video_in_file");
-    if (!cjson) {
-        loge("no video_in_file error");
-        ret = -1;
-        goto _EXIT;
-    }
-    strcpy(recorder_cxt->video_in_file_path, cjson->valuestring);
-
-    cjson = cJSON_GetObjectItem(root, "audio_in_file");
-    if (!cjson) {
-        strcpy(recorder_cxt->audio_in_file_path, cjson->valuestring);
-    }
-
-    cjson = cJSON_GetObjectItem(root, "output_file");
-    if (!cjson) {
-        loge("no output_file error");
-        ret = -1;
-        goto _EXIT;
-    }
-    strcpy(recorder_cxt->output_file_path, cjson->valuestring);
-
-    cjson = cJSON_GetObjectItem(root, "file_duration");
-    if (cjson) {
-        recorder_cxt->config.file_duration = cjson->valueint;
-    }
-
-    cjson = cJSON_GetObjectItem(root, "file_num");
-    if (cjson) {
-        recorder_cxt->config.file_num = cjson->valueint;
-    }
-
-    cjson = cJSON_GetObjectItem(root, "qfactor");
-    if (cjson) {
-        recorder_cxt->config.qfactor = cjson->valueint;
-    }
-    if (recorder_cxt->quality > 0)
-        recorder_cxt->config.qfactor = recorder_cxt->quality;
-    cjson = cJSON_GetObjectItem(root, "video");
-    if (cjson) {
-        int enable = cJSON_GetObjectItem(cjson, "enable")->valueint;
-        if (enable == 1) {
-            recorder_cxt->config.has_video = 1;
-        }
-        recorder_cxt->config.video_config.codec_type =
-            cJSON_GetObjectItem(cjson, "codec_type")->valueint;
-
-        printf("codec_type:0x%x\n", recorder_cxt->config.video_config.codec_type);
-        if (recorder_cxt->config.video_config.codec_type != MPP_CODEC_VIDEO_DECODER_MJPEG) {
-            ret = -1;
-            loge("only support  MPP_CODEC_VIDEO_DECODER_MJPEG");
-            recorder_cxt->recorder_stop = true;
-            goto _EXIT;
-        }
-        recorder_cxt->config.video_config.out_width =
-            cJSON_GetObjectItem(cjson, "out_width")->valueint;
-        recorder_cxt->config.video_config.out_height =
-            cJSON_GetObjectItem(cjson, "out_height")->valueint;
-        recorder_cxt->config.video_config.out_frame_rate =
-            cJSON_GetObjectItem(cjson, "out_framerate")->valueint;
-        recorder_cxt->config.video_config.out_bit_rate =
-            cJSON_GetObjectItem(cjson, "out_bitrate")->valueint;
-        recorder_cxt->config.video_config.in_width =
-            cJSON_GetObjectItem(cjson, "in_width")->valueint;
-        recorder_cxt->config.video_config.in_height =
-            cJSON_GetObjectItem(cjson, "in_height")->valueint;
-        recorder_cxt->config.video_config.in_pix_fomat =
-            cJSON_GetObjectItem(cjson, "in_pix_format")->valueint;
-    }
-
-    cjson = cJSON_GetObjectItem(root, "audio");
-    if (cjson) {
-        int enable = cJSON_GetObjectItem(cjson, "enable")->valueint;
-        if (enable == 1) {
-            recorder_cxt->config.has_audio = 1;
-        }
-        recorder_cxt->config.audio_config.codec_type =
-            cJSON_GetObjectItem(cjson, "codec_type")->valueint;
-        recorder_cxt->config.audio_config.out_bitrate =
-            cJSON_GetObjectItem(cjson, "out_bitrate")->valueint;
-        recorder_cxt->config.audio_config.out_samplerate =
-            cJSON_GetObjectItem(cjson, "out_samplerate")->valueint;
-        recorder_cxt->config.audio_config.out_channels =
-            cJSON_GetObjectItem(cjson, "out_channels")->valueint;
-        recorder_cxt->config.audio_config.out_bits_per_sample =
-            cJSON_GetObjectItem(cjson, "out_bits_per_sample")->valueint;
-        recorder_cxt->config.audio_config.in_samplerate =
-            cJSON_GetObjectItem(cjson, "in_samplerate")->valueint;
-        recorder_cxt->config.audio_config.in_channels =
-            cJSON_GetObjectItem(cjson, "in_channels")->valueint;
-        recorder_cxt->config.audio_config.in_bits_per_sample =
-            cJSON_GetObjectItem(cjson, "in_bits_per_sample")->valueint;
-    }
-_EXIT:
-    if (root) {
-        cJSON_Delete(root);
-    }
-    return ret;
-}
-
-
 static int parse_options(struct recorder_context *recoder_ctx, int cnt, char **options)
 {
     int argc = cnt;
@@ -362,21 +151,17 @@ static int parse_options(struct recorder_context *recoder_ctx, int cnt, char **o
     }
     optind = 0;
     while (1) {
-        opt = getopt(argc, argv, "i:c:t:r:q:dh");
+        opt = getopt(argc, argv, "i:t:r:q:dh");
         if (opt == -1) {
             break;
         }
         switch (opt) {
         case 'i':
-            if (strcmp(optarg, "dvp") == 0) {
+            if (strncmp(optarg, "dvp", 3) == 0) {
                 ctx->vin_source_type = AIC_RECORDER_VIN_DVP;
             } else {
                 ctx->vin_source_type = AIC_RECORDER_VIN_FILE;
             }
-            break;
-
-        case 'c':
-            strcpy(ctx->config_file_path, optarg);
             break;
 
         case 't':
@@ -388,7 +173,7 @@ static int parse_options(struct recorder_context *recoder_ctx, int cnt, char **o
             break;
 
         case 'q':
-            ctx->quality = atoi(optarg);
+            ctx->config.qfactor = atoi(optarg);
             break;
 
         case 'd':
@@ -490,128 +275,6 @@ static void recorder_render_deinit(struct recorder_render_data *render_data)
     render_data->render_init = false;
 }
 
-static int recorder_dvp_init(struct recorder_dvp_data *dvp_data)
-{
-    struct mpp_video_fmt *src;
-    struct dvp_out_fmt *dst;
-    int ret = -1;
-    int i = 0;
-
-    if (!dvp_data) {
-        loge("dvp_data is null");
-        return -1;
-    }
-
-    src = &dvp_data->src_fmt;
-    dst = &dvp_data->dst_fmt;
-
-#ifdef AIC_USING_CAMERA
-    /*Initial vin*/
-    if (mpp_vin_init(CAMERA_DEV_NAME))
-        return -1;
-#endif
-
-    /*get sensor fmt*/
-    ret = mpp_dvp_ioctl(DVP_IN_G_FMT, src);
-    if (ret < 0) {
-        loge("ioctl(DVP_IN_G_FMT) failed! err -%d\n", -ret);
-        goto _exit;
-    }
-
-    ret = mpp_dvp_ioctl(DVP_IN_S_FMT, src);
-    if (ret < 0) {
-        loge("ioctl(DVP_IN_S_FMT) failed! err -%d\n", -ret);
-        goto _exit;
-    }
-
-    /*dvp config*/
-    dvp_data->w = src->width;
-    dvp_data->h = src->height;
-    dst->width = src->width;
-    dst->height = src->height;
-    dst->pixelformat = MPP_FMT_NV12;
-    dst->num_planes = RECORDER_VID_BUF_PLANE_NUM;
-    dst->frame_offset = 0;
-    ret = mpp_dvp_ioctl(DVP_OUT_S_FMT, dst);
-    if (ret < 0) {
-        loge("ioctl(DVP_OUT_S_FMT) failed! err -%d\n", -ret);
-        goto _exit;
-    }
-
-    /*request dvp buffer*/
-    if (mpp_dvp_ioctl(DVP_REQ_BUF, (void *)&dvp_data->binfo) < 0) {
-        loge("ioctl(DVP_REQ_BUF) failed!\n");
-        goto _exit;
-    }
-    for (i = 0; i < RECORDER_VID_BUF_NUM; i++) {
-        if (dvp_queue_buf(i) < 0) {
-            loge("dvp_queue_buf %d failed!\n", i);
-            goto _exit;
-        }
-    }
-
-    /*start dvp*/
-    ret = mpp_dvp_ioctl(DVP_STREAM_ON, NULL);
-    if (ret < 0) {
-        loge("ioctl(DVP_STREAM_ON) failed! err -%d\n", -ret);
-        goto _exit;
-    }
-
-    logi("dvp:src: w(%d), h(%d); dst(%d): w(%d), h(%d)\n",
-        src->width, src->height, dst->pixelformat, dst->width, dst->height);
-
-    dvp_data->dvp_init = true;
-
-    return 0;
-
-_exit:
-    mpp_vin_deinit();
-
-    dvp_data->dvp_init = false;
-    return -1;
-}
-
-static void recorder_dvp_deinit(struct recorder_dvp_data *dvp_data)
-{
-    int ret = 0;
-    if (!dvp_data || !dvp_data->dvp_init)
-        return;
-
-    ret = mpp_dvp_ioctl(DVP_STREAM_OFF, NULL);
-    if (ret < 0) {
-        loge("ioctl(DVP_STREAM_OFF) failed! err -%d\n", -ret);
-        return;
-    }
-
-    mpp_vin_deinit();
-
-    dvp_data->dvp_init = false;
-}
-
-static int dvp_queue_buf(int index)
-{
-    if (mpp_dvp_ioctl(DVP_Q_BUF, (void *)(ptr_t)index) < 0) {
-        loge("Q failed! Maybe buf state is invalid.\n");
-        return -1;
-    }
-
-    return 0;
-}
-
-static int dvp_dequeue_buf(int *index)
-{
-    int ret = 0;
-
-    if (index == NULL)
-        return -1;
-
-    ret = mpp_dvp_ioctl(DVP_DQ_BUF, (void *)index);
-    if (ret < 0) {
-        logd("ioctl(DVP_DQ_BUF) failed! err -%d\n", -ret);
-        return -1;
-    }
-    return 0;
-}
 
 static int recorder_render_frame(struct recorder_render_data *render_data,
                                  struct mpp_frame *frame)
@@ -629,6 +292,7 @@ static int recorder_render_frame(struct recorder_render_data *render_data,
 
 static void do_recorder(struct recorder_context *recorder_cxt)
 {
+    struct recorder_cam_data *cam = &recorder_cxt->cam_data;
     struct vin_video_buf *binfo = NULL;
     struct mpp_frame *frame = NULL;
     struct dvp_out_fmt *dst = NULL;
@@ -643,14 +307,12 @@ static void do_recorder(struct recorder_context *recorder_cxt)
     return;
 #endif
 
-    // dequeue a frame
-    ret = dvp_dequeue_buf(&index);
+    ret = recorder_cam_dequeue_buf(&index);
     if (ret != 0)
         return;
 
-    // set frame info
-    binfo = &recorder_cxt->dvp_data.binfo;
-    dst = &recorder_cxt->dvp_data.dst_fmt;
+    binfo = &cam->binfo;
+    dst   = &cam->dst_fmt;
     frame = &recorder_cxt->frame[index];
     frame->id = index;
     frame->pts = aic_get_time_ms();
@@ -661,29 +323,31 @@ static void do_recorder(struct recorder_context *recorder_cxt)
     frame->buf.stride[1] = dst->width;
     frame->buf.stride[2] = 0;
     frame->buf.format = dst->pixelformat;
-    for (i = 0; i < RECORDER_VID_BUF_PLANE_NUM; i++) {
+    for (i = 0; i < RECORDER_CAM_PLANE_NUM; i++) {
         frame->buf.phy_addr[i] =
-            binfo->planes[index * RECORDER_VID_BUF_PLANE_NUM + i].buf;
+            binfo->planes[index * RECORDER_CAM_PLANE_NUM + i].buf;
     }
 
-    // render a frame
-    recorder_render_frame(&recorder_cxt->render_data, frame);
+    if (recorder_cxt->render_flag)
+        recorder_render_frame(&recorder_cxt->render_data, frame);
 
-    // send to recorder
     if (recorder_cxt->record_flag) {
         ret = aic_recorder_send_frame(recorder_cxt->recorder, frame);
         if (ret != 0) {
-            dvp_queue_buf(index);
+            recorder_cam_queue_buf(index);
             return;
         }
     }
-    dvp_queue_buf(index);
+    recorder_cam_queue_buf(index);
 }
 
 static void *recorder_thread(void *arg)
 {
     struct recorder_context *recorder_cxt = (struct recorder_context *)arg;
     struct timespec start_time = { 0 }, cur_time = { 0 };
+
+    if (!recorder_cxt)
+        return NULL;
 
     clock_gettime(CLOCK_REALTIME, &start_time);
 
@@ -702,7 +366,7 @@ static void *recorder_thread(void *arg)
     }
 
     if (recorder_cxt->vin_source_type == AIC_RECORDER_VIN_DVP)
-        recorder_dvp_deinit(&recorder_cxt->dvp_data);
+        recorder_cam_deinit(&recorder_cxt->cam_data);
     if (recorder_cxt->render_flag)
         recorder_render_deinit(&recorder_cxt->render_data);
 
@@ -712,16 +376,53 @@ static void *recorder_thread(void *arg)
         recorder_cxt->recorder = NULL;
     }
 
-    if (recorder_cxt) {
-        free(recorder_cxt);
-        recorder_cxt = NULL;
-    }
+    free(recorder_cxt);
+    recorder_cxt = NULL;
+    g_recorder_cxt = NULL;
 
     printf("recorder_thread exit\n");
 
     return NULL;
 }
 
+static void recorder_default_config(struct recorder_context *ctx)
+{
+    ctx->render_flag = false;
+    ctx->record_flag = true;
+    ctx->record_time = RECORDER_RECORD_TIME;
+    snprintf(ctx->output_file_path, sizeof(ctx->output_file_path),
+        "%s", RECORDER_OUTPUT_PATH);
+
+    ctx->config.file_duration = 60;
+    ctx->config.file_num = 0;
+    ctx->config.file_muxer_type = AIC_MUXER_TYPE_MP4;
+    ctx->config.qfactor = 80;
+
+    ctx->config.has_video = 1;
+    ctx->config.video_config.codec_type = MPP_CODEC_VIDEO_ENCODER_MJPEG;
+    ctx->config.video_config.in_width = 1280;
+    ctx->config.video_config.in_height = 720;
+    ctx->config.video_config.out_width = 1280;
+    ctx->config.video_config.out_height = 720;
+    ctx->config.video_config.out_frame_rate = 30;
+    ctx->config.video_config.out_bit_rate = 1024 * 1024;
+    ctx->config.video_config.in_pix_fomat = MPP_FMT_NV12;
+
+    ctx->config.has_audio = 0;
+}
+
+static void recorder_update_config(struct recorder_context *ctx)
+{
+    struct recorder_cam_data *cam = &ctx->cam_data;
+
+    if (!cam->cam_init)
+        return;
+
+    ctx->config.video_config.in_width = cam->w;
+    ctx->config.video_config.in_height = cam->h;
+    ctx->config.video_config.out_width = cam->w;
+    ctx->config.video_config.out_height = cam->h;
+}
 
 int recorder_demo_test(int argc, char *argv[])
 {
@@ -736,16 +437,11 @@ int recorder_demo_test(int argc, char *argv[])
         return -1;
     }
     memset(recorder_cxt, 0x00, sizeof(struct recorder_context));
-    recorder_cxt->record_flag = true;
-    recorder_cxt->record_time = RECORDER_DEMO_DEFAULT_RECORD_TIME;
+    recorder_default_config(recorder_cxt);
     if (parse_options(recorder_cxt, argc, argv)) {
         goto _EXIT;
     }
     g_recorder_cxt = recorder_cxt;
-    if (parse_config_file(recorder_cxt->config_file_path, recorder_cxt)) {
-        loge("parse_config_file %s error", recorder_cxt->config_file_path);
-        goto _EXIT;
-    }
 
     //create recorder module
     recorder_cxt->recorder = aic_recorder_create();
@@ -777,11 +473,12 @@ int recorder_demo_test(int argc, char *argv[])
 
     //initialize video input module
     if (recorder_cxt->vin_source_type == AIC_RECORDER_VIN_DVP) {
-        if (recorder_dvp_init(&recorder_cxt->dvp_data))
+        if (recorder_cam_init(&recorder_cxt->cam_data))
             goto _EXIT;
+        recorder_update_config(recorder_cxt);
     } else if (recorder_cxt->vin_source_type == AIC_RECORDER_VIN_FILE) {
         aic_recorder_set_input_file_path(recorder_cxt->recorder,
-            recorder_cxt->video_in_file_path, NULL);
+            "/sdcard/test.yuv", NULL);
     }
 
     //start recorder
@@ -808,20 +505,21 @@ int recorder_demo_test(int argc, char *argv[])
     return ret;
 
 _EXIT:
-    if (recorder_cxt->vin_source_type == AIC_RECORDER_VIN_DVP)
-        recorder_dvp_deinit(&recorder_cxt->dvp_data);
-    if (recorder_cxt->render_flag)
-        recorder_render_deinit(&recorder_cxt->render_data);
-
-    if (recorder_cxt && recorder_cxt->recorder) {
-        aic_recorder_stop(recorder_cxt->recorder);
-        aic_recorder_destroy(recorder_cxt->recorder);
-        recorder_cxt->recorder = NULL;
-    }
 
     if (recorder_cxt) {
+        if (recorder_cxt->vin_source_type == AIC_RECORDER_VIN_DVP)
+            recorder_cam_deinit(&recorder_cxt->cam_data);
+        if (recorder_cxt->render_flag)
+            recorder_render_deinit(&recorder_cxt->render_data);
+
+        if (recorder_cxt && recorder_cxt->recorder) {
+            aic_recorder_stop(recorder_cxt->recorder);
+            aic_recorder_destroy(recorder_cxt->recorder);
+            recorder_cxt->recorder = NULL;
+        }
         free(recorder_cxt);
         recorder_cxt = NULL;
+        g_recorder_cxt = NULL;
     }
 
     return ret;

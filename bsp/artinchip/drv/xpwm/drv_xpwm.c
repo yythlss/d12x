@@ -492,4 +492,4 @@ int drv_xpwm_init(void)
     LOG_I("ArtInChip XPWM loaded");
     return RT_EOK;
 }
-INIT_DEVICE_EXPORT(drv_xpwm_init);
+INIT_PREV_EXPORT(drv_xpwm_init);

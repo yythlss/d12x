@@ -21,6 +21,24 @@ if DRIVER_BARE_DRV_EN
         config AIC_CONSOLE_SYSNAME
             string "AIC Tiny Console Sysname"
             default "tinySPL"
+
+        config AIC_CONSOLE_USING_AUTH
+            bool "Enable AIC Tiny Console Authentication"
+            default n
+
+        if AIC_CONSOLE_USING_AUTH
+            config AIC_CONSOLE_DEFAULT_PASSWORD
+                string "The default password for console authentication"
+                default "bootloader"
+
+            config AIC_CONSOLE_PASSWORD_MIN
+                int "The password min length"
+                default 3
+
+            config AIC_CONSOLE_PASSWORD_MAX
+                int "The password max length"
+                default 32
+        endif
     endif
 
     config AIC_PRINTF_BARE_DRV
@@ -166,6 +184,8 @@ config AIC_FB_DRV_DEBUG
     bool "Enable Display driver debug"
     default n
     depends on AIC_DISPLAY_DRV
+    select LPKG_MPP
+    select RT_USING_FINSH
     select AIC_MPP_FB_TEST
     select AIC_DISPLAY_TEST
 
@@ -288,6 +308,11 @@ config AIC_SPINAND_DRV_TEST
     bool "Enable SPI NAND driver test command"
     default n
     depends on AIC_SPINAND_DRV && DRIVER_BARE_DRV_EN
+
+config AIC_NAND_VERIFY
+    bool "Enable NAND medium verification command"
+    default n
+    depends on RT_USING_MTD_NAND
 
 config AIC_MMC_TEST
     bool "Enable MMC test command"
@@ -424,6 +449,20 @@ config AIC_TSEN_TEST
     default n
     depends on AIC_TSEN_DRV
 
+if AIC_TSEN_TEST
+
+config AIC_TSEN_DVFS
+    bool "Enable thermal auto freq scaling"
+    default n
+    help
+        Automatically monitor CPU temperature and scale down CPU
+        frequency to prevent overheating:
+          - >= 90 C: switch to run mode 3 (24 MHz)
+          - 70~90 C: switch to run mode 2 (160 MHz)
+          - <  70 C: restore run mode 0 (480 MHz)
+
+endif
+
 config AIC_TSEN_HIGH_TEMP_ALARM_TEST
     bool "Enable HIGH TEMPERATURE ALARM test command"
     default n
@@ -516,6 +555,24 @@ if AIC_WIFI_TEST
         config AP_TEST_PASSWORD
             string "network password for AP testing"
             default "12345678"
+
+        config P2P_TEST_SSID
+            string "P2P GO SSID for P2P testing"
+            default "DIRECT-AIC-RTT-P2P"
+
+        config P2P_TEST_PASSWORD
+            string "P2P GO password for P2P testing"
+            default "kkkkkkkk"
+
+        config P2P_TEST_CHANNEL
+            int "P2P GO channel (1-13 for 2.4G, 36-165 for 5G)"
+            default 1
+            range 1 165
+
+        config P2P_TEST_GO_INTENT
+            int "P2P GO intent value (0-15)"
+            default 7
+            range 0 15
       endmenu
 endif
 
@@ -569,7 +626,14 @@ config AIC_SID_BURN_SPIENC_KEY_TEST
     depends on EFUSE_WRITE_SUPPORT
     depends on DRIVER_BARE_DRV_EN
 
-if AIC_SID_BURN_SPIENC_KEY_TEST
+config AIC_SID_BURN_SPIENC_HWAUTH_D12X_TEST
+    bool "Enable SID burn spienc key command(D12x hardware authorization)"
+    default n
+    depends on AIC_SID_DRV
+    depends on EFUSE_WRITE_SUPPORT
+    depends on DRIVER_BARE_DRV_EN
+
+if AIC_SID_BURN_SPIENC_KEY_TEST || AIC_SID_BURN_SPIENC_HWAUTH_D12X_TEST
 
     config AIC_SID_BURN_DEBUG_MODE
         bool "Enable SID debug mode"

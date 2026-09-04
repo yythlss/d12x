@@ -57,6 +57,9 @@ enum input_stat
     WAIT_NORMAL,
     WAIT_SPEC_KEY,
     WAIT_FUNC_KEY,
+#if defined(FINSH_USING_FUNC_EXT)
+    WAIT_EXT_KEY,
+#endif
 };
 struct finsh_shell
 {
@@ -66,6 +69,9 @@ struct finsh_shell
 
     rt_uint8_t echo_mode: 1;
     rt_uint8_t prompt_mode: 1;
+#if defined(FINSH_USING_FUNC_EXT)
+    rt_uint8_t overwrite_mode: 1;
+#endif
 
 #ifdef FINSH_USING_HISTORY
     rt_uint16_t current_history;

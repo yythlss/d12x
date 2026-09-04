@@ -20,14 +20,10 @@
 
 void boot_app(void *app)
 {
-    int ret;
     void (*ep)(int, unsigned long);
     enum boot_device dev;
     unsigned long boot_arg;
 
-    ret = console_get_ctrlc();
-    if (ret > 0)
-        return;
 #ifndef LPKG_USING_FDTLIB
     ep = image_get_entry_point(app);
 #else

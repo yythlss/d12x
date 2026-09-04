@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2022-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -13,6 +13,14 @@
 
 #define gen_reg(val) (volatile void *)(val)
 #define USEC_PER_SEC (1000000)
+
+#ifndef I2C_TARGET_HOLD_TIME_NS
+#define I2C_TARGET_HOLD_TIME_NS     300
+#endif
+
+#ifndef I2C_TARGET_SETUP_TIME_NS
+#define I2C_TARGET_SETUP_TIME_NS     350
+#endif
 
 int hal_i2c_clk_init(aic_i2c_ctrl *i2c_dev)
 {
@@ -28,9 +36,31 @@ int hal_i2c_clk_init(aic_i2c_ctrl *i2c_dev)
     return ret;
 }
 
-void hal_i2c_set_hold(aic_i2c_ctrl *i2c_dev, u32 val)
+void hal_i2c_set_hold_time(aic_i2c_ctrl *i2c_dev, u32 time_ns)
 {
-    writel(val, i2c_dev->reg_base + I2C_SDA_HOLD);
+    uint32_t hold_reg = 0;
+    uint32_t hold_cycles = 0;
+
+    hold_cycles = (uint32_t)(((uint64_t)time_ns * i2c_dev->module_clk / USEC_PER_SEC + 999) / 1000);
+    if (hold_cycles == 0)
+        hold_cycles = 1;
+
+    hold_reg = (hold_cycles & I2C_SDA_TX_HOLD_MASK) |
+               ((hold_cycles << 16) & I2C_SDA_RX_HOLD_MASK);
+    writel(hold_reg, i2c_dev->reg_base + I2C_SDA_HOLD);
+}
+
+void hal_i2c_set_setup_time(aic_i2c_ctrl *i2c_dev, u32 time_ns)
+{
+    uint32_t setup_cycles = 0;
+
+    setup_cycles = (uint32_t)(((uint64_t)time_ns * i2c_dev->module_clk / USEC_PER_SEC + 999) / 1000);
+    /* Hardware register value = cycles + 1, minimum 2 (= 1 cycle) */
+    if (setup_cycles == 0)
+        setup_cycles = 1;
+    setup_cycles += 1;
+
+    writel(setup_cycles, i2c_dev->reg_base + I2C_SDA_SETUP);
 }
 
 int hal_i2c_set_master_slave_mode(aic_i2c_ctrl *i2c_dev)
@@ -170,7 +200,8 @@ int hal_i2c_init(aic_i2c_ctrl *i2c_dev)
         return ret;
 
     hal_i2c_set_master_slave_mode(i2c_dev);
-    hal_i2c_set_hold(i2c_dev, 10);
+    hal_i2c_set_hold_time(i2c_dev, I2C_TARGET_HOLD_TIME_NS);
+    hal_i2c_set_setup_time(i2c_dev, I2C_TARGET_SETUP_TIME_NS);
     hal_i2c_master_10bit_addr(i2c_dev);
     hal_i2c_slave_10bit_addr(i2c_dev);
 #ifdef AIC_I2C_INTERRUPT_MODE
