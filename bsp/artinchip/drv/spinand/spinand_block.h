@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023-2025, ArtInChip Technology Co., Ltd
+ * Copyright (c) 2023-2026, ArtInChip Technology Co., Ltd
  *
  * SPDX-License-Identifier: Apache-2.0
  *
@@ -21,6 +21,13 @@
 #define BLOCK_CACHE_SIZE    AIC_SPINAND_BLOCK_CACHE_SIZE
 #endif
 
+/* Number of 512B sectors cached for the page tail after a partial read.
+ * Note: BLOCK_CACHE_NUM may be smaller than the sectors of one page
+ * (e.g. 4 on a 4KB-page chip with 8 sectors). The cache then holds only
+ * part of the page tail, which only costs an extra flash page read on
+ * the next access - correctness is guaranteed by spinand_read_nonftl_pages
+ * which handles a non-page-aligned pos.
+ */
 #ifndef AIC_SPINAND_BLOCK_CACHE_NUM
 #define BLOCK_CACHE_NUM     4
 #else

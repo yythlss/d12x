@@ -383,6 +383,7 @@ struct aic_spinand *spinand_probe(u32 spi_bus)
         pr_err("malloc buf failed\n");
         return NULL;
     }
+    memset(flash, 0, sizeof(struct aic_spinand));
 
     flash->user_data = qspi;
     flash->bus = spi_bus;
@@ -393,6 +394,7 @@ struct aic_spinand *spinand_probe(u32 spi_bus)
     err = spinand_flash_init(flash);
     if (err < 0) {
         pr_err("Failed to probe spinand flash.\n");
+        free(flash);
         return NULL;
     }
 
@@ -433,7 +435,7 @@ struct aic_spinand *spinand_probe(u32 spi_bus)
 #ifdef AIC_NAND_REFRESH_SUPPORT
     p = part;
     while (p) {
-        if (strcmp(p->name, "refresh") == 0) {
+        if (strncmp(p->name, "refresh", sizeof("refresh")) == 0) {
             if (spinand_register_report_bitflip_cb(flash, spinand_refresh_report_bitflip)) {
                 pr_err("spinand_register_report_bitflip_cb error\n");
                 break;

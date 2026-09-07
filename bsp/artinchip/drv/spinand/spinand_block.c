@@ -247,7 +247,15 @@ static rt_size_t spinand_read_nonftl_nalign(rt_device_t dev, rt_off_t *pos, void
     return sectors_read;
 }
 
-static rt_size_t spinand_read_nonftl_align(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size, rt_size_t sectors_read)
+/* Read the remaining data page by page.
+ * pos may not be page-aligned: cache_read can partially hit and leave
+ * pos in the middle of a page (e.g. when BLOCK_CACHE_NUM is smaller
+ * than the sectors of one page). The in-page offset is applied when
+ * copying data out of pagebuf.
+ * sectors_read is the count already read by the caller, which is also
+ * accumulated into the returned value.
+ */
+static rt_size_t spinand_read_nonftl_pages(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size, rt_size_t sectors_read)
 {
     struct spinand_blk_device *blk_dev = (struct spinand_blk_device *)dev;
     struct rt_mtd_nand_device *mtd_dev = blk_dev->mtd_device;
@@ -261,6 +269,12 @@ static rt_size_t spinand_read_nonftl_align(rt_device_t dev, rt_off_t pos, void *
         return -RT_ERROR;
 
     while (size > sectors_read) {
+        /* pos may start in the middle of a page, only the remaining
+         * sectors of the current page are available in this iteration.
+         */
+        const u8 pos_sector_offs = pos % SECTORS_PP;
+        const u8 sectors_left = SECTORS_PP - pos_sector_offs;
+
         start_page = spinand_start_page_calculate(dev, pos);
         if (start_page == INVALID_PAGE)
             return -RT_ERROR;
@@ -278,25 +292,28 @@ static rt_size_t spinand_read_nonftl_align(rt_device_t dev, rt_off_t pos, void *
             mtd_dev->ops->report_bitflip(mtd_dev, start_page);
         }
 
-        if ((size - sectors_read) > SECTORS_PP) {
-            copysize = SECTORS_PP * blk_dev->geometry.bytes_per_sector;
-            sectors_read += SECTORS_PP;
-            pos += SECTORS_PP;
-        } else {
+        if ((size - sectors_read) > sectors_left)
+            copy_sectors = sectors_left;
+        else
             copy_sectors = (size - sectors_read);
-            copysize = copy_sectors * blk_dev->geometry.bytes_per_sector;
-            sectors_read += copy_sectors;
-            pos += copy_sectors;
-        }
 
-        rt_memcpy(buffer, blk_dev->pagebuf, copysize);
+        copysize = copy_sectors * blk_dev->geometry.bytes_per_sector;
+        rt_memcpy(buffer,
+                  blk_dev->pagebuf + pos_sector_offs * blk_dev->geometry.bytes_per_sector,
+                  copysize);
         buffer += copysize;
-        start_page++;
-    }
+        sectors_read += copy_sectors;
+        pos += copy_sectors;
 
-    /* if copy not end align, store the remaining part to cache */
-    if (copy_sectors) {
-        spinand_nonftl_cache_write(blk_dev, (blk_dev->pagebuf + copysize), (SECTORS_PP - copy_sectors),  pos);
+        /* if copy not end align, store the remaining part to cache */
+        if (pos % SECTORS_PP) {
+            spinand_nonftl_cache_write(blk_dev,
+                                       blk_dev->pagebuf +
+                                       (pos_sector_offs + copy_sectors) * blk_dev->geometry.bytes_per_sector,
+                                       (SECTORS_PP - pos_sector_offs - copy_sectors),
+                                       pos);
+        }
+        start_page++;
     }
 
     return sectors_read;
@@ -386,8 +403,12 @@ rt_size_t rt_spinand_read_nonftl(rt_device_t dev, rt_off_t pos,
         return size;
 #endif
 
-    /* pos is aligned with page */
-    sectors_read = spinand_read_nonftl_align(dev, pos, buffer, size, sectors_read);
+    /* Read the remaining data page by page.
+     * Note: pos may not be page-aligned here, e.g. when cache_read only
+     * partially hit and pos stays in the middle of a page. The pages
+     * read routine handles the in-page offset.
+     */
+    sectors_read = spinand_read_nonftl_pages(dev, pos, buffer, size, sectors_read);
     if (sectors_read != size) {
         pr_err("ERROR: read not compete sectors_read: %d, size: %d.\n", sectors_read, size);
         return sectors_read;

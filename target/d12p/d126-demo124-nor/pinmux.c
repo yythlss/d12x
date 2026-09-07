@@ -70,14 +70,6 @@ struct aic_pinmux aic_pinmux_config[] = {
     {2, PIN_PULL_UP, 3, "PB.5"},
 #endif
 #endif
-#ifdef AIC_USING_SDMC0
-    {2, PIN_PULL_UP, 7, "PB.6"},
-    {2, PIN_PULL_UP, 7, "PB.7"},
-    {2, PIN_PULL_UP, 7, "PB.8"},
-    {2, PIN_PULL_UP, 7, "PB.9"},
-    {2, PIN_PULL_UP, 7, "PB.10"},
-    {2, PIN_PULL_UP, 7, "PB.11"},
-#endif
 #ifdef AIC_USING_QSPI0
 #ifndef AIC_SYSCFG_SIP_FLASH_ENABLE
     /* qspi0 */
@@ -97,20 +89,20 @@ struct aic_pinmux aic_pinmux_config[] = {
 #endif
 #endif
 #ifdef AIC_USING_SDMC0
-    {2, PIN_PULL_UP, 7, "PC.0"},
-    {2, PIN_PULL_UP, 7, "PC.1"},
-    {2, PIN_PULL_UP, 7, "PC.2"},
-    {2, PIN_PULL_UP, 7, "PC.3"},
-    {2, PIN_PULL_UP, 7, "PC.4"},
-    {2, PIN_PULL_UP, 7, "PC.5"},
+    {2, PIN_PULL_UP, 7, "PB.6"},
+    {2, PIN_PULL_UP, 7, "PB.7"},
+    {2, PIN_PULL_UP, 7, "PB.8"},
+    {2, PIN_PULL_UP, 7, "PB.9"},
+    {2, PIN_PULL_UP, 7, "PB.10"},
+    {2, PIN_PULL_UP, 7, "PB.11"},
 #endif
 #ifdef AIC_USING_SDMC1
-    {8, PIN_PULL_UP, 7, "PE.12"},
-    {8, PIN_PULL_UP, 7, "PE.13"},
-    {8, PIN_PULL_UP, 7, "PE.14"},
-    {8, PIN_PULL_UP, 7, "PE.15"},
-    {8, PIN_PULL_UP, 7, "PE.16"},
-    {8, PIN_PULL_UP, 7, "PE.17"},
+    /* {2, PIN_PULL_UP, 7, "PC.0"}, */
+    /* {2, PIN_PULL_UP, 7, "PC.1"}, */
+    /* {2, PIN_PULL_UP, 7, "PC.2"}, */
+    /* {2, PIN_PULL_UP, 7, "PC.3"}, */
+    /* {2, PIN_PULL_UP, 7, "PC.4"}, */
+    /* {2, PIN_PULL_UP, 7, "PC.5"}, */
 #endif
 #ifdef AIC_USING_QSPI2
 #ifdef AIC_LVGL_FIVE_DISP_DEMO
