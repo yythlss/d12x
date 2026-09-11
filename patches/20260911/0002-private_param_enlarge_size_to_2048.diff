@@ -1,0 +1,21 @@
+From 3b09d8c264faae64ca0759d3cda7ba8e982393fa Mon Sep 17 00:00:00 2001
+From: junlong.chen <junlong.chen@artinchip.com>
+Date: Thu, 20 Aug 2026 16:27:53 +0800
+Subject: [PATCH] private_param: enlarge size to 2048
+
+Change-Id: I73bb9b3264dae4b75f743ca11b3c7340820c8647
+---
+
+diff --git a/bsp/common/private_param/private_param.c b/bsp/common/private_param/private_param.c
+index 75f388f..cbf09a2 100644
+--- a/bsp/common/private_param/private_param.c
++++ b/bsp/common/private_param/private_param.c
+@@ -14,7 +14,7 @@
+ #include <private_param.h>
+ #include <aic_image.h>
+ 
+-char private_params_stash[1280] __attribute__((section(".data")));
++char private_params_stash[2048] __attribute__((section(".data")));
+ 
+ void reloc_private_params(void)
+ {
