@@ -59,8 +59,65 @@
 				"buf9": "0xFFFFFF00",
 			},
 		},
-
-        "cfg1": { // XCCELA AP12816 16M PSRAM
+		"cfg1": { //OPI APS3208K 4M PSRAM
+			"common": {
+				"clock":      "192000000",
+				"cs0_pins":   "0x0",
+				"cs1_pins":   "0x0",
+				"xspi_ctl":   "0x116d",
+				"xspi_tcr":   "0x280011",
+				"xspi_cfg":   "0x01020001",
+				"xspi_ldo":   "0x17", //1.92V
+				"psram_cfg0": "0x03030303",
+				"psram_cfg1": "0x00400001",
+				"xspi_cs0_iocfg1": "0x02020202",
+				"xspi_cs0_iocfg2": "0x02020202",
+				"xspi_cs0_iocfg3": "0x36060503",
+				"xspi_cs0_iocfg4": "0x26",
+				"xspi_cs1_iocfg1": "0x02020202",
+				"xspi_cs1_iocfg2": "0x02020202",
+				"xspi_cs1_iocfg3": "0x36060503",
+				"xspi_cs1_iocfg4": "0x26",
+			},
+			"reset": {
+				"proto": "0xff000001",
+				"buf":   "0x00ffffff",
+			},
+			"getid": {
+				"proto": "0x40030204",
+				"id":    "0x80c980c9",
+				"buf":   "0xffffffff",
+			},
+			"init": {
+				"proto0": "0xc0000002", //cmd: byte[0]=0xc0; dummy: byte[1]=0x00; addr: byte[2]=0x00; len: byte[3]=0x02;
+				"buf0":   "0x1a000000",
+				"proto1": "0xc0000402",
+				"buf1":   "0x80000000",
+				"proto2": "0xffffffff",
+				"buf2":   "0xffffffff",
+				"proto3": "0xffffffff",
+				"buf3":   "0xffffffff",
+			},
+			"xip_cfg": {
+				"wr_proto": "0x80020002",
+				"wr_buf":   "0xffffffff",
+				"rd_proto": "0x00060003",
+				"rd_buf":   "0xffffffff",
+			},
+			"backup": {
+				"buf0": "0xAA55AA55",
+				"buf1": "0x55AA55AA",
+				"buf2": "0x04080100", //byte0:read_hold (0x04); byte1:write_hold (0x08); byte3:axi_read_first(0x01); byte4: bit mode
+				"buf3": "0xFFFFFF04",
+				"buf4": "0xFFFFFF05",
+				"buf5": "0xFFFFFF06",
+				"buf6": "0xFFFFFF07",
+				"buf7": "0xFFFFFF08",
+				"buf8": "0xFFFFFF09",
+				"buf9": "0xFFFFFF00",
+			},
+		},
+		"cfg2": { // XCCELA AP12816 16M PSRAM
 			"common": {
 				"clock":      "198000000",
 				"cs0_pins":   "0x0",
@@ -119,8 +176,67 @@
 				"buf9": "0xFFFFFF00",
 			},
 		},
+		"cfg9": { // APS6408L-OBx9 (8MB x2) 16M, fuse 0x08; clone of cfg2, id only
+			"common": {
+				"clock":      "198000000",
+				"cs0_pins":   "0x0",
+				"cs1_pins":   "0x0",
+				"xspi_ctl":   "0x116d",
+				"xspi_tcr":   "0x280011",
+				"xspi_cfg":   "0x03000001",
+				"xspi_ldo":   "0x17", //1.92V
+				"psram_cfg0": "0x03030304", //cmd_lines, addr_lines, data_lines, addr_width
+				"psram_cfg1": "0x02000001",
+				"xspi_cs0_iocfg1": "0x02020202",
+				"xspi_cs0_iocfg2": "0x02020202",
+				"xspi_cs0_iocfg3": "0x36060405",
+				"xspi_cs0_iocfg4": "0x26",
+				"xspi_cs1_iocfg1": "0x02020202",
+				"xspi_cs1_iocfg2": "0x02020202",
+				"xspi_cs1_iocfg3": "0x36060403",
+				"xspi_cs1_iocfg4": "0x26",
+			},
+			"reset": {
+				"proto": "0xff000001",
+				"buf":   "0x00ffffff",
+			},
+			"getid": {
 
-		"cfg2": { // XCCELA UnilC SCKW18X12816 16M PSRAM
+				"proto": "0x40040104",
+				"id":    "0x8b8d8b8d",
+				"buf":   "0xffffffff",
+			},
+			"init": {
+				"proto0": "0xc0000001", //cmd: byte[0]=0xc0; dummy: byte[1]=0x00; addr: byte[2]=0x00; len: byte[3]=0x02;
+				"buf0":   "0x11000000",
+				"proto1": "0xc0000401",
+				"buf1":   "0x20000000",
+				"proto2": "0xffffffff",
+				"buf2":   "0xffffffff",
+				"proto3": "0xffffffff",
+				"buf3":   "0xffffffff",
+			},
+			"xip_cfg": {
+				"wr_proto": "0x80070002", //cmd: byte[0]=0x80; dummy: byte[1]=0x07; addr: byte[2]=0x08; len: byte[3]=0x02;
+				"wr_buf":   "0xffffffff",
+				"rd_proto": "0x00070003",
+				"rd_buf":   "0xffffffff",
+			},
+			"backup": {
+				"buf0": "0xAA55AA55", // x8 training value
+				"buf1": "0x55AA55AA",
+				"buf2": "0x04040100", //byte0:read_hold; byte1:write_hold; byte3:axi_read_first; byte4:bit mode
+				"buf3": "0xFFFFFF04",
+				"buf4": "0xFFFFFF05",
+				"buf5": "0xFFFFFF06",
+				"buf6": "0xFFFFFF07",
+				"buf7": "0xFFFFFF08",
+				"buf8": "0xFFFFFF09",
+				"buf9": "0xFFFFFF00",
+			},
+		},
+
+		"cfg3": { // XCCELA UnilC SCKW18X12816 16M PSRAM
 			"common": {
 				"clock":      "198000000",
 				"cs0_pins":   "0x0",
@@ -180,7 +296,7 @@
 			},
 		},
 
-		"cfg3": { // XCCELA AP25616 32M PSRAM
+		"cfg4": { // XCCELA AP25616 32M PSRAM
 			"common": {
 				"clock":      "198000000",
 				"cs0_pins":   "0x0",
@@ -230,6 +346,255 @@
 				"buf0": "0x5555aaaa",
 				"buf1": "0xaaaa5555",
 				"buf2": "0x05050101", //byte0:read_hold; byte1:write_hold; byte3:axi_read_first; byte4:bit mode
+				"buf3": "0xFFFFFF04",
+				"buf4": "0xFFFFFF05",
+				"buf5": "0xFFFFFF06",
+				"buf6": "0xFFFFFF07",
+				"buf7": "0xFFFFFF08",
+				"buf8": "0xFFFFFF09",
+				"buf9": "0xFFFFFF00",
+			},
+		},
+		"cfg5": { // W957D6NKR 16M, HyperBus x16, PARALLEL (fuse 0x05)
+			"common": {
+				"clock":      "198000000",
+				"cs0_pins":   "0x0",
+				"cs1_pins":   "0x0",
+				"xspi_ctl":   "0x115d",
+				"xspi_tcr":   "0x280011",
+				"xspi_cfg":   "0x03010001", //cs0+cs1, HyperBus, DDR
+				"xspi_ldo":   "0x17",
+				"psram_cfg0": "0x03030304",
+				"psram_cfg1": "0x00400001",
+				"xspi_cs0_iocfg1": "0x02020202",
+				"xspi_cs0_iocfg2": "0x02020202",
+				"xspi_cs0_iocfg3": "0x36060503",
+				"xspi_cs0_iocfg4": "0x36",
+				"xspi_cs1_iocfg1": "0x02020202",
+				"xspi_cs1_iocfg2": "0x02020202",
+				"xspi_cs1_iocfg3": "0x36060503",
+				"xspi_cs1_iocfg4": "0x36",
+			},
+			"reset": {
+				// CR1 write (software reset): cmd 0x60, 16-bit addr 0x0801, len 4
+				// MSB byte first on the wire: chip receives 0xAFC1
+				"proto": "0x60080104",
+				"buf":   "0xafc10000",
+			},
+			"getid": {
+				// ID Reg 0 read: cmd 0xc0, dummy 4, addr 0x00, len 4
+				"proto": "0xc0040004",
+				"id":    "0x0c860c86",
+				"buf":   "0xffffffff",
+			},
+			"init": {
+				// CR0 write: cmd 0x60, 16-bit addr 0x0800, len 4
+				// MSB byte first on the wire: chip receives 0x8F27
+				"proto0": "0x60080004",
+				"buf0":   "0x8f270000",
+				"proto1": "0xffffffff",
+				"buf1":   "0xffffffff",
+				"proto2": "0xffffffff",
+				"buf2":   "0xffffffff",
+				"proto3": "0xffffffff",
+				"buf3":   "0xffffffff",
+			},
+			"xip_cfg": {
+				"wr_proto": "0x20070002", //write cmd 0x20, dummy 7, len 2
+				"wr_buf":   "0xffffffff",
+				"rd_proto": "0xa0070003", //read cmd 0xa0, dummy 7, len 3
+				"rd_buf":   "0xffffffff",
+			},
+			"backup": {
+				"buf0": "0x5555aaaa",
+				"buf1": "0xaaaa5555",
+				"buf2": "0x02020001", //byte0:read_hold (0x02); byte1:write_hold (0x02); byte2:axi_read_first (0x01); byte3:bit mode (0x01, x16)
+				"buf3": "0xFFFFFF04",
+				"buf4": "0xFFFFFF05",
+				"buf5": "0xFFFFFF06",
+				"buf6": "0xFFFFFF07",
+				"buf7": "0xFFFFFF08",
+				"buf8": "0xFFFFFF09",
+				"buf9": "0xFFFFFF00",
+			},
+		},
+		// W956D8NKR 16M, HyperRAM 2.1 x8, PARALLEL (fuse 0x06)
+		"cfg6": {
+			"common": {
+				"clock":      "198000000",
+				"cs0_pins":   "0x0",
+				"cs1_pins":   "0x0",
+				"xspi_ctl":   "0x115d",
+				"xspi_tcr":   "0x280011",
+				"xspi_cfg":   "0x03010001", //cs0+cs1, HyperBus, DDR
+				"xspi_ldo":   "0x17",
+				"psram_cfg0": "0x03030304",
+				"psram_cfg1": "0x00400001",
+				"xspi_cs0_iocfg1": "0x02020202",
+				"xspi_cs0_iocfg2": "0x02020202",
+				"xspi_cs0_iocfg3": "0x36060503",
+				"xspi_cs0_iocfg4": "0x36",
+				"xspi_cs1_iocfg1": "0x02020202",
+				"xspi_cs1_iocfg2": "0x02020202",
+				"xspi_cs1_iocfg3": "0x36060503",
+				"xspi_cs1_iocfg4": "0x36",
+			},
+			"reset": {
+				// CR1 write (software reset): cmd 0x60, 16-bit addr 0x0801, len 4
+				"proto": "0x60080104",
+				"buf":   "0xafc10000", //chip receives 0xAFC1
+			},
+			"getid": {
+				// ID Reg 0 read: cmd 0xc0, dummy 4, addr 0x00, len 4
+				"proto": "0xc0040004",
+				"id":    "0x860c860c",
+				"buf":   "0xffffffff",
+			},
+			"init": {
+				// CR0 write: cmd 0x60, 16-bit addr 0x0800, len 4
+				"proto0": "0x60080004",
+				"buf0":   "0x8f270000", //chip receives 0x8F27
+				"proto1": "0xffffffff",
+				"buf1":   "0xffffffff",
+				"proto2": "0xffffffff",
+				"buf2":   "0xffffffff",
+				"proto3": "0xffffffff",
+				"buf3":   "0xffffffff",
+			},
+			"xip_cfg": {
+				"wr_proto": "0x20070002", //write cmd 0x20, dummy 7, len 2
+				"wr_buf":   "0xffffffff",
+				"rd_proto": "0xa0070003", //read cmd 0xa0, dummy 7, len 3
+				"rd_buf":   "0xffffffff",
+			},
+			"backup": {
+				"buf0": "0x55aa55aa",
+				"buf1": "0xaa55aa55",
+				"buf2": "0x02020000", //byte0:read_hold (0x02); byte1:write_hold (0x02); byte2:axi_read_first (0x01); byte3:bit mode (0x00, x8)
+				"buf3": "0xFFFFFF04",
+				"buf4": "0xFFFFFF05",
+				"buf5": "0xFFFFFF06",
+				"buf6": "0xFFFFFF07",
+				"buf7": "0xFFFFFF08",
+				"buf8": "0xFFFFFF09",
+				"buf9": "0xFFFFFF00",
+			},
+		},
+		// W955D8MKY 8M, HyperBus x8, PARALLEL (fuse 0x08)
+		"cfg7": {
+			"common": {
+				"clock":      "198000000",
+				"cs0_pins":   "0x0",
+				"cs1_pins":   "0x0",
+				"xspi_ctl":   "0x115d",
+				"xspi_tcr":   "0x280011",
+				"xspi_cfg":   "0x03010001", //cs0+cs1, HyperBus, DDR
+				"xspi_ldo":   "0x17",
+				"psram_cfg0": "0x03030304",
+				"psram_cfg1": "0x00400001",
+				"xspi_cs0_iocfg1": "0x02020202",
+				"xspi_cs0_iocfg2": "0x02020202",
+				"xspi_cs0_iocfg3": "0x36060503",
+				"xspi_cs0_iocfg4": "0x36",
+				"xspi_cs1_iocfg1": "0x02020202",
+				"xspi_cs1_iocfg2": "0x02020202",
+				"xspi_cs1_iocfg3": "0x36060503",
+				"xspi_cs1_iocfg4": "0x36",
+			},
+			"reset": {
+				// CR1 write with default value (no software reset): cmd 0x60, 16-bit addr 0x0801, len 4
+				"proto": "0x60080104",
+				"buf":   "0xff810000", //chip receives 0xFF81 (CR1 default)
+			},
+			"getid": {
+				// ID Reg 0 read: cmd 0xe0, dummy 4, addr 0x00, len 4
+				"proto": "0xe0040004",
+				"id":    "0x5f005f00",
+				"buf":   "0xffffffff",
+			},
+			"init": {
+				// CR0 write: cmd 0x60, 16-bit addr 0x0800, len 4
+				"proto0": "0x60080004",
+				"buf0":   "0x8f170000", //chip receives 0x8F17
+				"proto1": "0xffffffff",
+				"buf1":   "0xffffffff",
+				"proto2": "0xffffffff",
+				"buf2":   "0xffffffff",
+				"proto3": "0xffffffff",
+				"buf3":   "0xffffffff",
+			},
+			"xip_cfg": {
+				"wr_proto": "0x20060002", //write cmd 0x20, dummy 6, len 2
+				"wr_buf":   "0xffffffff",
+				"rd_proto": "0xa0060003", //read cmd 0xa0, dummy 6, len 3
+				"rd_buf":   "0xffffffff",
+			},
+			"backup": {
+				"buf0": "0x55aa55aa",
+				"buf1": "0xaa55aa55",
+				"buf2": "0x02020000", //byte0:read_hold (0x02); byte1:write_hold (0x02); byte2:axi_read_first (0x01); byte3:bit mode (0x00, x8)
+				"buf3": "0xFFFFFF04",
+				"buf4": "0xFFFFFF05",
+				"buf5": "0xFFFFFF06",
+				"buf6": "0xFFFFFF07",
+				"buf7": "0xFFFFFF08",
+				"buf8": "0xFFFFFF09",
+				"buf9": "0xFFFFFF00",
+			},
+		},
+		// W955D8MKY 4M, HyperBus x8, SINGLE (fuse 0x07)
+		"cfg8": {
+			"common": {
+				"clock":      "192000000",
+				"cs0_pins":   "0x0",
+				"cs1_pins":   "0x0",
+				"xspi_ctl":   "0x115d",
+				"xspi_tcr":   "0x280011",
+				"xspi_cfg":   "0x01010001", //cs0 only, HyperBus, DDR
+				"xspi_ldo":   "0x17",
+				"psram_cfg0": "0x03030304",
+				"psram_cfg1": "0x00400001",
+				"xspi_cs0_iocfg1": "0x02020202",
+				"xspi_cs0_iocfg2": "0x02020202",
+				"xspi_cs0_iocfg3": "0x36060503",
+				"xspi_cs0_iocfg4": "0x36",
+				"xspi_cs1_iocfg1": "0x02020202",
+				"xspi_cs1_iocfg2": "0x02020202",
+				"xspi_cs1_iocfg3": "0x36060503",
+				"xspi_cs1_iocfg4": "0x36",
+			},
+			"reset": {
+				// CR1 write with default value (no software reset): cmd 0x60, 16-bit addr 0x0801, len 4
+				"proto": "0x60080104",
+				"buf":   "0xff810000", //chip receives 0xFF81 (CR1 default)
+			},
+			"getid": {
+				// ID Reg 0 read: cmd 0xe0, dummy 4, addr 0x00, len 4
+				"proto": "0xe0040004",
+				"id":    "0x5f005f00",
+				"buf":   "0xffffffff",
+			},
+			"init": {
+				// CR0 write: cmd 0x60, 16-bit addr 0x0800, len 4
+				"proto0": "0x60080004",
+				"buf0":   "0x8f170000", //chip receives 0x8F17
+				"proto1": "0xffffffff",
+				"buf1":   "0xffffffff",
+				"proto2": "0xffffffff",
+				"buf2":   "0xffffffff",
+				"proto3": "0xffffffff",
+				"buf3":   "0xffffffff",
+			},
+			"xip_cfg": {
+				"wr_proto": "0x20060002", //write cmd 0x20, dummy 6, len 2
+				"wr_buf":   "0xffffffff",
+				"rd_proto": "0xa0060003", //read cmd 0xa0, dummy 6, len 3
+				"rd_buf":   "0xffffffff",
+			},
+			"backup": {
+				"buf0": "0x55aa55aa",
+				"buf1": "0xaa55aa55",
+				"buf2": "0x02020000", //byte0:read_hold (0x02); byte1:write_hold (0x02); byte2:axi_read_first (0x01); byte3:bit mode (0x00, x8)
 				"buf3": "0xFFFFFF04",
 				"buf4": "0xFFFFFF05",
 				"buf5": "0xFFFFFF06",

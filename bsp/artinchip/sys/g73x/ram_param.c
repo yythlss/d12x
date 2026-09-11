@@ -22,6 +22,11 @@ enum PSRAM_FUSE_ID {
     APS3208K = 0x00,
     SCKW18_12816O = 0x01,
     APS12816O = 0x02,
+    APS25616N = 0x03,
+    W957D6NKR = 0x05,
+    W956D8NKR = 0x06,
+    APS6408L = 0x07,
+    W955D8MKY = 0x08,
 };
 
 struct _psram_id {
@@ -46,6 +51,8 @@ struct _psram_info {
     {0x22, 0, 0, {0, 0}},       \
     /* G730BDU 4MB PSRAM*/      \
     {0x23, 1, 0x400000, {APS3208K, 0x80c980c9}},       \
+    /* G730BDU-2 4M */									\
+    {0x23, PSRAM_SINGLE, 0x400000, {W955D8MKY, 0x5f005f00}},			\
     /* G730BEU NON PSRAM*/      \
     {0x24, 0, 0, {0, 0}},       \
 }
@@ -104,12 +111,27 @@ u32 aic_get_ram_size(void)
 
 void aic_show_ram_size(void)
 {
-    char *psram_ids[] = {"APS32", "SCKW18", "APS128"};
+    /* Map psram_fuse_id to PSRAM chip name */
+    static const char *const psram_ids[] = {
+        [APS3208K]      = "APS32",
+        [SCKW18_12816O] = "SCKW18",
+        [APS12816O]     = "APS128",
+        [APS25616N]     = "APS256",
+        [W957D6NKR]     = "W957D6",
+        [W956D8NKR]     = "W956D8",
+        [APS6408L]      = "APS64",
+        [W955D8MKY]     = "W955D8",
+    };
+    const char *psram_name = "Unknown";
+    u32 fuse_id;
 
     if (!psram_info)
         aic_get_ram_size();
 
+    fuse_id = psram_info->psram_id.psram_fuse_id;
+    if ((fuse_id < ARRAY_SIZE(psram_ids)) && psram_ids[fuse_id])
+        psram_name = psram_ids[fuse_id];
+
     printf("PSRAM: %s, size %d MB\n",
-           psram_ids[psram_info->psram_id.psram_fuse_id],
-           psram_info->psram_size / 1024 / 1024);
+           psram_name, psram_info->psram_size / 1024 / 1024);
 }

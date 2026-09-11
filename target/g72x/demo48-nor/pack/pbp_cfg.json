@@ -58,6 +58,64 @@
 				"buf9": "0xFFFFFF00",
 			},
 		},
+		"cfg8": { //HyperBus W955D8MKY x8 32Mb single, Winbond
+			"common": {
+				"clock":      "198000000",
+				"cs0_pins":   "0x0",
+				"cs1_pins":   "0x0",
+				"xspi_ctl":   "0x115d",
+				"xspi_tcr":   "0x280011",
+				"xspi_cfg":   "0x01010001",
+				"xspi_ldo":   "0x17", //1.92V
+				"psram_cfg0": "0x03030304",
+				"psram_cfg1": "0x00400001",
+				"xspi_cs0_iocfg1": "0x02020202",
+				"xspi_cs0_iocfg2": "0x02020202",
+				"xspi_cs0_iocfg3": "0x36060503",
+				"xspi_cs0_iocfg4": "0x36",
+				"xspi_cs1_iocfg1": "0x02020202",
+				"xspi_cs1_iocfg2": "0x02020202",
+				"xspi_cs1_iocfg3": "0x36060503",
+				"xspi_cs1_iocfg4": "0x36",
+			},
+			"reset": {
+				"proto": "0x60080104", //cmd 0x60, addr 0x0801 (CR1), len 4
+				"buf":   "0xff810000", //no soft reset, keep the register value
+			},
+			"getid": {
+				"proto": "0xe0040004", //cmd 0xe0, dummy 4, addr 0x0000 (ID space)
+				"id":    "0x5f005f00",
+				"buf":   "0xffffffff",
+			},
+			"init": {
+				"proto0": "0x60080004", //cmd 0x60, addr 0x0800 (CR0), len 4
+				"buf0":   "0x8f170000", //chip receives 0x8F17
+				"proto1": "0xffffffff",
+				"buf1":   "0xffffffff",
+				"proto2": "0xffffffff",
+				"buf2":   "0xffffffff",
+				"proto3": "0xffffffff",
+				"buf3":   "0xffffffff",
+			},
+			"xip_cfg": {
+				"wr_proto": "0x20060002", //write cmd 0x20, dummy 6, len 2
+				"wr_buf":   "0xffffffff",
+				"rd_proto": "0xa0060003", //read cmd 0xa0, dummy 6, len 3
+				"rd_buf":   "0xffffffff",
+			},
+			"backup": {
+				"buf0": "0x55aa55aa", // training_value1 (x8 pattern)
+				"buf1": "0xaa55aa55", // training_value2
+				"buf2": "0x02020000", //byte0:read_hold (0x02); byte1:write_hold (0x02); byte2:axi_read_first(0); byte3: bit mode(0:8bit)
+				"buf3": "0xFFFFFF04",
+				"buf4": "0xFFFFFF05",
+				"buf5": "0xFFFFFF06",
+				"buf6": "0xFFFFFF07",
+				"buf7": "0xFFFFFF08",
+				"buf8": "0xFFFFFF09",
+				"buf9": "0xFFFFFF00",
+			},
+		},
 
 
 	},
