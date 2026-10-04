@@ -1,0 +1,24 @@
+Import('RTT_ROOT')
+Import('rtconfig')
+from building import *
+
+cwd     = GetCurrentDir()
+src     = ['main.c', 'im_master.c', 'im_ui.c']
+
+# LVGL 头文件路径 (应用目录先于 lvgl 包被扫描, 必须显式给出)
+LVGL_ROOT = os.path.join(cwd, '..', '..', '..', 'packages', 'artinchip', 'lvgl-ui', 'lvgl_v9')
+CPPPATH = [cwd, LVGL_ROOT,
+           os.path.join(LVGL_ROOT, 'lvgl'),
+           os.path.join(LVGL_ROOT, 'lvgl', 'env_support', 'rt-thread')]
+
+CFLAGS = ' -c -ffunction-sections'
+
+group   = DefineGroup('Applications', src, depend = [''], CPPPATH = CPPPATH, CFLAGS=CFLAGS)
+
+# slave/ 目录存放从机参考代码，不属于本工程，不参与编译
+list = os.listdir(cwd)
+for item in list:
+    if os.path.isfile(os.path.join(cwd, item, 'SConscript')):
+        group = group + SConscript(os.path.join(item, 'SConscript'))
+
+Return('group')

@@ -1,0 +1,9 @@
+config AIC_IM_METER_UI
+    bool "Industrial meter LVGL dashboard"
+    default y
+
+# 便携工业调试仪 (主机侧)
+#
+# 链路相关的宏 (RS485 串口号、方向控制引脚) 在 im_master.c 顶部修改:
+#   IM_RS485_UART_NAME  当前 "uart0"  -> /dev/uart0, PA.0 TX / PA.1 RX
+#   IM_RS485_DE_PIN_NAME 当前 "PC.7"

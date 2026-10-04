@@ -38,6 +38,10 @@ void lv_user_gui_init(void)
 {
 #if defined(AIC_LVGL_DEMO) && !defined(RT_USING_MODULE)
     aic_ui_init();
+#elif defined(AIC_IM_METER_UI)
+    extern void im_ui_init(void);
+
+    im_ui_init();
 #endif
 }
 

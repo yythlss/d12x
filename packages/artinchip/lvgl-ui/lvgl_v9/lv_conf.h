@@ -11,6 +11,13 @@
 
 #include <rtconfig.h>
 
+#if defined(AIC_IM_METER_UI)
+#undef LV_FONT_MONTSERRAT_20
+#define LV_FONT_MONTSERRAT_20 1
+#undef LV_FONT_MONTSERRAT_24
+#define LV_FONT_MONTSERRAT_24 1
+#endif
+
 #define LV_USE_LOG 1
 #if LV_USE_LOG
 
