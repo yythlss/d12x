@@ -261,12 +261,15 @@ menuconfig AIC_LVGL_DEMO
 if AIC_LVGL_DEMO
 choice
     prompt "select LVGL demo"
-    default AIC_LVGL_METER_DEMO
+    default AIC_LVGL_REOSC_DEMO
     depends on AIC_LVGL_DEMO
 
 config AIC_LVGL_UI_BUILDER
     select LPKG_USING_FREETYPE
     bool "LVGL Support UIBuider"
+
+config AIC_LVGL_REOSC_DEMO
+    bool "LVGL portable industrial debug tool"
 
 config AIC_WIDGETS_DEMO
     bool "LVGL aic widgets demos"

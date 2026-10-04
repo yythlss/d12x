@@ -579,7 +579,7 @@ def aicupg_cmd(aic_root, prj_chip, prj_board, prj_kernel, prj_app, prj_defconfig
         return
 
     if platform.system() == 'Windows':
-        upgcmd = os.path.join(aic_root, 'tools/scripts/upgcmd.exe')
+        upgcmd = r"D:\Project\claude\RTthread\upgtool\upgcmd.exe"
     else:
         upgcmd = os.path.join(aic_root, 'tools/scripts/upgcmd')
     if not os.path.exists(upgcmd):

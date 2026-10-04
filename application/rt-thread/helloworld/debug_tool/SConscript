@@ -1,0 +1,13 @@
+Import('RTT_ROOT')
+Import('rtconfig')
+from building import *
+
+cwd     = GetCurrentDir()
+src     = Glob('*.c')
+CPPPATH = [cwd, ]
+
+# 依赖 LVGL 图形库（界面部分）与串口/CAN 驱动
+# 仅在选中自定义调试仪 demo (AIC_LVGL_REOSC_DEMO) 时编译
+group = DefineGroup('DebugTool', src, depend = ['AIC_LVGL_REOSC_DEMO'], CPPPATH = CPPPATH)
+
+Return('group')

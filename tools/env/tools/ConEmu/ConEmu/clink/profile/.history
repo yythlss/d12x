@@ -1,0 +1,64 @@
+list
+lunch 11
+m
+aic
+a
+aicupg
+lunch 11
+m
+aic
+a
+aicpug
+cdD:\Project\claude\RTthread\upgtool 
+cd 
+cd D:\Project\claude\RTthread\upgtool
+aicupg
+list
+lunch 11
+m
+aic
+a
+aicupg
+lunch 11
+m
+aic
+a
+aicpug
+cdD:\Project\claude\RTthread\upgtool 
+cd D:\Project\claude\RTthread\luban-lite\tools\scripts
+New-Item -ItemType SymbolicLink -Name upgcmd.exe -Target D:\Project\claude\RTthread\upgtool\upgcmd.exe
+``` upgcmd.exe image D:\Project\claude\RTthread\luban-lite\output\d12x_hmi-nor_v1.0.0.img ```
+upgcmd.exe image D:\Project\claude\RTthread\luban-lite\output\d12x_hmi-nor_v1.0.0.imgupgcmd.exe image D:\Project\claude\RTthread\luban-lite\output\d12x_hmi-nor_v1.0.0.img 
+upgcmd.exe image D:\Project\claude\RTthread\luban-lite\output\d12x_hmi-nor_v1.0.0.img
+cd 
+code .
+cd D:\Project\claude\RTthread\upgtool
+upgcmd.exe list
+cd ..
+cd luban-lite
+ls
+aicupg
+cd 
+code .
+list
+lunch 10
+scons
+m
+cd D:\Project\claude\RTthread\upgtool
+upgcmd.exe help
+upgcmd.exe list
+upgcmd.exe serial COM7 D:\Project\claude\RTthread\luban-lite\d12x_demo68-nor_v1.0.0.img 
+cd ..
+ls
+cd luban-lite
+aicupg
+aicupg
+me
+me
+burn,bat
+burn.bat
+burn.bat
+burn.bat
+burn.bat
+scons
+m

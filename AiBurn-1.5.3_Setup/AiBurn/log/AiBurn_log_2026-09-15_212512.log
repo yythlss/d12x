@@ -1,0 +1,56 @@
+[debug] [2026-09-15 21:25:12] No device available
+[debug] [2026-09-15 21:25:12] Software Version: "1.5.3"
+[debug] [2026-09-15 21:25:12] Machine Name: "LAPTOP-3LJ1BTPV"
+[debug] [2026-09-15 21:25:12] System Name: "Windows 10 (10.0)"
+[debug] [2026-09-15 21:25:12] CPU Architecture: "x86_64" 
+
+[debug] [2026-09-15 21:25:12] Parse the image header from "D:/Project/claude/RTthread/luban-lite/output/d12x_hmi-nor_rt-thread_helloworld/images/d12x_hmi-nor_v1.0.0.img"
+[debug] [2026-09-15 21:25:12] Soc type: "d12x"
+[debug] [2026-09-15 21:25:12] Board type: "hmi-nor"
+[debug] [2026-09-15 21:25:12] Image version: "1.0.0"
+[debug] [2026-09-15 21:25:12] Storage type: "spi-nor"
+[debug] [2026-09-15 21:25:12] Storage ID: ""
+[debug] [2026-09-15 21:25:12] Meta count: "8" 
+
+[debug] [2026-09-15 21:25:12] Refresh the partition tree ...
+[debug] [2026-09-15 21:25:12]   Part name: image.target.spl , size: 251920 
+[debug] [2026-09-15 21:25:12]   Part name: image.target.env , size: 4096 
+[debug] [2026-09-15 21:25:12]   Part name: image.target.env_r , size: 4096 
+[debug] [2026-09-15 21:25:12]   Part name: image.target.os , size: 1570816 
+[debug] [2026-09-15 21:25:12]   Part name: image.target.rodata , size: 6959104 
+
+
+[debug] [2026-09-15 21:25:30] WinEvent: Some devnode changed
+[debug] [2026-09-15 21:25:30] No device available
+
+[debug] [2026-09-15 21:25:30] WinEvent: Some devnode changed
+[debug] [2026-09-15 21:25:30] No device available
+
+[debug] [2026-09-15 21:25:30] WinEvent: Some device arrival or removed 32768
+[debug] [2026-09-15 21:28:26] Current connect type: 1
+[error] [2026-09-15 21:28:28] devStr: "COM4"
+[error] [2026-09-15 21:28:33] libuart_open()678:                      Failed to open COM4 device.
+[debug] [2026-09-15 21:28:33] The status of device:  false
+[error] [2026-09-15 21:28:36] devStr: "COM7"
+[debug] [2026-09-15 21:28:36] Try to get device hd info...
+[debug] [2026-09-15 21:28:37] Get device hd info success
+[debug] [2026-09-15 21:28:37] The status of device:  true
+[debug] [2026-09-15 21:28:39] Start burn online ...
+[debug] [2026-09-15 21:28:39] Progress range: 0 ~  9082880
+
+[debug] [2026-09-15 21:28:39] Burn Image file "D:/Project/claude/RTthread/luban-lite/output/d12x_hmi-nor_rt-thread_helloworld/images/d12x_hmi-nor_v1.0.0.img" ...
+
+[debug] [2026-09-15 21:28:39] Try to ping uart device 1 ...
+[debug] [2026-09-15 21:28:40] Ping uart device success
+[warn ] [2026-09-15 21:28:43] Current baudrate equal max baudrate, do nothing!
+
+[debug] [2026-09-15 21:28:43] Meta 0 image.updater.psram , size 36112 ...
+[debug] [2026-09-15 21:28:43] Blocksize 4 , chunk 16384 * 2 , rest 3344
+[debug] [2026-09-15 21:28:43] Offset: 6144 Size: 36112
+[debug] [2026-09-15 21:28:43]  Dev "COM7" Send chunk 0 ...
+[debug] [2026-09-15 21:28:45]  Dev "COM7" Send chunk 1 ...
+[info ] [2026-09-15 21:28:54] aicupg_trans_send_pkt_inner()245:       no CSW. (rc=0)
+[error] [2026-09-15 21:28:54] aicupg_cmd_send_fwc_data_update()689:   Send out data length is not expected. ret = 0
+[error] [2026-09-15 21:28:54] Dev "COM7" Failed to send data 16384
+[error] [2026-09-15 21:28:54]  Dev "COM7" Failed to send 16384
+[error] [2026-09-15 21:33:16] devStr: "COM7"

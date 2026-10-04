@@ -1,0 +1,61 @@
+[debug] [2026-09-16 21:20:52] No device available
+[debug] [2026-09-16 21:20:52] Software Version: "1.5.3"
+[debug] [2026-09-16 21:20:52] Machine Name: "LAPTOP-3LJ1BTPV"
+[debug] [2026-09-16 21:20:52] System Name: "Windows 10 (10.0)"
+[debug] [2026-09-16 21:20:52] CPU Architecture: "x86_64" 
+
+[debug] [2026-09-16 21:20:52] Parse the image header from "D:/Project/claude/RTthread/luban-lite/output/d12x_hmi-nor_rt-thread_helloworld/images/d12x_hmi-nor_v1.0.0.img"
+[debug] [2026-09-16 21:20:52] Soc type: "d12x"
+[debug] [2026-09-16 21:20:52] Board type: "hmi-nor"
+[debug] [2026-09-16 21:20:52] Image version: "1.0.0"
+[debug] [2026-09-16 21:20:52] Storage type: "spi-nor"
+[debug] [2026-09-16 21:20:52] Storage ID: ""
+[debug] [2026-09-16 21:20:52] Meta count: "8" 
+
+[debug] [2026-09-16 21:20:52] Refresh the partition tree ...
+[debug] [2026-09-16 21:20:52]   Part name: image.target.spl , size: 251920 
+[debug] [2026-09-16 21:20:52]   Part name: image.target.env , size: 4096 
+[debug] [2026-09-16 21:20:52]   Part name: image.target.env_r , size: 4096 
+[debug] [2026-09-16 21:20:52]   Part name: image.target.os , size: 1570816 
+[debug] [2026-09-16 21:20:52]   Part name: image.target.rodata , size: 6959104 
+
+[debug] [2026-09-16 21:20:56] Current connect type: 1
+[error] [2026-09-16 21:21:04] devStr: "COM7"
+[debug] [2026-09-16 21:21:04] Try to get device hd info...
+[debug] [2026-09-16 21:21:04] Get device hd info success
+[debug] [2026-09-16 21:21:04] The status of device:  true
+[debug] [2026-09-16 21:21:10] Current file path: "D:/Project/claude/RTthread/luban-lite/output/d12x_hmi-nor_rt-thread_helloworld/images/d12x_hmi-nor_v1.0.0.img"
+[debug] [2026-09-16 21:21:33] Parse the image header from "D:/Project/claude/RTthread/luban-lite/output/d12x_demo68-nor_rt-thread_helloworld/images/d12x_demo68-nor_v1.0.0.img"
+[debug] [2026-09-16 21:21:33] Soc type: "d12x"
+[debug] [2026-09-16 21:21:33] Board type: "demo68-nor"
+[debug] [2026-09-16 21:21:33] Image version: "1.0.0"
+[debug] [2026-09-16 21:21:33] Storage type: "spi-nor"
+[debug] [2026-09-16 21:21:33] Storage ID: ""
+[debug] [2026-09-16 21:21:33] Meta count: "9" 
+
+[debug] [2026-09-16 21:21:33] Refresh the partition tree ...
+[debug] [2026-09-16 21:21:33]   Part name: image.target.spl , size: 255504 
+[debug] [2026-09-16 21:21:33]   Part name: image.target.env , size: 4096 
+[debug] [2026-09-16 21:21:33]   Part name: image.target.env_r , size: 4096 
+[debug] [2026-09-16 21:21:33]   Part name: image.target.os , size: 1628160 
+[debug] [2026-09-16 21:21:33]   Part name: image.target.rodata , size: 6959104 
+[debug] [2026-09-16 21:21:33]   Part name: image.target.data , size: 266240 
+
+[debug] [2026-09-16 21:21:33] Start burn online ...
+[debug] [2026-09-16 21:21:33] Progress range: 0 ~  9410560
+
+[debug] [2026-09-16 21:21:33] Burn Image file "D:/Project/claude/RTthread/luban-lite/output/d12x_demo68-nor_rt-thread_helloworld/images/d12x_demo68-nor_v1.0.0.img" ...
+
+[debug] [2026-09-16 21:21:34] Try to ping uart device 1 ...
+[debug] [2026-09-16 21:21:34] Ping uart device success
+[warn ] [2026-09-16 21:21:38] Current baudrate equal max baudrate, do nothing!
+
+[debug] [2026-09-16 21:21:38] Meta 0 image.updater.psram , size 36112 ...
+[debug] [2026-09-16 21:21:38] Blocksize 4 , chunk 16384 * 2 , rest 3344
+[debug] [2026-09-16 21:21:38] Offset: 6656 Size: 36112
+[debug] [2026-09-16 21:21:38]  Dev "COM7" Send chunk 0 ...
+[debug] [2026-09-16 21:21:39]  Dev "COM7" Send chunk 1 ...
+[info ] [2026-09-16 21:21:49] aicupg_trans_send_pkt_inner()245:       no CSW. (rc=0)
+[error] [2026-09-16 21:21:49] aicupg_cmd_send_fwc_data_update()689:   Send out data length is not expected. ret = 0
+[error] [2026-09-16 21:21:49] Dev "COM7" Failed to send data 16384
+[error] [2026-09-16 21:21:49]  Dev "COM7" Failed to send 16384

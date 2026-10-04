@@ -1,0 +1,2 @@
+D:/Project/claude/RTthread/luban-lite/output/d12x_demo68-nor_rt-thread_helloworld/images/d12x_demo68-nor_v1.0.0.img, 2026-09-19_14:50:05
+D:/Project/claude/RTthread/luban-lite/output/d12x_hmi-nor_rt-thread_helloworld/images/d12x_hmi-nor_v1.0.0.img, 2026-09-16_21:20:52
