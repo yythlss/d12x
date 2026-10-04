@@ -238,8 +238,15 @@ void im_board_init(void)
     rt_pin_mode(IM_KEY_LEFT_PIN,  PIN_MODE_INPUT_PULLUP);
     rt_pin_mode(IM_KEY_RIGHT_PIN, PIN_MODE_INPUT_PULLUP);
 
-    /* AI */
-    g_adc = (rt_adc_device_t)rt_device_find(IM_ADC_DEV_NAME);
+    /* AI: ADC1/ADC3 的通道 0~3 都对应 PA0~PA3, 哪个使能了就用哪个 */
+    {
+        static const char *adc_name[] = {IM_ADC_DEV_NAME, "adc3"};
+        int i;
+
+        for (i = 0; i < 2 && !g_adc; i++)
+            g_adc = (rt_adc_device_t)rt_device_find(adc_name[i]);
+    }
+
     if (g_adc) {
         rt_adc_enable(g_adc, IM_ADC_CH0);
         rt_adc_enable(g_adc, IM_ADC_CH1);
@@ -255,6 +262,27 @@ void im_board_init(void)
     if (tid)
         rt_thread_startup(tid);
 }
+
+/* 本地自检: 不接主机也能看采集是否正常 */
+static void im_slave_dump(void)
+{
+    rt_kprintf("model 0x%04X  fw 0x%04X  uptime %us\n",
+               g_reg[IM_REG_IDX(IM_REG_DEV_MODEL)],
+               g_reg[IM_REG_IDX(IM_REG_FW_VER)],
+               (rt_uint32_t)((g_reg[IM_REG_IDX(IM_REG_UPTIME_HI)] << 16) |
+                             g_reg[IM_REG_IDX(IM_REG_UPTIME_LO)]));
+    rt_kprintf("AI %4u %4u %4u %4u mV   DI 0x%02X   DO 0x%02X\n",
+               g_reg[IM_REG_IDX(IM_REG_AI0_MV)], g_reg[IM_REG_IDX(IM_REG_AI1_MV)],
+               g_reg[IM_REG_IDX(IM_REG_AI2_MV)], g_reg[IM_REG_IDX(IM_REG_AI3_MV)],
+               g_reg[IM_REG_IDX(IM_REG_DI_MAP)], g_reg[IM_REG_IDX(IM_REG_DO_MAP)]);
+    rt_kprintf("hb %u  frame %u  crc_err %u  err 0x%X  %s\n",
+               g_reg[IM_REG_IDX(IM_REG_HEARTBEAT)],
+               g_reg[IM_REG_IDX(IM_REG_FRAME_CNT)],
+               g_reg[IM_REG_IDX(IM_REG_CRC_ERR_CNT)],
+               g_reg[IM_REG_IDX(IM_REG_ERR_CODE)],
+               g_adc ? "" : "(adc missing)");
+}
+MSH_CMD_EXPORT(im_slave_dump, dump industrial meter slave registers);
 
 /* 从站启动入口: 在 RT-Thread 上电后调用一次 */
 int im_slave_startup(void)
