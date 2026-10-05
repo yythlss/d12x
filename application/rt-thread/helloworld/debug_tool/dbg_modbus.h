@@ -51,6 +51,9 @@ typedef struct {
     rt_uint16_t count_hi;      /* 数量 或 写入值 */
 } dbg_modbus_req_t;
 
+/* CRC16 (poly 0xA001, init 0xFFFF)，dbg_slave 也复用它 */
+rt_uint16_t dbg_modbus_crc16(const rt_uint8_t *data, rt_uint32_t len);
+
 /* 初始化 Modbus 工作线程（内部创建消息队列 + 线程） */
 int dbg_modbus_init(void);
 

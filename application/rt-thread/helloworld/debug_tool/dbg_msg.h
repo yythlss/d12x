@@ -18,6 +18,7 @@
 #define DBG_MSG_CAN_TX        0x04  /* CAN 发出报文 */
 #define DBG_MSG_ADC_VAL       0x05  /* ADC 采样值 */
 #define DBG_MSG_MODBUS_RESULT 0x06  /* Modbus 应答结果 */
+#define DBG_MSG_SLAVE_DATA    0x07  /* 从机仪表盘数据（见 dbg_slave.h 偏移定义） */
 
 /* 消息体大小 */
 #define DBG_MSG_DATA_MAX      64

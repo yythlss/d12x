@@ -19,10 +19,12 @@
 #include "dbg_can.h"
 #include "dbg_modbus.h"
 #include "dbg_adc.h"
+#include "dbg_slave.h"
 #include "ui_main_screen.h"
 #include "ui_serial_screen.h"
 #include "ui_can_screen.h"
 #include "ui_scope_screen.h"
+#include "ui_slave_screen.h"
 
 static lv_obj_t *g_main_screen;
 
@@ -41,6 +43,9 @@ static void dbg_msg_dispatch(dbg_msg_t *msg)
         break;
     case DBG_MSG_ADC_VAL:
         ui_scope_on_adc(msg->data, msg->len);
+        break;
+    case DBG_MSG_SLAVE_DATA:
+        ui_slave_on_data(msg->data, msg->len);
         break;
     default:
         break;
@@ -83,6 +88,11 @@ void ui_init(void)
     /* 5. 模拟量采集（默认自测信号源，无外设可验证示波） */
     if (dbg_adc_init() != RT_EOK) {
         rt_kprintf("dbg_tool: adc init failed\n");
+    }
+
+    /* 5.5 从机轮询线程（Modbus-RTU 主站 -> 星火一号） */
+    if (dbg_slave_init() != RT_EOK) {
+        rt_kprintf("dbg_tool: slave poll init failed\n");
     }
 
     /* 6. 主菜单界面 */
