@@ -20,6 +20,7 @@
 #include "dbg_modbus.h"
 #include "dbg_adc.h"
 #include "dbg_slave.h"
+#include "dbg_log.h"
 #include "ui_main_screen.h"
 #include "ui_serial_screen.h"
 #include "ui_can_screen.h"
@@ -45,6 +46,8 @@ static void dbg_msg_dispatch(dbg_msg_t *msg)
         ui_scope_on_adc(msg->data, msg->len);
         break;
     case DBG_MSG_SLAVE_DATA:
+        /* 记录模块先入队（内部只是 memcpy，不会拖慢 UI），再刷新仪表盘 */
+        dbg_log_on_data(msg->data, msg->len);
         ui_slave_on_data(msg->data, msg->len);
         break;
     default:
@@ -93,6 +96,11 @@ void ui_init(void)
     /* 5.5 从机轮询线程（Modbus-RTU 主站 -> 星火一号） */
     if (dbg_slave_init() != RT_EOK) {
         rt_kprintf("dbg_tool: slave poll init failed\n");
+    }
+
+    /* 5.6 SD 卡 CSV 记录（第 8 步）：建线程 + 环形缓冲，真正落盘在线程里做 */
+    if (dbg_log_init() != RT_EOK) {
+        rt_kprintf("dbg_tool: csv log init failed\n");
     }
 
     /* 6. 主菜单界面 */

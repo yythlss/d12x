@@ -10,10 +10,11 @@
  *   - 结果打包后经 dbg_msg 总线投递 DBG_MSG_SLAVE_DATA 给仪表盘 UI
  *
  * 为什么不复用 dbg_modbus.c：
- *   1. dbg_modbus 走 dbg_serial(uart0)，而 uart0 的 TX 在 RT-Thread 下发不出数据（已知问题）
- *   2. dbg_serial 开着 INT_RX + 自有接收线程，会把从机的应答字节抢走，
- *      这里 transceiver 和接收必须在同一个线程里闭环
- *   3. 即便把 dbg_serial 改到 uart1，它也会把应答当「串口数据」转发给串口页
+ *   1. dbg_serial(uart0) 开着 INT_RX + 自有接收线程，会把从机应答字节抢走，
+ *      这里收发必须在同一个线程里闭环
+ *   2. 即便把 dbg_serial 改到 uart1，它也会把应答当「串口数据」转发给串口页
+ *   3. 注：uart0 的 TX 本身正常（同仓库 im_master.c 用它跑 RS485），不能复用是 rx_indicate
+ *      冲突，与 uart0 TX 无关
  *   所以这里独立实现一条精简主站链路，只复用 dbg_modbus_crc16() 和消息总线。
  *
  * 数据打包格式见 dbg_slave.c 顶部注释。
@@ -57,7 +58,36 @@
 #define SLV_OFF_GYRO_Z       24
 #define SLV_OFF_STATUS       26   /* 0=OK 1=超时 2=CRC错 3=从机异常 */
 
+/* 执行器写寄存器地址（第 6 步：仅以下这些开放写） */
+#define R_DO_CTRL       0x0100   /* b0 LED_R b1 LED_G b2 LED_B b3 BEEP */
+#define R_PWM_DUTY      0x0101   /* 0.1 % */
+#define R_LED_FX        0x0102   /* 灯效模式 0~7，见 DBG_FX_* */
+#define R_LED_FX_ARG    0x0103   /* 灯效参数（速度 1~9） */
+
+/* 灯效模式（与从机 mb_slave.c 的 MB_FX_* 一一对应，改动需两边同步） */
+#define DBG_FX_SOLID        0   /* 纯色：由 R_DO_CTRL 三位 + PWM_DUTY 亮度决定 */
+#define DBG_FX_BREATH       1   /* 呼吸 */
+#define DBG_FX_RAINBOW      2   /* 彩虹 */
+#define DBG_FX_CHASE        3   /* 跑马 */
+#define DBG_FX_COLOR_CYCLE  4   /* 颜色循环 */
+#define DBG_FX_FLASH        5   /* 闪烁 */
+#define DBG_FX_MARQUEE      6   /* 双向扫描 */
+#define DBG_FX_SPARKLE      7   /* 星光 */
+#define DBG_FX_MAX          8
+
 /* 初始化：创建链路 + 轮询线程 */
 int dbg_slave_init(void);
+
+/* 写单个保持寄存器（FC06）：驱动从机执行器。LOOPBACK 时仅更新本地镜像，不碰 uart1。
+ * 返回 RT_EOK 表示已发出（或镜像已更新）。 */
+int dbg_slave_write_reg(rt_uint16_t reg, rt_uint16_t val);
+
+/* 读取执行器本地镜像（UI 初始化按钮状态用） */
+rt_uint16_t dbg_slave_get_do_ctrl(void);
+rt_uint16_t dbg_slave_get_pwm_duty(void);
+rt_uint16_t dbg_slave_get_led_fx(void);
+
+/* 一次性设置灯效模式 + 参数（等价于两次 FC06，但只发一帧后者自动补齐） */
+int dbg_slave_set_led_fx(rt_uint16_t mode, rt_uint16_t arg);
 
 #endif /* __DBG_SLAVE_H__ */

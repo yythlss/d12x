@@ -58,6 +58,13 @@ static rt_uint8_t           g_last_rx[32];
 static int                  g_last_len;
 static rt_uint8_t           g_last_status;
 
+/* 执行器本地镜像（第 6 步）：LOOPBACK 时直接反映 UI 操作；
+ * 真实链路下由从机物理执行，主机不回读 DO_CTRL，故以本地镜像作为 UI 显示状态。 */
+static rt_uint16_t          g_do_ctrl = 0;
+static rt_uint16_t          g_pwm_duty = 0;
+static rt_uint16_t          g_led_fx = 0;        /* 当前灯效模式（0=纯色） */
+static rt_uint16_t          g_led_fx_arg = 3;    /* 灯效速度/参数 1~9 */
+
 /* ------------------------------------------------------------ 小工具 */
 static void put16(rt_uint8_t *p, rt_uint16_t v)
 {
@@ -269,6 +276,65 @@ static void dbg_slave_entry(void *param)
         slave_do_once();
         rt_thread_mdelay(SLAVE_POLL_MS);
     }
+}
+
+/* -------------------------------------------------------- 执行器写（第 6 步） */
+int dbg_slave_write_reg(rt_uint16_t reg, rt_uint16_t val)
+{
+    rt_uint8_t  tx[8];
+    rt_uint16_t crc;
+
+    /* 只放行执行器相关的四个寄存器，避免 UI 误写采集区 */
+    if (reg != R_DO_CTRL && reg != R_PWM_DUTY &&
+        reg != R_LED_FX   && reg != R_LED_FX_ARG)
+        return -RT_ERROR;
+
+#if DBG_SLAVE_LOOPBACK
+    /* 自测：不碰 uart1，仅更新本地镜像，UI 立即反映操作结果 */
+    if      (reg == R_DO_CTRL)    g_do_ctrl  = val;
+    else if (reg == R_PWM_DUTY)   g_pwm_duty = val;
+    else if (reg == R_LED_FX)     g_led_fx   = val;
+    else                          g_led_fx_arg = val;
+    return RT_EOK;
+#else
+    tx[0] = DBG_SLAVE_ADDR;
+    tx[1] = MODBUS_FC_WRITE_SINGLE_REG;
+    put16(&tx[2], reg);
+    put16(&tx[4], val);
+    crc = dbg_modbus_crc16(tx, 6);
+    put_crc(&tx[6], crc);
+
+    if (rt_device_write(g_dev, 0, tx, sizeof(tx)) != sizeof(tx))
+        return -RT_ERROR;
+    /* 真实链路下也同步本地镜像：主机不回读这两格，UI 需要它维持按钮高亮 */
+    if      (reg == R_DO_CTRL)    g_do_ctrl  = val;
+    else if (reg == R_PWM_DUTY)   g_pwm_duty = val;
+    else if (reg == R_LED_FX)     g_led_fx   = val;
+    else                          g_led_fx_arg = val;
+    return RT_EOK;
+#endif
+}
+
+rt_uint16_t dbg_slave_get_do_ctrl(void)  { return g_do_ctrl; }
+rt_uint16_t dbg_slave_get_pwm_duty(void) { return g_pwm_duty; }
+rt_uint16_t dbg_slave_get_led_fx(void)   { return g_led_fx; }
+
+int dbg_slave_set_led_fx(rt_uint16_t mode, rt_uint16_t arg)
+{
+    if (mode >= DBG_FX_MAX) return -RT_ERROR;
+    if (arg < 1 || arg > 9) arg = 3;      /* 速度档位收敛到 1~9 */
+
+    /* 切回纯色时，把 R_DO_CTRL 的三个颜色位清掉——纯色模式下这三个位是"常亮"标志，
+     * 若沿用灯效期间写入的值，退出灯效会看到一颗常亮的意外颜色 */
+    if (mode == DBG_FX_SOLID)
+    {
+        rt_uint16_t keep = (rt_uint16_t)(g_do_ctrl & (rt_uint16_t)~0x0007u);
+        if (dbg_slave_write_reg(R_DO_CTRL, keep) != RT_EOK) return -RT_ERROR;
+    }
+
+    if (dbg_slave_write_reg(R_LED_FX_ARG, arg)  != RT_EOK) return -RT_ERROR;
+    if (dbg_slave_write_reg(R_LED_FX, mode)     != RT_EOK) return -RT_ERROR;
+    return RT_EOK;
 }
 
 int dbg_slave_init(void)
