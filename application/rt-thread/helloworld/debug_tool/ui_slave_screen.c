@@ -347,7 +347,7 @@ static void rec_btn_cb(lv_event_t *e)
 {
     (void)e;
 
-    dbg_log_toggle();       /* 内部只改状态/开关文件，不做阻塞的文件 IO */
+    dbg_log_toggle();       /* 只置请求标志；挂载/开文件/写盘/关文件都在 dbglog 线程做，不卡界面 */
     ui_rec_sync();
 }
 

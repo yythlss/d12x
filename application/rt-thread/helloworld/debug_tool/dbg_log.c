@@ -7,12 +7,16 @@
  *
  * 数据流：
  *   dbg_slave 轮询线程 ──27B 报文──▶ dbg_msg 总线 ──▶ dbg_main 分发（LVGL 线程）
- *        ──▶ dbg_log_on_data()（只入环形缓冲）──▶ dbglog 线程 ──▶ CSV 文件
+ *        ──▶ dbg_log_on_data()（只 memcpy + 推进 g_widx）──▶ dbglog 线程 ──▶ CSV
  *
- * 为什么要有环形缓冲和独立线程：
- *   消息分发跑在 LVGL timer 上下文，在里面 open/write 一张慢卡会把界面卡住。
- *   这里让 UI 侧只做 memcpy，真正落盘交给低优先级的 dbglog 线程。
- *   缓冲满了丢最旧的一条 —— 宁可丢采样，也不阻塞 UI。
+ * 线程模型（重要）：
+ *   - 生产者 = LVGL 线程（dbg_log_on_data）：只写 g_widx，绝不碰 g_ridx / 文件。
+ *     缓冲满则丢「最新」一条（直接 return），保证 SPSC、不与消费者争g_ridx。
+ *   - 消费者 = dbglog 线程：独占 g_ridx，且**所有文件 I/O（挂载/open/写/close）
+ *     都在这里做**，LVGL 只改意图标志（g_want）。这样按REC 不会卡界面，
+ *     也避免 stop 时 LVGL 与本线程同时排空同一批数据。
+ *   - g_want 是「目标状态」而非一次性请求：dbglog 线程每 tick 把 g_state 向它对齐，
+ *     所以连按两次 REC（想取消）也能正确停下，不会丢指令。
  */
 
 #include <rtthread.h>
@@ -31,12 +35,8 @@
 /*
  * 自测开关：手上没插 SD 卡时置 1。
  *   1 = 不落卡，把前几行 CSV 打到串口，用来验证「入队 → 格式化 → 出队」这条链路
- *       以及 CSV 字段顺序/小数位是否正确（LOOPBACK 的 dbg_slave 正好提供数据源）
  *   0 = 真正写 /sdcard
- *
- * 2026-10-06：软件链路已验证通过（串口 CSV 行格式/起停/行数全对），现改为 0 真落卡。
- *   注意数据源仍是 dbg_slave 的仿真值 —— 想要真实传感器读数，
- *   还要接线并把 dbg_slave.h 的 DBG_SLAVE_LOOPBACK 改成 0。两个开关互相独立。
+ * 2026-10-06：软件链路已验证通过，现改为 0 真落卡。
  */
 #define DBG_LOG_LOOPBACK      0
 
@@ -54,18 +54,23 @@
 /* 文件名序号上限，超出则回绕覆盖（正常使用到不了） */
 #define DBG_LOG_MAX_SEQ       999
 
+/* 消费者线程同步的目标状态（**仅 LVGL 线程写**，dbglog 线程只读） */
+#define DBG_LOG_WANT_IDLE      0
+#define DBG_LOG_WANT_RECORD    1
+
 /* ------------------------------------------------------------- 内部状态 */
 static struct
 {
     rt_uint8_t buf[DBG_LOG_RING][SLAVE_PKT_LEN];
 } g_ring;
 
-static volatile rt_uint32_t g_widx;      /* 写指针（LVGL 线程推进） */
-static rt_uint32_t          g_ridx;      /* 读指针（dbglog 线程推进） */
+static volatile rt_uint32_t g_widx;      /* 写指针（仅 LVGL 线程推进） */
+static rt_uint32_t          g_ridx;      /* 读指针（仅 dbglog 线程推进） */
 
 static rt_thread_t g_thread  = RT_NULL;
 static int         g_fd      = -1;
 static int         g_state   = DBG_LOG_ST_IDLE;
+static volatile int g_want    = DBG_LOG_WANT_IDLE;   /* LVGL 的意图，dbglog 线程读取 */
 static rt_uint32_t g_rows;
 static rt_tick_t   g_start_tick;
 static char        g_path[24] = "-";       /* 短名，UI 显示用 */
@@ -97,10 +102,10 @@ static void fmt_dec1(char *dst, int size, rt_int16_t raw)
 
 /* -------------------------------------------------------- 挂载与文件 */
 /*
- * 确保 /sdcard 可用。
+ * 确保 /sdcard 可用。**只在 dbglog 线程调用**，不做在 LVGL 上下文。
  * 本工程 board.c 的 mount_table 里有 {"sd1", "/sdcard", "elm", ...}，开机会自动挂一次；
- * 但开机没插卡的话那次会失败，且没开热插拔检测（drv_sdcard.c 整段被 #ifdef 掉了），
- * 所以这里再挂一次 —— 用户插卡后点一下 REC 就能用，不用重启。
+ * 但开机没插卡的话那次会失败，且没开热插拔检测，所以这里再挂一次——
+ * 用户插卡后点一下 REC 就能用，不用重启。
  * 最终以「能否创建文件」为准，不依赖 dfs_mount 的返回值（已挂载时它会失败）。
  */
 static int ensure_mounted(void)
@@ -160,9 +165,8 @@ static int write_line(const char *line, int len)
 }
 
 /*
- * 把一条 27 字节报文写成一行 CSV。
+ * 把一条 27 字节报文写成一行 CSV。**仅 dbglog 线程调用**。
  * 列：t_s,temp_C,humi_pct,lux,ps,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z
- * t_s 是「开始记录后的秒数」，方便直接拿去画曲线。
  */
 static void write_one_row(const rt_uint8_t *pkt)
 {
@@ -199,24 +203,96 @@ static void write_one_row(const rt_uint8_t *pkt)
     }
 }
 
-/* --------------------------------------------------------- 记录线程 */
+/* 排空缓冲到文件（**仅 dbglog 线程调用**，独占 g_ridx） */
+static void drain_ring(void)
+{
+    while (RING_COUNT() > 0)
+    {
+        write_one_row(g_ring.buf[RING_SLOT(g_ridx)]);
+        g_ridx++;
+    }
+}
+
+/* 打开新文件 + 写表头 + 进入RUNNING（**仅 dbglog 线程调用**） */
+static void do_start(void)
+{
+#if DBG_LOG_LOOPBACK
+    rt_snprintf(g_path, sizeof(g_path), "LOOPBACK (no card)");
+#else
+    int fd;
+
+    if (ensure_mounted() != RT_EOK)
+    {
+        g_state = DBG_LOG_ST_NOCARD;
+        LOG_W("sdcard not available (%s), cannot start", DBG_LOG_MOUNT_POINT);
+        return;
+    }
+
+    fd = create_log_file();
+    if (fd < 0)
+    {
+        g_state = DBG_LOG_ST_NOCARD;
+        LOG_E("create csv file failed");
+        return;
+    }
+    g_fd = fd;
+
+    {
+        static const char header[] =
+            "t_s,temp_C,humi_pct,lux,ps,acc_x,acc_y,acc_z,gyro_x,gyro_z\r\n";
+        write(g_fd, header, sizeof(header) - 1);
+    }
+#endif
+
+    /* 丢掉停止期间堆的旧数据，从干净状态开始（消费者独占 ridx） */
+    g_ridx       = g_widx;
+    g_rows       = 0;
+    g_start_tick = rt_tick_get();
+    g_state      = DBG_LOG_ST_RUNNING;
+    LOG_I("recording started: %s", g_path);
+}
+
+/* 排空 + 关文件 + 置 IDLE（**仅 dbglog 线程调用**） */
+static void do_stop(void)
+{
+    if (g_state != DBG_LOG_ST_RUNNING)
+        return;
+
+    drain_ring();                 /* 先把残留写完 */
+
+#if !DBG_LOG_LOOPBACK
+    if (g_fd >= 0)
+    {
+        close(g_fd);        /* close 会把缓存冲进卡里，正常停止不会丢数据 */
+        g_fd = -1;
+    }
+#endif
+
+    g_state = DBG_LOG_ST_IDLE;
+    LOG_I("recording stopped, %u rows", g_rows);
+}
+
+/* --------------------------------------------------------- 记录线程
+ * 消费者：独占 g_ridx + 所有文件 I/O。
+ * LVGL 只改 g_want（想录/想停），本线程每tick 把 g_state 向 g_want 对齐：
+ * 用「目标状态」而不是「一次性请求」，连按两次 REC 也不会丢指令。 */
 static void dbg_log_thread_entry(void *parameter)
 {
     (void)parameter;
 
     for (;;)
     {
-        if (g_state == DBG_LOG_ST_RUNNING)
+        if (g_want == DBG_LOG_WANT_RECORD)
         {
-            /* 把缓冲里积累的采样一次性写掉 */
-            while (RING_COUNT() > 0)
-            {
-                write_one_row(g_ring.buf[RING_SLOT(g_ridx)]);
-                g_ridx++;
-            }
+            if (g_state != DBG_LOG_ST_RUNNING)
+                do_start();
+            else
+                drain_ring();
         }
         else
         {
+            if (g_state == DBG_LOG_ST_RUNNING)
+                do_stop();
             /* 没在记录：丢弃，避免停止期间堆积的数据在下次开始时爆出来 */
             g_ridx = g_widx;
         }
@@ -225,7 +301,9 @@ static void dbg_log_thread_entry(void *parameter)
     }
 }
 
-/* ------------------------------------------------------------- 对外 */
+/* ------------------------------------------------------------- 对外
+ * start/stop/toggle 运行在 LVGL 线程：只改 g_want，立即返回，
+ * 真正的挂载/open/write/close 全部由 dbglog 线程完成，界面不会卡。 */
 int dbg_log_init(void)
 {
     g_widx  = 0;
@@ -233,6 +311,7 @@ int dbg_log_init(void)
     g_rows  = 0;
     g_fd    = -1;
     g_state = DBG_LOG_ST_IDLE;
+    g_want  = DBG_LOG_WANT_IDLE;
 
     g_thread = rt_thread_create("dbglog", dbg_log_thread_entry, RT_NULL,
                                 DBG_LOG_STACK, DBG_LOG_PRIO, 20);
@@ -248,78 +327,20 @@ int dbg_log_init(void)
 
 int dbg_log_start(void)
 {
-    int fd;
-
-    if (g_state == DBG_LOG_ST_RUNNING)
-        return RT_EOK;
-
-    if (ensure_mounted() != RT_EOK)
-    {
-        g_state = DBG_LOG_ST_NOCARD;
-        LOG_W("sdcard not available (%s), cannot start", DBG_LOG_MOUNT_POINT);
-        return -RT_ERROR;
-    }
-
-#if !DBG_LOG_LOOPBACK
-    fd = create_log_file();
-    if (fd < 0)
-    {
-        LOG_E("create csv file failed");
-        return -RT_ERROR;
-    }
-    g_fd = fd;
-
-    {
-        static const char header[] =
-            "t_s,temp_C,humi_pct,lux,ps,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z\r\n";
-        write(g_fd, header, sizeof(header) - 1);
-    }
-#else
-    rt_snprintf(g_path, sizeof(g_path), "LOOPBACK (no card)");
-#endif
-
-    /* 丢掉停止期间堆的旧数据，从干净状态开始 */
-    g_ridx       = g_widx;
-    g_rows       = 0;
-    g_start_tick = rt_tick_get();
-    g_state      = DBG_LOG_ST_RUNNING;
-
-    LOG_I("recording started: %s", g_path);
+    g_want = DBG_LOG_WANT_RECORD;
     return RT_EOK;
 }
 
 int dbg_log_stop(void)
 {
-    if (g_state != DBG_LOG_ST_RUNNING)
-        return RT_EOK;
-
-    /* 先把残留的采样写完再关 */
-    while (RING_COUNT() > 0)
-    {
-        write_one_row(g_ring.buf[RING_SLOT(g_ridx)]);
-        g_ridx++;
-    }
-
-#if !DBG_LOG_LOOPBACK
-    if (g_fd >= 0)
-    {
-        close(g_fd);        /* close 会把缓存冲进卡里，正常停止不会丢数据 */
-        g_fd = -1;
-    }
-#endif
-
-    g_state = DBG_LOG_ST_IDLE;
-    LOG_I("recording stopped, %u rows", g_rows);
+    g_want = DBG_LOG_WANT_IDLE;
     return RT_EOK;
 }
 
 int dbg_log_toggle(void)
 {
-    if (g_state == DBG_LOG_ST_RUNNING)
-        dbg_log_stop();
-    else
-        dbg_log_start();
-
+    g_want = (g_want == DBG_LOG_WANT_RECORD) ? DBG_LOG_WANT_IDLE
+                                            : DBG_LOG_WANT_RECORD;
     return g_state;
 }
 
@@ -340,7 +361,8 @@ const char *dbg_log_path(void)
 
 /*
  * 数据入口：由 dbg_main.c 的消息分发调用，跑在 LVGL 线程。
- * 只做 memcpy + 推进写指针，绝不碰文件系统。
+ * 只做 memcpy + 推进 g_widx，绝不碰 g_ridx / 文件系统 —— 保持 SPSC，
+ * 也不会因慢卡阻塞界面。
  */
 void dbg_log_on_data(const rt_uint8_t *data, rt_uint16_t len)
 {
@@ -352,9 +374,9 @@ void dbg_log_on_data(const rt_uint8_t *data, rt_uint16_t len)
     if (g_state != DBG_LOG_ST_RUNNING)
         return;
 
-    /* 满则丢最旧的一条，保证 UI 不被阻塞 */
+    /* 满则丢最新一条（不碰 g_ridx，避免与消费者争 tail）——宁可丢采样也不阻塞 UI */
     if (RING_COUNT() >= DBG_LOG_RING)
-        g_ridx++;
+        return;
 
     slot = RING_SLOT(g_widx);
     memcpy(g_ring.buf[slot], data, SLAVE_PKT_LEN);
