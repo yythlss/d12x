@@ -28,13 +28,19 @@ int dbg_msg_init(void)
 
 int dbg_msg_send(dbg_msg_t *msg)
 {
+    /* 队列满时需要一个独立的丢弃缓冲区：rt_mq_recv() 会把队首消息拷进
+     * 传入的 buffer，若直接复用调用者的 msg，刚构造好的消息会被队首最旧
+     * 的消息整个覆盖，且随后被当作"新消息"重复入队。 */
+    dbg_msg_t discard;
+
     if (g_dbg_mq == RT_NULL || msg == RT_NULL)
         return -RT_ERROR;
 
     if (rt_mq_send(g_dbg_mq, msg, sizeof(dbg_msg_t)) != RT_EOK) {
-        /* 队列满，丢弃最旧的避免阻塞采集线程 */
-        rt_mq_recv(g_dbg_mq, msg, sizeof(dbg_msg_t), 0);
-        rt_mq_send(g_dbg_mq, msg, sizeof(dbg_msg_t));
+        rt_mq_recv(g_dbg_mq, &discard, sizeof(discard), 0);   /* 丢最旧 */
+        /* 重试入队本次消息；仍失败说明期间被别的生产者抢满，直接丢弃本次 */
+        if (rt_mq_send(g_dbg_mq, msg, sizeof(dbg_msg_t)) != RT_EOK)
+            return -RT_EFULL;
     }
     return RT_EOK;
 }

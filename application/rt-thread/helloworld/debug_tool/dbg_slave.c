@@ -65,9 +65,33 @@ static struct rt_semaphore  g_rs485_sem;
 static dbg_rs485_req_t      g_rs485_req;        /* 单缓冲：UI 串行使用（一次只发一个） */
 static dbg_rs485_result_t   g_rs485_result;     /* 最近一次结果，供 UI 取走 */
 
-/* 前置声明：定义见文件末尾，由轮询线程经信号量调用 */
+/* ------------------------------------------- 执行器写投递（第 6 步）
+ * ⚠️ 为什么执行器写也必须走信号量（与 RS485 扫描同理）：
+ *   dbg_slave_write_reg() 由 LVGL 按钮回调调用，若在 LVGL 上下文直接
+ *   rt_device_write(uart1)，会与轮询线程的 slave_do_once() 并发占用同一条
+ *   链路 → 字节交织、CRC 全错；且从机对 FC06 会回 8 字节回显，只发不收时
+ *   回显滞留在接收缓冲，被下一轮 slave_recv_frame() 当成 FC03 应答读走
+ *   → 长度不符 → 仪表盘误报 CRC 错（现场每点一次按钮就报一次）。
+ *   故这里只投递请求并立即返回，事务（含读回显）由轮询线程串行完成。 */
+static struct rt_semaphore  g_act_sem;
+#if !DBG_SLAVE_LOOPBACK
+/* LOOPBACK 下执行器写只改本地镜像，不投递事务，这两个变量无使用者 */
+static rt_uint16_t          g_act_reg;
+static rt_uint16_t          g_act_val;
+
+/* 前置声明：定义在 dbg_slave_entry() 之后（与执行器写小节在一起），此处先引用 */
+static void slave_do_actuator_write(rt_uint16_t reg, rt_uint16_t val);
+#endif
+
+/* 前置声明：定义见文件末尾，由轮询线程经信号量调用。
+ * real/loopback 两个实现互斥存在，各自的声明也必须条件编译，
+ * 否则切到真链路(LOOPBACK=0)时 dbg_rs485_run_real 只有隐式声明 → 编译失败。 */
 static void dbg_rs485_run(const dbg_rs485_req_t *req);
+#if DBG_SLAVE_LOOPBACK
 static void dbg_rs485_run_loopback(const dbg_rs485_req_t *req);
+#else
+static void dbg_rs485_run_real(const dbg_rs485_req_t *req);
+#endif
 
 /* 执行器本地镜像（第 6 步）：LOOPBACK 时直接反映 UI 操作；
  * 真实链路下由从机物理执行，主机不回读 DO_CTRL，故以本地镜像作为 UI 显示状态。 */
@@ -112,10 +136,13 @@ static rt_err_t slave_rx_ind(rt_device_t dev, rt_size_t size)
 static int slave_recv_frame(rt_uint8_t *buf, int max, int timeout_ms)
 {
     int total = 0;
-    rt_tick_t deadline = rt_tick_get() + rt_tick_from_millisecond(timeout_ms);
+    /* 用「经过时间」而非「截止时刻」比较：rt_tick_t 约 49.7 天后会回绕，
+     * 直接比较 rt_tick_get() < deadline 会在回绕后恒为假，导致每轮都超时。 */
+    rt_tick_t start = rt_tick_get();
+    rt_uint32_t wait_ticks = (rt_uint32_t)rt_tick_from_millisecond(timeout_ms);
     rt_tick_t last = rt_tick_get();
 
-    while (rt_tick_get() < deadline) {
+    while ((rt_uint32_t)(rt_tick_get() - start) < wait_ticks) {
         int n = (int)rt_device_read(g_dev, 0, buf + total, max - total);
 
         if (n > 0) {
@@ -302,22 +329,71 @@ static void dbg_slave_entry(void *param)
     (void)param;
 
     while (1) {
-        /* RS485 扫描事务优先：有请求先处理（保证 uart1 独占、应答不被下一轮轮询吞掉），
-         * 否则做常规仪表盘轮询。信号量超时就当一次正常的 500ms 轮询间隔。 */
-        if (rt_sem_take(&g_rs485_sem, rt_tick_from_millisecond(SLAVE_POLL_MS)) == RT_EOK) {
+        /* 事务一律在此线程串行执行，保证 uart1 独占：
+         *   1) 执行器写优先（用户在点按钮，延迟要低）
+         *   2) 其次 RS485 扫描事务（保证应答不被下一轮轮询「抢走」导致帧错乱）
+         *   3) 最后常规仪表盘轮询
+         *
+         * 三个信号量**共用一个等待窗口**：用剩余预算而不是各等满
+         * SLAVE_POLL_MS，否则「执行器 500ms + 扫描 500ms」串行等待会把无操作时的
+         * 仪表盘刷新周期从 500ms 拖到 1000ms（串口回复仍正确，只是刷新变慢）。
+         * 预算耗尽且无请求时，本轮就做一次常规轮询，周期稳定在 SLAVE_POLL_MS。 */
+        rt_tick_t  budget = rt_tick_from_millisecond(SLAVE_POLL_MS);
+        rt_tick_t  entry  = rt_tick_get();
+        int        did_io = 0;
+
+#if !DBG_SLAVE_LOOPBACK
+        if (rt_sem_take(&g_act_sem, budget) == RT_EOK) {
+            slave_do_actuator_write(g_act_reg, g_act_val);
+            did_io = 1;
+            budget -= (rt_uint32_t)(rt_tick_get() - entry);      /* 写完接着用剩余预算 */
+        }
+#endif
+
+        if (budget > 0 &&
+            rt_sem_take(&g_rs485_sem, budget) == RT_EOK) {
             dbg_rs485_run(&g_rs485_req);
-        } else {
+            did_io = 1;
+        }
+
+        /* 本轮既没写也没扫描：把剩下的预算花在常规轮询上，
+         * 不足一个 tick 时直接进入下一轮（此时距上轮已至少间隔一个周期） */
+        if (!did_io) {
+            rt_tick_t wait = rt_tick_get() - entry;
+            if (wait < budget)
+                rt_thread_mdelay((rt_uint32_t)
+                    ((budget - wait) * 1000u / (rt_uint32_t)RT_TICK_PER_SECOND));
             slave_do_once();
         }
     }
 }
 
 /* -------------------------------------------------------- 执行器写（第 6 步） */
-int dbg_slave_write_reg(rt_uint16_t reg, rt_uint16_t val)
+#if !DBG_SLAVE_LOOPBACK
+/* 轮询线程侧：真正发一帧 FC06 并**读掉回显**（仅轮询线程调用）。
+ * 从机会把请求原样回显 8 字节，必须收掉，否则会污染下一轮 FC03 解析。 */
+static void slave_do_actuator_write(rt_uint16_t reg, rt_uint16_t val)
 {
     rt_uint8_t  tx[8];
+    rt_uint8_t  rx[SLAVE_FRAME_MAX];
     rt_uint16_t crc;
+    int         got;
 
+    tx[0] = DBG_SLAVE_ADDR;
+    tx[1] = MODBUS_FC_WRITE_SINGLE_REG;
+    put16(&tx[2], reg);
+    put16(&tx[4], val);
+    crc = dbg_modbus_crc16(tx, 6);
+    put_crc(&tx[6], crc);
+
+    /* 返回值语义同 slave_exchange：0 成功 / 1 超时 / 2 CRC错 / 3 异常 / 4 发送失败。
+     * 写失败不重试——本地镜像已同步，UI 靠镜像维持高亮，下一次操作会覆盖。 */
+    slave_exchange(tx, sizeof(tx), rx, SLAVE_FRAME_MAX, &got);
+}
+#endif /* !DBG_SLAVE_LOOPBACK */
+
+int dbg_slave_write_reg(rt_uint16_t reg, rt_uint16_t val)
+{
     /* 只放行执行器相关的四个寄存器，避免 UI 误写采集区 */
     if (reg != R_DO_CTRL && reg != R_PWM_DUTY &&
         reg != R_LED_FX   && reg != R_LED_FX_ARG)
@@ -331,20 +407,16 @@ int dbg_slave_write_reg(rt_uint16_t reg, rt_uint16_t val)
     else                          g_led_fx_arg = val;
     return RT_EOK;
 #else
-    tx[0] = DBG_SLAVE_ADDR;
-    tx[1] = MODBUS_FC_WRITE_SINGLE_REG;
-    put16(&tx[2], reg);
-    put16(&tx[4], val);
-    crc = dbg_modbus_crc16(tx, 6);
-    put_crc(&tx[6], crc);
-
-    if (rt_device_write(g_dev, 0, tx, sizeof(tx)) != sizeof(tx))
-        return -RT_ERROR;
-    /* 真实链路下也同步本地镜像：主机不回读这两格，UI 需要它维持按钮高亮 */
+    /* 真实链路：本地镜像立即更新（主机不回读这两格，UI 需要它维持按钮高亮），
+     * 然后把帧投递给轮询线程串行收发——不在 LVGL 上下文碰 uart1。 */
     if      (reg == R_DO_CTRL)    g_do_ctrl  = val;
     else if (reg == R_PWM_DUTY)   g_pwm_duty = val;
     else if (reg == R_LED_FX)     g_led_fx   = val;
     else                          g_led_fx_arg = val;
+
+    g_act_reg = reg;
+    g_act_val = val;
+    rt_sem_release(&g_act_sem);
     return RT_EOK;
 #endif
 }
@@ -617,6 +689,8 @@ int dbg_slave_init(void)
     rt_thread_t tid;
 
     rt_sem_init(&g_rs485_sem, "slv_rs", 0, RT_IPC_FLAG_FIFO);   /* 扫描事务信号量 */
+    /* 执行器写信号量：LOOPBACK 下不使用，但仍初始化以免条件编译下漏掉 */
+    rt_sem_init(&g_act_sem, "slv_act", 0, RT_IPC_FLAG_FIFO);
 
 #if !DBG_SLAVE_LOOPBACK
     struct serial_configure cfg = RT_SERIAL_CONFIG_DEFAULT;
