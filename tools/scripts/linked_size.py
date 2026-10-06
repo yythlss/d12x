@@ -289,7 +289,7 @@ if __name__ == '__main__':
 
     mapfile = args.map
     lines = []
-    with open(mapfile, 'r+') as fm:
+    with open(mapfile, 'r') as fm:
         lines = fm.readlines()
 
     stat = get_linked_size(lines)

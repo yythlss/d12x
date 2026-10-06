@@ -19,6 +19,7 @@
 #define DBG_MSG_ADC_VAL       0x05  /* ADC 采样值 */
 #define DBG_MSG_MODBUS_RESULT 0x06  /* Modbus 应答结果 */
 #define DBG_MSG_SLAVE_DATA    0x07  /* 从机仪表盘数据（见 dbg_slave.h 偏移定义） */
+#define DBG_MSG_RS485_RESULT  0x08  /* RS485 透传扫描结果（dbg_rs485_result_t，见 dbg_slave.h） */
 
 /* 消息体大小 */
 #define DBG_MSG_DATA_MAX      64

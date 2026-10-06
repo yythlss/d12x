@@ -90,4 +90,63 @@ rt_uint16_t dbg_slave_get_led_fx(void);
 /* 一次性设置灯效模式 + 参数（等价于两次 FC06，但只发一帧后者自动补齐） */
 int dbg_slave_set_led_fx(rt_uint16_t mode, rt_uint16_t arg);
 
+/* ============================================================ RS485 透传扫描（第 7 步）
+ * 主机不直接对现场 Modbus 设备做主站，而是把「请求帧原始字节」交给星火一号的
+ * RS485 网关（REG 0x0300~0x0307 + 0x0380 数据区），由网关发到 RS485 总线并把应答
+ * 回填数据区。这样 D12x 侧不需要任何 Modbus 主站栈，纯做字节搬运 + 解析。
+ *
+ * 关键约束：uart1 被本模块的轮询线程独占，扫描事务（FC16 装帧 -> FC06 触发 -> FC03
+ * 轮询 ST/读应答）必须也在该线程里执行，否则响应会被下一轮仪表盘轮询吞掉。
+ * 因此扫描请求走一个信号量投递给轮询线程，由它串行执行后通过消息总线回传结果。
+ * ============================================================ */
+/* 网关寄存器映射（与从机 mb_slave.c 的 REG_RS485_* 严格对齐） */
+#define R_RS485_CTRL    0x0300   /* WO 写 1 触发一次透传（自清） */
+#define R_RS485_ADDR    0x0301   /* RW 目标从站地址 1~247 */
+#define R_RS485_FUNC    0x0302   /* RW 功能码 3/6/16 */
+#define R_RS485_QTY     0x0303   /* RW 数量 */
+#define R_RS485_ST      0x0304   /* RO 状态 0空闲/1忙/2成功/3超时/4校验错/5超长 */
+#define R_RS485_OUTLEN  0x0305   /* RO 本次发出字节数 */
+#define R_RS485_INLEN   0x0306   /* RO 收到应答字节数 */
+#define R_RS485_ERRCNT  0x0307   /* RO 累计失败次数 */
+#define R_RS485_DATA    0x0380   /* RW 透传数据区，每寄存器装 1 字节 */
+
+#define DBG_RS485_BUF_MAX    128   /* 与从机 RS485_BUF_MAX 对齐（应答窗口上限） */
+/* FC16 写数据区受从机 FC16 处理约束 qty<=123（byteCount=2*qty）限制：
+ * 请求帧长 = 9 + 2*N（N 为寄存器数），故 N <= 56 时帧长 121~123 才塞得进单次 FC16 写。 */
+#define DBG_RS485_FC16_MAX   56
+/* 单次 FC16 写数据区的最大寄存器数（从机非法数据值判定：qty>123 失败） */
+#define DBG_RS485_LOAD_MAX   123
+
+/* 网关状态（与从机 RS485 网关一致） */
+#define DBG_RS485_ST_IDLE     0
+#define DBG_RS485_ST_BUSY     1
+#define DBG_RS485_ST_OK       2
+#define DBG_RS485_ST_TIMEOUT  3
+#define DBG_RS485_ST_CRC_ERR  4
+#define DBG_RS485_ST_OVERFLOW 5
+
+/* 一次扫描请求：扫描页把用户操作抽象成此结构 */
+typedef struct {
+    rt_uint8_t  func;                     /* 3 读 / 6 写单 / 16 写多 */
+    rt_uint8_t  addr;                     /* 目标从站地址 1~247 */
+    rt_uint16_t reg;                      /* 起始寄存器 */
+    rt_uint16_t qty;                      /* FC03/FC16：寄存器个数；FC06：要写的值 */
+    rt_uint16_t data[DBG_RS485_FC16_MAX]; /* FC16 载荷（每项是寄存器值，大端 2 字节） */
+} dbg_rs485_req_t;
+
+/* 执行结果：链路线程填好，扫描页从全局取走（应答可能 > 64 字节，不走消息体） */
+typedef struct {
+    rt_uint8_t  status;                   /* DBG_RS485_ST_* */
+    rt_uint16_t out_len;                  /* 发出的请求字节数 */
+    rt_uint16_t in_len;                   /* 收到的应答字节数 */
+    rt_uint8_t  rsp[DBG_RS485_BUF_MAX];   /* 应答原始字节（含 addr/func/.../CRC） */
+} dbg_rs485_result_t;
+
+/* 提交一次 RS485 透传请求（非阻塞：交给轮询线程，结果经 DBG_MSG_RS485_RESULT 回传）。
+ * 返回 RT_EOK 表示已入队；参数非法返回 -RT_EINVAL。 */
+int dbg_slave_rs485_request(const dbg_rs485_req_t *req);
+
+/* 取最近一次结果（收到 DBG_MSG_RS485_RESULT 后调用）。返回 RT_EOK 表示成功拷贝。 */
+int dbg_slave_rs485_get_result(dbg_rs485_result_t *out);
+
 #endif /* __DBG_SLAVE_H__ */

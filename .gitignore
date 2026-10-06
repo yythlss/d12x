@@ -1,10 +1,8 @@
 *.pyc
-.config
 .config.old
 .defconfig
 .dirlist
 cconfig.h
-rtconfig.h
 partition_table.h
 .sconsign.dblite
 .Kconfig.prj

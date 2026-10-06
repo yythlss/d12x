@@ -219,13 +219,14 @@ lv_obj_t *ui_serial_screen_create(void)
     lv_label_set_long_mode(g_rx_label, LV_LABEL_LONG_WRAP);
     lv_obj_align(g_rx_label, LV_ALIGN_TOP_LEFT, 8, 22);
 
-    /* 底部操作区 */
+    /* 底部操作区（Send / Clear 在右下角，不压 RX 卡片） */
     make_btn(g_serial_screen, "Send", CLR_ACCENT, serial_send_cb,
              68, 40, LV_ALIGN_BOTTOM_RIGHT, -84, -8, 1);
     make_btn(g_serial_screen, "Clear", CLR_ACCENT, serial_clear_cb,
              68, 40, LV_ALIGN_BOTTOM_RIGHT, -8, -8, 0);
+    /* Modbus Test 放在标题栏右侧（Back 按钮左边），避免压住 RX 卡片 */
     make_btn(g_serial_screen, "Modbus Test", CLR_ACCENT, modbus_test_cb,
-             100, 40, LV_ALIGN_BOTTOM_RIGHT, -84, -56, 0);
+             100, 34, LV_ALIGN_TOP_RIGHT, -72, 5, 0);
 
     /* 发送输入框 */
     g_ta_send = lv_textarea_create(g_serial_screen);

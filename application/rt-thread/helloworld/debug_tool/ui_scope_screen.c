@@ -245,7 +245,7 @@ lv_obj_t *ui_scope_screen_create(void)
     g_lbl_value = lv_label_create(g_scope_screen);
     lv_label_set_text(g_lbl_value, "-- mV");
     lv_obj_set_style_text_color(g_lbl_value, CLR_TITLE_BAR, 0);
-    lv_obj_align(g_lbl_value, LV_ALIGN_TOP_LEFT, SCOPE_LEFT + 300, bar_y + 8);
+    lv_obj_align(g_lbl_value, LV_ALIGN_TOP_LEFT, SCOPE_LEFT + 240, bar_y + 8);
 
     /* 清空 */
     make_btn(g_scope_screen, "Clear", CLR_TEXT_DARK, scope_clear_cb, 56, 34,
@@ -279,8 +279,8 @@ void ui_scope_on_adc(const rt_uint8_t *data, rt_uint16_t len)
     if (dbg_adc_is_running())
         scope_push_sample(adc);
 
-    /* 更新读数 */
-    snprintf(buf, sizeof(buf), "%d mV (%d)", (int)mv, (int)adc);
+    /* 更新读数（只显示 mV，避免底栏与右侧 Clear 按钮重叠） */
+    snprintf(buf, sizeof(buf), "%d mV", (int)mv);
     lv_label_set_text(g_lbl_value, buf);
 
     /* 数据源变化时刷新 */

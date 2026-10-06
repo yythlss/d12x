@@ -26,6 +26,7 @@
 #include "ui_can_screen.h"
 #include "ui_scope_screen.h"
 #include "ui_slave_screen.h"
+#include "ui_rs485_screen.h"
 
 static lv_obj_t *g_main_screen;
 
@@ -49,6 +50,9 @@ static void dbg_msg_dispatch(dbg_msg_t *msg)
         /* 记录模块先入队（内部只是 memcpy，不会拖慢 UI），再刷新仪表盘 */
         dbg_log_on_data(msg->data, msg->len);
         ui_slave_on_data(msg->data, msg->len);
+        break;
+    case DBG_MSG_RS485_RESULT:
+        ui_rs485_on_result(msg->data, msg->len);
         break;
     default:
         break;

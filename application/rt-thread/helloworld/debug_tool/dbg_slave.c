@@ -58,6 +58,17 @@ static rt_uint8_t           g_last_rx[32];
 static int                  g_last_len;
 static rt_uint8_t           g_last_status;
 
+/* --------------------------------------------------- RS485 扫描（第 7 步）
+ * 扫描请求通过信号量投递给轮询线程，避免与仪表盘轮询并发占用 uart1，
+ * 也避免写请求的应答被下一轮轮询「抢走」导致帧错乱。 */
+static struct rt_semaphore  g_rs485_sem;
+static dbg_rs485_req_t      g_rs485_req;        /* 单缓冲：UI 串行使用（一次只发一个） */
+static dbg_rs485_result_t   g_rs485_result;     /* 最近一次结果，供 UI 取走 */
+
+/* 前置声明：定义见文件末尾，由轮询线程经信号量调用 */
+static void dbg_rs485_run(const dbg_rs485_req_t *req);
+static void dbg_rs485_run_loopback(const dbg_rs485_req_t *req);
+
 /* 执行器本地镜像（第 6 步）：LOOPBACK 时直接反映 UI 操作；
  * 真实链路下由从机物理执行，主机不回读 DO_CTRL，故以本地镜像作为 UI 显示状态。 */
 static rt_uint16_t          g_do_ctrl = 0;
@@ -121,6 +132,24 @@ static int slave_recv_frame(rt_uint8_t *buf, int max, int timeout_ms)
         rt_thread_mdelay(1);
     }
     return total;
+}
+#endif /* !DBG_SLAVE_LOOPBACK */
+
+#if !DBG_SLAVE_LOOPBACK
+/* 发送一帧并收应答（带 CRC 校验）。返回 0 成功 / 1 超时 / 2 CRC错 / 3 从机异常 / 4 发送失败 */
+static int slave_exchange(const rt_uint8_t *tx, int txlen, rt_uint8_t *rx, int rxmax, int *got)
+{
+    if (rt_device_write(g_dev, 0, tx, (rt_size_t)txlen) != (rt_size_t)txlen)
+        return 4;
+
+    *got = slave_recv_frame(rx, rxmax, SLAVE_TIMEOUT_MS);
+    if (*got < 5)
+        return 1;                                   /* 超时 */
+    if (rx[1] & 0x80)
+        return 3;                                   /* 从机异常应答 */
+    if (get_crc(&rx[*got - 2]) != dbg_modbus_crc16(rx, (rt_uint32_t)(*got - 2)))
+        return 2;                                   /* CRC 错 */
+    return 0;
 }
 #endif /* !DBG_SLAVE_LOOPBACK */
 
@@ -273,8 +302,13 @@ static void dbg_slave_entry(void *param)
     (void)param;
 
     while (1) {
-        slave_do_once();
-        rt_thread_mdelay(SLAVE_POLL_MS);
+        /* RS485 扫描事务优先：有请求先处理（保证 uart1 独占、应答不被下一轮轮询吞掉），
+         * 否则做常规仪表盘轮询。信号量超时就当一次正常的 500ms 轮询间隔。 */
+        if (rt_sem_take(&g_rs485_sem, rt_tick_from_millisecond(SLAVE_POLL_MS)) == RT_EOK) {
+            dbg_rs485_run(&g_rs485_req);
+        } else {
+            slave_do_once();
+        }
     }
 }
 
@@ -337,9 +371,252 @@ int dbg_slave_set_led_fx(rt_uint16_t mode, rt_uint16_t arg)
     return RT_EOK;
 }
 
+/* ---------------------------------------- RS485 透传扫描（第 7 步） */
+/* 组请求帧（含 2 字节 CRC 占位，网关会重算并覆盖最后 2 字节） */
+static void dbg_rs485_build_req(const dbg_rs485_req_t *req, rt_uint8_t *b, int *len)
+{
+    int i;
+
+    b[0] = req->addr;
+    b[1] = req->func;
+    put16(&b[2], req->reg);
+    if (req->func == MODBUS_FC_READ_HOLD_REGS ||
+        req->func == MODBUS_FC_WRITE_SINGLE_REG) {
+        put16(&b[4], req->qty);          /* 读：数量；写单：值 */
+        *len = 6;
+    } else {                              /* FC16 写多 */
+        put16(&b[4], req->qty);
+        b[6] = (rt_uint8_t)(req->qty * 2);
+        for (i = 0; i < (int)req->qty; i++)
+            put16(&b[7 + i * 2], req->data[i]);
+        *len = 7 + (int)req->qty * 2;
+    }
+    b[*len] = 0;                          /* 末尾补 2 字节 CRC 占位 */
+    b[*len + 1] = 0;
+    *len += 2;
+}
+
+/* 把结果通过消息总线回传（仅状态/长度走消息体，应答字节由 UI 调 get_result 取走） */
+static void dbg_rs485_post_result(void)
+{
+    dbg_msg_t msg;
+
+    memset(&msg, 0, sizeof(msg));
+    msg.type = DBG_MSG_RS485_RESULT;
+    msg.len  = 5;
+    msg.data[0] = g_rs485_result.status;
+    put16(&msg.data[1], g_rs485_result.out_len);
+    put16(&msg.data[3], g_rs485_result.in_len);
+    dbg_msg_send(&msg);
+}
+
+/* 扫描事务统一入口：真实/自测共用，由轮询线程调用 */
+static void dbg_rs485_run(const dbg_rs485_req_t *req)
+{
+#if DBG_SLAVE_LOOPBACK
+    dbg_rs485_run_loopback(req);
+#else
+    dbg_rs485_run_real(req);
+#endif
+}
+
+int dbg_slave_rs485_request(const dbg_rs485_req_t *req)
+{
+    if (req == RT_NULL)
+        return -RT_EINVAL;
+    if (req->func != MODBUS_FC_READ_HOLD_REGS &&
+        req->func != MODBUS_FC_WRITE_SINGLE_REG &&
+        req->func != MODBUS_FC_WRITE_MULTI_REGS)
+        return -RT_EINVAL;
+    if (req->addr < 1 || req->addr > 247)
+        return -RT_EINVAL;
+    if (req->func == MODBUS_FC_READ_HOLD_REGS && (req->qty < 1 || req->qty > 125))
+        return -RT_EINVAL;
+    if (req->func == MODBUS_FC_WRITE_MULTI_REGS &&
+        (req->qty < 1 || req->qty > DBG_RS485_FC16_MAX))
+        return -RT_EINVAL;
+
+    g_rs485_req = *req;                   /* 单缓冲，UI 串行使用（一次只发一个） */
+    rt_sem_release(&g_rs485_sem);
+    return RT_EOK;
+}
+
+int dbg_slave_rs485_get_result(dbg_rs485_result_t *out)
+{
+    if (out == RT_NULL)
+        return -RT_ERROR;
+    *out = g_rs485_result;
+    return RT_EOK;
+}
+
+#if !DBG_SLAVE_LOOPBACK
+/* 真实链路：通过星火一号的 RS485 网关完成一次透传。
+ * 链路（全部走 uart1 -> 从机 FC03/FC06/FC16）：
+ *   1) FC16 把请求原始字节写入 0x0380
+ *   2) FC06 写 OUTLEN(0x0305) = 请求字节数
+ *   3) FC06 写 CTRL(0x0300) = 1 触发网关
+ *   4) FC03 轮询 ST(0x0304) 直到终态（最长 ~1.5s）
+ *   5) FC03 读 0x0380 起 INLEN 字节 = 应答 */
+static void dbg_rs485_run_real(const dbg_rs485_req_t *req)
+{
+    rt_uint8_t req_bytes[DBG_RS485_BUF_MAX + 4];
+    rt_uint8_t rx[SLAVE_FRAME_MAX];
+    rt_uint8_t frame[7 + 2 * DBG_RS485_BUF_MAX + 2];
+    rt_uint16_t crc;
+    int len, got, r, i;
+    rt_uint16_t st, inlen;
+    rt_uint32_t waited;
+
+    dbg_rs485_build_req(req, req_bytes, &len);
+    if (len > DBG_RS485_LOAD_MAX)
+        len = DBG_RS485_LOAD_MAX;
+    g_rs485_result.out_len = (rt_uint16_t)len;
+    memset(g_rs485_result.rsp, 0, sizeof(g_rs485_result.rsp));
+    g_rs485_result.in_len = 0;
+    g_rs485_result.status = DBG_RS485_ST_TIMEOUT;   /* 默认失败 = 超时 */
+
+    /* 1) 写请求字节到网关数据区 0x0380。
+     *    关键：网关数据区「每寄存器装 1 字节（取低字节）」，但标准 FC16 要求
+     *    byteCount == 2*qty。所以这里把每个请求字节放到 16 位寄存器的【低字节】、
+     *    高字节填 0，byteCount 仍按标准写 2*len —— 这样既满足从机合法性检查，
+     *    网关取低字节时又正好还原出原始请求帧。 */
+    frame[0] = DBG_SLAVE_ADDR;
+    frame[1] = MODBUS_FC_WRITE_MULTI_REGS;
+    put16(&frame[2], R_RS485_DATA);
+    put16(&frame[4], (rt_uint16_t)len);
+    frame[6] = (rt_uint8_t)(2 * len);                /* byteCount = 2*len（标准） */
+    for (i = 0; i < len; i++) {
+        frame[7 + i * 2]     = 0;                    /* 高字节 = 0 */
+        frame[7 + i * 2 + 1] = req_bytes[i];          /* 低字节 = 请求字节 */
+    }
+    crc = dbg_modbus_crc16(frame, (rt_uint32_t)(7 + 2 * len));
+    put_crc(&frame[7 + 2 * len], crc);
+    r = slave_exchange(frame, 7 + 2 * len + 2, rx, SLAVE_FRAME_MAX, &got);
+    if (r != 0) {                                   /* 写数据区失败：网关没拿到请求 */
+        dbg_rs485_post_result();
+        return;
+    }
+
+    /* 2) 写 OUTLEN(0x0305) = len（网关据此取字节数，并自管补 CRC） */
+    frame[0] = DBG_SLAVE_ADDR;
+    frame[1] = MODBUS_FC_WRITE_SINGLE_REG;
+    put16(&frame[2], R_RS485_OUTLEN);
+    put16(&frame[4], (rt_uint16_t)len);
+    crc = dbg_modbus_crc16(frame, 6);
+    put_crc(&frame[6], crc);
+    slave_exchange(frame, 8, rx, SLAVE_FRAME_MAX, &got);   /* best-effort */
+
+    /* 3) 写 CTRL(0x0300) = 1 触发网关 */
+    frame[0] = DBG_SLAVE_ADDR;
+    frame[1] = MODBUS_FC_WRITE_SINGLE_REG;
+    put16(&frame[2], R_RS485_CTRL);
+    put16(&frame[4], 1);
+    crc = dbg_modbus_crc16(frame, 6);
+    put_crc(&frame[6], crc);
+    slave_exchange(frame, 8, rx, SLAVE_FRAME_MAX, &got);   /* best-effort */
+
+    /* 4) 轮询 ST（读 0x0304 起 3 寄存器：ST/OUTLEN/INLEN）直到终态 */
+    st = DBG_RS485_ST_BUSY;
+    inlen = 0;
+    waited = 0;
+    while (st == DBG_RS485_ST_IDLE || st == DBG_RS485_ST_BUSY) {
+        frame[0] = DBG_SLAVE_ADDR;
+        frame[1] = MODBUS_FC_READ_HOLD_REGS;
+        put16(&frame[2], R_RS485_ST);
+        put16(&frame[4], 3);
+        crc = dbg_modbus_crc16(frame, 6);
+        put_crc(&frame[6], crc);
+        r = slave_exchange(frame, 8, rx, SLAVE_FRAME_MAX, &got);
+        if (r == 0 && got >= 11) {
+            st    = get16(&rx[3]);     /* 0x0304 ST */
+            inlen = get16(&rx[7]);     /* 0x0306 INLEN */
+        }
+        rt_thread_mdelay(20);
+        waited += 20;
+        if (waited > 1500)
+            break;
+    }
+
+    g_rs485_result.status = (rt_uint8_t)st;
+
+    /* 5) 成功则读 0x0380 起 INLEN 字节（每寄存器低字节 = 应答字节） */
+    if (st == DBG_RS485_ST_OK && inlen > 0) {
+        if (inlen > DBG_RS485_BUF_MAX)
+            inlen = DBG_RS485_BUF_MAX;
+        g_rs485_result.in_len = inlen;
+        frame[0] = DBG_SLAVE_ADDR;
+        frame[1] = MODBUS_FC_READ_HOLD_REGS;
+        put16(&frame[2], R_RS485_DATA);
+        put16(&frame[4], inlen);
+        crc = dbg_modbus_crc16(frame, 6);
+        put_crc(&frame[6], crc);
+        r = slave_exchange(frame, 8, rx, SLAVE_FRAME_MAX, &got);
+        if (r == 0 && got >= (int)(5 + 2 * inlen)) {
+            for (i = 0; i < (int)inlen; i++)
+                g_rs485_result.rsp[i] = (rt_uint8_t)(get16(&rx[3 + i * 2]) & 0xFFu);
+        } else {
+            g_rs485_result.in_len = 0;   /* 读应答失败：保留 status=ok 但无数据 */
+        }
+    }
+
+    dbg_rs485_post_result();
+}
+#endif /* !DBG_SLAVE_LOOPBACK */
+
+#if DBG_SLAVE_LOOPBACK
+/* 自测：合成一次「假现场设备」应答，镜像从机 mb_rs485_sim_rsp 的语义。
+ * 证的是扫描页这条软件链路（组帧 -> 触发 -> 轮询 -> 回填 -> 解析）对，
+ * 不代表真实硬件/真现场设备存在。 */
+static void dbg_rs485_run_loopback(const dbg_rs485_req_t *req)
+{
+    rt_uint8_t rsp[DBG_RS485_BUF_MAX];
+    rt_uint8_t tmp[DBG_RS485_BUF_MAX + 4];
+    rt_uint16_t crc;
+    int len, n = 0, i;
+
+    dbg_rs485_build_req(req, tmp, &len);
+    g_rs485_result.out_len = (rt_uint16_t)len;
+    memset(g_rs485_result.rsp, 0, sizeof(g_rs485_result.rsp));
+    g_rs485_result.in_len = 0;
+
+    rsp[0] = req->addr;
+    rsp[1] = req->func;
+    if (req->func == MODBUS_FC_READ_HOLD_REGS) {
+        rt_uint16_t q = (req->qty == 0 || req->qty > 60) ? 2 : req->qty;
+        rsp[2] = (rt_uint8_t)(q * 2);
+        for (i = 0; i < (int)q; i++)
+            put16(&rsp[3 + i * 2], (rt_uint16_t)(0x0100 + i));   /* 假数据，便于看错位 */
+        n = 3 + (int)q * 2;
+    } else if (req->func == MODBUS_FC_WRITE_SINGLE_REG) {
+        put16(&rsp[2], req->reg);
+        put16(&rsp[4], req->qty);
+        n = 6;
+    } else {   /* FC16 */
+        put16(&rsp[2], req->reg);
+        put16(&rsp[4], req->qty);
+        n = 6;
+    }
+
+    if (n + 2 <= DBG_RS485_BUF_MAX) {
+        crc = dbg_modbus_crc16(rsp, (rt_uint32_t)n);
+        put_crc(&rsp[n], crc);
+        n += 2;
+        memcpy(g_rs485_result.rsp, rsp, (rt_size_t)n);
+        g_rs485_result.in_len = (rt_uint16_t)n;
+        g_rs485_result.status = DBG_RS485_ST_OK;
+    } else {
+        g_rs485_result.status = DBG_RS485_ST_OVERFLOW;
+    }
+
+    dbg_rs485_post_result();
+}
+#endif /* DBG_SLAVE_LOOPBACK */
+
 int dbg_slave_init(void)
 {
     rt_thread_t tid;
+
+    rt_sem_init(&g_rs485_sem, "slv_rs", 0, RT_IPC_FLAG_FIFO);   /* 扫描事务信号量 */
 
 #if !DBG_SLAVE_LOOPBACK
     struct serial_configure cfg = RT_SERIAL_CONFIG_DEFAULT;
