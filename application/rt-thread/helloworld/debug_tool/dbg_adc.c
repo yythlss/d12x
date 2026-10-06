@@ -243,3 +243,37 @@ const char *dbg_adc_source_name(void)
 {
     return (g_source == DBG_ADC_SRC_GPAI) ? "GPAI" : "SYNTH";
 }
+
+/* 线程安全地读取指定 GPAI 通道电压（mV）。
+ * 关键：与示波采样线程共用 g_adc_lock —— gpai 驱动内部无锁，
+ * 两个线程同时 rt_adc_control(GET_CH_INFO) 抽同一个FIFO 会竞态。 */
+int dbg_adc_read_mv(rt_uint8_t ch, rt_uint16_t *mv)
+{
+    if (mv == RT_NULL)
+        return -RT_EINVAL;
+    *mv = 0;
+
+#ifdef AIC_GPAI_DRV
+    if (g_gpai != RT_NULL && ch < DBG_ADC_CH_NUM) {
+        struct aic_gpai_ch_info info;
+        rt_uint16_t adc_val;
+        rt_uint32_t cal;
+        int v = 0;
+
+        rt_mutex_take(g_adc_lock, RT_WAITING_FOREVER);
+        memset(&info, 0, sizeof(info));
+        info.chan_id = ch;
+        if (rt_adc_control(g_gpai, RT_ADC_CMD_GET_CH_INFO, (void *)&info) == RT_EOK
+            && info.fifo_valid_cnt > 0) {
+            adc_val = info.adc_values[info.fifo_valid_cnt - 1];
+            cal = hal_adcim_auto_calibration();
+            v = hal_adcim_adc2voltage(&adc_val, cal, DBG_ADC_VOLTAGE_SCALE, 3);
+            if (v > 0)
+                *mv = (rt_uint16_t)((rt_uint32_t)v / 10);  /* scale=10000 -> mV */
+        }
+        rt_mutex_release(g_adc_lock);
+        return RT_EOK;
+    }
+#endif
+    return -RT_ERROR;
+}

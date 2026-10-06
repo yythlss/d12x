@@ -66,4 +66,10 @@ int  dbg_adc_is_running(void);
 /* 查询当前数据源名称（"SYNTH" / "GPAI"） */
 const char *dbg_adc_source_name(void);
 
+/* 线程安全地读取指定 GPAI 通道电压（mV）。
+ * 与示波采样线程共用同一把锁，避免两个线程并发 drain 同一个 gpai 设备
+ * （gpai 驱动内部无锁，并发调用会产生竞态）。供 dbg_power 等模块复用。
+ * 通道无效或 GPAI 未启用时返回 -RT_ERROR。*/
+int  dbg_adc_read_mv(rt_uint8_t ch, rt_uint16_t *mv);
+
 #endif /* __DBG_ADC_H__ */
