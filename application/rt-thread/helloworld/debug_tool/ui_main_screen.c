@@ -16,6 +16,7 @@
 #include "ui_scope_screen.h"
 #include "ui_slave_screen.h"
 #include "ui_rs485_screen.h"
+#include "dbg_power.h"
 
 #define DBG_MAIN_GAP     10
 #define DBG_MAIN_TOP     70      /* 第一张卡顶部距屏幕顶 */
@@ -39,6 +40,11 @@ static lv_obj_t *g_scope_screen;
 static lv_obj_t *g_slave_screen;
 static lv_obj_t *g_rs485_screen;
 static lv_obj_t *g_main_screen;
+
+/* 电量 / 低功耗 UI 元素 */
+static lv_obj_t *g_lbl_bat;      /* 顶栏右侧电量标签 */
+static lv_obj_t *g_btn_sleep;    /* 顶栏左侧睡眠/唤醒按钮 */
+static lv_timer_t *g_bat_timer;
 
 /* 菜单卡片数量：改这里即可自动重排 */
 #define MAIN_CARD_NUM    5
@@ -122,12 +128,45 @@ static lv_obj_t *create_menu_card(lv_obj_t *parent, const char *title,
     return card;
 }
 
+/* 电池电量周期刷新（每 2s 采样一次，更新顶栏标签） */
+static void bat_timer_cb(lv_timer_t *t)
+{
+    char buf[32];
+
+    (void)t;
+    dbg_power_sample();
+
+    if (!dbg_power_available()) {
+        lv_label_set_text(g_lbl_bat, "BAT N/A");
+    } else {
+        rt_uint16_t mv = dbg_power_get_mv();
+        rt_uint8_t pct = dbg_power_get_pct();
+        snprintf(buf, sizeof(buf), "BAT %d%% %dmV", (int)pct, (int)mv);
+        lv_label_set_text(g_lbl_bat, buf);
+    }
+}
+
+/* 睡眠按钮：切换 LIGHT 睡眠 / 唤醒（轻点屏幕也可唤醒） */
+static void sleep_btn_cb(lv_event_t *e)
+{
+    (void)e;
+    if (dbg_power_is_suspended())
+        dbg_power_resume();
+    else
+        dbg_power_suspend();
+
+    lv_obj_t *lbl = lv_obj_get_child(g_btn_sleep, 0);
+    if (lbl)
+        lv_label_set_text(lbl, dbg_power_is_suspended() ? "Wake" : "Sleep");
+}
+
 lv_obj_t *ui_main_screen_create(void)
 {
     if (g_main_screen != NULL)
         return g_main_screen;
 
     g_main_screen = lv_obj_create(NULL);
+
     lv_obj_set_size(g_main_screen, LV_HOR_RES, LV_VER_RES);
     lv_obj_set_style_bg_color(g_main_screen, CLR_BG, 0);
     lv_obj_set_style_bg_opa(g_main_screen, LV_OPA_COVER, 0);
@@ -145,6 +184,30 @@ lv_obj_t *ui_main_screen_create(void)
     lv_label_set_text(title, "Industrial Debug Tool");
     lv_obj_set_style_text_color(title, CLR_TEXT_TITLE, 0);
     lv_obj_center(title);
+
+    /* 顶栏左侧：睡眠/唤醒按钮（轻点屏幕亦可唤醒） */
+    g_btn_sleep = lv_button_create(head);
+    lv_obj_set_size(g_btn_sleep, 64, 32);
+    lv_obj_align(g_btn_sleep, LV_ALIGN_LEFT_MID, 8, 0);
+    lv_obj_set_style_bg_color(g_btn_sleep, CLR_CAN, 0);
+    lv_obj_set_style_bg_opa(g_btn_sleep, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(g_btn_sleep, 6, 0);
+    {
+        lv_obj_t *lbl = lv_label_create(g_btn_sleep);
+        lv_label_set_text(lbl, "Sleep");
+        lv_obj_center(lbl);
+    }
+    lv_obj_add_event_cb(g_btn_sleep, sleep_btn_cb, LV_EVENT_CLICKED, NULL);
+
+    /* 顶栏右侧：电量标签 */
+    g_lbl_bat = lv_label_create(head);
+    lv_label_set_text(g_lbl_bat, "BAT --");
+    lv_obj_set_style_text_color(g_lbl_bat, CLR_TEXT_TITLE, 0);
+    lv_obj_align(g_lbl_bat, LV_ALIGN_RIGHT_MID, -8, 0);
+
+    /* 电量周期刷新定时器（每 2s） */
+    dbg_power_sample();
+    g_bat_timer = lv_timer_create(bat_timer_cb, 2000, NULL);
 
     /* 功能卡片（两列网格，5 张 = 3 行） */
     {

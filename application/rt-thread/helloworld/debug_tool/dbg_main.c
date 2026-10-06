@@ -21,6 +21,7 @@
 #include "dbg_adc.h"
 #include "dbg_slave.h"
 #include "dbg_log.h"
+#include "dbg_power.h"
 #include "ui_main_screen.h"
 #include "ui_serial_screen.h"
 #include "ui_can_screen.h"
@@ -105,6 +106,11 @@ void ui_init(void)
     /* 5.6 SD 卡 CSV 记录（第 8 步）：建线程 + 环形缓冲，真正落盘在线程里做 */
     if (dbg_log_init() != RT_EOK) {
         rt_kprintf("dbg_tool: csv log init failed\n");
+    }
+
+    /* 5.7 电量监测 + 低功耗（GPAI 未启用时自动 N/A，UI 仍可显示） */
+    if (dbg_power_init() != RT_EOK) {
+        rt_kprintf("dbg_tool: power init failed\n");
     }
 
     /* 6. 主菜单界面 */
