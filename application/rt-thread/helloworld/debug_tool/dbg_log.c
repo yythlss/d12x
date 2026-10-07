@@ -239,7 +239,7 @@ static void do_start(void)
 
     {
         static const char header[] =
-            "t_s,temp_C,humi_pct,lux,ps,acc_x,acc_y,acc_z,gyro_x,gyro_z\r\n";
+            "t_s,temp_C,humi_pct,lux,ps,acc_x,acc_y,acc_z,gyro_x,gyro_y,gyro_z\r\n";
         write(g_fd, header, sizeof(header) - 1);
     }
 #endif
