@@ -34,6 +34,11 @@
 #define CLR_TEXT_TITLE lv_color_hex(0xFFFFFF)
 #define CLR_TEXT_DARK lv_color_hex(0x333A45)
 
+/* 待机（Sleep）主题：整屏压暗，按钮转琥珀色吸引注意 */
+#define CLR_TITLE_BAR_SLEEP lv_color_hex(0x101826) /* 更深蓝灰标题栏 */
+#define CLR_BG_SLEEP        lv_color_hex(0x1E2A3A) /* 深蓝灰背景 */
+#define CLR_WAKE_BTN        lv_color_hex(0xE0A030) /* 唤醒按钮：琥珀色 */
+
 static lv_obj_t *g_serial_screen;
 static lv_obj_t *g_can_screen;
 static lv_obj_t *g_scope_screen;
@@ -147,6 +152,7 @@ static void bat_timer_cb(lv_timer_t *t)
 }
 
 /* 睡眠按钮：切换 LIGHT 睡眠 / 唤醒（轻点屏幕也可唤醒） */
+static void apply_power_theme(int suspended);
 static void sleep_btn_cb(lv_event_t *e)
 {
     (void)e;
@@ -158,6 +164,24 @@ static void sleep_btn_cb(lv_event_t *e)
     lv_obj_t *lbl = lv_obj_get_child(g_btn_sleep, 0);
     if (lbl)
         lv_label_set_text(lbl, dbg_power_is_suspended() ? "Wake" : "Sleep");
+    apply_power_theme(dbg_power_is_suspended());
+}
+
+/* 根据电源状态切换主界面主题色：Sleep=夜间压暗主题，Wake=默认亮色主题 */
+static void apply_power_theme(int suspended)
+{
+    lv_color_t title = suspended ? CLR_TITLE_BAR_SLEEP : CLR_TITLE_BAR;
+    lv_color_t bg    = suspended ? CLR_BG_SLEEP : CLR_BG;
+    lv_color_t btn   = suspended ? CLR_WAKE_BTN : CLR_CAN;
+    lv_obj_t   *head = lv_obj_get_parent(g_btn_sleep);
+    lv_obj_t   *lbl  = lv_obj_get_child(g_btn_sleep, 0);
+
+    lv_obj_set_style_bg_color(g_main_screen, bg, 0);
+    if (head)
+        lv_obj_set_style_bg_color(head, title, 0);
+    lv_obj_set_style_bg_color(g_btn_sleep, btn, 0);
+    if (lbl)
+        lv_obj_set_style_text_color(lbl, CLR_TEXT_TITLE, 0);
 }
 
 lv_obj_t *ui_main_screen_create(void)
@@ -195,6 +219,7 @@ lv_obj_t *ui_main_screen_create(void)
     {
         lv_obj_t *lbl = lv_label_create(g_btn_sleep);
         lv_label_set_text(lbl, "Sleep");
+        lv_obj_set_style_text_color(lbl, CLR_TEXT_TITLE, 0);
         lv_obj_center(lbl);
     }
     lv_obj_add_event_cb(g_btn_sleep, sleep_btn_cb, LV_EVENT_CLICKED, NULL);
