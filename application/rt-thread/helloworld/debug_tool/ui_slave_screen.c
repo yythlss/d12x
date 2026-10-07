@@ -241,14 +241,28 @@ static void actuator_spd_cb(lv_event_t *e)
  */
 #define ACT_BTN_H   22
 
+/*
+ * 执行器按钮统一构造。
+ * 关键修复：之前 lv_obj_set_size(btn, w, ...) 把宽度写死，而标签用的是 LV_FONT_DEFAULT
+ * （偏大），像 "PWM 0%"/"rainbow 9"/"SPD 3" 这种文字比按钮还宽，LVGL 默认会裁切子对象
+ * → 按钮文字显示不全。现改为：
+ *   1) 标签显式用 montserrat_12（已编进 lv_conf，CAN RX 日志也用这字号，可读且紧凑）；
+ *   2) 宽度 = LV_SIZE_CONTENT（自适应文字，永不横向裁切）+ 调用方 w 作为最小宽度
+ *      （R/G/B 仍保持方块感，FX 等保留足够容纳最长 "marquee 9" 的宽度）。
+ * 两行预算（12px 下）：一行 40+40+40+52、二行 60+84+44，均 < 内容区 207，不会换行。
+ */
 static lv_obj_t *act_btn(lv_obj_t *parent, const char *label, int w,
                          lv_event_cb_t cb, void *user_data)
 {
     lv_obj_t *btn = lv_button_create(parent);
     lv_obj_t *lbl = lv_label_create(btn);
 
-    lv_obj_set_size(btn, w, ACT_BTN_H);
     lv_label_set_text(lbl, label);
+    lv_obj_set_style_text_font(lbl, &lv_font_montserrat_12, 0); /* 小字号，杜绝文字超出按钮 */
+    lv_obj_set_width(btn, LV_SIZE_CONTENT);                      /* 宽度自适应文字：永不裁切 */
+    lv_obj_set_height(btn, ACT_BTN_H);
+    lv_obj_set_style_min_width(btn, w, 0);                       /* 调用方 w 作最小宽度（保持方块/留白） */
+    lv_obj_set_style_pad_hor(btn, 6, 0);                         /* 左右留白，文字不贴边 */
     lv_obj_center(lbl);
     lv_obj_set_style_bg_color(btn, CLR_CARD_BG, 0);
     lv_obj_set_style_radius(btn, 6, 0);
