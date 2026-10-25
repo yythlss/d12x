@@ -1,43 +1,135 @@
-Luban-Lite SDK 是由ArtInChip设计的，旨在为系统级芯片(SoC)设计提供一个轻量级、高效且易于使用的软件开发工具包。该SDK的设计规划兼顾了简单性与广泛的客户支持，同时确保对主流实时操作系统(RTOS)的兼容性。
+# 便携式工业调试仪 · 主控（ArtInChip D12x）
 
-通过这个仓库，匠芯创科技期望与全球开发者共同打造一个功能丰富、易于使用的嵌入式开发生态，推动技术的创新与发展。
+> **RT-Thread 嵌入式电子设计大赛 2026 参赛作品**
+> 基于 RT-Thread + LVGL v9 的单芯片手持工业现场调试终端。
+>
+> 本仓库基于 **ArtInChip Luban-Lite SDK** 开发，作品源码位于
+> [`application/rt-thread/helloworld/debug_tool/`](application/rt-thread/helloworld/debug_tool/)。
 
-# 架构与设计介绍
-Luban-Lite SDK的架构设计分为两种主要情况，根据是否使用操作系统(OS)进行区分：
+---
 
-- **RTOS架构**：当使用RTOS时，Luban-Lite提供了一个结构化的框架，使得在不同的RTOS间移植变得容易。它抽象了底层硬件的差异，提供了统一的API接口，使得应用程序可以无缝地在不同的RTOS上运行。 RTOS 架构兼容市面上最流行的几种RTOS内核，如RT-Thread、FreeRTOS等，为开发者提供灵活的实时系统选择。
+## 1. 作品简介
 
-- **Baremetal架构**：在不使用RTOS的情况下，Luban-Lite提供了一套完整的库和驱动，允许开发者直接在硬件上编写和运行代码。Baremetal 架构为那些不需要完整操作系统的应用程序提供直接在硬件上运行的能力，从而减少开销并提高性能。
+传统工业现场调试依赖笔记本 + 串口线 + 多个软件，笨重且准备时间长。本作品把「串口调试、
+Modbus 主站、示波采样、Modbus 从机监测、RS485 总线透传扫描、PWM 信号源、环境传感、本板遥测、
+SD 卡录波、低功耗」等现场常用功能，集成进一块巴掌大的 D12x 开发板，配合一块星火一号从机板，
+构成「单芯片手持调试仪 + 配套传感器/执行器/网关节点」的轻量调试系统。
 
-Luban-Lite SDK 还具备完整的软件栈生态资源，提供丰富的库和工具，促进快速开发和部署，包括驱动程序、协议栈、中间件和示例应用程序。
+- 主控（本仓库）：ArtInChip **D12x**，480×272 RGB 屏，RT-Thread + LVGL v9
+- 从机（配套仓库）：STM32F407 **星火一号**，作 Modbus 从站、传感器节点、RS485 网关
+- 上位：Python 零依赖云端服务 + 微信小程序（同工作区 `tools/cloud_server`、`miniprogram`）
 
-# 功能与特性
-Luban-Lite SDK的主要功能和特性包括：
+> 配套从机仓库：<https://github.com/yythlss/SparkNo1>
 
-- 源码自动检测机制：SDK能够自动检测源码的更改，并触发相关的构建过程，简化了开发流程。
-- 文件系统镜像制作：提供了制作不同类型文件系统镜像的工具，方便开发者根据项目需求创建定制化的文件系统。
-- 模块化设计：SDK采用模块化设计，各个软件包和组件可以独立更新和编译，提高了代码的可维护性和扩展性。
+---
 
-# 使用前提条件
-使用Luban-Lite SDK之前，开发者需要确保满足以下前提条件：
+## 2. 硬件平台
 
-- 硬件平台：确保拥有与Luban-Lite兼容的ArtInChip SoC硬件平台。
-- 开发环境：设置合适的开发环境，包括必要的编译器、工具链和IDE。
-- 基础知识：具备基本的编程知识，熟悉C或C++语言，以及对嵌入式系统开发的基本理解。
+| 项 | 规格 |
+|---|---|
+| SoC | ArtInChip D12x（RISC-V，内置 RGB LCD 控制器） |
+| 操作系统 | RT-Thread（内核 / 设备框架 / 消息队列 / 信号量 / DFS+elmfat / PM / FinSH） |
+| GUI | LVGL v9，480×272 电阻/电容触摸 |
+| 存储 | SD 卡（elmfat 文件系统，CSV 录波） |
+| 串口 | uart0（console + 串口调试）、uart1（独占，与从机 TTL 直连） |
+| WiFi | 板载 RW007（SPI2：CS=PF10 / INT=PG11 / RST=PG15）*注：云端由从机侧经 RW007 上行* |
+| 显示 | 主界面 lv_tileview 双页滑动（环境监测页 + 应用图标网格） |
 
-# 授权与使用条件
-Luban-Lite SDK为开源项目，遵循相关开源协议，授权任何个人和组织使用、复制、修改、合并和分发。但在对SDK进行修改和衍生时，必须保留原作者的版权信息，并在衍生作品中声明更改的部分及原作者信息。
+**与从机（星火一号）接线**（TTL 直连，115200/8N1，**严禁 5V，双方均为 3.3V TTL**）：
 
-# 文档和资源
-本仓库不仅提供了Luban-Lite SDK 的安装和配置指南，还包含了丰富的示例代码、开发教程和API参考文档，帮助开发者快速上手并充分利用SDK的功能。
+| D12x（主控 uart1） | 星火一号 | 说明 |
+|---|---|---|
+| PA2 (TX) | PB11 (RX) | 主控发 → 从机收 |
+| PA3 (RX) | PB10 (TX) | 主控收 ← 从机发 |
+| GND | GND | 共地 |
 
-Luban-Lite SDK 的文档请参考 doc 目录，是广东匠芯创科技有限公司对技术透明性和开放性承诺的体现，旨在为全球的开发者和工程师提供一个可靠的资源中心，以支持他们在各种硬件平台上的创新和产品开发。
+---
 
-# 参与与贡献
-匠芯创科技鼓励开发者积极参与项目，贡献代码或提供改进建议。请咨询仓库管理员，了解具体的贡献流程和要求。
+## 3. 自研代码目录
 
-总体而言，Luban-Lite SDK是为那些寻求在ArtInChip SoC上快速开发高效、可靠应用的开发者设计的。它的设计理念是简化开发过程，同时提供足够的灵活性以支持各种实时操作系统和裸机应用，使得开发者能够根据具体需求选择最适合的开发路径。
+作品全部自研代码在 `application/rt-thread/helloworld/debug_tool/`（**37 个文件 / 约 7476 行**）：
 
+| 模块 | 职责 |
+|---|---|
+| `dbg_main` | 主入口：初始化各模块、加载主菜单、创建 LVGL 消息分发定时器 |
+| `dbg_msg` | 轻量消息总线，解耦生产线程与 UI 刷新（队列深 64） |
+| `dbg_serial` | 串口调试（uart0）：收发、波特率切换 |
+| `dbg_theme` | 全局统一配色：日/夜两套色板 + 登记式自动换色 |
+| `dbg_adc` | 模拟量采集：软件信号源 / GPAI 真实采集（12-bit，6 通道） |
+| `dbg_modbus` | Modbus-RTU 主站（异步事务，FC01/03/06） |
+| `dbg_slave` | 独占 uart1 的从机主站轮询 + RS485 透传事务 |
+| `dbg_log` | SD 卡 CSV 数据记录（环形缓冲 → 落盘） |
+| `dbg_power` | 电池电量（GPAI）+ 低功耗（PM LIGHT） |
+| `dbg_pwm` | PWM 信号源（输出可调占空比/频率） |
+| `dbg_d12x` | 本板遥测：结温 / 电量 / CPU / 内存；并中转从机上云 |
+| `ui_main_screen` 等 7 个 UI 页 | 主界面 + 串口 / 示波 / 从机仪表盘 / RS485 扫描 / PWM / 环境监测页 |
 
+> 注：CAN 模块（`dbg_can` / `ui_can_screen`）已移除——开发板无板载 CAN 收发器。
 
+---
 
+## 4. 线程模型（主控）
+
+| 线程 | 优先级 | 职责 |
+|---|---|---|
+| LVGL 主线程 | 高 | 界面渲染、事件回调、消息分发（10 ms 定时器） |
+| `dbg_d12x` | 15 | 本板遥测采集 + 中转上报 |
+| `dbglog` | 20 | SD 卡落盘（慢 I/O 独立线程，不阻塞 UI） |
+| `dbg_modbus` | 21 | Modbus 异步事务 |
+| `dbg_serial` | 22 | 串口透传 |
+| `dbg_slv` | 22 | 独占 uart1：执行器写 → RS485 扫描 → 常规轮询（信号量串行化） |
+| `dbg_adc` | 23 | ADC 采样 |
+
+---
+
+## 5. 快速开始
+
+### 5.1 构建（Windows 环境）
+
+```bat
+:: 进入 SDK 自带环境
+win_env.bat        (或 win_cmd.bat)
+
+:: 确认目标板为 d12x，应用为 helloworld/debug_tool
+:: 如需改配置（如开启 AIC_USING_GPAI）：
+km                 (app_menuconfig)
+
+:: 构建 bootloader + application
+m                  (make_boot_and_app)
+```
+
+> 改过 menuconfig 后务必 **Clean → Build**。条件编译的两个分支都要编过再提交。
+
+### 5.2 烧录
+
+- 使用 AiBurn（`AiBurn-1.5.3_Setup/`）或 `upgtool/` 烧录 `output/` 下产物；
+- 详见仓库内 `烧录方法-AiBurn命令行.md`。
+
+### 5.3 运行
+
+上电后进入主界面（双页滑动）：左页环境监测，右页应用图标网格。
+点按图标进入对应功能页，Back 返回右页。
+
+---
+
+## 6. 关键设计参数
+
+| 项 | 值 |
+|---|---|
+| 从机轮询 | 500 ms / 轮，38 寄存器，27 字节打包上传 |
+| SD 录波 | 环形 32×27 B，200 ms 落盘，文件 `dbg_001~999.csv` |
+| 消息总线 | 队列深 64，单条 ≤64 B |
+| 云端上报（从机侧） | 5 s 摘要，HTTP POST 到 `tools/cloud_server/server.py` |
+| 宏 | `DBG_SLAVE_LOOPBACK`（dbg_slave.h）、`DBG_LOG_LOOPBACK`（dbg_log.c）、`DBG_D12X_POLL_MS`（dbg_d12x.c） |
+
+---
+
+## 7. 开源与许可
+
+- **Luban-Lite SDK 本体**：遵循 ArtInChip 相关开源协议（详见 SDK 原始说明），版权归广东匠芯创科技有限公司所有。
+- **本作品自研代码**（`application/rt-thread/helloworld/debug_tool/`）：各源文件带 SPDX 头，以 Apache License 2.0 开源。
+- SDK 通用使用说明见仓库 `doc/` 目录。
+
+---
+
+欢迎在 Issues 中交流，也欢迎在 RT-Thread 官方论坛的参赛帖下拍砖。
