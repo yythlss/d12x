@@ -6,7 +6,9 @@ cwd     = GetCurrentDir()
 src     = Glob('*.c')
 CPPPATH = [cwd, ]
 
-# 依赖 LVGL 图形库（界面部分）与串口/CAN 驱动
+# 依赖 LVGL 图形库（界面部分）与串口驱动
+# 注：Glob('*.c') 会自动收编目录下所有 .c —— 新增模块直接丢进来即可，
+#     但删除模块必须真的删掉文件，否则残留的 .c 仍会被编进固件。
 # 仅在选中自定义调试仪 demo (AIC_LVGL_REOSC_DEMO) 时编译
 group = DefineGroup('DebugTool', src, depend = ['AIC_LVGL_REOSC_DEMO'], CPPPATH = CPPPATH)
 

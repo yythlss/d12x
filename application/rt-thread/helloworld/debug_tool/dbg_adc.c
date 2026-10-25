@@ -16,6 +16,8 @@
 #include <string.h>
 #include "dbg_adc.h"
 #include "dbg_msg.h"
+#include "dbg_slave.h"      /* RS485 数据源：复用网关请求/结果接口 */
+#include "dbg_modbus.h"     /* MODBUS_FC_READ_HOLD_REGS */
 
 #ifdef AIC_GPAI_DRV
 #include <rtdevice.h>
@@ -37,6 +39,12 @@ static rt_mutex_t  g_adc_lock   = RT_NULL;
 static volatile int g_running = 0;
 static volatile int g_source  = DBG_ADC_SRC_SYNTH;
 static volatile rt_uint8_t g_chan = 0;
+
+/* RS485 数据源：仅在示波页前台且数据源为 RS485 时发请求；
+ * g_rs485_pending 保证同一时刻最多一个在途请求，波形的刷新节奏由 RS485
+ * 往返时间自然决定（不堆积请求、不拖垮轮询线程）。 */
+static volatile int g_rs485_active  = 0;
+static volatile int g_rs485_pending = 0;
 
 #ifdef AIC_GPAI_DRV
 static rt_adc_device_t g_gpai = RT_NULL;
@@ -115,6 +123,24 @@ static void adc_thread_entry(void *param)
                 }
             }
 #endif
+        } else if (g_running && g_source == DBG_ADC_SRC_RS485) {
+            /* RS485 源：每个采样周期发一次读请求（无在途请求时才发），
+             * 应答回到 dbg_adc_on_rs485_result() 后投递一个波形样本。
+             * rate 由 RS485 往返时间决定，至多一个在途请求，不会堆积。 */
+            if (g_rs485_active && !g_rs485_pending) {
+                dbg_rs485_req_t base;
+                dbg_rs485_req_t req;
+
+                dbg_slave_rs485_get_last(&base);
+                memset(&req, 0, sizeof(req));
+                req.func = MODBUS_FC_READ_HOLD_REGS;
+                req.addr = base.addr;
+                req.reg  = (rt_uint16_t)(base.reg + g_chan);
+                req.qty  = 1;          /* 单寄存器 = 一个样本 */
+
+                if (dbg_slave_rs485_request(&req) == RT_EOK)
+                    g_rs485_pending = 1;
+            }
         } else if (g_running) {
             rt_uint16_t adc_val = 0, mv = 0;
             synth_next(&adc_val, &mv);
@@ -195,6 +221,11 @@ int dbg_adc_set_source(int src)
         rt_mutex_release(g_adc_lock);
         return -RT_ERROR;
 #endif
+    } else if (src == DBG_ADC_SRC_RS485) {
+        /* RS485 源不依赖 GPAI，只要从机轮询线程已起即可（dbg_slave_init 默认起）。
+         * 切到 RS485 时清掉在途请求，避免上一页遗留的请求被误消费。 */
+        g_rs485_pending = 0;
+        g_source = DBG_ADC_SRC_RS485;
     } else {
         g_source = DBG_ADC_SRC_SYNTH;
     }
@@ -241,7 +272,55 @@ int dbg_adc_is_running(void)
 
 const char *dbg_adc_source_name(void)
 {
-    return (g_source == DBG_ADC_SRC_GPAI) ? "GPAI" : "SYNTH";
+    if (g_source == DBG_ADC_SRC_GPAI)
+        return "GPAI";
+    if (g_source == DBG_ADC_SRC_RS485)
+        return "RS485";
+    return "SYNTH";
+}
+
+int dbg_adc_gpai_available(void)
+{
+#ifdef AIC_GPAI_DRV
+    return (g_gpai != RT_NULL) ? 1 : 0;
+#else
+    return 0;
+#endif
+}
+
+void dbg_adc_rs485_active(int on)
+{
+    rt_mutex_take(g_adc_lock, RT_WAITING_FOREVER);
+    g_rs485_active = on ? 1 : 0;
+    if (!on)
+        g_rs485_pending = 0;   /* 离台即丢弃在途请求，避免误消费/空转 */
+    rt_mutex_release(g_adc_lock);
+}
+
+/* 由消息总线在 DBG_MSG_RS485_RESULT 时调用：只消费示波自己发出的请求。
+ * 复用 dbg_slave_rs485_get_result() 取回完整应答（含 rsp 字节，消息体只带状态）。 */
+void dbg_adc_on_rs485_result(void)
+{
+    dbg_rs485_result_t res;
+    rt_uint16_t reg_val;
+
+    if (!g_rs485_pending)      /* 不是示波发出的请求（属于扫描页），放行给扫描页 */
+        return;
+    g_rs485_pending = 0;
+
+    if (dbg_slave_rs485_get_result(&res) != RT_EOK)
+        return;
+    if (res.status != DBG_RS485_ST_OK || res.in_len < 5)
+        return;
+    if (res.rsp[1] != MODBUS_FC_READ_HOLD_REGS)   /* 仅处理 FC03 读应答 */
+        return;
+    if (res.rsp[2] < 2)        /* 至少 1 个寄存器（2 字节） */
+        return;
+
+    /* 第一个寄存器值（大端）即波形样本；寄存器为 16-bit，量程 0..65535。
+     * 把同一值同时写入 mv 字段，供示波页在 RS485 模式下显示原始值。 */
+    reg_val = (rt_uint16_t)((res.rsp[3] << 8) | res.rsp[4]);
+    adc_post(reg_val, reg_val, (rt_uint8_t)g_chan);
 }
 
 /* 线程安全地读取指定 GPAI 通道电压（mV）。

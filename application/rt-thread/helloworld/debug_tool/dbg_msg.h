@@ -11,11 +11,11 @@
 #include <rtthread.h>
 #include "lvgl.h"
 
-/* 消息类型 */
+/* 消息类型
+ * 注：DBG_MSG_CAN_RX / CAN_TX 已随 CAN 调试功能一并移除，编号不再复用，
+ *     避免旧消息残留被当别的数据包解析。 */
 #define DBG_MSG_SERIAL_RX     0x01  /* 串口收到数据 */
 #define DBG_MSG_SERIAL_TX     0x02  /* 串口发出数据 */
-#define DBG_MSG_CAN_RX        0x03  /* CAN 收到报文 */
-#define DBG_MSG_CAN_TX        0x04  /* CAN 发出报文 */
 #define DBG_MSG_ADC_VAL       0x05  /* ADC 采样值 */
 #define DBG_MSG_MODBUS_RESULT 0x06  /* Modbus 应答结果 */
 #define DBG_MSG_SLAVE_DATA    0x07  /* 从机仪表盘数据（见 dbg_slave.h 偏移定义） */

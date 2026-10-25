@@ -73,6 +73,8 @@ static rt_err_t dbg_serial_rx_ind(rt_device_t dev, rt_size_t size)
     return RT_EOK;
 }
 
+static void dbg_serial_tx_selftest(void);
+
 int dbg_serial_init(const char *dev_name)
 {
     struct serial_configure config;
@@ -94,7 +96,19 @@ int dbg_serial_init(const char *dev_name)
         return -RT_ERROR;
     }
 
-    /* 先获取 uart0 当前有效配置（保留正确的 uart_index/function），只改波特率 */
+    /* ⚠️ 必须先 open 再下发配置！
+     * RT-Thread 的 RT_DEVICE_CTRL_CONFIG 处理里有 `if (serial->parent.ref_count)`
+     * 判断——未打开（ref_count==0）时只把配置存进 serial->config，**不会真正
+     * 写进硬件寄存器**。原代码先 CONFIG 后 OPEN，导致波特率/数据位/校验被静默
+     * 丢弃，uart0 仍跑在 bootloader 遗留的旧配置上：PC 按 115200 采样收到的是
+     * 帧错误、被驱动丢弃，表现为「指示灯闪（检测到起始位）但任何显示模式都空白」，
+     * 且只有复位（bootloader 重新初始化串口）时才涌出内容。 */
+    if (rt_device_open(g_serial, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX) != RT_EOK) {
+        rt_kprintf("dbg_serial: open %s failed!\n", dev_name);
+        return -RT_ERROR;
+    }
+
+    /* 打开后读取当前有效配置（保留 uart_index/function），只改波特率 */
     if (rt_device_control(g_serial, RT_SERIAL_GET_CONFIG, &config) != RT_EOK) {
         rt_kprintf("dbg_serial: get config failed!\n");
         return -RT_ERROR;
@@ -107,11 +121,6 @@ int dbg_serial_init(const char *dev_name)
     }
     g_baud = DBG_BAUD_115200;
 
-    if (rt_device_open(g_serial, RT_DEVICE_OFLAG_RDWR | RT_DEVICE_FLAG_INT_RX) != RT_EOK) {
-        rt_kprintf("dbg_serial: open %s failed!\n", dev_name);
-        return -RT_ERROR;
-    }
-
     rt_device_set_rx_indicate(g_serial, dbg_serial_rx_ind);
 
     thread = rt_thread_create("dbg_serial", dbg_serial_rx_entry, RT_NULL,
@@ -122,7 +131,58 @@ int dbg_serial_init(const char *dev_name)
     }
     rt_thread_startup(thread);
 
+    dbg_serial_tx_selftest();
+
     return RT_EOK;
+}
+
+/*
+ * 开机 TX 自检：连发 3 帧「纯可打印 ASCII + CRLF」。
+ *
+ * 之所以做成开机自动打印而不是只留 msh 命令：本机 msh 控制台在 uart1
+ * （RT_CONSOLE_DEVICE_NAME="uart1"），而 uart1 同时被从机轮询线程独占，
+ * 命令行输入会被轮询吞掉、msh 实际不可用（输出正常但无法交互）。
+ *
+ * 判读：
+ *   - 串口助手出现 3 行 "D12X UART0 TX TEST #n ABCabc012" -> 发送通路完好，
+ *     之前"收不到"是载荷内容问题（发了不可打印字节）。
+ *   - 指示灯闪但仍无内容 -> 问题在 PC 侧（选错 COM / 未真正打开 / 暂停显示 / 流控 / 编码）。
+ */
+static void dbg_serial_tx_selftest(void)
+{
+    struct serial_configure cfg;
+    char  buf[64];
+    int   i;
+
+    memset(&cfg, 0, sizeof(cfg));
+    if (rt_device_control(g_serial, RT_SERIAL_GET_CONFIG, &cfg) != RT_EOK) {
+        rt_kprintf("dbg_serial: selftest: get config failed\n");
+        return;
+    }
+
+    rt_kprintf("dbg_serial: selftest dev=%s baud=%d data=%d stop=%d parity=%d\n",
+               DBG_SERIAL_DEV_NAME, (int)cfg.baud_rate,
+               (int)cfg.data_bits, (int)cfg.stop_bits, (int)cfg.parity);
+
+    for (i = 1; i <= 3; i++) {
+        rt_size_t wr;
+        int n;
+
+        n = rt_snprintf(buf, sizeof(buf), "D12X TX TEST #%d ABCabc012\r\n", i);
+        if (n <= 0)
+            continue;
+
+        /* A) 发到 uart0 —— 串口调试页所接的那路（PA.0/PA.1），
+         *    PC 串口助手应看到本行文本。 */
+        wr = rt_device_write(g_serial, 0, (const void *)buf, (rt_size_t)n);
+
+        /* B) 同时发一份到控制台（RT_CONSOLE_DEVICE_NAME="uart1"），
+         *    用于区分：到底哪一路串口连到了 PC。 */
+        rt_kprintf("dbg_serial: UART0 write frame%d len=%d ret=%d | console: %s",
+                   i, n, (int)wr, buf);
+
+        rt_thread_mdelay(1000);
+    }
 }
 
 int dbg_serial_set_baud(rt_uint32_t baud)

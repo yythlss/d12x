@@ -3,7 +3,7 @@ Import('rtconfig')
 from building import *
 
 cwd     = GetCurrentDir()
-src     = ['main.c', 'im_master.c', 'im_ui.c']
+src     = ['main.c', 'im_master.c', 'im_ui.c', 'im_d12x_report.c']
 
 # LVGL 头文件路径 (应用目录先于 lvgl 包被扫描, 必须显式给出)
 LVGL_ROOT = os.path.join(cwd, '..', '..', '..', 'packages', 'artinchip', 'lvgl-ui', 'lvgl_v9')

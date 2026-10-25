@@ -37,7 +37,7 @@
  *       副产品：不占用 uart1，msh 命令行照常可用。
  *   0 = 正常轮询真实从机（对接硬件时必须改回 0）
  */
-#define DBG_SLAVE_LOOPBACK   1
+#define DBG_SLAVE_LOOPBACK   0
 
 /* 一次打包的数据长度（字节） */
 #define SLAVE_PKT_LEN        27
@@ -148,5 +148,29 @@ int dbg_slave_rs485_request(const dbg_rs485_req_t *req);
 
 /* 取最近一次结果（收到 DBG_MSG_RS485_RESULT 后调用）。返回 RT_EOK 表示成功拷贝。 */
 int dbg_slave_rs485_get_result(dbg_rs485_result_t *out);
+
+/* 记录/读取「最近一次 RS485 请求」：扫描页 UI 配置好目标后，示波 RS485 数据源
+ * 直接复用它作为采样目标（addr/reg 取第一个寄存器，qty 强制为 1）。
+ * 默认 addr=1 / reg=0 / func=3，未配置过也能给出合法目标。 */
+int dbg_slave_rs485_set_last(const dbg_rs485_req_t *req);
+int dbg_slave_rs485_get_last(dbg_rs485_req_t *out);
+
+/* ============================================================ D12x 本板数据经星火一号中转上报
+ * D12x 采集自身结温 / 电量 / 运行态（不接任何外设），经 uart1 把这份数据 FC16 写到
+ * 星火一号的 0x0400 中转区；星火一号 cloud_upload 线程以 device="d12x" 一并上报云端。
+ * 小程序「数据来源」因此出现第二个节点「D12x 主控终端」，且不为 D12x 单独拉上行链路。
+ * 同样走轮询线程串行（uart1 独占），避免与仪表盘 / RS485 事务并发。 */
+#define R_D12X_BASE    0x0400   /* 与从机 mb_slave.c 的 REG_D12X_TEMP 对齐 */
+
+typedef struct {
+    rt_int16_t  temp;     /* 结温 0.1 ℃，可负 */
+    rt_uint16_t bat;      /* 电量 0.1 % */
+    rt_uint16_t cpu;      /* CPU 占用 0.1 % */
+    rt_uint16_t mem;      /* 剩余内存 KB */
+    rt_uint16_t uptime;   /* 运行秒数 */
+} dbg_d12x_snap_t;
+
+/* 提交一份 D12x 本板快照（非阻塞：交给轮询线程 FC16 写中转区）。返回 RT_EOK 表示已入队。 */
+int dbg_slave_d12x_set(const dbg_d12x_snap_t *snap);
 
 #endif /* __DBG_SLAVE_H__ */

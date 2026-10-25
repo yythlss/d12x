@@ -81,6 +81,22 @@ int im_master_write(rt_uint16_t addr, rt_uint16_t val)
     return ret;
 }
 
+/* 多寄存器连续写 (FC16, modbus_write_registers)，供 D12x 自身运行态批量上报用。
+ * buf 内容按 Modbus 大端按字拷贝，调用方自行保证 addr+n 不越界从站保持区。 */
+int im_master_write_regs(rt_uint16_t addr, rt_uint16_t n, const rt_uint16_t *buf)
+{
+    int ret;
+
+    if (!g_ctx || !buf || n == 0)
+        return -RT_ERROR;
+
+    rt_mutex_take(g_lock, RT_WAITING_FOREVER);
+    ret = modbus_write_registers(g_ctx, addr, n, (rt_uint16_t *)buf);
+    rt_mutex_release(g_lock);
+
+    return ret;
+}
+
 int im_master_set_poll_ms(rt_uint32_t ms)
 {
     if (ms < 10 || ms > 10000)

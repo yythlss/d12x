@@ -20,17 +20,29 @@
 #include "dbg_slave.h"
 #include "dbg_modbus.h"
 #include "ui_main_screen.h"
+#include "dbg_theme.h"
 
-/* 配色（与从机仪表盘 / 主菜单统一主题） */
-#define CLR_TITLE_BAR   lv_color_hex(0x8E44AD)  /* RS485 紫 */
-#define CLR_BG          lv_color_hex(0xF0F3F7)
-#define CLR_CARD_BG     lv_color_hex(0xFFFFFF)
-#define CLR_TEXT_WHITE  lv_color_hex(0xFFFFFF)
-#define CLR_TEXT_DARK   lv_color_hex(0x333A45)
-#define CLR_MUTED       lv_color_hex(0x8A93A1)
-#define CLR_ACCENT      lv_color_hex(0x8E44AD)
-#define CLR_OK          lv_color_hex(0x2E8B57)
-#define CLR_ERR         lv_color_hex(0xC0392B)
+/* 页面强调色：RS485 紫（日/夜两版） */
+#define CLR_ACC_RS485_DAY     0x8E44AD
+#define CLR_ACC_RS485_NIGHT   0xA463C4
+
+/* 状态色：运行时切换，显式给日夜两版 */
+#define CLR_OK_DAY      0x2E8B57
+#define CLR_OK_NIGHT    0x3FA76A
+#define CLR_ERR_DAY     0xC0392B
+#define CLR_ERR_NIGHT   0xD45B45
+
+static uint32_t clr_ok(void)   { return dbg_theme_is_night() ? CLR_OK_NIGHT  : CLR_OK_DAY; }
+static uint32_t clr_err(void)  { return dbg_theme_is_night() ? CLR_ERR_NIGHT : CLR_ERR_DAY; }
+static uint32_t clr_card(void) { return dbg_theme_get()->card_bg; }
+static uint32_t clr_text(void) { return dbg_theme_get()->text; }
+static uint32_t clr_dim(void)  { return dbg_theme_get()->text_dim; }
+static uint32_t clr_title_text(void) { return dbg_theme_get()->title_text; }
+/* 本页强调色（脱离 page_accent，供运行时派色使用） */
+static uint32_t clr_accent(void)
+{
+    return dbg_theme_is_night() ? CLR_ACC_RS485_NIGHT : CLR_ACC_RS485_DAY;
+}
 
 #define HEADER_H        44
 
@@ -67,6 +79,7 @@ static field_t    g_fval  = {0, 0, 0xFFFF, 1, 1, RT_NULL};
 /* 结果与状态 */
 static lv_obj_t  *g_lbl_result;
 static lv_obj_t  *g_lbl_status;
+static lv_obj_t  *g_btn_back;
 
 /* --------------------------------------------- 小工具 */
 static void field_refresh(field_t *f)
@@ -125,12 +138,12 @@ static lv_obj_t *small_btn(lv_obj_t *parent, const char *label, lv_event_cb_t cb
     lv_obj_set_size(btn, 34, 24);
     lv_label_set_text(lbl, label);
     lv_obj_center(lbl);
-    lv_obj_set_style_bg_color(btn, CLR_CARD_BG, 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(clr_card()), 0);
     lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(btn, 6, 0);
-    lv_obj_set_style_border_color(btn, CLR_ACCENT, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(clr_accent()), 0);
     lv_obj_set_style_border_width(btn, 1, 0);
-    lv_obj_set_style_text_color(lbl, CLR_TEXT_DARK, 0);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(clr_text()), 0);
     lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
     return btn;
 }
@@ -142,11 +155,11 @@ static lv_obj_t *make_stepper(lv_obj_t *parent, const char *label_text, field_t 
     lv_obj_t *lbl = lv_label_create(row);
 
     lv_label_set_text(lbl, label_text);
-    lv_obj_set_style_text_color(lbl, CLR_TEXT_DARK, 0);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(clr_text()), 0);
     small_btn(row, "-", field_dec_cb, f);
     f->lbl = lv_label_create(row);
     field_refresh(f);
-    lv_obj_set_style_text_color(f->lbl, CLR_TEXT_DARK, 0);
+    lv_obj_set_style_text_color(f->lbl, lv_color_hex(clr_text()), 0);
     small_btn(row, "+", field_inc_cb, f);
     return row;
 }
@@ -161,12 +174,13 @@ static void func_highlight(void)
     for (i = 0; i < 3; i++) {
         lv_obj_t *lbl = lv_obj_get_child(btns[i], 0);
         if (i == active) {
-            lv_obj_set_style_bg_color(btns[i], CLR_ACCENT, 0);
-            lv_obj_set_style_text_color(lbl, CLR_TEXT_WHITE, 0);
+            lv_obj_set_style_bg_color(btns[i], lv_color_hex(clr_accent()), 0);
+            lv_obj_set_style_text_color(lbl, lv_color_hex(clr_title_text()), 0);
         } else {
-            lv_obj_set_style_bg_color(btns[i], CLR_CARD_BG, 0);
-            lv_obj_set_style_text_color(lbl, CLR_TEXT_DARK, 0);
+            lv_obj_set_style_bg_color(btns[i], lv_color_hex(clr_card()), 0);
+            lv_obj_set_style_text_color(lbl, lv_color_hex(clr_text()), 0);
         }
+        lv_obj_set_style_border_color(btns[i], lv_color_hex(clr_accent()), 0);
     }
 }
 
@@ -218,11 +232,14 @@ static void send_cb(lv_event_t *e)
     }
 
     if (dbg_slave_rs485_request(&req) == RT_EOK) {
+        dbg_slave_rs485_set_last(&req);   /* 记下目标，供示波 RS485 数据源复用 */
         if (g_lbl_status) lv_label_set_text(g_lbl_status, "RS485: sending...");
-        if (g_lbl_status) lv_obj_set_style_text_color(g_lbl_status, CLR_MUTED, 0);
+        if (g_lbl_status) lv_obj_set_style_text_color(g_lbl_status,
+                                                      lv_color_hex(clr_dim()), 0);
     } else {
         if (g_lbl_status) lv_label_set_text(g_lbl_status, "RS485: bad params");
-        if (g_lbl_status) lv_obj_set_style_text_color(g_lbl_status, CLR_ERR, 0);
+        if (g_lbl_status) lv_obj_set_style_text_color(g_lbl_status,
+                                                      lv_color_hex(clr_err()), 0);
     }
 }
 
@@ -231,6 +248,32 @@ static void rs485_back_cb(lv_event_t *e)
 {
     (void)e;
     lv_screen_load_anim(ui_main_screen_get(), LV_SCR_LOAD_ANIM_MOVE_RIGHT, 300, 0, 0);
+}
+
+/*
+ * 动态补刀：功能码按钮的高亮态、Send 主色、返回按钮蒙层不透明度。
+ * 这些颜色随交互/状态变化，不在 track 表内，切主题时重派一次。
+ */
+static void rs485_apply_theme(void)
+{
+    const dbg_theme_t *th = dbg_theme_get();
+
+    if (g_screen == NULL)
+        return;
+
+    func_highlight();
+
+    if (g_btn_send) {
+        lv_obj_set_style_bg_color(g_btn_send, lv_color_hex(clr_accent()), 0);
+        lv_obj_set_style_text_color(lv_obj_get_child(g_btn_send, 0),
+                                    lv_color_hex(th->title_text), 0);
+    }
+
+    if (g_btn_back != NULL)
+        lv_obj_set_style_bg_opa(g_btn_back, (lv_opa_t)th->head_btn_opa, 0);
+
+    /* 步进器的 +/- 小按钮底色跟随 setpper 重建时的 clr_card()，这里无需额外处理；
+     * 结果区（只读框）在 create 时已按 track 登记，会自动重刷。 */
 }
 
 lv_obj_t *ui_rs485_screen_create(void)
@@ -243,36 +286,38 @@ lv_obj_t *ui_rs485_screen_create(void)
     if (g_screen != NULL)
         return g_screen;
 
+    dbg_theme_set_page_accent(CLR_ACC_RS485_DAY, CLR_ACC_RS485_NIGHT);
+
     g_screen = lv_obj_create(NULL);
     lv_obj_set_size(g_screen, screen_w, screen_h);
-    lv_obj_set_style_bg_color(g_screen, CLR_BG, 0);
-    lv_obj_set_style_bg_opa(g_screen, LV_OPA_COVER, 0);
+    dbg_theme_track_bg(g_screen, DBG_C_BG);
 
     /* 标题栏 */
     head = lv_obj_create(g_screen);
     lv_obj_set_size(head, screen_w, HEADER_H);
     lv_obj_align(head, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_set_style_bg_color(head, CLR_TITLE_BAR, 0);
-    lv_obj_set_style_bg_opa(head, LV_OPA_COVER, 0);
+    dbg_theme_track_bg(head, DBG_C_ACCENT);
     lv_obj_set_style_radius(head, 0, 0);
     lv_obj_set_style_border_width(head, 0, 0);
 
     title = lv_label_create(head);
     lv_label_set_text(title, "RS485 Scan");
-    lv_obj_set_style_text_color(title, CLR_TEXT_WHITE, 0);
+    dbg_theme_track_text(title, DBG_C_TITLE_TEXT);
     lv_obj_center(title);
 
     btn_back = lv_button_create(head);
     lv_obj_set_size(btn_back, 56, 30);
     lv_obj_align(btn_back, LV_ALIGN_LEFT_MID, 6, 0);
-    lv_obj_set_style_bg_color(btn_back, lv_color_hex(0x000000), 0);
-    lv_obj_set_style_bg_opa(btn_back, LV_OPA_30, 0);
+    dbg_theme_track_bg(btn_back, DBG_C_NEUTRAL);
+    lv_obj_set_style_bg_opa(btn_back,
+                            (lv_opa_t)dbg_theme_get()->head_btn_opa, 0);
     lv_obj_set_style_radius(btn_back, 6, 0);
     lbl_back = lv_label_create(btn_back);
     lv_label_set_text(lbl_back, "<-");
-    lv_obj_set_style_text_color(lbl_back, CLR_TEXT_WHITE, 0);
+    dbg_theme_track_text(lbl_back, DBG_C_TITLE_TEXT);
     lv_obj_center(lbl_back);
     lv_obj_add_event_cb(btn_back, rs485_back_cb, LV_EVENT_CLICKED, NULL);
+    g_btn_back = btn_back;
 
     /* 内容区：纵向 flex，标题栏之下到底部 */
     content = lv_obj_create(g_screen);
@@ -290,7 +335,7 @@ lv_obj_t *ui_rs485_screen_create(void)
     row = make_row(content);
     lbl = lv_label_create(row);
     lv_label_set_text(lbl, "Func:");
-    lv_obj_set_style_text_color(lbl, CLR_TEXT_DARK, 0);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(clr_text()), 0);
     func_btn[0] = lv_button_create(row);
     func_btn[1] = lv_button_create(row);
     func_btn[2] = lv_button_create(row);
@@ -305,7 +350,8 @@ lv_obj_t *ui_rs485_screen_create(void)
             lv_obj_center(bl);
             lv_obj_set_style_radius(func_btn[i], 6, 0);
             lv_obj_set_style_border_width(func_btn[i], 1, 0);
-            lv_obj_set_style_border_color(func_btn[i], CLR_ACCENT, 0);
+            lv_obj_set_style_border_color(func_btn[i],
+                                          lv_color_hex(clr_accent()), 0);
             lv_obj_add_event_cb(func_btn[i], func_cb, LV_EVENT_CLICKED,
                                 (void *)(intptr_t)(i == 0 ? 3 : (i == 1 ? 6 : 16)));
         }
@@ -324,13 +370,13 @@ lv_obj_t *ui_rs485_screen_create(void)
     g_btn_send = lv_button_create(content);
     lv_obj_set_width(g_btn_send, LV_PCT(100));
     lv_obj_set_height(g_btn_send, 40);
-    lv_obj_set_style_bg_color(g_btn_send, CLR_ACCENT, 0);
+    lv_obj_set_style_bg_color(g_btn_send, lv_color_hex(clr_accent()), 0);
     lv_obj_set_style_bg_opa(g_btn_send, LV_OPA_COVER, 0);
     lv_obj_set_style_radius(g_btn_send, 8, 0);
     {
         lv_obj_t *bl = lv_label_create(g_btn_send);
         lv_label_set_text(bl, "READ");
-        lv_obj_set_style_text_color(bl, CLR_TEXT_WHITE, 0);
+        lv_obj_set_style_text_color(bl, lv_color_hex(clr_title_text()), 0);
         lv_obj_center(bl);
         lv_obj_add_event_cb(g_btn_send, send_cb, LV_EVENT_CLICKED, NULL);
     }
@@ -342,17 +388,20 @@ lv_obj_t *ui_rs485_screen_create(void)
     lv_obj_set_flex_grow(g_lbl_result, 1);
     lv_label_set_text(g_lbl_result, "");
     lv_obj_set_style_text_font(g_lbl_result, &lv_font_montserrat_12, 0);
-    lv_obj_set_style_bg_color(g_lbl_result, CLR_CARD_BG, 0);
-    lv_obj_set_style_bg_opa(g_lbl_result, LV_OPA_COVER, 0);
+    dbg_theme_track_bg(g_lbl_result, DBG_C_CARD);
+    dbg_theme_track_text(g_lbl_result, DBG_C_TEXT);
     lv_obj_set_style_pad_all(g_lbl_result, 8, 0);
     lv_obj_set_style_radius(g_lbl_result, 8, 0);
-    lv_obj_set_style_border_color(g_lbl_result, lv_color_hex(0xDCE1E8), 0);
+    lv_obj_set_style_border_color(g_lbl_result,
+                                  lv_color_hex(dbg_theme_get()->card_border), 0);
     lv_obj_set_style_border_width(g_lbl_result, 1, 0);
 
     /* 状态条 */
     g_lbl_status = lv_label_create(content);
     lv_label_set_text(g_lbl_status, "ready");
-    lv_obj_set_style_text_color(g_lbl_status, CLR_MUTED, 0);
+    dbg_theme_track_text(g_lbl_status, DBG_C_DIM);
+
+    dbg_theme_register(rs485_apply_theme);
 
     return g_screen;
 }
@@ -408,6 +457,6 @@ void ui_rs485_on_result(const rt_uint8_t *data, rt_uint16_t len)
     if (g_lbl_status) {
         lv_label_set_text(g_lbl_status, stxt);
         lv_obj_set_style_text_color(g_lbl_status,
-            (res.status == DBG_RS485_ST_OK) ? CLR_OK : CLR_ERR, 0);
+            lv_color_hex((res.status == DBG_RS485_ST_OK) ? clr_ok() : clr_err()), 0);
     }
 }

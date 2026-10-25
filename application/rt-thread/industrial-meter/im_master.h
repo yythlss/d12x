@@ -30,6 +30,7 @@ rt_uint16_t im_master_reg(rt_uint16_t addr);
 /* 同步读写 (与轮询线程互斥, 供 shell/UI 调用) */
 int  im_master_read(rt_uint16_t addr, rt_uint16_t n, rt_uint16_t *buf);
 int  im_master_write(rt_uint16_t addr, rt_uint16_t val);
+int  im_master_write_regs(rt_uint16_t addr, rt_uint16_t n, const rt_uint16_t *buf);
 
 /* 轮询周期 (ms) */
 int  im_master_set_poll_ms(rt_uint32_t ms);

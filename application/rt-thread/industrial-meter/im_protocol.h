@@ -49,6 +49,20 @@ extern "C" {
 #define IM_REG_VREF_MV          0x0023      /* ADC 参考电压 (mV), 校准用 */
 #define IM_REG_CMD              0x0024      /* 命令寄存器, 写后自动清零 */
 
+/* ---------------- D12x 主机自身运行态 ----------------
+ * 这部分寄存器不在「从机 -> 主机」的轮询块里，方向是反的：
+ * 由 D12x（Modbus 主机）把自己的结温 / 电量 / CPU / 内存 / 运行时间
+ * 经 RS485 写回星火一号从站的 0x0400~0x0404，再由从站原样中转上云
+ * (device 标 "d12x")。从站对这片区域只转发、不采集、不改值。
+ * 单位必须与云端 small_report 对齐：温度/电量/CPU = 0.1，内存 = KB，时间 = s。
+ * 与 SparkNo1/applications/mb_slave.c 的 REG_D12X_* 保持数值一致。 */
+#define IM_REG_D12X_TEMP    0x0400      /* RW D12x SoC 结温 0.1 ℃ (int16, 可为负) */
+#define IM_REG_D12X_BAT     0x0401      /* RW D12x 电量 0.1 % ; 未接电池/电源供电时默认 100% */
+#define IM_REG_D12X_CPU     0x0402      /* RW D12x CPU 占用 0.1 % */
+#define IM_REG_D12X_MEM     0x0403      /* RW D12x 剩余内存 KB */
+#define IM_REG_D12X_UPTIME  0x0404      /* RW D12x 运行秒数 */
+#define IM_REG_D12X_CNT     5           /* 连续寄存器个数 (0x0400~0x0404) */
+
 /* 一次性轮询的寄存器块 */
 #define IM_REG_BLOCK_START      IM_REG_DEV_MODEL
 #define IM_REG_BLOCK_LEN        (IM_REG_CMD - IM_REG_BLOCK_START + 1)

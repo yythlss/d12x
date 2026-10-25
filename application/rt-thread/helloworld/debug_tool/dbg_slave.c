@@ -58,6 +58,12 @@ static rt_uint8_t           g_last_rx[32];
 static int                  g_last_len;
 static rt_uint8_t           g_last_status;
 
+/* 最近一次 RS485 请求（扫描页 UI 配置，示波 RS485 数据源复用其 addr/reg） */
+static dbg_rs485_req_t      g_last_req;
+
+/* 上次仪表盘轮询时刻（轮询线程保活用，见 dbg_slave_entry） */
+static rt_tick_t            g_last_dash;
+
 /* --------------------------------------------------- RS485 扫描（第 7 步）
  * 扫描请求通过信号量投递给轮询线程，避免与仪表盘轮询并发占用 uart1，
  * 也避免写请求的应答被下一轮轮询「抢走」导致帧错乱。 */
@@ -78,6 +84,18 @@ static struct rt_semaphore  g_act_sem;
 /* LOOPBACK 下执行器写只改本地镜像，不投递事务，这两个变量无使用者 */
 static rt_uint16_t          g_act_reg;
 static rt_uint16_t          g_act_val;
+
+/* D12x 本板快照中转缓冲：采集线程(dbg_d12x.c)只更新 g_d12x_snap + g_d12x_pending，
+ * 轮询线程按退避节奏尝试 FC16 发往从机 0x0400 区。从机未接时拉长重试间隔，
+ * 但始终保留最新一份快照，重连后下个窗口即补传，不丢趋势。 */
+#define D12X_RETRY_MS_NORMAL  1000      /* 正常节奏：有从机时最多 1s 补一次 */
+#define D12X_RETRY_MS_MAX     30000     /* 退避封顶 30s：从机长期不在时不再每周期烧超时 */
+static dbg_d12x_snap_t      g_d12x_snap;
+static rt_uint8_t           g_d12x_pending;   /* 有待发的新快照（1=未发出/重连待补） */
+static rt_tick_t            g_d12x_next_try;  /* 下次尝试 FC16 的时间戳(tick) */
+static rt_tick_t            g_d12x_backoff;   /* 当前退避间隔(tick)，失败翻倍、成功复位 */
+/* 前置声明：定义在执行器写小节之后；返回 rc（0 成功 / 非0 失败）供退避判断 */
+static int slave_do_d12x_write(void);
 
 /* 前置声明：定义在 dbg_slave_entry() 之后（与执行器写小节在一起），此处先引用 */
 static void slave_do_actuator_write(rt_uint16_t reg, rt_uint16_t val);
@@ -328,6 +346,10 @@ static void dbg_slave_entry(void *param)
 {
     (void)param;
 
+    /* 上次仪表盘轮询时刻：连续做 RS485/执行器事务时用来保底插轮询，
+     * 避免示波 RS485 数据源持续发请求把仪表盘饿死。 */
+    g_last_dash = rt_tick_get();
+
     while (1) {
         /* 事务一律在此线程串行执行，保证 uart1 独占：
          *   1) 执行器写优先（用户在点按钮，延迟要低）
@@ -356,6 +378,27 @@ static void dbg_slave_entry(void *param)
             did_io = 1;
         }
 
+        /* D12x 本板数据中转写：采集线程只更新 g_d12x_snap + g_d12x_pending，
+         * 这里按退避节奏尝试 FC16。从机在 -> 最多 1s 补一次；从机不在 ->
+         * 指数退避（封顶 30s）只周期性探一次，不每周期烧超时才重试。
+         * 最新快照始终保留在 g_d12x_snap，重连后下个窗口即把"最近值"补传出去。 */
+        if (g_d12x_pending && rt_tick_get() >= g_d12x_next_try) {
+            int rc = slave_do_d12x_write();
+            if (rc == 0) {
+                g_d12x_pending  = 0;
+                g_d12x_backoff = rt_tick_from_millisecond(D12X_RETRY_MS_NORMAL);
+                g_d12x_next_try = rt_tick_get() + g_d12x_backoff;
+            } else {
+                rt_tick_t b = g_d12x_backoff * 2;
+                rt_tick_t cap = rt_tick_from_millisecond(D12X_RETRY_MS_MAX);
+                if (b > cap || b == 0)
+                    b = cap;
+                g_d12x_backoff  = b;
+                g_d12x_next_try = rt_tick_get() + b;
+            }
+            did_io = 1;
+        }
+
         /* 本轮既没写也没扫描：把剩下的预算花在常规轮询上，
          * 不足一个 tick 时直接进入下一轮（此时距上轮已至少间隔一个周期） */
         if (!did_io) {
@@ -364,6 +407,17 @@ static void dbg_slave_entry(void *param)
                 rt_thread_mdelay((rt_uint32_t)
                     ((budget - wait) * 1000u / (rt_uint32_t)RT_TICK_PER_SECOND));
             slave_do_once();
+            g_last_dash = rt_tick_get();
+        } else {
+            /* 连续做执行器/RS485 事务时（例如示波 RS485 数据源持续发请求），
+             * 上面两个信号量会一直被取走，did_io 恒为真，仪表盘轮询可能被饿死。
+             * 这里保底：距上次仪表盘轮询超过一个周期就插一次，保证仪表盘仍刷新。
+             * 仪表盘轮询与 RS485 事务在同一线程里串行，不会并发占用 uart1。 */
+            if ((rt_tick_get() - g_last_dash) >=
+                rt_tick_from_millisecond(SLAVE_POLL_MS)) {
+                slave_do_once();
+                g_last_dash = rt_tick_get();
+            }
         }
     }
 }
@@ -389,6 +443,48 @@ static void slave_do_actuator_write(rt_uint16_t reg, rt_uint16_t val)
     /* 返回值语义同 slave_exchange：0 成功 / 1 超时 / 2 CRC错 / 3 异常 / 4 发送失败。
      * 写失败不重试——本地镜像已同步，UI 靠镜像维持高亮，下一次操作会覆盖。 */
     slave_exchange(tx, sizeof(tx), rx, SLAVE_FRAME_MAX, &got);
+}
+
+/* D12x 本板数据 -> 从机 0x0400 中转区（FC16 写 5 个寄存器）。
+ * 仅在轮询线程调用（uart1 独占）。返回 slave_exchange 的 rc：
+ *   0 成功 / 1 超时 / 2 CRC错 / 3 异常 / 4 发送失败。
+ * 调用方据此决定：成功则清 pending、失败则指数退避、保留最新快照下窗口补。 */
+static int slave_do_d12x_write(void)
+{
+    rt_uint8_t  frame[7 + 2 * 5 + 2];
+    rt_uint8_t  rx[SLAVE_FRAME_MAX];
+    rt_uint16_t crc;
+    int         got;
+    int         rc;
+
+    frame[0] = DBG_SLAVE_ADDR;
+    frame[1] = MODBUS_FC_WRITE_MULTI_REGS;
+    put16(&frame[2], R_D12X_BASE);          /* 0x0400 结温 */
+    put16(&frame[4], 5);                     /* 5 个寄存器：temp/bat/cpu/mem/uptime */
+    frame[6] = (rt_uint8_t)(2 * 5);          /* byteCount = 10 */
+    put16(&frame[7],  (rt_uint16_t)g_d12x_snap.temp);   /* 强转保留 int16 位模式 */
+    put16(&frame[9],  g_d12x_snap.bat);
+    put16(&frame[11], g_d12x_snap.cpu);
+    put16(&frame[13], g_d12x_snap.mem);
+    put16(&frame[15], g_d12x_snap.uptime);
+    crc = dbg_modbus_crc16(frame, (rt_uint32_t)(7 + 2 * 5));
+    put_crc(&frame[17], crc);
+    rc = slave_exchange(frame, 19, rx, SLAVE_FRAME_MAX, &got);
+    return rc;
+}
+
+int dbg_slave_d12x_set(const dbg_d12x_snap_t *snap)
+{
+    if (snap == RT_NULL)
+        return -RT_EINVAL;
+#if DBG_SLAVE_LOOPBACK
+    return RT_EOK;                           /* 自测无 uart1，不写 */
+#else
+    /* 只更新最新快照 + 置 pending；轮询线程按退避节奏发出，不在此占用 uart1 */
+    g_d12x_snap = *snap;
+    g_d12x_pending = 1;
+    return RT_EOK;
+#endif
 }
 #endif /* !DBG_SLAVE_LOOPBACK */
 
@@ -518,6 +614,22 @@ int dbg_slave_rs485_get_result(dbg_rs485_result_t *out)
     if (out == RT_NULL)
         return -RT_ERROR;
     *out = g_rs485_result;
+    return RT_EOK;
+}
+
+int dbg_slave_rs485_set_last(const dbg_rs485_req_t *req)
+{
+    if (req == RT_NULL)
+        return -RT_EINVAL;
+    g_last_req = *req;
+    return RT_EOK;
+}
+
+int dbg_slave_rs485_get_last(dbg_rs485_req_t *out)
+{
+    if (out == RT_NULL)
+        return -RT_EINVAL;
+    *out = g_last_req;
     return RT_EOK;
 }
 
@@ -688,9 +800,21 @@ int dbg_slave_init(void)
 {
     rt_thread_t tid;
 
+    /* 最近请求默认值：addr=1 / reg=0 / FC03 读 1 寄存器。
+     * 这样在用户还没进扫描页配置前，示波 RS485 源也有一个合法目标可采样。 */
+    memset(&g_last_req, 0, sizeof(g_last_req));
+    g_last_req.func = MODBUS_FC_READ_HOLD_REGS;
+    g_last_req.addr = DBG_SLAVE_ADDR;
+    g_last_req.reg  = 0;
+    g_last_req.qty  = 1;
+
     rt_sem_init(&g_rs485_sem, "slv_rs", 0, RT_IPC_FLAG_FIFO);   /* 扫描事务信号量 */
     /* 执行器写信号量：LOOPBACK 下不使用，但仍初始化以免条件编译下漏掉 */
     rt_sem_init(&g_act_sem, "slv_act", 0, RT_IPC_FLAG_FIFO);
+    /* D12x 中转写不再用信号量：采集线程只更新快照，轮询线程按退避节奏发出 */
+    g_d12x_pending  = 0;
+    g_d12x_backoff  = rt_tick_from_millisecond(D12X_RETRY_MS_NORMAL);
+    g_d12x_next_try = 0;                     /* 下一个轮询周期即尝试 */
 
 #if !DBG_SLAVE_LOOPBACK
     struct serial_configure cfg = RT_SERIAL_CONFIG_DEFAULT;
@@ -707,6 +831,15 @@ int dbg_slave_init(void)
         rt_kprintf("dbg_slave: open %s failed\n", DBG_SLAVE_UART_NAME);
         return -RT_ERROR;
     }
+
+    /*
+     * uart1 同时是 console：若设备带 RT_DEVICE_FLAG_STREAM，串口驱动会把发出的
+     * 0x0A('\n') 字节扩写成 0x0D 0x0A（serial.c 的 \n->\r\n 转换）。Modbus 帧里含
+     * 0x0A 的字节（典型如 FC16 写多寄存器的 byteCount=0x0A）会被撑成两字节，整帧
+     * 错位、从机 CRC 校验失败。这里清掉该标志，保证二进制帧原样发出。
+     * 代价：console 输出不再自动回车，仅影响串口调试观感，不影响 LCD / Modbus。
+     */
+    g_dev->open_flag &= ~RT_DEVICE_FLAG_STREAM;
 
     cfg.baud_rate = DBG_SLAVE_BAUD;
     if (rt_device_control(g_dev, RT_DEVICE_CTRL_CONFIG, &cfg) != RT_EOK) {

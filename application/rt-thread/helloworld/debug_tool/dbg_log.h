@@ -66,4 +66,22 @@ const char *dbg_log_path(void);
  * ------------------------------------------------------------------------- */
 void dbg_log_on_data(const rt_uint8_t *data, rt_uint16_t len);
 
+/* ---------------------------------------------------------------------------
+ * 回放（第 4 步）：列出 /sdcard 下已录 CSV，并解析指定文件为温度/湿度/光照波形点。
+ * 所有文件 I/O 仍在此模块内完成，调用方（UI 线程）只是拿点数组去画，不碰卡。
+ * CSV 列（见 dbg_log.c 表头）：t_s,temp_C,humi_pct,lux,ps,acc_x..gyro_z
+ * ------------------------------------------------------------------------- */
+typedef struct {
+    rt_uint32_t t_s;    /* 相对秒 */
+    float       temp;   /* ℃   */
+    float       humi;   /* %RH */
+    float       lux;    /* lx  */
+} dbg_replay_point_t;
+
+/* 列出 CSV 文件名（仅文件名，不含路径），names 为 max 个长度 24 的缓冲；返回文件数 */
+int dbg_log_list_csv(char (*names)[24], int max);
+
+/* 解析指定文件名（仅文件名，自动拼 /sdcard/），填充 pts（最多 max_pts），返回点数；失败 -1 */
+int dbg_log_replay(const char *name, dbg_replay_point_t *pts, int max_pts);
+
 #endif /* __DBG_LOG_H__ */

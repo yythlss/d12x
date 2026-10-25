@@ -18,16 +18,26 @@
 #include "dbg_slave.h"
 #include "dbg_log.h"
 #include "ui_main_screen.h"
+#include "dbg_theme.h"
 
-/* 配色（与各功能页保持一致的主题体系） */
-#define CLR_TITLE_BAR   lv_color_hex(0x1D9E75)  /* 青绿 */
-#define CLR_BG          lv_color_hex(0xF0F3F7)
-#define CLR_CARD_BG     lv_color_hex(0xFFFFFF)
-#define CLR_TEXT_WHITE  lv_color_hex(0xFFFFFF)
-#define CLR_TEXT_DARK   lv_color_hex(0x333A45)
-#define CLR_MUTED       lv_color_hex(0x8A93A1)
-#define CLR_OK          lv_color_hex(0x2E8B57)
-#define CLR_ERR         lv_color_hex(0xC0392B)
+/* 页面强调色：从机青绿（日/夜两版） */
+#define CLR_ACC_SLAVE_DAY     0x1D9E75
+#define CLR_ACC_SLAVE_NIGHT   0x28B489
+
+/*
+ * 状态色：不再写死。这些颜色是运行时按状态切换的（联动 OK / 断线 ERR），
+ * 不走 track 机制的动态角色，所以显式给出日夜两版。
+ */
+#define CLR_OK_DAY      0x2E8B57
+#define CLR_OK_NIGHT    0x3FA76A
+#define CLR_ERR_DAY     0xC0392B
+#define CLR_ERR_NIGHT   0xD45B45
+
+static uint32_t clr_ok(void)   { return dbg_theme_is_night() ? CLR_OK_NIGHT  : CLR_OK_DAY; }
+static uint32_t clr_err(void)  { return dbg_theme_is_night() ? CLR_ERR_NIGHT : CLR_ERR_DAY; }
+static uint32_t clr_card(void) { return dbg_theme_get()->card_bg; }
+static uint32_t clr_text(void) { return dbg_theme_get()->text; }
+static uint32_t clr_title_text(void) { return dbg_theme_get()->title_text; }
 
 #define HEADER_H        48
 #define PAD             10
@@ -100,17 +110,16 @@ static lv_obj_t *create_card(lv_obj_t *parent, int x, int y, int w, int h,
 
     lv_obj_set_size(card, w, h);
     lv_obj_set_pos(card, x, y);
-    lv_obj_set_style_bg_color(card, CLR_CARD_BG, 0);
-    lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+    dbg_theme_track_bg(card, DBG_C_CARD);
     lv_obj_set_style_radius(card, 12, 0);
     lv_obj_set_style_border_width(card, 0, 0);
     lv_obj_set_style_shadow_width(card, 10, 0);
-    lv_obj_set_style_shadow_opa(card, LV_OPA_20, 0);
+    lv_obj_set_style_shadow_opa(card, (lv_opa_t)dbg_theme_get()->shadow_opa, 0);
     lv_obj_set_style_pad_all(card, 10, 0);
 
     lv_obj_t *t = lv_label_create(card);
     lv_label_set_text(t, title);
-    lv_obj_set_style_text_color(t, CLR_MUTED, 0);
+    dbg_theme_track_text(t, DBG_C_DIM);
     lv_obj_align(t, LV_ALIGN_TOP_LEFT, 0, 0);
 
     return card;
@@ -122,7 +131,7 @@ static lv_obj_t *add_row(lv_obj_t *card, lv_obj_t *ref, const char *text)
     lv_obj_t *l = lv_label_create(card);
 
     lv_label_set_text(l, text);
-    lv_obj_set_style_text_color(l, CLR_TEXT_DARK, 0);
+    dbg_theme_track_text(l, DBG_C_TEXT);
     if (ref == NULL)
         lv_obj_align(l, LV_ALIGN_TOP_LEFT, 2, 24);
     else
@@ -144,11 +153,11 @@ static void actuator_toggle_cb(lv_event_t *e)
     dbg_slave_write_reg(R_DO_CTRL, v);
 
     if (v & bit) {
-        lv_obj_set_style_bg_color(btn, CLR_OK, 0);
-        lv_obj_set_style_text_color(lbl, CLR_TEXT_WHITE, 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(clr_ok()), 0);
+        lv_obj_set_style_text_color(lbl, lv_color_hex(clr_title_text()), 0);
     } else {
-        lv_obj_set_style_bg_color(btn, CLR_CARD_BG, 0);
-        lv_obj_set_style_text_color(lbl, CLR_TEXT_DARK, 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(clr_card()), 0);
+        lv_obj_set_style_text_color(lbl, lv_color_hex(clr_text()), 0);
     }
 }
 
@@ -197,13 +206,15 @@ static void ui_fx_sync(void)
         /* 非纯色模式把 FX 按钮点亮，一眼能看出灯效正在跑 */
         if (mode != DBG_FX_SOLID)
         {
-            lv_obj_set_style_bg_color(g_btn_fx, CLR_OK, 0);
-            lv_obj_set_style_text_color(lv_obj_get_child(g_btn_fx, 0), CLR_TEXT_WHITE, 0);
+            lv_obj_set_style_bg_color(g_btn_fx, lv_color_hex(clr_ok()), 0);
+            lv_obj_set_style_text_color(lv_obj_get_child(g_btn_fx, 0),
+                                        lv_color_hex(clr_title_text()), 0);
         }
         else
         {
-            lv_obj_set_style_bg_color(g_btn_fx, CLR_CARD_BG, 0);
-            lv_obj_set_style_text_color(lv_obj_get_child(g_btn_fx, 0), CLR_TEXT_DARK, 0);
+            lv_obj_set_style_bg_color(g_btn_fx, lv_color_hex(clr_card()), 0);
+            lv_obj_set_style_text_color(lv_obj_get_child(g_btn_fx, 0),
+                                        lv_color_hex(clr_text()), 0);
         }
     }
 
@@ -264,9 +275,9 @@ static lv_obj_t *act_btn(lv_obj_t *parent, const char *label, int w,
     lv_obj_set_style_min_width(btn, w, 0);                       /* 调用方 w 作最小宽度（保持方块/留白） */
     lv_obj_set_style_pad_hor(btn, 6, 0);                         /* 左右留白，文字不贴边 */
     lv_obj_center(lbl);
-    lv_obj_set_style_bg_color(btn, CLR_CARD_BG, 0);
+    lv_obj_set_style_bg_color(btn, lv_color_hex(clr_card()), 0);
     lv_obj_set_style_radius(btn, 6, 0);
-    lv_obj_set_style_text_color(lbl, CLR_TEXT_DARK, 0);
+    lv_obj_set_style_text_color(lbl, lv_color_hex(clr_text()), 0);
     lv_obj_add_event_cb(btn, cb, LV_EVENT_CLICKED, user_data);
     return btn;
 }
@@ -274,11 +285,13 @@ static lv_obj_t *act_btn(lv_obj_t *parent, const char *label, int w,
 static void act_highlight(lv_obj_t *btn, int on)
 {
     if (on) {
-        lv_obj_set_style_bg_color(btn, CLR_OK, 0);
-        lv_obj_set_style_text_color(lv_obj_get_child(btn, 0), CLR_TEXT_WHITE, 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(clr_ok()), 0);
+        lv_obj_set_style_text_color(lv_obj_get_child(btn, 0),
+                                    lv_color_hex(clr_title_text()), 0);
     } else {
-        lv_obj_set_style_bg_color(btn, CLR_CARD_BG, 0);
-        lv_obj_set_style_text_color(lv_obj_get_child(btn, 0), CLR_TEXT_DARK, 0);
+        lv_obj_set_style_bg_color(btn, lv_color_hex(clr_card()), 0);
+        lv_obj_set_style_text_color(lv_obj_get_child(btn, 0),
+                                    lv_color_hex(clr_text()), 0);
     }
 }
 
@@ -341,16 +354,16 @@ static void ui_rec_sync(void)
 
     if (st == DBG_LOG_ST_RUNNING) {
         lv_label_set_text(g_lbl_rec, "STOP");
-        lv_obj_set_style_bg_color(g_btn_rec, CLR_OK, 0);
-        lv_obj_set_style_text_color(g_lbl_rec, CLR_TEXT_WHITE, 0);
+        lv_obj_set_style_bg_color(g_btn_rec, lv_color_hex(clr_ok()), 0);
+        lv_obj_set_style_text_color(g_lbl_rec, lv_color_hex(clr_title_text()), 0);
     } else if (st == DBG_LOG_ST_NOCARD) {
         lv_label_set_text(g_lbl_rec, "NO SD");
-        lv_obj_set_style_bg_color(g_btn_rec, CLR_ERR, 0);
-        lv_obj_set_style_text_color(g_lbl_rec, CLR_TEXT_WHITE, 0);
+        lv_obj_set_style_bg_color(g_btn_rec, lv_color_hex(clr_err()), 0);
+        lv_obj_set_style_text_color(g_lbl_rec, lv_color_hex(clr_title_text()), 0);
     } else {
         lv_label_set_text(g_lbl_rec, "REC");
-        lv_obj_set_style_bg_color(g_btn_rec, CLR_CARD_BG, 0);
-        lv_obj_set_style_text_color(g_lbl_rec, CLR_TEXT_DARK, 0);
+        lv_obj_set_style_bg_color(g_btn_rec, lv_color_hex(clr_card()), 0);
+        lv_obj_set_style_text_color(g_lbl_rec, lv_color_hex(clr_text()), 0);
     }
 
     if (st != DBG_LOG_ST_RUNNING)
@@ -371,6 +384,38 @@ static void slave_back_cb(lv_event_t *e)
     lv_screen_load_anim(ui_main_screen_get(), LV_SCR_LOAD_ANIM_MOVE_RIGHT, 300, 0, 0);
 }
 
+/*
+ * 主题刷新的「动态补刀」：
+ * dbg_theme_repaint() 只能处理登记过的静态角色，而本页有一批颜色是
+ * 「运行时按状态切换」的（R/G/B 高亮、灯效点亮、REC/STOP/NO SD、链路状态），
+ * 它们不在 track 表内，需要在这里按当前状态重新派色一次。
+ */
+static void slave_apply_theme(void)
+{
+    rt_uint16_t v = dbg_slave_get_do_ctrl();
+
+    if (g_screen == NULL)
+        return;
+
+    act_highlight(g_btn_r,    (v & DO_BIT_R)    ? 1 : 0);
+    act_highlight(g_btn_g,    (v & DO_BIT_G)    ? 1 : 0);
+    act_highlight(g_btn_b,    (v & DO_BIT_B)    ? 1 : 0);
+    act_highlight(g_btn_beep, (v & DO_BIT_BEEP) ? 1 : 0);
+
+    ui_fx_sync();      /* 内含「非纯色灯效时点亮 FX 按钮」的派色 */
+    ui_rec_sync();     /* 内含 REC/STOP/NO SD 三态派色 */
+
+    /* 标题栏两个按钮的描边用「标题栏浅色」，跟着 title_text 走 */
+    if (g_btn_rec != NULL)
+        lv_obj_set_style_border_color(g_btn_rec,
+                                      lv_color_hex(clr_title_text()), 0);
+
+    /* 链路状态色由下一次数据刷新重新决定；这里先退回中性色，
+     * 避免切主题后旧的高对比色留在屏幕上。 */
+    if (g_lbl_status != NULL)
+        dbg_theme_track_text(g_lbl_status, DBG_C_DIM);
+}
+
 lv_obj_t *ui_slave_screen_create(void)
 {
     lv_obj_t *head, *title, *btn, *btn_lbl, *cardA, *cardB, *cardC;
@@ -381,36 +426,36 @@ lv_obj_t *ui_slave_screen_create(void)
     if (g_screen != NULL)
         return g_screen;
 
+    dbg_theme_set_page_accent(CLR_ACC_SLAVE_DAY, CLR_ACC_SLAVE_NIGHT);
+
     g_screen = lv_obj_create(NULL);
     lv_obj_set_size(g_screen, screen_w, screen_h);
-    lv_obj_set_style_bg_color(g_screen, CLR_BG, 0);
-    lv_obj_set_style_bg_opa(g_screen, LV_OPA_COVER, 0);
+    dbg_theme_track_bg(g_screen, DBG_C_BG);
 
     /* 标题栏 */
     head = lv_obj_create(g_screen);
     lv_obj_set_size(head, screen_w, HEADER_H);
     lv_obj_align(head, LV_ALIGN_TOP_MID, 0, 0);
-    lv_obj_set_style_bg_color(head, CLR_TITLE_BAR, 0);
-    lv_obj_set_style_bg_opa(head, LV_OPA_COVER, 0);
+    dbg_theme_track_bg(head, DBG_C_ACCENT);
     lv_obj_set_style_radius(head, 0, 0);
     lv_obj_set_style_border_width(head, 0, 0);
 
     title = lv_label_create(head);
     lv_label_set_text(title, "Slave Monitor");
-    lv_obj_set_style_text_color(title, CLR_TEXT_WHITE, 0);
+    dbg_theme_track_text(title, DBG_C_TITLE_TEXT);
     lv_obj_center(title);
 
     btn = lv_button_create(head);
     lv_obj_set_size(btn, 64, 34);
     lv_obj_align(btn, LV_ALIGN_LEFT_MID, 6, 0);
-    lv_obj_set_style_bg_color(btn, CLR_TITLE_BAR, 0);
+    dbg_theme_track_bg(btn, DBG_C_ACCENT);
     lv_obj_set_style_border_width(btn, 1, 0);
-    lv_obj_set_style_border_color(btn, CLR_TEXT_WHITE, 0);
+    lv_obj_set_style_border_color(btn, lv_color_hex(clr_title_text()), 0);
     lv_obj_add_event_cb(btn, slave_back_cb, LV_EVENT_CLICKED, NULL);
 
     btn_lbl = lv_label_create(btn);
     lv_label_set_text(btn_lbl, "< Back");
-    lv_obj_set_style_text_color(btn_lbl, CLR_TEXT_WHITE, 0);
+    dbg_theme_track_text(btn_lbl, DBG_C_TITLE_TEXT);
     lv_obj_center(btn_lbl);
 
     /* 标题栏右侧：CSV 记录（第 8 步）。
@@ -419,20 +464,18 @@ lv_obj_t *ui_slave_screen_create(void)
     lv_label_set_text(g_lbl_rows, "");
     lv_obj_set_size(g_lbl_rows, 60, 34);
     lv_obj_align(g_lbl_rows, LV_ALIGN_RIGHT_MID, -70, 0);
-    lv_obj_set_style_text_color(g_lbl_rows, CLR_TEXT_WHITE, 0);
+    dbg_theme_track_text(g_lbl_rows, DBG_C_TITLE_TEXT);
     lv_obj_set_style_text_align(g_lbl_rows, LV_TEXT_ALIGN_RIGHT, 0);
 
     g_btn_rec = lv_button_create(head);
     lv_obj_set_size(g_btn_rec, 56, 34);
     lv_obj_align(g_btn_rec, LV_ALIGN_RIGHT_MID, -6, 0);
-    lv_obj_set_style_bg_color(g_btn_rec, CLR_CARD_BG, 0);
     lv_obj_set_style_border_width(g_btn_rec, 1, 0);
-    lv_obj_set_style_border_color(g_btn_rec, CLR_TEXT_WHITE, 0);
+    lv_obj_set_style_border_color(g_btn_rec, lv_color_hex(clr_title_text()), 0);
     lv_obj_add_event_cb(g_btn_rec, rec_btn_cb, LV_EVENT_CLICKED, NULL);
 
     g_lbl_rec = lv_label_create(g_btn_rec);
     lv_label_set_text(g_lbl_rec, "REC");
-    lv_obj_set_style_text_color(g_lbl_rec, CLR_TEXT_DARK, 0);
     lv_obj_center(g_lbl_rec);
 
     /* 可用区域划分 */
@@ -471,9 +514,11 @@ lv_obj_t *ui_slave_screen_create(void)
     lv_label_set_text(g_lbl_status, "HB --   UP -- s   waiting...");
     lv_obj_set_size(g_lbl_status, full_w, STATUS_H);
     lv_obj_set_pos(g_lbl_status, PAD, status_y);
-    lv_obj_set_style_text_color(g_lbl_status, CLR_MUTED, 0);
+    dbg_theme_track_text(g_lbl_status, DBG_C_DIM);
 
     ui_rec_sync();      /* 第 8 步：按钮初始态（待机 = 灰色 REC） */
+
+    dbg_theme_register(slave_apply_theme);
 
     return g_screen;
 }
@@ -499,7 +544,7 @@ void ui_slave_on_data(const rt_uint8_t *data, rt_uint16_t len)
         default: txt = "HB --    slave exception";      break;
         }
         lv_label_set_text(g_lbl_status, txt);
-        lv_obj_set_style_text_color(g_lbl_status, CLR_ERR, 0);
+        lv_obj_set_style_text_color(g_lbl_status, lv_color_hex(clr_err()), 0);
         return;
     }
 
@@ -541,7 +586,7 @@ void ui_slave_on_data(const rt_uint8_t *data, rt_uint16_t len)
                 "");
 #endif
     lv_label_set_text(g_lbl_status, buf);
-    lv_obj_set_style_text_color(g_lbl_status, CLR_OK, 0);
+    lv_obj_set_style_text_color(g_lbl_status, lv_color_hex(clr_ok()), 0);
 
     /* 第 8 步：记录中则刷新已写行数（只读一个计数，不做文件 IO） */
     if (g_lbl_rows != NULL && dbg_log_state() == DBG_LOG_ST_RUNNING)

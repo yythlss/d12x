@@ -24,6 +24,8 @@
 #include <dfs_posix.h>
 #include <fcntl.h>
 #include <dfs_fs.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #include "dbg_log.h"
 #include "dbg_slave.h"
@@ -381,4 +383,97 @@ void dbg_log_on_data(const rt_uint8_t *data, rt_uint16_t len)
     slot = RING_SLOT(g_widx);
     memcpy(g_ring.buf[slot], data, SLAVE_PKT_LEN);
     g_widx++;
+}
+
+/* --------------------------------------------------------------------------- 回放（第 4 步）
+ * 列出 /sdcard 下所有 *.csv；解析指定文件为温度/湿度/光照波形点。
+ * 全部文件 I/O 在此函数内完成（调用方通常是 UI 线程），不卡界面。 */
+int dbg_log_list_csv(char (*names)[24], int max)
+{
+    DIR *d;
+    struct dirent *e;
+    int n = 0;
+
+    if (names == RT_NULL || max <= 0)
+        return 0;
+
+    d = opendir(DBG_LOG_MOUNT_POINT);
+    if (d == RT_NULL)
+        return 0;
+
+    while ((e = readdir(d)) != RT_NULL && n < max) {
+        int len = (int)strlen(e->d_name);
+        if (len > 4 && strcmp(e->d_name + len - 4, ".csv") == 0) {
+            strncpy(names[n], e->d_name, 23);
+            names[n][23] = '\0';
+            n++;
+        }
+    }
+    closedir(d);
+    return n;
+}
+
+int dbg_log_replay(const char *name, dbg_replay_point_t *pts, int max_pts)
+{
+    char        path[64];
+    int         fd;
+    struct stat st;
+    rt_uint8_t *buf;
+    long        sz, rd, i;
+    int         n = 0, line_no = 0;
+
+    if (name == RT_NULL || pts == RT_NULL || max_pts <= 0)
+        return -1;
+
+    rt_snprintf(path, sizeof(path), DBG_LOG_MOUNT_POINT "/%s", name);
+    fd = open(path, O_RDONLY);
+    if (fd < 0)
+        return -1;
+    if (fstat(fd, &st) != 0 || st.st_size <= 0) {
+        close(fd);
+        return 0;
+    }
+    sz = st.st_size;
+    buf = rt_malloc((rt_size_t)sz + 1);
+    if (buf == RT_NULL) {
+        close(fd);
+        return -1;
+    }
+    rd = read(fd, buf, (size_t)sz);
+    close(fd);
+    if (rd <= 0) {
+        rt_free(buf);
+        return 0;
+    }
+    buf[rd] = '\0';
+
+    /* 逐行解析，跳过首行表头 */
+    i = 0;
+    while (i < rd && n < max_pts) {
+        long e = i;
+        while (e < rd && buf[e] != '\n' && buf[e] != '\r')
+            e++;
+        buf[e] = '\0';                     /* 截断当前行 */
+
+        if (line_no > 0) {                 /* 第 0 行是表头 */
+            int         t, ax, ay, az, gx, gy, gz;
+            unsigned    ps;
+            float       temp, humi, lux;
+            if (sscanf((char *)&buf[i], "%d,%f,%f,%f,%u,%d,%d,%d,%d,%d,%d",
+                       &t, &temp, &humi, &lux, &ps,
+                       &ax, &ay, &az, &gx, &gy, &gz) == 11) {
+                pts[n].t_s  = (rt_uint32_t)t;
+                pts[n].temp = temp;
+                pts[n].humi = humi;
+                pts[n].lux  = lux;
+                n++;
+            }
+        }
+        line_no++;
+        i = e + 1;
+        while (i < rd && (buf[i] == '\n' || buf[i] == '\r'))
+            i++;
+    }
+    rt_free(buf);
+    return n;
 }

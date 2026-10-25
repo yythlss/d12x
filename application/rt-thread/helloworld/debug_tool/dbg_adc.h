@@ -24,6 +24,7 @@
 /* 数据源选择 */
 #define DBG_ADC_SRC_SYNTH   0   /* 软件信号发生器（无硬件可验证） */
 #define DBG_ADC_SRC_GPAI    1   /* 片内 GPAI 真实采集 */
+#define DBG_ADC_SRC_RS485   2   /* RS485 工业总线：经星火一号网关周期读保持寄存器 */
 
 /* DBG_MSG_ADC_VAL 消息打包格式：
  *   data[0] = 数据源(DBG_ADC_SRC_*)  + 高 4 位保留
@@ -63,8 +64,26 @@ int  dbg_adc_run(int on);
 /* 当前是否在采集 */
 int  dbg_adc_is_running(void);
 
-/* 查询当前数据源名称（"SYNTH" / "GPAI"） */
+/* 查询当前数据源名称（"SYNTH" / "GPAI" / "RS485"） */
 const char *dbg_adc_source_name(void);
+
+/* GPAI 是否可用（驱动已编译且设备已注册）。RS485 源不依赖 GPAI，恒可用。 */
+int dbg_adc_gpai_available(void);
+
+/*
+ * RS485 数据源：示波页把「最近一次 RS485 扫描请求」（由扫描页 UI 配置，见
+ * dbg_slave_rs485_get_last）当作采样目标，周期读其中第一个保持寄存器的值作为
+ * 一个波形样本。通道(CH0..CH5)在此模式下偏移寄存器地址(reg+chan)，便于看某段连续
+ * 寄存器随时间的波形。
+ *
+ * 仅在示波页前台(dbg_adc_rs485_active(1))且数据源为 RS485 时才发请求，避免
+ * 持续占用 uart1 把仪表盘轮询饿死。
+ */
+void dbg_adc_rs485_active(int on);
+
+/* 由消息总线在收到 DBG_MSG_RS485_RESULT 时调用；自带 pending 守卫，只消费示波
+ * 自己发出的请求，不会误吞扫描页的结果。 */
+void dbg_adc_on_rs485_result(void);
 
 /* 线程安全地读取指定 GPAI 通道电压（mV）。
  * 与示波采样线程共用同一把锁，避免两个线程并发 drain 同一个 gpai 设备
